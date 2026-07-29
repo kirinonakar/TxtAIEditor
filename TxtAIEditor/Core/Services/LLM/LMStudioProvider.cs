@@ -64,13 +64,42 @@ namespace TxtAIEditor.Core.Services.LLM
                     {
                         var root = doc.RootElement;
                         await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
-                        if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                        if (root.TryGetProperty("choices", out var choices) &&
+                            choices.ValueKind == JsonValueKind.Array &&
+                            choices.GetArrayLength() > 0)
                         {
                             var firstChoice = choices[0];
-                            if (firstChoice.TryGetProperty("message", out var message) &&
-                                message.TryGetProperty("content", out var content))
+                            if (firstChoice.TryGetProperty("message", out var message))
                             {
-                                return content.GetString() ?? string.Empty;
+                                if (message.TryGetProperty("content", out var content) &&
+                                    content.ValueKind == JsonValueKind.String)
+                                {
+                                    string? contentText = content.GetString();
+                                    if (!string.IsNullOrEmpty(contentText))
+                                    {
+                                        return contentText;
+                                    }
+                                }
+
+                                if (message.TryGetProperty("reasoning_content", out var reasoningContent) &&
+                                    reasoningContent.ValueKind == JsonValueKind.String)
+                                {
+                                    string? reasoningText = reasoningContent.GetString();
+                                    if (!string.IsNullOrEmpty(reasoningText))
+                                    {
+                                        return reasoningText;
+                                    }
+                                }
+
+                                if (message.TryGetProperty("reasoning", out var reasoning) &&
+                                    reasoning.ValueKind == JsonValueKind.String)
+                                {
+                                    string? reasoningText = reasoning.GetString();
+                                    if (!string.IsNullOrEmpty(reasoningText))
+                                    {
+                                        return reasoningText;
+                                    }
+                                }
                             }
                         }
                     }
@@ -139,17 +168,43 @@ namespace TxtAIEditor.Core.Services.LLM
                                 {
                                     var root = doc.RootElement;
                                     await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
-                                    if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                                    if (root.TryGetProperty("choices", out var choices) &&
+                                        choices.ValueKind == JsonValueKind.Array &&
+                                        choices.GetArrayLength() > 0)
                                     {
                                         var firstChoice = choices[0];
-                                        if (firstChoice.TryGetProperty("delta", out var delta) &&
-                                            delta.TryGetProperty("content", out var content))
+                                        if (firstChoice.TryGetProperty("delta", out var delta))
                                         {
-                                            string? text = content.GetString();
-                                            if (!string.IsNullOrEmpty(text))
+                                            if (delta.TryGetProperty("content", out var content) &&
+                                                content.ValueKind == JsonValueKind.String)
                                             {
-                                                cancellationToken.ThrowIfCancellationRequested();
-                                                await onChunk(text);
+                                                string? text = content.GetString();
+                                                if (!string.IsNullOrEmpty(text))
+                                                {
+                                                    cancellationToken.ThrowIfCancellationRequested();
+                                                    await onChunk(text);
+                                                }
+                                            }
+
+                                            if (onReasoning != null)
+                                            {
+                                                string? reasoningText = null;
+                                                if (delta.TryGetProperty("reasoning_content", out var reasoningContent) &&
+                                                    reasoningContent.ValueKind == JsonValueKind.String)
+                                                {
+                                                    reasoningText = reasoningContent.GetString();
+                                                }
+                                                else if (delta.TryGetProperty("reasoning", out var reasoning) &&
+                                                         reasoning.ValueKind == JsonValueKind.String)
+                                                {
+                                                    reasoningText = reasoning.GetString();
+                                                }
+
+                                                if (!string.IsNullOrEmpty(reasoningText))
+                                                {
+                                                    cancellationToken.ThrowIfCancellationRequested();
+                                                    await onReasoning(reasoningText);
+                                                }
                                             }
                                         }
                                     }
