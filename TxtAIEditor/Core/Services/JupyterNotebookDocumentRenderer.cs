@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -16,7 +17,7 @@ namespace TxtAIEditor.Core.Services
             _getString = getString;
         }
 
-        internal string Render(NotebookDocument doc, string filePath)
+        internal string Render(NotebookDocument doc, string filePath, EditorSettings? settings = null)
         {
             string fileName = Path.GetFileName(filePath);
             string dirPath = Path.GetDirectoryName(filePath) ?? string.Empty;
@@ -105,6 +106,7 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine($"window.__notebookPath = {JsonSerializer.Serialize(filePath)};");
             sb.AppendLine($"window.__notebookDir = {JsonSerializer.Serialize(dirPath)};");
             sb.AppendLine($"window.__notebookStrings = {BuildNotebookStringsJson()};");
+            sb.AppendLine($"window.__notebookSettings = {JsonSerializer.Serialize(new { autocompleteOnEnter = settings?.AutocompleteOnEnter ?? true, autocompleteOnTab = settings?.AutocompleteOnTab ?? true })};");
             sb.AppendLine(JupyterNotebookViewerScripts.GetJavaScript());
             sb.AppendLine("</script>");
             sb.AppendLine("</body>");

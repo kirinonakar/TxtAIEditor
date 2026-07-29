@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -17,7 +18,7 @@ namespace TxtAIEditor.Core.Services
             _renderer = new JupyterNotebookDocumentRenderer(getString);
         }
 
-        public async Task<string> BuildHtmlAsync(string filePath)
+        public async Task<string> BuildHtmlAsync(string filePath, EditorSettings? settings = null)
         {
             string json;
             try
@@ -45,7 +46,7 @@ namespace TxtAIEditor.Core.Services
                 return BuildErrorHtml(_getString("JupyterNotebookInvalid", "Invalid Jupyter notebook format."));
             }
 
-            return _renderer.Render(doc, filePath);
+            return _renderer.Render(doc, filePath, settings);
         }
 
         private string BuildErrorHtml(string message)

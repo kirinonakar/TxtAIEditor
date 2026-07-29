@@ -181,6 +181,22 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public async Task ApplySettingsAsync(EditorSettings settings)
+        {
+            if (settings == null) return;
+            string optionsJson = JsonSerializer.Serialize(new
+            {
+                autocompleteOnEnter = settings.AutocompleteOnEnter,
+                autocompleteOnTab = settings.AutocompleteOnTab
+            });
+            string script = $"window.__updateNotebookOptions && window.__updateNotebookOptions({optionsJson});";
+
+            foreach (NotebookSession session in _sessions.Values)
+            {
+                await ExecuteScriptSafeAsync(session.WebView, script);
+            }
+        }
+
         private async Task InitializeAsync(OpenedTab tab, NotebookSession session)
         {
             try
@@ -662,7 +678,7 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                string html = await _viewerService.BuildHtmlAsync(tab.FilePath);
+                string html = await _viewerService.BuildHtmlAsync(tab.FilePath, _settingsService.CurrentSettings);
                 string htmlPath = await WriteViewerHtmlAsync(session, html);
                 session.WebView.Source = new Uri(htmlPath, UriKind.Absolute);
             }

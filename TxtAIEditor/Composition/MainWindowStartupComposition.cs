@@ -113,6 +113,7 @@ namespace TxtAIEditor.Composition
                 tabDirtyState,
                 pdfViewer,
                 officeDocumentViewer,
+                notebookViewer,
                 statusBar,
                 livePreview,
                 llmAssistant,

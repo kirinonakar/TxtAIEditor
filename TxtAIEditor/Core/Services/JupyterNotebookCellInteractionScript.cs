@@ -14,7 +14,9 @@ namespace TxtAIEditor.Core.Services
         wordStart: 0,
         wordEnd: 0,
         caretOffset: 0,
-        word: ''
+        word: '',
+        autocompleteOnEnter: typeof window !== 'undefined' && window.__notebookSettings ? window.__notebookSettings.autocompleteOnEnter !== false : true,
+        autocompleteOnTab: typeof window !== 'undefined' && window.__notebookSettings ? window.__notebookSettings.autocompleteOnTab !== false : true
     };
 
     const pyKeywords = [
@@ -144,6 +146,10 @@ namespace TxtAIEditor.Core.Services
             hideNbAutocomplete();
             return;
         }
+        if (!nbAutocompleteState.autocompleteOnEnter && !nbAutocompleteState.autocompleteOnTab) {
+            hideNbAutocomplete();
+            return;
+        }
         const info = getWordUnderCaretInEditor(editor);
         if (!info || !info.word || info.word.length < 1) {
             hideNbAutocomplete();
@@ -167,6 +173,19 @@ namespace TxtAIEditor.Core.Services
 
         renderNbAutocomplete();
     }
+
+    window.__updateNotebookOptions = function(opts) {
+        if (!opts) return;
+        if (opts.hasOwnProperty('autocompleteOnEnter')) {
+            nbAutocompleteState.autocompleteOnEnter = !!opts.autocompleteOnEnter;
+        }
+        if (opts.hasOwnProperty('autocompleteOnTab')) {
+            nbAutocompleteState.autocompleteOnTab = !!opts.autocompleteOnTab;
+        }
+        if (!nbAutocompleteState.autocompleteOnEnter && !nbAutocompleteState.autocompleteOnTab) {
+            hideNbAutocomplete();
+        }
+    };
 
     function hideNbAutocomplete() {
         nbAutocompleteState.isOpen = false;
@@ -1581,11 +1600,25 @@ namespace TxtAIEditor.Core.Services
                 moveNbAutocompleteIndex(-1);
                 return;
             }
-            if (e.key === 'Enter' || e.key === 'Tab') {
-                e.preventDefault();
-                e.stopPropagation();
-                insertSelectedNbCandidate();
-                return;
+            if (e.key === 'Enter') {
+                if (nbAutocompleteState.autocompleteOnEnter) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    insertSelectedNbCandidate();
+                    return;
+                } else {
+                    hideNbAutocomplete();
+                }
+            }
+            if (e.key === 'Tab') {
+                if (nbAutocompleteState.autocompleteOnTab) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    insertSelectedNbCandidate();
+                    return;
+                } else {
+                    hideNbAutocomplete();
+                }
             }
             if (e.key === 'Escape') {
                 e.preventDefault();

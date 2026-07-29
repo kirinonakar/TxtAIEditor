@@ -38,6 +38,7 @@ namespace TxtAIEditor.Controls
         private readonly TabDirtyStateController _tabDirtyStateController;
         private readonly PdfViewerController _pdfViewerController;
         private readonly OfficeDocumentViewerController _officeDocumentViewerController;
+        private readonly JupyterNotebookViewerController? _notebookViewerController;
         private readonly StatusBarController _statusBarController;
         private readonly LivePreviewController _livePreviewController;
         private readonly LlmAssistantController _llmAssistantController;
@@ -78,6 +79,7 @@ namespace TxtAIEditor.Controls
             TabDirtyStateController tabDirtyStateController,
             PdfViewerController pdfViewerController,
             OfficeDocumentViewerController officeDocumentViewerController,
+            JupyterNotebookViewerController? notebookViewerController,
             StatusBarController statusBarController,
             LivePreviewController livePreviewController,
             LlmAssistantController llmAssistantController,
@@ -117,6 +119,7 @@ namespace TxtAIEditor.Controls
             _tabDirtyStateController = tabDirtyStateController;
             _pdfViewerController = pdfViewerController;
             _officeDocumentViewerController = officeDocumentViewerController;
+            _notebookViewerController = notebookViewerController;
             _statusBarController = statusBarController;
             _livePreviewController = livePreviewController;
             _llmAssistantController = llmAssistantController;
@@ -248,6 +251,11 @@ namespace TxtAIEditor.Controls
                 {
                     grp.WebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(CreateEditorOptionsMessage(settings)));
                 }
+            }
+
+            if (_notebookViewerController != null)
+            {
+                await _notebookViewerController.ApplySettingsAsync(settings);
             }
         }
 
