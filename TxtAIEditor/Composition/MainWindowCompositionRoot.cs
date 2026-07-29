@@ -38,11 +38,9 @@ namespace TxtAIEditor.Composition
                 moduleBindings.ShellPane.ApplyLeftSidebarVisibility(show);
 
             void ApplyPreviewVisibility(bool show) =>
-                MainWindowLayoutOperations.ApplyPreviewVisibility(
+                moduleBindings.ApplyPreviewVisibility(
                     show,
-                    moduleBindings.ShellPane,
-                    lifecycleFacade.IsStartupInitializationComplete,
-                    moduleBindings.LivePreview);
+                    lifecycleFacade.IsStartupInitializationComplete);
 
             Task ToggleLeftPanelAsync() =>
                 moduleBindings.ShellPane.ToggleLeftPanelAsync();
@@ -85,18 +83,9 @@ namespace TxtAIEditor.Composition
                 () => moduleBindings.ToolbarCommand,
                 ToggleLeftPanelAsync,
                 ToggleRightPanelAsync,
-                () => moduleBindings.ExplorerNavigation.SetTreeMode(
-                    !moduleBindings.ExplorerNavigation.IsTreeMode),
-                folderPath => moduleBindings.ExplorerNavigation.NavigateToFolderAsync(
-                    folderPath,
-                    revealInLeftPanel: true));
-            var previewControllers = previewModule.Controllers;
+                moduleBindings.ToggleExplorerTreeMode,
+                moduleBindings.NavigateExplorerToFolderAndRevealAsync);
             moduleBindings.Bind(previewModule);
-            var compareTabController = previewControllers.CompareTab;
-            var livePreviewController = previewControllers.LivePreview;
-            var pdfViewerController = previewControllers.PdfViewer;
-            var officeDocumentViewerController = previewControllers.OfficeDocumentViewer;
-            var notebookViewerController = previewControllers.NotebookViewer;
 
             var workspaceModule = MainWindowWorkspaceModule.Compose(
                 window,
@@ -112,12 +101,7 @@ namespace TxtAIEditor.Composition
                 previewFacade,
                 workspaceFacade,
                 () => moduleBindings.ToolbarCommand);
-            var workspaceControllers = workspaceModule.Controllers;
             moduleBindings.Bind(workspaceModule);
-            var functionKeyShortcutService = workspaceControllers.FunctionKeyShortcut;
-            var gitAutoRefreshTimer = workspaceControllers.GitAutoRefreshTimer;
-            var explorerNavigationController = workspaceControllers.ExplorerNavigation;
-            var favoritesRecentController = workspaceControllers.FavoritesRecent;
 
             var editorModule = MainWindowEditorModule.ComposeFoundation(
                 ui,
@@ -150,9 +134,7 @@ namespace TxtAIEditor.Composition
                 new MainWindowDocumentModuleDependencies(
                     shellModule,
                     editorModule,
-                    livePreviewController,
-                    favoritesRecentController,
-                    notebookViewerController),
+                    previewModule),
                 workspaceModule,
                 shellFacade,
                 editorFacade,
@@ -169,28 +151,26 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 shellModule,
                 editorModule,
-                favoritesRecentController,
-                pdfViewerController,
-                officeDocumentViewerController,
+                workspaceModule,
                 new MainWindowInteractionCallbacks(
                     () => state.CurrentFolderPath,
                     () => state.CurrentRepoPath,
                     () => documentFacade.OpenEmptyTab(),
                     workspaceModule.LoadDirectoryRoot,
-                    explorerNavigationController.RefreshTreeFolder,
+                    workspaceModule.RefreshTreeFolder,
                     documentFacade.LoadFileIntoTabAsync,
-                    livePreviewController.OpenFileInExternalViewerAsync,
-                    livePreviewController.OpenFileWithDefaultProgramAsync,
+                    previewModule.OpenFileInExternalViewerAsync,
+                    previewModule.OpenFileWithDefaultProgramAsync,
                     documentFacade.LoadFileIntoTabAsync,
                     workspaceModule.NavigateExplorerToFolderAsync,
                     folderPath => workspaceModule.NavigateExplorerToFolderAsync(
                         folderPath,
                         revealInLeftPanel: true),
                     workspaceFacade.GetSelectedExplorerItem,
-                    () => explorerNavigationController.IsViewingArchive,
-                    () => explorerNavigationController.IsViewingRemote,
-                    explorerNavigationController.RefreshRemoteDirectoryAsync,
-                    () => explorerNavigationController.IsTreeMode,
+                    () => workspaceModule.IsViewingArchive,
+                    () => workspaceModule.IsViewingRemote,
+                    workspaceModule.RefreshRemoteDirectoryAsync,
+                    () => workspaceModule.IsTreeMode,
                     ToggleLeftPanelAsync,
                     ToggleRightPanelAsync,
                     shellFacade.FocusSearchPanel,
@@ -204,7 +184,7 @@ namespace TxtAIEditor.Composition
                     () => moduleBindings.ToolbarCommand?.ToggleTheme(),
                     shellModule.ToggleStickyNoteMode,
                     () => moduleBindings.ToolbarCommand?.ToggleLivePreview(),
-                    () => explorerNavigationController.SetTreeMode(!explorerNavigationController.IsTreeMode),
+                    workspaceModule.ToggleExplorerTreeMode,
                     () => moduleBindings.ToolbarCommand?.ToggleCsvTableMode(),
                     TogglePreviewWidth,
                     shellFacade.ToggleMaximize,
@@ -218,9 +198,7 @@ namespace TxtAIEditor.Composition
                     (tab, tabItem) => shellModule.ReloadTabAsync(
                         tab,
                         tabItem,
-                        pdfViewerController,
-                        officeDocumentViewerController,
-                        notebookViewerController,
+                        previewModule,
                         editorModule,
                         editorFacade.UpdateLanguageUi,
                         shellFacade.UpdateWindowTitle),
@@ -254,7 +232,7 @@ namespace TxtAIEditor.Composition
             var terminalPanelController = interactionControllers.TerminalPanel;
             var snippetsController = interactionControllers.Snippets;
 
-            var agentControllers = MainWindowAgentComposition.Compose(
+            var agentModule = MainWindowAgentModule.Compose(
                 window,
                 ui,
                 commonServices,
@@ -268,14 +246,11 @@ namespace TxtAIEditor.Composition
                     editorModule,
                     documentModule,
                     previewModule),
-                workspaceControllers,
+                workspaceModule,
                 shellFacade,
                 documentFacade,
                 agentFacade,
                 workspaceFacade);
-            var llmAssistantController = agentControllers.LlmAssistant;
-            var agentController = agentControllers.Agent;
-
             editorModule.ComposeRuntime(
                 window,
                 ui,
@@ -290,8 +265,8 @@ namespace TxtAIEditor.Composition
                     previewModule,
                     documentModule,
                     interactionControllers,
-                    workspaceControllers,
-                    agentControllers),
+                    workspaceModule,
+                    agentModule),
                 initialEditorLineWarmupCount,
                 shellFacade,
                 editorFacade,
@@ -326,22 +301,15 @@ namespace TxtAIEditor.Composition
                 state.EditorSessions,
                 shellModule,
                 editorModule,
-                functionKeyShortcutService,
+                workspaceModule,
                 documentModule,
-                gitAutoRefreshTimer,
-                livePreviewController,
-                pdfViewerController,
-                officeDocumentViewerController,
-                notebookViewerController,
-                llmAssistantController,
-                agentController,
+                previewModule,
+                agentModule,
                 snippetsController,
-                favoritesRecentController,
                 fileOpenDropController,
                 rootKeyboardShortcutController,
                 documentModule,
                 terminalPanelController,
-                compareTabController,
                 new MainWindowStartupCallbacks(
                     () => state.CurrentRepoPath,
                     () => state.CurrentFolderPath,
@@ -380,7 +348,7 @@ namespace TxtAIEditor.Composition
                 editorModule,
                 documentModule,
                 previewModule,
-                agentControllers,
+                agentModule,
                 workspaceModule,
                 LifecycleControllers.From(startupControllers));
         }

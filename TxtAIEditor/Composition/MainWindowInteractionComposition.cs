@@ -78,9 +78,7 @@ namespace TxtAIEditor.Composition
             MainWindowViewModel viewModel,
             MainWindowShellModule shellModule,
             MainWindowEditorModule editorModule,
-            FavoritesRecentController favoritesRecent,
-            PdfViewerController pdfViewer,
-            OfficeDocumentViewerController officeDocumentViewer,
+            MainWindowWorkspaceModule workspaceModule,
             MainWindowInteractionCallbacks callbacks)
         {
             var shell = shellModule.Composition;
@@ -127,9 +125,7 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 shellModule,
                 editorModule,
-                favoritesRecent,
-                pdfViewer,
-                officeDocumentViewer,
+                workspaceModule,
                 callbacks,
                 explorerFileActions);
         }
@@ -143,9 +139,7 @@ namespace TxtAIEditor.Composition
             MainWindowViewModel viewModel,
             MainWindowShellModule shellModule,
             MainWindowEditorModule editorModule,
-            FavoritesRecentController favoritesRecent,
-            PdfViewerController pdfViewer,
-            OfficeDocumentViewerController officeDocumentViewer,
+            MainWindowWorkspaceModule workspaceModule,
             MainWindowInteractionCallbacks callbacks,
             ExplorerFileActionsController explorerFileActions)
         {
@@ -156,6 +150,7 @@ namespace TxtAIEditor.Composition
             var tabEncryption = shell.TabEncryption;
             var dialog = shell.Dialog;
             var activeEditorInsertion = editorModule.Foundation.ActiveEditorInsertion;
+            var favoritesRecent = workspaceModule.Composition.FavoritesRecent;
 
             var terminalPanel = new TerminalPanelController(
                 window,

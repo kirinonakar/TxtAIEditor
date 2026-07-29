@@ -21,8 +21,7 @@ namespace TxtAIEditor.Controls
         private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly DispatcherQueue _dispatcherQueue;
-        private readonly LlmAssistantController _llmAssistantController;
-        private readonly AgentController _agentController;
+        private readonly IAgentUiCommands _agentCommands;
         private readonly TextBlock _selectionStatsText;
         private readonly StatusBarController _statusBarController;
         private readonly Func<string, string, string> _getString;
@@ -40,8 +39,7 @@ namespace TxtAIEditor.Controls
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             Dictionary<string, EditorDocumentSession> editorSessions,
             DispatcherQueue dispatcherQueue,
-            LlmAssistantController llmAssistantController,
-            AgentController agentController,
+            IAgentUiCommands agentCommands,
             TextBlock selectionStatsText,
             StatusBarController statusBarController,
             Func<string, string, string> getString,
@@ -57,8 +55,7 @@ namespace TxtAIEditor.Controls
             _tabBridges = tabBridges;
             _editorSessions = editorSessions;
             _dispatcherQueue = dispatcherQueue;
-            _llmAssistantController = llmAssistantController;
-            _agentController = agentController;
+            _agentCommands = agentCommands;
             _selectionStatsText = selectionStatsText;
             _statusBarController = statusBarController;
             _getString = getString;
@@ -112,8 +109,7 @@ namespace TxtAIEditor.Controls
 
         private async Task HandleSelectionChangedAsync(TabViewItem activeTabItem)
         {
-            _llmAssistantController.ClearSelection();
-            _agentController.ClearSelection();
+            _agentCommands.ClearSelectionContext();
             _selectionStatsText.Text = _getString("SelectionNoneBlocked", "선택 영역: 없음 (전체 파일의 경우 파일 추가 사용)");
 
             if (activeTabItem.Tag is string tabId)

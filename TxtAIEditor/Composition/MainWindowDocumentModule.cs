@@ -10,9 +10,7 @@ namespace TxtAIEditor.Composition
     internal sealed record MainWindowDocumentModuleDependencies(
         MainWindowShellModule Shell,
         MainWindowEditorModule Editor,
-        LivePreviewController LivePreview,
-        FavoritesRecentController FavoritesRecent,
-        JupyterNotebookViewerController NotebookViewer);
+        MainWindowPreviewModule Preview);
 
     internal sealed class MainWindowDocumentModule :
         ITabSaveCommands,
@@ -43,6 +41,7 @@ namespace TxtAIEditor.Composition
             Func<Task> saveUiLayoutSettingsAsync)
         {
             var shell = dependencies.Shell.Composition;
+            var preview = dependencies.Preview.Composition;
             var callbacks = new MainWindowDocumentCommandCallbacks(
                 editorFacade.UpdateLanguageUi,
                 workspace.RefreshGitStatusUiAsync,
@@ -68,12 +67,12 @@ namespace TxtAIEditor.Composition
                 state.EditorSessions,
                 shell.StatusBar,
                 shell.TabNavigation,
-                dependencies.LivePreview,
+                preview.LivePreview,
                 dependencies.Editor.Foundation.TabDirtyState,
                 shell.TabEncryption,
-                dependencies.FavoritesRecent,
+                workspace.Composition.FavoritesRecent,
                 shell.Dialog,
-                dependencies.NotebookViewer,
+                preview.NotebookViewer,
                 callbacks);
 
             return new MainWindowDocumentModule(controllers);

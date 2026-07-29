@@ -51,22 +51,15 @@ namespace TxtAIEditor.Composition
             Dictionary<string, EditorDocumentSession> editorSessions,
             MainWindowShellModule shellModule,
             MainWindowEditorModule editorModule,
-            FunctionKeyShortcutService functionKeyShortcut,
+            MainWindowWorkspaceModule workspaceModule,
             IAutoSaveLifecycle autoSaveLifecycle,
-            DispatcherTimer gitAutoRefreshTimer,
-            LivePreviewController livePreview,
-            PdfViewerController pdfViewer,
-            OfficeDocumentViewerController officeDocumentViewer,
-            JupyterNotebookViewerController notebookViewer,
-            LlmAssistantController llmAssistant,
-            AgentController agent,
+            MainWindowPreviewModule previewModule,
+            MainWindowAgentModule agentModule,
             SnippetsController snippets,
-            FavoritesRecentController favoritesRecent,
             FileOpenDropController fileOpenDrop,
             RootKeyboardShortcutController rootKeyboardShortcut,
             ITabSaveCommands tabSaveCommands,
             TerminalPanelController terminalPanel,
-            CompareTabController compareTab,
             MainWindowStartupCallbacks callbacks)
         {
             var shell = shellModule.Composition;
@@ -78,6 +71,16 @@ namespace TxtAIEditor.Composition
             var dialog = shell.Dialog;
             var tabDirtyState = editorModule.Foundation.TabDirtyState;
             var shellPane = editorModule.Runtime.ShellPane;
+            var preview = previewModule.Composition;
+            var livePreview = preview.LivePreview;
+            var pdfViewer = preview.PdfViewer;
+            var officeDocumentViewer = preview.OfficeDocumentViewer;
+            var notebookViewer = preview.NotebookViewer;
+            var compareTab = preview.CompareTab;
+            var workspace = workspaceModule.Composition;
+            var functionKeyShortcut = workspace.FunctionKeyShortcut;
+            var gitAutoRefreshTimer = workspace.GitAutoRefreshTimer;
+            var favoritesRecent = workspace.FavoritesRecent;
 
             var lifecycle = new MainWindowLifecycleController(
                 window,
@@ -116,8 +119,7 @@ namespace TxtAIEditor.Composition
                 notebookViewer,
                 statusBar,
                 livePreview,
-                llmAssistant,
-                agent,
+                agentModule,
                 tabNavigation.GetActiveTab,
                 callbacks.GetCurrentFolderPath,
                 callbacks.GetLocalizedString,

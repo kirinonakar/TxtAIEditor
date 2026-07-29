@@ -71,8 +71,7 @@ namespace TxtAIEditor.Composition
             ActiveEditorInsertionController activeEditorInsertion,
             TabContextMenuController tabContextMenu,
             FavoritesRecentController favoritesRecent,
-            LlmAssistantController llmAssistant,
-            AgentController agent,
+            IAgentUiCommands agentCommands,
             int initialEditorLineWarmupCount,
             MainWindowEditorRuntimeCallbacks callbacks)
         {
@@ -142,8 +141,7 @@ namespace TxtAIEditor.Composition
                 tabBridges,
                 editorSessions,
                 window.DispatcherQueue,
-                llmAssistant,
-                agent,
+                agentCommands,
                 ui.PreviewGrid.SelectionStats,
                 statusBar,
                 callbacks.GetLocalizedString,

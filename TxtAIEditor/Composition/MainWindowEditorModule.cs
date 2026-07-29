@@ -13,8 +13,8 @@ namespace TxtAIEditor.Composition
         MainWindowPreviewModule Preview,
         MainWindowDocumentModule Documents,
         MainWindowInteractionControllers Interaction,
-        MainWindowWorkspaceControllers Workspace,
-        MainWindowAgentModuleFacade Agents);
+        MainWindowWorkspaceModule Workspace,
+        MainWindowAgentModule Agents);
 
     internal sealed class MainWindowEditorModule
     {
@@ -55,7 +55,7 @@ namespace TxtAIEditor.Composition
                 () => getToolbarCommand()?.ToggleTheme(),
                 shellFacade.ToggleMaximize,
                 () => getToolbarCommand()?.ToggleWordWrap(),
-                () => workspace.SetExplorerTreeMode(!workspace.Controllers.ExplorerNavigation.IsTreeMode),
+                workspace.ToggleExplorerTreeMode,
                 () => getToolbarCommand()?.ToggleCsvTableMode(),
                 toggleLeftPanelAsync,
                 toggleRightPanelAsync,
@@ -87,7 +87,7 @@ namespace TxtAIEditor.Composition
                 state.TabBridges,
                 state.EditorSessions,
                 shell,
-                preview.Controllers.EditorLineNavigation,
+                preview.Composition.EditorLineNavigation,
                 initialEditorLineWarmupCount,
                 tabId => state.EditorSessions.TryGetValue(tabId, out var session) ? session : null,
                 callbacks);
@@ -118,7 +118,7 @@ namespace TxtAIEditor.Composition
                 throw new InvalidOperationException("Editor runtime has already been composed.");
             }
 
-            var preview = dependencies.Preview.Controllers;
+            var preview = dependencies.Preview.Composition;
             var callbacks = new MainWindowEditorRuntimeCallbacks(
                 editorFacade.SchedulePreview,
                 editorFacade.UpdateLanguageUi,
@@ -185,9 +185,8 @@ namespace TxtAIEditor.Composition
                 preview.EditorLinkNavigation,
                 Foundation.ActiveEditorInsertion,
                 dependencies.Interaction.TabContextMenu,
-                dependencies.Workspace.FavoritesRecent,
-                dependencies.Agents.LlmAssistant,
-                dependencies.Agents.Agent,
+                dependencies.Workspace.Composition.FavoritesRecent,
+                dependencies.Agents,
                 initialEditorLineWarmupCount,
                 callbacks);
         }

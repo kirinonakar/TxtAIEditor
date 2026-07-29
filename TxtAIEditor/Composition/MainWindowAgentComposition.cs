@@ -49,13 +49,13 @@ namespace TxtAIEditor.Composition
         ITabCloseCommands Documents,
         MainWindowPreviewModule Preview);
 
-    internal sealed record MainWindowAgentModuleFacade(
+    internal sealed record MainWindowAgentControllers(
         LlmAssistantController LlmAssistant,
         AgentController Agent);
 
     internal static class MainWindowAgentComposition
     {
-        public static MainWindowAgentModuleFacade Compose(
+        public static MainWindowAgentControllers Compose(
             MainWindow window,
             MainWindowUiRefs ui,
             MainWindowCommonServices commonServices,
@@ -65,12 +65,13 @@ namespace TxtAIEditor.Composition
             MainWindowViewModel viewModel,
             MainWindowState state,
             MainWindowAgentModuleDependencies dependencies,
-            MainWindowWorkspaceControllers workspace,
+            MainWindowWorkspaceModule workspaceModule,
             IMainWindowShellFacade shellFacade,
             IMainWindowDocumentFacade documentFacade,
             IMainWindowAgentFacade agentFacade,
             IMainWindowWorkspaceFacade workspaceFacade)
         {
+            var workspace = workspaceModule.Composition;
             var explorerNavigation = workspace.ExplorerNavigation;
             return Compose(
                 window,
@@ -100,7 +101,7 @@ namespace TxtAIEditor.Composition
                     shellFacade.UpdateWindowTitle));
         }
 
-        public static MainWindowAgentModuleFacade Compose(
+        public static MainWindowAgentControllers Compose(
             MainWindow window,
             MainWindowUiRefs ui,
             MainWindowCommonServices commonServices,
@@ -116,7 +117,7 @@ namespace TxtAIEditor.Composition
             var shell = dependencies.Shell.Composition;
             var editor = dependencies.Editor.Foundation;
             var documents = dependencies.Documents;
-            var preview = dependencies.Preview.Controllers;
+            var preview = dependencies.Preview.Composition;
 
             var llmAssistant = new LlmAssistantController(
                 agentServices.LlmService,
@@ -250,7 +251,7 @@ namespace TxtAIEditor.Composition
 
             window.Closed += (_, _) => agent.CloseMcpSessions();
 
-            return new MainWindowAgentModuleFacade(llmAssistant, agent);
+            return new MainWindowAgentControllers(llmAssistant, agent);
         }
 
         private static OpenedTab CreateGeneratedTab(

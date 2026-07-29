@@ -14,10 +14,10 @@ namespace TxtAIEditor.Composition
     {
         private MainWindowPreviewModule(MainWindowPreviewControllers controllers)
         {
-            Controllers = controllers;
+            Composition = controllers;
         }
 
-        public MainWindowPreviewControllers Controllers { get; }
+        internal MainWindowPreviewControllers Composition { get; }
 
         public static MainWindowPreviewModule Compose(
             MainWindowUiRefs ui,
@@ -79,28 +79,34 @@ namespace TxtAIEditor.Composition
         }
 
         public void Schedule(OpenedTab tab) =>
-            Controllers.LivePreview.Schedule(tab);
+            Composition.LivePreview.Schedule(tab);
 
         public void Render(OpenedTab tab) =>
-            Controllers.LivePreview.Render(tab);
+            Composition.LivePreview.Render(tab);
 
         public string GetPreviewBaseHref(OpenedTab tab) =>
-            Controllers.LivePreview.GetPreviewBaseHref(tab);
+            Composition.LivePreview.GetPreviewBaseHref(tab);
 
         public Task RevealFileLineAsync(string filePath, int lineNumber) =>
-            Controllers.EditorLineNavigation.RevealFileLineAsync(filePath, lineNumber);
+            Composition.EditorLineNavigation.RevealFileLineAsync(filePath, lineNumber);
 
         public Task RevealTabLineAsync(string tabId, int lineNumber) =>
-            Controllers.EditorLineNavigation.RevealTabLineAsync(tabId, lineNumber);
+            Composition.EditorLineNavigation.RevealTabLineAsync(tabId, lineNumber);
 
         public void RefreshActivePreview() =>
-            Controllers.LivePreview.EnsureVisiblePreviewRendered();
+            Composition.LivePreview.EnsureVisiblePreviewRendered();
+
+        public Task OpenFileInExternalViewerAsync(string filePath) =>
+            Composition.LivePreview.OpenFileInExternalViewerAsync(filePath);
+
+        public Task OpenFileWithDefaultProgramAsync(string filePath) =>
+            Composition.LivePreview.OpenFileWithDefaultProgramAsync(filePath);
 
         public void CloseReadOnlyViewer(string tabId)
         {
-            Controllers.PdfViewer.Close(tabId);
-            Controllers.OfficeDocumentViewer.Close(tabId);
-            Controllers.NotebookViewer.Close(tabId);
+            Composition.PdfViewer.Close(tabId);
+            Composition.OfficeDocumentViewer.Close(tabId);
+            Composition.NotebookViewer.Close(tabId);
         }
     }
 }

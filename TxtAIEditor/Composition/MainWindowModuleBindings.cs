@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using TxtAIEditor.Controls;
 
 namespace TxtAIEditor.Composition
@@ -14,12 +15,6 @@ namespace TxtAIEditor.Composition
         private MainWindowEditorModule? _editor;
         private MainWindowStartupControllers? _startup;
 
-        public LivePreviewController LivePreview =>
-            Require(_preview, nameof(MainWindowPreviewModule)).Controllers.LivePreview;
-
-        public ExplorerNavigationController ExplorerNavigation =>
-            Require(_workspace, nameof(MainWindowWorkspaceModule)).Controllers.ExplorerNavigation;
-
         public ShellPaneController ShellPane =>
             Require(_editor, nameof(MainWindowEditorModule)).Runtime.ShellPane;
 
@@ -28,6 +23,20 @@ namespace TxtAIEditor.Composition
 
         public MainWindowToolbarCommandController? ToolbarCommand =>
             _startup?.ToolbarCommand;
+
+        public void ApplyPreviewVisibility(bool show, bool startupInitializationComplete) =>
+            MainWindowLayoutOperations.ApplyPreviewVisibility(
+                show,
+                ShellPane,
+                startupInitializationComplete,
+                Require(_preview, nameof(MainWindowPreviewModule)).Composition.LivePreview);
+
+        public void ToggleExplorerTreeMode() =>
+            Require(_workspace, nameof(MainWindowWorkspaceModule)).ToggleExplorerTreeMode();
+
+        public Task NavigateExplorerToFolderAndRevealAsync(string folderPath) =>
+            Require(_workspace, nameof(MainWindowWorkspaceModule))
+                .NavigateExplorerToFolderAsync(folderPath, revealInLeftPanel: true);
 
         public void Bind(MainWindowPreviewModule preview) =>
             _preview = BindOnce(_preview, preview, nameof(MainWindowPreviewModule));

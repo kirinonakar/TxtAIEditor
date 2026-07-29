@@ -41,8 +41,7 @@ namespace TxtAIEditor.Controls
         private readonly JupyterNotebookViewerController? _notebookViewerController;
         private readonly StatusBarController _statusBarController;
         private readonly LivePreviewController _livePreviewController;
-        private readonly LlmAssistantController _llmAssistantController;
-        private readonly AgentController _agentController;
+        private readonly IAgentUiCommands _agentCommands;
         private readonly Func<OpenedTab?> _getActiveTab;
         private readonly Func<string> _getCurrentFolderPath;
         private readonly Func<string, string, string> _getLocalizedString;
@@ -82,8 +81,7 @@ namespace TxtAIEditor.Controls
             JupyterNotebookViewerController? notebookViewerController,
             StatusBarController statusBarController,
             LivePreviewController livePreviewController,
-            LlmAssistantController llmAssistantController,
-            AgentController agentController,
+            IAgentUiCommands agentCommands,
             Func<OpenedTab?> getActiveTab,
             Func<string> getCurrentFolderPath,
             Func<string, string, string> getLocalizedString,
@@ -122,8 +120,7 @@ namespace TxtAIEditor.Controls
             _notebookViewerController = notebookViewerController;
             _statusBarController = statusBarController;
             _livePreviewController = livePreviewController;
-            _llmAssistantController = llmAssistantController;
-            _agentController = agentController;
+            _agentCommands = agentCommands;
             _getActiveTab = getActiveTab;
             _getCurrentFolderPath = getCurrentFolderPath;
             _getLocalizedString = getLocalizedString;
@@ -193,9 +190,7 @@ namespace TxtAIEditor.Controls
 
         private async Task<bool> ApplyRuntimeSettingsAsync(EditorSettings settings, string oldLanguage)
         {
-            _llmAssistantController.UpdateModelDisplay();
-            _agentController.UpdateModelDisplay(true);
-            _agentController.UpdateContextStats();
+            _agentCommands.ApplyRuntimeSettings();
             ApplyResourceLanguage();
             _applyPreviewVisibility(settings.DefaultMarkdownEnabled);
             _topToolbar.MarkdownToolbarIsChecked = settings.DefaultMarkdownToolbarEnabled;
@@ -301,8 +296,7 @@ namespace TxtAIEditor.Controls
                     _statusBarController.UpdateTotalLines(activeTab);
                 }
 
-                _llmAssistantController.UpdateModelDisplay();
-                _agentController.UpdateModelDisplay();
+                _agentCommands.RefreshLocalizedModelDisplay();
             }
             catch (Exception ex)
             {

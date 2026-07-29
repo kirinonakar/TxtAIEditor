@@ -34,7 +34,7 @@ namespace TxtAIEditor.Composition
             _setCurrentRepoPath = setCurrentRepoPath;
         }
 
-        public MainWindowWorkspaceControllers Controllers =>
+        internal MainWindowWorkspaceControllers Composition =>
             _controllers ?? throw new InvalidOperationException("Workspace module has not been composed yet.");
 
         public static MainWindowWorkspaceModule Compose(
@@ -69,7 +69,7 @@ namespace TxtAIEditor.Composition
                 viewModel,
                 state.TabBridges,
                 shell.TabEncryption,
-                dependencies.Preview.Controllers.CompareTab,
+                dependencies.Preview.Composition.CompareTab,
                 shell.Dialog,
                 new MainWindowWorkspaceCompositionCallbacks(
                     shell.StickyNoteMode.ToggleTopMostFromShortcut,
@@ -102,37 +102,55 @@ namespace TxtAIEditor.Composition
         }
 
         public void LoadDirectoryRoot(string folderPath) =>
-            Controllers.ExplorerNavigation.LoadDirectoryRoot(folderPath);
+            Composition.ExplorerNavigation.LoadDirectoryRoot(folderPath);
 
         public void SetExplorerTreeMode(bool enableTreeMode) =>
-            Controllers.ExplorerNavigation.SetTreeMode(enableTreeMode);
+            Composition.ExplorerNavigation.SetTreeMode(enableTreeMode);
+
+        public void ToggleExplorerTreeMode() =>
+            Composition.ExplorerNavigation.SetTreeMode(!Composition.ExplorerNavigation.IsTreeMode);
+
+        public void RefreshTreeFolder(string folderPath) =>
+            Composition.ExplorerNavigation.RefreshTreeFolder(folderPath);
+
+        public bool IsViewingArchive =>
+            Composition.ExplorerNavigation.IsViewingArchive;
+
+        public bool IsViewingRemote =>
+            Composition.ExplorerNavigation.IsViewingRemote;
+
+        public bool IsTreeMode =>
+            Composition.ExplorerNavigation.IsTreeMode;
+
+        public Task RefreshRemoteDirectoryAsync() =>
+            Composition.ExplorerNavigation.RefreshRemoteDirectoryAsync();
 
         public async Task NavigateExplorerToFolderAsync(string folderPath, bool revealInLeftPanel = true)
         {
             if (RemotePath.IsRemote(folderPath))
             {
-                await Controllers.ExplorerNavigation.NavigateRemoteVirtualPathAsync(folderPath, revealInLeftPanel);
+                await Composition.ExplorerNavigation.NavigateRemoteVirtualPathAsync(folderPath, revealInLeftPanel);
             }
             else
             {
-                await Controllers.ExplorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel);
+                await Composition.ExplorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel);
             }
         }
 
         public void QueueGitStatusRefresh() =>
-            Controllers.GitStatusRefresh.QueueRefresh();
+            Composition.GitStatusRefresh.QueueRefresh();
 
         public void AddRecentFolder(string folderPath) =>
-            Controllers.FavoritesRecent.AddRecentFolder(folderPath);
+            Composition.FavoritesRecent.AddRecentFolder(folderPath);
 
         public bool TryOpenArchive(string filePath) =>
-            Controllers.ExplorerNavigation.TryOpenArchive(filePath);
+            Composition.ExplorerNavigation.TryOpenArchive(filePath);
 
         public Task<OpenedTab?> LoadFileAsync(string filePath) =>
-            Controllers.FileTabLoad.LoadAsync(filePath);
+            Composition.FileTabLoad.LoadAsync(filePath);
 
         public Task<FileTabLoadResult> LoadFileWithResultAsync(string filePath) =>
-            Controllers.FileTabLoad.LoadWithResultAsync(filePath);
+            Composition.FileTabLoad.LoadWithResultAsync(filePath);
 
         public Task OpenShellPathAsync(
             string path,
@@ -141,7 +159,7 @@ namespace TxtAIEditor.Composition
             MainWindowWorkspaceOperations.OpenShellPathAsync(
                 path,
                 shell.Composition.ShellPanelLayout,
-                Controllers.ExplorerNavigation,
+                Composition.ExplorerNavigation,
                 loadFileIntoTabAsync);
 
         public string GetSearchRoot() =>
@@ -154,14 +172,14 @@ namespace TxtAIEditor.Composition
             MainWindowWorkspaceOperations.RefreshGitStatusUiAsync(
                 _state,
                 _workspaceServices.GitService,
-                Controllers.GitAutoRefreshTimer,
+                Composition.GitAutoRefreshTimer,
                 _tabNavigation,
-                Controllers.GitStatusRefresh,
-                Controllers.ExplorerNavigation,
+                Composition.GitStatusRefresh,
+                Composition.ExplorerNavigation,
                 _setCurrentRepoPath);
 
         public void RefreshCurrentFolder(string folderPath) =>
-            Controllers.ExplorerNavigation.LoadDirectoryRoot(folderPath);
+            Composition.ExplorerNavigation.LoadDirectoryRoot(folderPath);
 
         private string GetCurrentRepoPathForGitRefresh() =>
             MainWindowWorkspaceOperations.GetCurrentRepoPathForGitRefresh(

@@ -249,8 +249,7 @@ namespace TxtAIEditor.Composition
 
         public void UpdateRightPanelSelectionContext(string selectedText, OpenedTab tab, int startLine, int endLine)
         {
-            Controllers.Agents.LlmAssistant.SetSelectionText(selectedText);
-            Controllers.Agents.Agent.SetSelectionText(selectedText, tab, startLine, endLine);
+            Controllers.Agents.SetSelectionContext(selectedText, tab, startLine, endLine);
             if (string.IsNullOrEmpty(selectedText))
             {
                 _ui.PreviewGrid.SelectionStats.Text = GetLocalizedString("SelectionNoneBlocked", "선택 영역: 없음 (전체 파일의 경우 파일 추가 사용)");
@@ -304,7 +303,7 @@ namespace TxtAIEditor.Composition
 
         public IReadOnlyList<AgentFileEditPreview> GetAgentSessionEdits()
         {
-            return Controllers.Agents.Agent.SessionEdits;
+            return Controllers.Agents.GetSessionEdits();
         }
 
         public void CloseTabAndCleanup(OpenedTab tab, TabViewItem tabItem)
@@ -427,8 +426,7 @@ namespace TxtAIEditor.Composition
 
         public void SyncAgentSettingsAfterLoad()
         {
-            Controllers.Agents.Agent.UpdateModelDisplay(true);
-            Controllers.Agents.Agent.UpdateContextStats();
+            Controllers.Agents.SyncSettingsAfterLoad();
         }
 
         public void UpdateAutoSaveStatus()

@@ -142,9 +142,7 @@ namespace TxtAIEditor.Composition
         public Task ReloadTabAsync(
             OpenedTab tab,
             TabViewItem tabItem,
-            PdfViewerController pdfViewer,
-            OfficeDocumentViewerController officeDocumentViewer,
-            JupyterNotebookViewerController notebookViewer,
+            MainWindowPreviewModule previewModule,
             MainWindowEditorModule editor,
             System.Action<OpenedTab> updateLanguageUi,
             System.Action updateWindowTitle) =>
@@ -152,9 +150,9 @@ namespace TxtAIEditor.Composition
                 tab,
                 tabItem,
                 Composition.StatusBar,
-                pdfViewer,
-                officeDocumentViewer,
-                notebookViewer,
+                previewModule.Composition.PdfViewer,
+                previewModule.Composition.OfficeDocumentViewer,
+                previewModule.Composition.NotebookViewer,
                 editor.Foundation.TabReload,
                 updateLanguageUi,
                 updateWindowTitle);
