@@ -100,7 +100,7 @@ namespace TxtAIEditor.Controls
             string extension = Path.GetExtension(filePath);
             string command = extension.ToLowerInvariant() switch
             {
-                ".ps1" => $"powershell -ExecutionPolicy Bypass -File \"{fileName}\"",
+                ".ps1" => fileName.Contains(' ') ? $".\\\"{fileName}\"" : $".\\{fileName}",
                 ".bat" or ".cmd" => $"cmd /c \"{fileName}\"",
                 _ => $"python \"{fileName}\""
             };
