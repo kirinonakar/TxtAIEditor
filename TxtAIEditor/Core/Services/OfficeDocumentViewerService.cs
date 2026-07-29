@@ -400,6 +400,29 @@ mark.txt-office-find-match.txt-office-find-active {
         return found;
     }
 
+    function findMatchIndexFromCurrentView() {
+        const viewportWidth = document.documentElement.clientWidth || window.innerWidth || 0;
+        const viewportHeight = document.documentElement.clientHeight || window.innerHeight || 0;
+        let firstMatchBelowView = -1;
+
+        for (let index = 0; index < matches.length; index++) {
+            const rect = matches[index].getBoundingClientRect();
+            if (rect.width <= 0 && rect.height <= 0) continue;
+            if (rect.bottom < 0) continue;
+
+            const isHorizontallyVisible = rect.right >= 0 && rect.left <= viewportWidth;
+            if (isHorizontallyVisible && rect.top <= viewportHeight) {
+                return index;
+            }
+
+            if (firstMatchBelowView < 0 && rect.top > viewportHeight) {
+                firstMatchBelowView = index;
+            }
+        }
+
+        return firstMatchBelowView >= 0 ? firstMatchBelowView : 0;
+    }
+
     function rebuildMatches() {
         clearHighlights();
 
@@ -434,7 +457,7 @@ mark.txt-office-find-match.txt-office-find-active {
         });
 
         if (matches.length) {
-            activeIndex = 0;
+            activeIndex = findMatchIndexFromCurrentView();
             revealActive();
         } else {
             updateStatus();
