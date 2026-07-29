@@ -112,7 +112,7 @@
                           Style="{StaticResource SidebarToggleButtonStyle}"
                           IsChecked="True"
                           Click="HandleLeftPanelToggleClick"
-                          ToolTipService.ToolTip="좌측 패널">
+                          ToolTipService.ToolTip="좌측 패널 (Ctrl+1)">
                 <FontIcon Glyph="&#xE145;" FontSize="11"/>
             </ToggleButton>
 
@@ -202,7 +202,7 @@
                           Style="{StaticResource SidebarToggleButtonStyle}"
                           IsChecked="True"
                           Click="HandleRightPanelToggleClick"
-                          ToolTipService.ToolTip="우측 패널"
+                          ToolTipService.ToolTip="우측 패널 (Ctrl+2)"
                           Margin="8,0,0,0">
                 <FontIcon Glyph="&#xE145;" FontSize="11" RenderTransformOrigin="0.5,0.5">
                     <FontIcon.RenderTransform>

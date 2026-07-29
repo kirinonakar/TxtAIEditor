@@ -12,6 +12,7 @@
                     Spacing="4">
             <ToggleButton x:Name="TopMostButton"
                           Click="OnTopMostClick"
+                          ToolTipService.ToolTip="항상 위 (F9)"
                           Height="28"
                           Padding="12,0,12,0"
                           CornerRadius="4"
@@ -40,6 +41,7 @@
 
             <Button x:Name="ExitButton"
                     Click="OnExitClick"
+                    ToolTipService.ToolTip="스티커 노트 모드 종료 (F12)"
                     Background="#FF5C5C"
                     Foreground="White"
                     BorderThickness="0"
