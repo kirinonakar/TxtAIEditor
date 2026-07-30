@@ -6,10 +6,12 @@ import {
     clearPreservedScrollTop,
     lineAt,
     lineTop,
+    maximumVirtualScrollTop,
     post,
     prefetchAround,
     queueRender,
     reportCursorAndSelection,
+    setupVirtualHeight,
     state,
     usesCompressedScroll,
     visualScrollDeltaToScrollTopDelta
@@ -103,6 +105,12 @@ export function bindEditorEvents({
     }, { passive: false });
 
     scrollContainer.addEventListener('scroll', () => {
+        const maximumScrollTop = maximumVirtualScrollTop();
+        if (scrollContainer.scrollTop > maximumScrollTop + 0.5) {
+            scrollContainer.scrollTop = maximumScrollTop;
+            return;
+        }
+
         hideContextMenu();
         if (state.preservedScrollTop !== null &&
             Math.abs(scrollContainer.scrollTop - state.preservedScrollTop) > 1) {
@@ -137,7 +145,10 @@ export function bindEditorEvents({
         });
     });
 
-    window.addEventListener('resize', () => queueRender(true));
+    window.addEventListener('resize', () => {
+        setupVirtualHeight();
+        queueRender(true);
+    });
     window.addEventListener('dragstart', event => event.preventDefault(), false);
     window.addEventListener('dragover', event => event.preventDefault(), false);
     window.addEventListener('drop', event => event.preventDefault(), false);

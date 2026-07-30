@@ -330,6 +330,12 @@ function snapCssPixelsToDevicePixels(value) {
     return Math.ceil(value * dpr) / dpr;
 }
 
+function roundCssPixelsToDevicePixels(value) {
+    const dpr = Number(window.devicePixelRatio || 1);
+    if (!Number.isFinite(dpr) || dpr <= 0) return value;
+    return Math.round(value * dpr) / dpr;
+}
+
 function applyOptions(msg) {
     const theme = msg.theme || 'Dark';
     const bg = msg.customBackgroundColor || (theme === 'PastelDark' ? '#24273a' : (theme === 'Light' ? '#ffffff' : '#1e1e1e'));
@@ -738,11 +744,19 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
 
 function setupVirtualHeight() {
     const savedScroll = scrollContainer.scrollTop;
+    const maximumScrollTop = maximumVirtualScrollTop();
+    if (state.preservedScrollTop !== null) {
+        state.preservedScrollTop = Math.min(
+            maximumScrollTop,
+            Math.max(0, Number(state.preservedScrollTop || 0)));
+    }
     const preservedHeight = state.preservedScrollTop !== null
         ? Math.max(0, Number(state.preservedScrollTop || 0)) + scrollContainer.clientHeight
         : 0;
     virtualSpacer.style.height = `${Math.max(totalVirtualHeight(), preservedHeight)}px`;
-    const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+    const maxScroll = Math.min(
+        maximumScrollTop,
+        Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight));
     if (savedScroll > maxScroll) {
         scrollContainer.scrollTop = maxScroll;
     }
@@ -882,7 +896,7 @@ function totalVirtualHeight() {
         return Math.max(viewHeight + state.lineHeight, Math.min(total, BROWSER_SCROLL_HEIGHT_LIMIT));
     }
 
-    return total;
+    return total + trailingScrollHeight();
 }
 
 function rawTotalVirtualHeight() {
@@ -892,6 +906,16 @@ function rawTotalVirtualHeight() {
         total += state.lineHeightIndex.totalDelta;
     }
     return Math.max(1, total);
+}
+
+function trailingScrollHeight() {
+    const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
+    const lastLineHeight = Math.max(1, lineHeightFor(effectiveLineCount()));
+    return Math.max(0, viewHeight - lastLineHeight);
+}
+
+function maximumVirtualScrollTop() {
+    return Math.max(0, totalVirtualHeight() - scrollContainer.clientHeight);
 }
 
 function lineTop(lineNumber) {
@@ -967,7 +991,7 @@ function compressedScrollMetrics() {
     const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
     const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight));
     const lineCount = effectiveLineCount();
-    const maxFirstLine = Math.max(1, lineCount - visibleRows + 1);
+    const maxFirstLine = lineCount;
     const virtualHeight = totalVirtualHeight();
     const maxScrollTop = Math.max(0, virtualHeight - viewHeight);
     return { lineCount, maxFirstLine, maxScrollTop, visibleRows, viewHeight };
@@ -1095,7 +1119,8 @@ function compressedScrollScale() {
     if (!usesCompressedScroll()) return 1;
 
     const metrics = compressedScrollMetrics();
-    const rawMaxScrollTop = Math.max(0, rawTotalVirtualHeight() - metrics.viewHeight);
+    const lastLineHeight = Math.max(1, lineHeightFor(effectiveLineCount()));
+    const rawMaxScrollTop = Math.max(0, rawTotalVirtualHeight() - lastLineHeight);
     if (metrics.maxScrollTop <= 0 || rawMaxScrollTop <= 0) return 1;
     return Math.max(1, rawMaxScrollTop / metrics.maxScrollTop);
 }
@@ -1221,11 +1246,11 @@ function measureRenderedRows(renderOnChange = true) {
         // different temporary shape. Re-measuring those rows moves the current
         // scroll anchor by their accumulated delta and can make the viewport
         // oscillate at a render-window boundary.
-        if (rowRect.bottom <= containerRect.top) continue;
+        if (state.inlineLivePreviewEnabled && rowRect.bottom <= containerRect.top) continue;
         const isSkipped = row.classList.contains('live-preview-skipped');
         const minimum = isSkipped ? 0 : state.lineHeight;
         const measuredHeight = Math.max(rowRect.height || 0, row.scrollHeight || 0);
-        const measured = Math.max(minimum, Math.ceil(measuredHeight));
+        const measured = Math.max(minimum, roundCssPixelsToDevicePixels(measuredHeight));
         if (setMeasuredLineHeight(lineNumber, measured)) {
             changed = true;
         }
@@ -1710,6 +1735,7 @@ export {
     lineTop,
     invalidateMeasuredLineHeightsAround,
     markDirty,
+    maximumVirtualScrollTop,
     measureRenderedRows,
     orderedRange,
     post,
