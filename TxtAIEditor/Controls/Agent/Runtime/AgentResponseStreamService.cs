@@ -468,9 +468,15 @@ namespace TxtAIEditor.Controls
 
             cancellationToken.ThrowIfCancellationRequested();
             response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
+            if (responseBuilder.Length == 0 &&
+                stepReasoningBuilder.Length > 0 &&
+                string.Equals(response, stepReasoningBuilder.ToString(), StringComparison.Ordinal))
+            {
+                response = string.Empty;
+            }
 
             double stepReasoningTokens = AgentTokenEstimator.Estimate(stepReasoningBuilder.ToString());
-            if (stepReasoningTokens > 0)
+            if (stepReasoningTokens > 0 && !runContext.LlmSettings.LlmRetainThinking)
             {
                 await _uiDispatcher.RunAsync(() =>
                 {
@@ -580,10 +586,17 @@ namespace TxtAIEditor.Controls
                 }
             }
 
+            string responseWithoutThinking = AgentThinkingTranscriptFormatter.RemoveInlineThinking(response);
+            string thinkingText = AgentThinkingTranscriptFormatter.CollectThinking(
+                stepReasoningBuilder.ToString(),
+                response);
+
             return new AgentResponseStreamResult
             {
                 Response = response,
                 CleanResponse = runContext.LlmSettings.LlmAgentVerbose ? response : cleanStreamTextBuilder.ToString(),
+                ResponseWithoutThinking = responseWithoutThinking,
+                ThinkingText = thinkingText,
                 Truncated = truncated,
                 PrintedLength = printedLength,
                 HeldPotentialToolCallText = heldPotentialToolCallText,
@@ -596,6 +609,8 @@ namespace TxtAIEditor.Controls
     {
         public string Response { get; init; } = string.Empty;
         public string CleanResponse { get; init; } = string.Empty;
+        public string ResponseWithoutThinking { get; init; } = string.Empty;
+        public string ThinkingText { get; init; } = string.Empty;
         public bool Truncated { get; init; }
         public int PrintedLength { get; init; }
         public bool HeldPotentialToolCallText { get; init; }

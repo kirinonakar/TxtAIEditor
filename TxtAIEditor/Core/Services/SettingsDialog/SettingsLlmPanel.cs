@@ -26,6 +26,7 @@ namespace TxtAIEditor.Core.Services
         private readonly PasswordBox _exaApiKeyBox;
         private readonly CheckBox _confirmBeforeSendingCheck;
         private readonly CheckBox _agentVerboseCheck;
+        private readonly CheckBox _retainThinkingCheck;
         private readonly CheckBox _agentAutoApproveGitEditsCheck;
         private readonly CheckBox _agentAutoApprovePowerShellCheck;
         private readonly CheckBox _agentAutoApprovePlanningCheck;
@@ -63,6 +64,7 @@ namespace TxtAIEditor.Core.Services
 
             _confirmBeforeSendingCheck = new CheckBox { Content = getString("SettingsLlmConfirmBeforeSending", "전송 전 확인"), IsChecked = settings.LlmConfirmBeforeSending };
             _agentVerboseCheck = new CheckBox { Content = getString("SettingsLlmAgentVerbose", "Agent 상세 출력 활성화 (Verbose)"), IsChecked = settings.LlmAgentVerbose };
+            _retainThinkingCheck = new CheckBox { Content = getString("SettingsLlmRetainThinking", "추론 유지 (Retain thinking)"), IsChecked = settings.LlmRetainThinking };
             _agentAutoApproveGitEditsCheck = new CheckBox { Content = getString("SettingsLlmAgentAutoApproveGitEdits", "Git 폴더 내 파일 변경/생성 자동 승인"), IsChecked = settings.LlmAgentAutoApproveGitEdits };
             _agentAutoApprovePowerShellCheck = new CheckBox { Content = getString("SettingsLlmAgentAutoApprovePowerShell", "고위험 PowerShell 명령 외 자동 승인"), IsChecked = settings.LlmAgentAutoApprovePowerShell };
             _agentAutoApprovePlanningCheck = new CheckBox { Content = getString("SettingsLlmAgentAutoApprovePlanning", "계획 실행 자동 승인"), IsChecked = settings.LlmAgentAutoApprovePlanning };
@@ -142,6 +144,7 @@ namespace TxtAIEditor.Core.Services
                 : (_visionFallbackModelCombo.SelectedItem as string ?? settings.LlmVisionFallbackModel)).Trim();
             settings.LlmConfirmBeforeSending = _confirmBeforeSendingCheck.IsChecked == true;
             settings.LlmAgentVerbose = _agentVerboseCheck.IsChecked == true;
+            settings.LlmRetainThinking = _retainThinkingCheck.IsChecked == true;
             settings.LlmAgentAutoApproveGitEdits = _agentAutoApproveGitEditsCheck.IsChecked == true;
             settings.LlmAgentAutoApprovePowerShell = _agentAutoApprovePowerShellCheck.IsChecked == true;
             settings.LlmAgentAutoApprovePlanning = _agentAutoApprovePlanningCheck.IsChecked == true;
@@ -244,6 +247,7 @@ namespace TxtAIEditor.Core.Services
 
             section.Children.Add(_confirmBeforeSendingCheck);
             section.Children.Add(_agentVerboseCheck);
+            section.Children.Add(_retainThinkingCheck);
             section.Children.Add(_agentAutoApproveGitEditsCheck);
             section.Children.Add(_agentAutoApprovePowerShellCheck);
             section.Children.Add(_agentAutoApprovePlanningCheck);

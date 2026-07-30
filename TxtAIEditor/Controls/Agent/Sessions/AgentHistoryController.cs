@@ -258,9 +258,49 @@ namespace TxtAIEditor.Controls
             bool suppressInstructionMetadataSection = false;
             bool afterUserRequest = false;
             bool inPlanningModeTaskDetails = false;
+            bool inRetainedThinking = false;
+            var retainedThinking = new StringBuilder();
+
+            void AppendThinkingSummary()
+            {
+                int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(retainedThinking.ToString()));
+                string thinkingLabel = getString?.Invoke("AgentActivityThinking", "생각중") ?? "생각중";
+                string tokenFormat = getString?.Invoke("AgentInlineTokenCountFormat", "{0:N0} 토큰") ?? "{0:N0} 토큰";
+                string labelFormat = getString?.Invoke("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})") ?? "{0} ({1})";
+                result.AppendLine(string.Format(
+                    labelFormat,
+                    thinkingLabel,
+                    string.Format(tokenFormat, tokenCount)));
+                retainedThinking.Clear();
+            }
 
             foreach (var line in lines)
             {
+                if (inRetainedThinking)
+                {
+                    bool reachedThinkingBoundary =
+                        line.StartsWith("[assistant:", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[tool:", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[Retry detail:", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("[Retry instruction]", StringComparison.OrdinalIgnoreCase);
+                    if (!reachedThinkingBoundary)
+                    {
+                        retainedThinking.AppendLine(line);
+                        continue;
+                    }
+
+                    AppendThinkingSummary();
+                    inRetainedThinking = false;
+                }
+
+                if (line.StartsWith("[assistant: thinking]", StringComparison.OrdinalIgnoreCase))
+                {
+                    inRetainedThinking = true;
+                    retainedThinking.Clear();
+                    continue;
+                }
+
                 if (inRetryDetail)
                 {
                     if (line.StartsWith("[End retry detail]", StringComparison.OrdinalIgnoreCase))
@@ -489,6 +529,11 @@ namespace TxtAIEditor.Controls
                         result.AppendLine(line);
                     }
                 }
+            }
+
+            if (inRetainedThinking)
+            {
+                AppendThinkingSummary();
             }
 
             return result.ToString().TrimEnd();

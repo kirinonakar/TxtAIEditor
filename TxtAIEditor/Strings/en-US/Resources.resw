@@ -2430,6 +2430,9 @@ Plan: {0}</value>
   <data name="SettingsLlmAgentVerbose" xml:space="preserve">
     <value>Enable agent verbose output (Verbose)</value>
   </data>
+  <data name="SettingsLlmRetainThinking" xml:space="preserve">
+    <value>Retain thinking in history and pass it to the next turn</value>
+  </data>
   <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
     <value>Auto-approve file changes/creation in Git folders</value>
   </data>

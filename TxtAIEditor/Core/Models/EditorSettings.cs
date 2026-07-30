@@ -72,6 +72,7 @@ namespace TxtAIEditor.Core.Models
         public string LlmThinkingLevel { get; set; } = "";
         public bool LlmConfirmBeforeSending { get; set; } = false;
         public bool LlmAgentVerbose { get; set; } = false;
+        public bool LlmRetainThinking { get; set; } = false;
         public bool LlmAgentAutoApproveGitEdits { get; set; } = false;
         public bool LlmAgentAutoApprovePowerShell { get; set; } = false;
         public bool LlmAgentAutoApprovePlanning { get; set; } = false;

@@ -161,6 +161,10 @@ namespace TxtAIEditor.Controls
 
             history = AgentRunTranscriptService.RemoveRetryDebugDetails(history);
             history = AgentRunTranscriptService.ConvertToolCallTagsToLogTags(history);
+            if (!_settingsProvider().LlmRetainThinking)
+            {
+                history = AgentThinkingTranscriptFormatter.RemoveRetainedThinkingSections(history);
+            }
             if (string.IsNullOrEmpty(history))
             {
                 return string.Empty;

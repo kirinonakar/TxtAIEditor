@@ -104,7 +104,16 @@ namespace TxtAIEditor.Core.Services.LLM
                         async reasoningChunk =>
                         {
                             reasoningResponse.Append(reasoningChunk);
-                            if (onReasoning != null) await onReasoning(reasoningChunk);
+                            if (onReasoning != null)
+                            {
+                                await onReasoning(reasoningChunk);
+                            }
+                            else if (settings.LlmAgentVerbose)
+                            {
+                                emittedOutput = true;
+                                fullResponse.Append(reasoningChunk);
+                                await onChunk(reasoningChunk);
+                            }
                         },
                         tools,
                         onProviderUsage
@@ -254,6 +263,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 LlmModel = fallbackModel,
                 LlmThinkingLevel = settings.LlmThinkingLevel,
                 LlmAgentVerbose = settings.LlmAgentVerbose,
+                LlmRetainThinking = settings.LlmRetainThinking,
                 LlmSourceLanguage = settings.LlmSourceLanguage,
                 LlmTargetLanguage = settings.LlmTargetLanguage,
                 LlmVisionFallbackProvider = fallbackProvider,

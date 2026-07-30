@@ -145,6 +145,13 @@ namespace TxtAIEditor.Core.Services.LLM
                                         var firstChoice = choices[0];
                                         if (firstChoice.TryGetProperty("delta", out var delta))
                                         {
+                                            if (onReasoning != null &&
+                                                LlmReasoningContentReader.TryGetText(delta, out string reasoningText))
+                                            {
+                                                cancellationToken.ThrowIfCancellationRequested();
+                                                await onReasoning(reasoningText);
+                                            }
+
                                             if (delta.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array && toolCalls.GetArrayLength() > 0)
                                             {
                                                 hasToolCalls = true;

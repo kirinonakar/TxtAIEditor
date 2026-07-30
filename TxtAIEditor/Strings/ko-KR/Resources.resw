@@ -2430,6 +2430,9 @@
   <data name="SettingsLlmAgentVerbose" xml:space="preserve">
     <value>Agent 상세 출력 활성화 (Verbose)</value>
   </data>
+  <data name="SettingsLlmRetainThinking" xml:space="preserve">
+    <value>추론 유지 (thinking을 history와 다음 turn에 전달)</value>
+  </data>
   <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
     <value>Git 폴더 내 파일 변경/생성 자동 승인</value>
   </data>

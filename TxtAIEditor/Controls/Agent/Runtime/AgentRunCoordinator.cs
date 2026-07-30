@@ -361,8 +361,17 @@ namespace TxtAIEditor.Controls
                     int printedLength = streamResult.PrintedLength;
                     bool heldPotentialToolCallText = streamResult.HeldPotentialToolCallText;
                     bool visibleTextFlushed = streamResult.VisibleTextFlushed;
+                    string responseForTranscript = streamResult.ResponseWithoutThinking;
+                    string retainedThinking = runContext.LlmSettings.LlmRetainThinking
+                        ? streamResult.ThinkingText
+                        : string.Empty;
+                    string retainedThinkingSection =
+                        AgentThinkingTranscriptFormatter.BuildThinkingSection(retainedThinking);
+                    string retainedThinkingTranscriptPart = string.IsNullOrEmpty(retainedThinkingSection)
+                        ? string.Empty
+                        : Environment.NewLine + Environment.NewLine + retainedThinkingSection;
 
-                    if (truncated && !string.IsNullOrWhiteSpace(response))
+                    if (truncated && !string.IsNullOrWhiteSpace(responseForTranscript))
                     {
                         await _runOutputController.StopRunThinkingActivityAsync(runContext);
 
@@ -376,8 +385,9 @@ namespace TxtAIEditor.Controls
                                 "If you were about to write a tool_call, write it now.";
                             string retryDetail = _runTranscriptService.BuildRetryDetail(
                                 "truncated_response",
-                                response,
+                                responseForTranscript,
                                 continuationNote);
+                            retryDetail = retainedThinkingTranscriptPart + retryDetail;
 
                             await _uiDispatcher.RunAsync(() =>
                             {
@@ -394,7 +404,7 @@ namespace TxtAIEditor.Controls
                         }
                     }
 
-                    if (string.IsNullOrWhiteSpace(response))
+                    if (string.IsNullOrWhiteSpace(responseForTranscript))
                     {
                         await _runOutputController.StopRunThinkingActivityAsync(runContext);
 
@@ -408,6 +418,7 @@ namespace TxtAIEditor.Controls
                                 "empty_response",
                                 string.Empty,
                                 retryNote);
+                            retryDetail = retainedThinkingTranscriptPart + retryDetail;
 
                             await _uiDispatcher.RunAsync(() =>
                             {
@@ -434,7 +445,7 @@ namespace TxtAIEditor.Controls
                         AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                             runContext,
                             conversationTurn,
-                            transcript,
+                            transcript + retainedThinkingTranscriptPart,
                             initialTranscript,
                             $"[Agent Response]: {emptyResponseMessage}");
                         _ = PersistRunSessionToHistoryAsync();
@@ -514,10 +525,13 @@ namespace TxtAIEditor.Controls
                                     : "The tool_call JSON could not be parsed.");
                             string retryDetail = _runTranscriptService.BuildRetryDetail(
                                 responseLooksLikeToolResultReplay ? "tool_result_replay" : "tool_call_format",
-                                response,
+                                responseForTranscript,
                                 retryNote);
                             runContext.RetryDebugHistory.AppendLine(retryDetail);
-                            string retryPromptContext = "\n\n" + retryNote;
+                            string retryPromptContext =
+                                retainedThinkingTranscriptPart +
+                                "\n\n[Retry instruction]\n" +
+                                retryNote.Trim();
                             transcript += retryPromptContext;
                             modelTranscript += retryPromptContext;
                             runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryPromptContext);
@@ -564,8 +578,9 @@ namespace TxtAIEditor.Controls
                                 "Do not answer with the plan as plain text. Save it by including exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename.";
                             string retryDetail = _runTranscriptService.BuildRetryDetail(
                                 "make_plan_required",
-                                response,
+                                responseForTranscript,
                                 retryNote);
+                            retryDetail = retainedThinkingTranscriptPart + retryDetail;
 
                             transcript += retryDetail;
                             modelTranscript += retryDetail;
@@ -618,8 +633,9 @@ namespace TxtAIEditor.Controls
                                 "<tool_call>{\"name\":\"skill_use\",\"arguments\":{\"name\":\"skill-name\"}}>";
                             string retryDetail = _runTranscriptService.BuildRetryDetail(
                                 "skill_not_called",
-                                response,
+                                responseForTranscript,
                                 retryNote);
+                            retryDetail = retainedThinkingTranscriptPart + retryDetail;
 
                             await _uiDispatcher.RunAsync(() =>
                             {
@@ -654,15 +670,18 @@ namespace TxtAIEditor.Controls
                             await _runOutputController.EndStreamedAnswerAsync(runContext);
                         }
 
+                        string finalAnswerLog = AgentThinkingTranscriptFormatter.BuildFinalAnswerLog(
+                            responseForTranscript,
+                            retainedThinking);
                         AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                             runContext,
                             conversationTurn,
                             transcript,
                             initialTranscript,
-                            $"[Agent Response]: {response.Trim()}");
+                            finalAnswerLog);
                         _ = PersistRunSessionToHistoryAsync();
 
-                        runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(response);
+                        runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(finalAnswerLog);
                         completed = true;
                         break;
                     }
@@ -774,8 +793,13 @@ namespace TxtAIEditor.Controls
                         var addedPartBuilder = new StringBuilder();
                         addedPartBuilder.AppendLine();
                         addedPartBuilder.AppendLine();
+                        if (!string.IsNullOrEmpty(retainedThinkingSection))
+                        {
+                            addedPartBuilder.AppendLine(retainedThinkingSection);
+                            addedPartBuilder.AppendLine();
+                        }
                         addedPartBuilder.AppendLine("[assistant: tool call]");
-                        addedPartBuilder.AppendLine(response);
+                        addedPartBuilder.AppendLine(responseForTranscript);
 
                         foreach (var tcRes in toolCallResults)
                         {

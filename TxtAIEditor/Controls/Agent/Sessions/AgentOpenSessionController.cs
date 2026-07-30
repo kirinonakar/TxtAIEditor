@@ -1035,6 +1035,7 @@ namespace TxtAIEditor.Controls
                 LlmThinkingLevel = settings.LlmThinkingLevel,
                 LlmConfirmBeforeSending = settings.LlmConfirmBeforeSending,
                 LlmAgentVerbose = settings.LlmAgentVerbose,
+                LlmRetainThinking = settings.LlmRetainThinking,
                 LlmAgentAutoApproveGitEdits = settings.LlmAgentAutoApproveGitEdits,
                 LlmAgentAutoApprovePowerShell = settings.LlmAgentAutoApprovePowerShell,
                 LlmAgentAutoApprovePlanning = settings.LlmAgentAutoApprovePlanning,

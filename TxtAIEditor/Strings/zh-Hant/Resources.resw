@@ -2430,6 +2430,9 @@
   <data name="SettingsLlmAgentVerbose" xml:space="preserve">
     <value>啟用 Agent 詳細輸出（Verbose）</value>
   </data>
+  <data name="SettingsLlmRetainThinking" xml:space="preserve">
+    <value>在歷史記錄中保留推理並傳遞到下一輪</value>
+  </data>
   <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
     <value>自動核准 Git 資料夾內的檔案變更/建立</value>
   </data>
