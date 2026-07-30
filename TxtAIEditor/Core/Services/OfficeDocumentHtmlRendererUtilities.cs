@@ -157,16 +157,23 @@ body { padding: 28px 16px 44px; }
     position: absolute;
     display: flex;
     flex-direction: column;
-    padding: clamp(2px, .65vw, 8px);
     overflow: hidden;
     color: var(--text);
     white-space: pre-wrap;
+}
+.hwpx-group-shape-text-positioned {
+    display: block;
 }
 .hwpx-group-shape-paragraph {
     display: block;
     width: 100%;
     margin: 0;
     line-height: 1.24;
+}
+.hwpx-group-shape-line {
+    position: absolute;
+    display: block;
+    white-space: nowrap;
 }
 @media (max-width: 640px) {
     body { padding: 0; }

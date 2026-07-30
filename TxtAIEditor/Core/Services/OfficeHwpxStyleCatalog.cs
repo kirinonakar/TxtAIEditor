@@ -229,6 +229,18 @@ namespace TxtAIEditor.Core.Services
                 styles.Add("font-family:" + QuoteCssFontFamily(face) + ", \"Malgun Gothic\", sans-serif");
             }
 
+            XElement? ratio = charPr.Elements().FirstOrDefault(e => e.Name.LocalName == "ratio");
+            if (int.TryParse(
+                    GetAttributeValue(ratio, "hangul"),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int ratioValue) &&
+                ratioValue is >= 50 and <= 200 &&
+                ratioValue != 100)
+            {
+                styles.Add("font-stretch:" + ratioValue.ToString(CultureInfo.InvariantCulture) + "%");
+            }
+
             if (charPr.Elements().Any(e => e.Name.LocalName == "bold"))
             {
                 styles.Add("font-weight:700");

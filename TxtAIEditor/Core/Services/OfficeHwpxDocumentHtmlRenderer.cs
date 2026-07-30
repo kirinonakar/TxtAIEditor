@@ -502,14 +502,47 @@ namespace TxtAIEditor.Core.Services
 
                     builder.Append('>');
                     int before = builder.Length;
-                    AppendHwpxChildrenHtml(
-                        builder,
-                        archive,
-                        binaryItems,
-                        characterStyles,
-                        paragraphStyles,
-                        borderFillStyles,
-                        cell.Elements());
+                    if (subList != null && HasHwpxFloatingContainer(subList))
+                    {
+                        foreach (XElement cellElement in cell.Elements())
+                        {
+                            if (ReferenceEquals(cellElement, subList))
+                            {
+                                AppendHwpxChildrenHtml(
+                                    builder,
+                                    archive,
+                                    binaryItems,
+                                    characterStyles,
+                                    paragraphStyles,
+                                    borderFillStyles,
+                                    subList.Elements().Where(element =>
+                                        !IsHwpxFloatingObjectSpacerParagraph(element)));
+                            }
+                            else
+                            {
+                                AppendHwpxBlockHtml(
+                                    builder,
+                                    archive,
+                                    binaryItems,
+                                    characterStyles,
+                                    paragraphStyles,
+                                    borderFillStyles,
+                                    cellElement);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        AppendHwpxChildrenHtml(
+                            builder,
+                            archive,
+                            binaryItems,
+                            characterStyles,
+                            paragraphStyles,
+                            borderFillStyles,
+                            cell.Elements());
+                    }
+
                     if (builder.Length == before)
                     {
                         builder.Append("&nbsp;");
@@ -523,6 +556,33 @@ namespace TxtAIEditor.Core.Services
 
             builder.Append("</tbody></table></div>");
             return builder.ToString();
+        }
+
+        private static bool HasHwpxFloatingContainer(XElement subList)
+        {
+            return subList.Descendants().Any(element =>
+            {
+                if (element.Name.LocalName != "container")
+                {
+                    return false;
+                }
+
+                XElement? position = element.Elements()
+                    .FirstOrDefault(child => child.Name.LocalName == "pos");
+                return GetAttributeValue(position, "treatAsChar") == "0";
+            });
+        }
+
+        private static bool IsHwpxFloatingObjectSpacerParagraph(XElement element)
+        {
+            if (element.Name.LocalName != "p")
+            {
+                return false;
+            }
+
+            return !element.Descendants().Any(descendant =>
+                descendant.Name.LocalName is "tbl" or "container" or "pic" or "img" ||
+                descendant.Name.LocalName == "t" && !string.IsNullOrWhiteSpace(descendant.Value));
         }
 
         private static bool TryBuildHwpxTableTracks(
@@ -838,11 +898,17 @@ namespace TxtAIEditor.Core.Services
                     renderedShapeCount++;
 
                     XElement? drawText = shape.Elements().FirstOrDefault(element => element.Name.LocalName == "drawText");
-                    string text = BuildHwpxShapeTextHtml(drawText, characterStyles, paragraphStyles);
+                    string text = BuildHwpxShapeTextHtml(
+                        drawText,
+                        shape,
+                        characterStyles,
+                        paragraphStyles,
+                        out bool usesPositionedLineLayout);
                     if (!string.IsNullOrWhiteSpace(text))
                     {
                         AppendHwpxShapeTextLayer(
                             textLayers,
+                            shape,
                             drawText,
                             text,
                             left,
@@ -850,7 +916,8 @@ namespace TxtAIEditor.Core.Services
                             width,
                             height,
                             containerWidth,
-                            containerHeight);
+                            containerHeight,
+                            usesPositionedLineLayout);
                     }
                 }
                 else if (shape.Name.LocalName == "line" &&
@@ -892,16 +959,41 @@ namespace TxtAIEditor.Core.Services
 
         private static string BuildHwpxShapeTextHtml(
             XElement? drawText,
+            XElement shape,
             IReadOnlyDictionary<string, string> characterStyles,
-            IReadOnlyDictionary<string, string> paragraphStyles)
+            IReadOnlyDictionary<string, string> paragraphStyles,
+            out bool usesPositionedLineLayout)
         {
+            usesPositionedLineLayout = false;
             if (drawText == null)
             {
                 return string.Empty;
             }
 
+            var paragraphs = drawText.Descendants()
+                .Where(element => element.Name.LocalName == "p")
+                .ToList();
+            ReadHwpxTextMargins(
+                drawText,
+                out double marginLeft,
+                out double marginRight,
+                out double marginTop,
+                out double marginBottom);
+            bool hasShapeSize = TryReadHwpxSize(shape, out double shapeWidth, out double shapeHeight);
+            double textWidth = shapeWidth - marginLeft - marginRight;
+            double textHeight = shapeHeight - marginTop - marginBottom;
+            usesPositionedLineLayout =
+                hasShapeSize &&
+                textWidth > 0 &&
+                textHeight > 0 &&
+                paragraphs
+                    .Where(paragraph => paragraph.Descendants()
+                        .Any(element => element.Name.LocalName == "t" && !string.IsNullOrEmpty(element.Value)))
+                    .All(paragraph => paragraph.Descendants()
+                        .Count(element => element.Name.LocalName == "lineseg") == 1);
+
             var text = new StringBuilder();
-            foreach (XElement paragraph in drawText.Descendants().Where(element => element.Name.LocalName == "p"))
+            foreach (XElement paragraph in paragraphs)
             {
                 var paragraphContent = new StringBuilder();
                 IReadOnlyDictionary<XText, string> textValues = GetHwpxRenderedTextValues(paragraph);
@@ -928,8 +1020,44 @@ namespace TxtAIEditor.Core.Services
                     continue;
                 }
 
-                text.Append("<span class=\"hwpx-group-shape-paragraph\"");
-                AppendStyleAttribute(text, GetHwpxParagraphStyle(paragraph, paragraphStyles));
+                text.Append("<span class=\"hwpx-group-shape-paragraph");
+                string paragraphStyle = GetHwpxParagraphStyle(paragraph, paragraphStyles);
+                if (usesPositionedLineLayout)
+                {
+                    text.Append(" hwpx-group-shape-line");
+                    XElement lineSegment = paragraph.Descendants()
+                        .First(element => element.Name.LocalName == "lineseg");
+                    double left = Math.Clamp(
+                        ReadHwpxDoubleAttribute(lineSegment, "horzpos") / textWidth * 100.0,
+                        0.0,
+                        100.0);
+                    double top = Math.Clamp(
+                        ReadHwpxDoubleAttribute(lineSegment, "vertpos") / textHeight * 100.0,
+                        0.0,
+                        100.0);
+                    double width = Math.Clamp(
+                        ReadHwpxDoubleAttribute(lineSegment, "horzsize") / textWidth * 100.0,
+                        0.0,
+                        100.0 - left);
+                    double height = Math.Clamp(
+                        ReadHwpxDoubleAttribute(lineSegment, "vertsize") / textHeight * 100.0,
+                        0.0,
+                        100.0 - top);
+                    paragraphStyle = string.Join(
+                        ';',
+                        new[]
+                        {
+                            paragraphStyle,
+                            "left:" + CssPercent(left),
+                            "top:" + CssPercent(top),
+                            "width:" + CssPercent(width),
+                            "height:" + CssPercent(height),
+                            "line-height:1"
+                        }.Where(style => !string.IsNullOrWhiteSpace(style)));
+                }
+
+                text.Append('"');
+                AppendStyleAttribute(text, paragraphStyle);
                 text.Append('>')
                     .Append(paragraphContent)
                     .Append("</span>");
@@ -940,6 +1068,7 @@ namespace TxtAIEditor.Core.Services
 
         private static void AppendHwpxShapeTextLayer(
             StringBuilder builder,
+            XElement shape,
             XElement? drawText,
             string text,
             double left,
@@ -947,7 +1076,8 @@ namespace TxtAIEditor.Core.Services
             double width,
             double height,
             double containerWidth,
-            double containerHeight)
+            double containerHeight,
+            bool usesPositionedLineLayout)
         {
             XElement? subList = drawText?.Descendants().FirstOrDefault(element => element.Name.LocalName == "subList");
             string verticalAlignment = GetAttributeValue(subList, "vertAlign").ToUpperInvariant();
@@ -957,12 +1087,34 @@ namespace TxtAIEditor.Core.Services
                 "BOTTOM" => "flex-end",
                 _ => "center"
             };
+            if (TryReadHwpxSize(shape, out double shapeWidth, out double shapeHeight))
+            {
+                ReadHwpxTextMargins(
+                    drawText,
+                    out double marginLeft,
+                    out double marginRight,
+                    out double marginTop,
+                    out double marginBottom);
+                double horizontalScale = width / shapeWidth;
+                double verticalScale = height / shapeHeight;
+                left += marginLeft * horizontalScale;
+                top += marginTop * verticalScale;
+                width = Math.Max(0, width - ((marginLeft + marginRight) * horizontalScale));
+                height = Math.Max(0, height - ((marginTop + marginBottom) * verticalScale));
+            }
+
             double leftPercent = Math.Clamp(left / containerWidth * 100.0, 0.0, 100.0);
             double topPercent = Math.Clamp(top / containerHeight * 100.0, 0.0, 100.0);
             double widthPercent = Math.Clamp(width / containerWidth * 100.0, 0.0, 100.0 - leftPercent);
             double heightPercent = Math.Clamp(height / containerHeight * 100.0, 0.0, 100.0 - topPercent);
 
-            builder.Append("<span class=\"hwpx-group-shape-text\" style=\"left:")
+            builder.Append("<span class=\"hwpx-group-shape-text");
+            if (usesPositionedLineLayout)
+            {
+                builder.Append(" hwpx-group-shape-text-positioned");
+            }
+
+            builder.Append("\" style=\"left:")
                 .Append(CssPercent(leftPercent))
                 .Append(";top:")
                 .Append(CssPercent(topPercent))
@@ -975,6 +1127,21 @@ namespace TxtAIEditor.Core.Services
                 .Append("\">")
                 .Append(text)
                 .Append("</span>");
+        }
+
+        private static void ReadHwpxTextMargins(
+            XElement? drawText,
+            out double left,
+            out double right,
+            out double top,
+            out double bottom)
+        {
+            XElement? textMargin = drawText?.Elements()
+                .FirstOrDefault(element => element.Name.LocalName == "textMargin");
+            left = ReadHwpxDoubleAttribute(textMargin, "left");
+            right = ReadHwpxDoubleAttribute(textMargin, "right");
+            top = ReadHwpxDoubleAttribute(textMargin, "top");
+            bottom = ReadHwpxDoubleAttribute(textMargin, "bottom");
         }
 
         private static void AppendHwpxRectangleVector(
