@@ -1264,7 +1264,9 @@ function measureRenderedRows(renderOnChange = true, force = false) {
         if (state.inlineLivePreviewEnabled && rowRect.bottom <= containerRect.top) continue;
         const isSkipped = row.classList.contains('live-preview-skipped');
         const minimum = isSkipped ? 0 : state.lineHeight;
-        const measuredHeight = Math.max(rowRect.height || 0, row.scrollHeight || 0);
+        const measuredHeight = state.inlineLivePreviewEnabled
+            ? Math.max(rowRect.height || 0, row.scrollHeight || 0)
+            : (rowRect.height || row.scrollHeight || 0);
         const measured = Math.max(minimum, roundCssPixelsToDevicePixels(measuredHeight));
         if (setMeasuredLineHeight(lineNumber, measured)) {
             changed = true;
