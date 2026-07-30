@@ -190,7 +190,7 @@ namespace TxtAIEditor.Controls
             };
             TextBlock validationText = new()
             {
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
+                Foreground = GetResourceBrush("SystemFillColorCriticalBrush", new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red)),
                 TextWrapping = TextWrapping.Wrap,
                 Visibility = Visibility.Collapsed
             };
@@ -222,12 +222,13 @@ namespace TxtAIEditor.Controls
                 Text = Get("RemoteServerCredentialNotice", "주소와 비밀번호는 Windows 자격 증명 관리자에 일반 자격 증명으로 저장됩니다."),
                 FontSize = 11,
                 TextWrapping = TextWrapping.Wrap,
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+                Opacity = 0.75
             });
 
             ContentDialog dialog = new()
             {
                 XamlRoot = XamlRoot,
+                RequestedTheme = ActualTheme,
                 Title = Get("RemoteExplorerAddServerTitle", "리모트 서버 추가"),
                 Content = content,
                 PrimaryButtonText = Get("CommonAdd", "추가"),
@@ -291,6 +292,7 @@ namespace TxtAIEditor.Controls
             ContentDialog dialog = new()
             {
                 XamlRoot = XamlRoot,
+                RequestedTheme = ActualTheme,
                 Title = Get("RemoteServerDeleteTitle", "서버 삭제"),
                 Content = string.Format(
                     Get("RemoteServerDeleteMessageFormat", "'{0}' 서버와 저장된 자격 증명을 삭제할까요?"),
@@ -536,11 +538,21 @@ namespace TxtAIEditor.Controls
             };
         }
 
+        private static Microsoft.UI.Xaml.Media.Brush GetResourceBrush(string resourceKey, Microsoft.UI.Xaml.Media.Brush fallback)
+        {
+            if (Application.Current.Resources.TryGetValue(resourceKey, out object resource) && resource is Microsoft.UI.Xaml.Media.Brush brush)
+            {
+                return brush;
+            }
+            return fallback;
+        }
+
         private async Task ShowErrorAsync(string title, string message)
         {
             ContentDialog dialog = new()
             {
                 XamlRoot = XamlRoot,
+                RequestedTheme = ActualTheme,
                 Title = title,
                 Content = message,
                 CloseButtonText = Get("CommonClose", "닫기")
