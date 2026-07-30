@@ -273,7 +273,12 @@ namespace TxtAIEditor.Core.Services
             if (int.TryParse(GetAttributeValue(spacing, "hangul"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int spacingValue) &&
                 spacingValue != 0)
             {
-                styles.Add("letter-spacing:" + (spacingValue / 100.0).ToString("0.###", CultureInfo.InvariantCulture) + "em");
+                double spacingEm = spacingValue / 100.0;
+                styles.Add("letter-spacing:" + spacingEm.ToString("0.###", CultureInfo.InvariantCulture) + "em");
+                if (spacingValue < 0)
+                {
+                    styles.Add("word-spacing:" + (-spacingEm).ToString("0.###", CultureInfo.InvariantCulture) + "em");
+                }
             }
 
             return string.Join(';', styles);
