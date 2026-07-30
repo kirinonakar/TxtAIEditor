@@ -99,7 +99,7 @@ namespace TxtAIEditor.Core.Services
             var content = new StringBuilder();
             foreach (ZipArchiveEntry sectionEntry in sectionEntries)
             {
-                XDocument section = await LoadXmlEntryAsync(sectionEntry).ConfigureAwait(false);
+                XDocument section = await LoadHwpxSectionXmlAsync(sectionEntry).ConfigureAwait(false);
                 AppendHwpxChildrenHtml(
                     content,
                     archive,
@@ -116,6 +116,13 @@ namespace TxtAIEditor.Core.Services
             }
 
             return BuildDocumentHtml(Path.GetFileName(filePath), content.ToString());
+        }
+
+        private static async Task<XDocument> LoadHwpxSectionXmlAsync(ZipArchiveEntry entry)
+        {
+            using Stream stream = entry.Open();
+            return await Task.Run(() =>
+                XDocument.Load(stream, LoadOptions.PreserveWhitespace)).ConfigureAwait(false);
         }
 
         private static void AppendHwpxChildrenHtml(
@@ -236,7 +243,16 @@ namespace TxtAIEditor.Core.Services
                         content.Append(' ');
                         break;
                     case "fwSpace":
-                        content.Append("&#12288;");
+                        string? listMarkerSpacing = GetHwpxListMarkerSpacing(element);
+                        if (listMarkerSpacing == null)
+                        {
+                            content.Append("&#12288;");
+                        }
+                        else
+                        {
+                            content.Append(listMarkerSpacing);
+                        }
+
                         break;
                     case "pic":
                     case "img":
@@ -297,25 +313,73 @@ namespace TxtAIEditor.Core.Services
                 .ToHashSet();
 
             var renderedValues = new Dictionary<XText, string>();
-            if (softWrapPositions.Count == 0)
+            if (softWrapPositions.Count > 0)
             {
-                return renderedValues;
+                int textOffset = 0;
+                foreach (XText textNode in textNodes)
+                {
+                    string text = textNode.Value;
+                    string renderedText = NormalizeHwpxSoftWrapPadding(text, textOffset, softWrapPositions);
+                    if (!ReferenceEquals(renderedText, text))
+                    {
+                        renderedValues[textNode] = renderedText;
+                    }
+
+                    textOffset += text.Length;
+                }
             }
 
-            int textOffset = 0;
-            foreach (XText textNode in textNodes)
+            NormalizeHwpxLeadingSpaceRuns(paragraph, renderedValues);
+            return renderedValues;
+        }
+
+        private static void NormalizeHwpxLeadingSpaceRuns(
+            XElement paragraph,
+            IDictionary<XText, string> renderedValues)
+        {
+            var leadingSpaceNodes = new List<XText>();
+            int leadingSpaceCount = 0;
+            foreach (XNode node in paragraph.DescendantNodes())
             {
-                string text = textNode.Value;
-                string renderedText = NormalizeHwpxSoftWrapPadding(text, textOffset, softWrapPositions);
-                if (!ReferenceEquals(renderedText, text))
+                if (IsInsideNestedElement(paragraph, node, "tbl"))
                 {
-                    renderedValues[textNode] = renderedText;
+                    continue;
                 }
 
-                textOffset += text.Length;
-            }
+                if (node is XText textNode && textNode.Parent?.Name.LocalName == "t")
+                {
+                    string text = renderedValues.TryGetValue(textNode, out string? renderedText)
+                        ? renderedText
+                        : textNode.Value;
+                    if (text.Length > 0 && text.All(value => value == ' '))
+                    {
+                        leadingSpaceNodes.Add(textNode);
+                        leadingSpaceCount += text.Length;
+                        continue;
+                    }
 
-            return renderedValues;
+                    if (leadingSpaceNodes.Count == 0 || string.IsNullOrEmpty(text))
+                    {
+                        return;
+                    }
+
+                    foreach (XText leadingSpaceNode in leadingSpaceNodes)
+                    {
+                        renderedValues[leadingSpaceNode] = string.Empty;
+                    }
+
+                    renderedValues[textNode] = new string(' ', leadingSpaceCount) + text;
+                    return;
+                }
+
+                if (leadingSpaceNodes.Count > 0 &&
+                    node is XElement element &&
+                    element.Name.LocalName is "tab" or "lineBreak" or "br" or "cr" or
+                        "nbSpace" or "fwSpace" or "pic" or "img" or "container")
+                {
+                    return;
+                }
+            }
         }
 
         private static string NormalizeHwpxSoftWrapPadding(
@@ -373,6 +437,85 @@ namespace TxtAIEditor.Core.Services
         private static bool IsHangulSyllable(char value)
         {
             return value >= '\uAC00' && value <= '\uD7A3';
+        }
+
+        private static string? GetHwpxListMarkerSpacing(XElement fixedWidthSpace)
+        {
+            if (fixedWidthSpace.Name.LocalName != "fwSpace")
+            {
+                return null;
+            }
+
+            XElement? paragraph = fixedWidthSpace.Ancestors()
+                .FirstOrDefault(element => element.Name.LocalName == "p");
+            if (paragraph == null)
+            {
+                return null;
+            }
+
+            var inlineNodes = paragraph.DescendantNodes()
+                .Where(node =>
+                    !IsInsideNestedElement(paragraph, node, "tbl") &&
+                    (node is XText textNode && textNode.Parent?.Name.LocalName == "t" ||
+                     node is XElement element &&
+                     element.Name.LocalName is "tab" or "lineBreak" or "br" or "cr" or
+                         "nbSpace" or "fwSpace" or "pic" or "img" or "container"))
+                .ToList();
+            int spaceIndex = inlineNodes.FindIndex(node => ReferenceEquals(node, fixedWidthSpace));
+            if (spaceIndex < 0)
+            {
+                return null;
+            }
+
+            int sequenceStart = spaceIndex;
+            while (sequenceStart > 0 &&
+                   inlineNodes[sequenceStart - 1] is XElement previousSpace &&
+                   previousSpace.Name.LocalName == "fwSpace")
+            {
+                sequenceStart--;
+            }
+
+            int sequenceEnd = spaceIndex;
+            while (sequenceEnd + 1 < inlineNodes.Count &&
+                   inlineNodes[sequenceEnd + 1] is XElement nextSpace &&
+                   nextSpace.Name.LocalName == "fwSpace")
+            {
+                sequenceEnd++;
+            }
+
+            if (sequenceEnd - sequenceStart + 1 < 2 ||
+                sequenceStart == 0 ||
+                sequenceEnd + 1 >= inlineNodes.Count ||
+                inlineNodes[sequenceStart - 1] is not XText ||
+                inlineNodes[sequenceEnd + 1] is not XText suffix ||
+                string.IsNullOrEmpty(suffix.Value))
+            {
+                return null;
+            }
+
+            int prefixStart = sequenceStart - 1;
+            while (prefixStart > 0 && inlineNodes[prefixStart - 1] is XText)
+            {
+                prefixStart--;
+            }
+
+            string markerPrefix = string.Concat(
+                inlineNodes
+                    .Skip(prefixStart)
+                    .Take(sequenceStart - prefixStart)
+                    .OfType<XText>()
+                    .Select(textNode => textNode.Value));
+            Match markerMatch = Regex.Match(
+                markerPrefix,
+                @"(?:^|\s)(?:[가-힣]\.|(?<numeric>\d+\)))$");
+            if (!markerMatch.Success)
+            {
+                return null;
+            }
+
+            return markerMatch.Groups["numeric"].Success && spaceIndex == sequenceStart
+                ? " "
+                : string.Empty;
         }
 
         private static string BuildHwpxTableHtml(
