@@ -162,12 +162,34 @@ namespace TxtAIEditor.Controls
                 AgentFileEditPreview edit = edits[i];
                 builder.AppendLine($"--- File: {edit.RelativePath} (Action: {edit.ActionName}) ---");
                 builder.AppendLine(edit.IsNewFile ? "[New File]" : "[Modified File]");
-                builder.AppendLine($"Old chars: {edit.OldContent?.Length ?? 0:N0}");
-                builder.AppendLine($"New chars: {edit.NewContent?.Length ?? 0:N0}");
+
+                int oldLineCount = CountLines(edit.OldContent);
+                int newLineCount = CountLines(edit.NewContent);
+                int netChange = newLineCount - oldLineCount;
+                string changeSummary = netChange >= 0 ? $"+{netChange:N0}" : $"{netChange:N0}";
+                builder.AppendLine($"Lines: {oldLineCount:N0} -> {newLineCount:N0} ({changeSummary})");
                 builder.AppendLine();
             }
 
             return builder.ToString().TrimEnd();
+        }
+
+        private static int CountLines(string? text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return 0;
+            }
+
+            int count = 1;
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '\n')
+                {
+                    count++;
+                }
+            }
+            return count;
         }
     }
 }
