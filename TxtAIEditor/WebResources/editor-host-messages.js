@@ -32,6 +32,7 @@ import {
     setCsvTableMode,
     updateCsvLocalization
 } from './editor-csv-table.js';
+import { isFullDocumentLivePreviewLanguage } from './editor-html-live-preview.js';
 
 const EDITOR_PROTOCOL_VERSION = 1;
 const VERSIONED_HOST_ACTIONS = new Set([
@@ -82,7 +83,8 @@ function applyModelInitialization(msg) {
     if (msg.inlineLivePreviewEnabled !== undefined && msg.inlineLivePreviewEnabled !== null) {
         state.inlineLivePreviewEnabled = !!msg.inlineLivePreviewEnabled;
         state.livePreviewBaseHref = msg.livePreviewBaseHref || '';
-        state.inlineLivePreviewSourceLine = state.inlineLivePreviewEnabled && state.language !== 'html'
+        state.inlineLivePreviewSourceLine = state.inlineLivePreviewEnabled &&
+            !isFullDocumentLivePreviewLanguage(state.language)
             ? Math.min(
                 Math.max(1, Number(msg.lineCount || 1)),
                 Math.max(1, Number(state.currentLine || 1)))
@@ -247,7 +249,7 @@ export function createHostMessageHandler({
             }
             pendingModelResynchronization = null;
             applyModelInitialization(msg);
-            if (state.inlineLivePreviewEnabled && state.language !== 'html') {
+            if (state.inlineLivePreviewEnabled && !isFullDocumentLivePreviewLanguage(state.language)) {
                 void ensureInlinePreviewDependencies?.();
             }
             break;
@@ -403,7 +405,7 @@ export function createHostMessageHandler({
                     state.language = nextLanguage;
                     syncLanguageClass();
                     state.lineEndStacks.clear();
-                    if (state.inlineLivePreviewEnabled && state.language !== 'html') {
+                    if (state.inlineLivePreviewEnabled && !isFullDocumentLivePreviewLanguage(state.language)) {
                         void ensureInlinePreviewDependencies?.();
                     }
                     queueRender(true);
@@ -589,10 +591,10 @@ export function createHostMessageHandler({
             state.inlineLivePreviewEnabled = !!msg.enabled;
             state.livePreviewBaseHref = msg.baseHref || '';
             clearPendingInlineLivePreviewFocus();
-            if (state.inlineLivePreviewEnabled && state.language !== 'html') {
+            if (state.inlineLivePreviewEnabled && !isFullDocumentLivePreviewLanguage(state.language)) {
                 void ensureInlinePreviewDependencies?.();
             }
-            if (state.inlineLivePreviewEnabled && state.language !== 'html') {
+            if (state.inlineLivePreviewEnabled && !isFullDocumentLivePreviewLanguage(state.language)) {
                 const activeEl = document.activeElement?.closest?.('.line-text');
                 const activeLine = activeEl ? Number(activeEl.dataset.line) : state.currentLine;
                 if (activeLine) {

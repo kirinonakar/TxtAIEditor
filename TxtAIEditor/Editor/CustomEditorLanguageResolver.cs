@@ -27,6 +27,7 @@ namespace TxtAIEditor.Editor
                 ".js" or ".jsx" or ".mjs" or ".cjs" => "javascript",
                 ".ts" or ".tsx" or ".mts" or ".cts" => "typescript",
                 ".html" or ".htm" => "html",
+                ".svg" => "svg",
                 ".css" => "css",
                 ".scss" => "scss",
                 ".less" => "less",

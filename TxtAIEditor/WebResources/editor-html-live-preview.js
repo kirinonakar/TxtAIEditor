@@ -29,9 +29,13 @@ function buildHtmlPreviewDocument(html, baseHref) {
     return `<!DOCTYPE html><html><head>${injection}</head><body>${bodySource}</body></html>`;
 }
 
+function isFullDocumentLivePreviewLanguage(language) {
+    return ['html', 'svg'].includes(String(language || '').toLowerCase());
+}
+
 function isFullHtmlLivePreviewActive() {
     return state.inlineLivePreviewEnabled &&
-        String(state.language || '').toLowerCase() === 'html';
+        isFullDocumentLivePreviewLanguage(state.language);
 }
 
 function fullDocumentText() {
@@ -128,5 +132,6 @@ function createFullHtmlLivePreviewRenderer() {
 export {
     buildHtmlPreviewDocument,
     createFullHtmlLivePreviewRenderer,
+    isFullDocumentLivePreviewLanguage,
     isFullHtmlLivePreviewActive
 };

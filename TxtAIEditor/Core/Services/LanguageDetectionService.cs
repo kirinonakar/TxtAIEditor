@@ -19,6 +19,7 @@ namespace TxtAIEditor.Core.Services
                 ".markdown" => "markdown",
                 ".html" => "html",
                 ".htm" => "html",
+                ".svg" => "svg",
                 ".tex" => "latex",
                 ".diff" => "diff",
                 ".cs" => "csharp",

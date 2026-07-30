@@ -1668,6 +1668,7 @@ function lineCommentSyntax() {
         case 'vb':
             return { prefix: "' " };
         case 'html':
+        case 'svg':
         case 'xml':
         case 'markdown':
             return { blockStart: '<!-- ', blockEnd: ' -->' };

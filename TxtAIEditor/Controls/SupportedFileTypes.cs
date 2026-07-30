@@ -15,6 +15,7 @@ namespace TxtAIEditor.Controls
             ".csv",
             ".html",
             ".htm",
+            ".svg",
             ".css",
             ".js",
             ".ts",

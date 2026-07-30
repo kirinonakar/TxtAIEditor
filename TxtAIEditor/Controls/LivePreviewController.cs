@@ -306,9 +306,10 @@ namespace TxtAIEditor.Controls
                 }
 
                 int selectedMode;
-                if (string.Equals(tab.Language, "html", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(tab.Language, "html", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(tab.Language, "svg", StringComparison.OrdinalIgnoreCase))
                 {
-                    selectedMode = 1; // HTML Preview is unconditionally forced for HTML files
+                    selectedMode = 1; // HTML Preview is unconditionally forced for HTML and SVG files
                 }
                 else if (!_tabPreviewModes.TryGetValue(tab.Id, out selectedMode))
                 {
