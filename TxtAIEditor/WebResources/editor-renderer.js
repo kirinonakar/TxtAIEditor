@@ -11,6 +11,7 @@ import {
     syncCustomSelectionClass,
     trimHexCacheToRange,
     totalVirtualHeight,
+    usesFullDocumentRender,
     visibleRange,
     viewportTopForLine
 } from './editor-core.js';
@@ -186,6 +187,7 @@ function createEditorRenderer({
         updateHexStickyHeader();
 
         const csvTableLineCount = state.csvTableEnabled ? prepareCsvTableRenderModel() : 0;
+        const renderFullDocument = usesFullDocumentRender();
         const range = visibleRange();
         const firstVisibleLine = lineAt(scrollContainer.scrollTop);
         const lastVisibleLine = lineAt(
@@ -243,7 +245,8 @@ function createEditorRenderer({
             : '';
         const csvModeKey = state.csvTableEnabled ? `${state.csvTableVersion || 0}:${state.csvTableColumnCount || 0}:${state.csvSelectedLine || 0}:${state.csvSelectedColumn || 0}:${state.csvVirtualLineCount || 0}:${(state.csvJsonNavPath || []).join('.')}` : '0';
         const horizontalRenderKey = state.csvTableEnabled ? scrollContainer.scrollLeft : 0;
-        const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${totalVirtualHeight()}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${activeLine || 0}:${state.editingLine || 0}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}`;
+        const virtualHeightRenderKey = renderFullDocument ? 'full-document' : totalVirtualHeight();
+        const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${virtualHeightRenderKey}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${activeLine || 0}:${state.editingLine || 0}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}`;
         if (!state.csvTableEnabled || !isJsonCsvTableMode()) {
             requestMissingLines(renderStart, renderEnd);
             trimHexCacheToRange(renderStart, renderEnd);
@@ -469,8 +472,8 @@ function createEditorRenderer({
         refreshHoveredLineFromLastPointer();
 
         watchLivePreviewImages();
-        measureRenderedRows();
-        renderMermaidBlocks(viewport, () => measureRenderedRows());
+        measureRenderedRows(!renderFullDocument);
+        renderMermaidBlocks(viewport, () => measureRenderedRows(true, true));
 
         if (pendingInlineLivePreviewFocus) {
             focusPendingInlineLivePreviewLine();
@@ -715,7 +718,7 @@ function createEditorRenderer({
                     img.replaceWith(document.createTextNode(img.getAttribute('alt') || ''));
                 }
                 state.lastRangeKey = '';
-                measureRenderedRows();
+                measureRenderedRows(true, true);
             };
             if (img.complete) {
                 finish(img.naturalWidth > 0);

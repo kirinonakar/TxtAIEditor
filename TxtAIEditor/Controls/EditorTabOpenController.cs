@@ -820,12 +820,15 @@ namespace TxtAIEditor.Controls
             int transitionVersion = BeginViewModeTransition(tab.Id);
             try
             {
+                int initialLineCount = EditorInitialCachePolicy.GetInitialLineCount(
+                    session.Model.LineCount,
+                    _initialEditorLineWarmupCount);
                 await bridgeGroup.Bridge.InitializeModelAsync(
                     session.Model.LineCount,
                     tab.Language,
                     _settingsService.CurrentSettings,
                     isReadOnly,
-                    session.GetLines(1, _initialEditorLineWarmupCount),
+                    session.GetLines(1, initialLineCount),
                     session.DocumentId,
                     session.DocumentVersion,
                     tab.Id,
@@ -1351,13 +1354,16 @@ namespace TxtAIEditor.Controls
             bridge.EditorReady += async () =>
             {
                 var currentSession = getSession();
+                int initialLineCount = EditorInitialCachePolicy.GetInitialLineCount(
+                    currentSession.Model.LineCount,
+                    _initialEditorLineWarmupCount);
                 await bridge.SetSplitViewAsync(_editorWorkspace.CurrentSplitMode != EditorSplitMode.None);
                 await bridge.InitializeModelAsync(
                     currentSession.Model.LineCount,
                     tab.Language,
                     _settingsService.CurrentSettings,
                     isReadOnly,
-                    currentSession.GetLines(1, _initialEditorLineWarmupCount),
+                    currentSession.GetLines(1, initialLineCount),
                     currentSession.DocumentId,
                     currentSession.DocumentVersion,
                     tab.Id,

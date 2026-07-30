@@ -270,12 +270,15 @@ namespace TxtAIEditor.Controls
         {
             if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
             {
+                int initialLineCount = EditorInitialCachePolicy.GetInitialLineCount(
+                    session.Model.LineCount,
+                    _initialEditorLineWarmupCount);
                 await bridgeGroup.Bridge.InitializeModelAsync(
                     session.Model.LineCount,
                     tab.Language,
                     _settingsService.CurrentSettings,
                     isReadOnly: isReadOnly,
-                    initialLines: session.GetLines(1, _initialEditorLineWarmupCount),
+                    initialLines: session.GetLines(1, initialLineCount),
                     documentId: session.DocumentId,
                     documentVersion: session.DocumentVersion,
                     viewId: tab.Id);

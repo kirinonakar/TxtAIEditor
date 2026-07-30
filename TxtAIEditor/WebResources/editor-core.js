@@ -9,6 +9,8 @@ const HEX_RENDER_OVERSCAN = 48;
 const BROWSER_SCROLL_HEIGHT_LIMIT = 12000000;
 const HEX_CACHE_RETAIN_LINES = 512;
 const HEX_SELECTION_CACHE_RETAIN_LIMIT = 2048;
+// Keep this aligned with EditorInitialCachePolicy.FullDocumentLineLimit.
+const FULL_DOCUMENT_RENDER_LINE_LIMIT = 1000;
 
 const runtime = {
     drawEditableSelectionOverlays: () => { },
@@ -450,7 +452,7 @@ function applyOptions(msg) {
         document.documentElement.style.setProperty('--hex-data-odd', '#8a8a8a');
     }
 
-    if (!state.wordWrap || previousLineHeight !== state.lineHeight) {
+    if (usesMeasuredLineHeights() || previousLineHeight !== state.lineHeight) {
         clearMeasuredLineHeights();
     }
 
@@ -963,6 +965,10 @@ function lineAt(scrollTop) {
 function visibleRange() {
     const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
     const lineCount = effectiveLineCount();
+    if (usesFullDocumentRender()) {
+        return { start: 1, end: lineCount, count: lineCount };
+    }
+
     const firstVisible = lineAt(scrollContainer.scrollTop);
     if (usesCompressedScroll()) {
         const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight) + 1);
@@ -980,6 +986,13 @@ function visibleRange() {
     const start = Math.max(1, windowAnchor - overscan);
     const end = Math.min(lineCount, start + visibleLineCount + (overscan * 2) + windowStep - 1);
     return { start, end, count: Math.max(0, end - start + 1) };
+}
+
+function usesFullDocumentRender() {
+    return !state.csvTableEnabled &&
+        !state.inlineLivePreviewEnabled &&
+        state.language !== 'hex' &&
+        effectiveLineCount() <= FULL_DOCUMENT_RENDER_LINE_LIMIT;
 }
 
 function usesCompressedScroll() {
@@ -1228,17 +1241,19 @@ function cancelPendingColumnTextInputs() {
     state.pendingColumnTextInputs.length = 0;
 }
 
-function measureRenderedRows(renderOnChange = true) {
+function measureRenderedRows(renderOnChange = true, force = false) {
     if (!usesMeasuredLineHeights()) return;
 
     const anchorLine = lineAt(scrollContainer.scrollTop);
     const anchorOffset = scrollContainer.scrollTop - lineTop(anchorLine);
     const oldEditingLineTop = state.editingLine ? lineTop(state.editingLine) : null;
     const containerRect = scrollContainer.getBoundingClientRect();
+    const reuseMeasuredHeights = usesFullDocumentRender() && !force;
     let changed = false;
     for (const row of viewport.querySelectorAll('.line-row')) {
         const lineNumber = Number(row.dataset.line || 0);
         if (!lineNumber) continue;
+        if (reuseMeasuredHeights && state.lineHeights.has(lineNumber)) continue;
         const rowRect = row.getBoundingClientRect();
         // Live preview keeps a large lookbehind window in the DOM. Its first
         // line can move into the middle of a merged Markdown block as the
@@ -1761,6 +1776,7 @@ export {
     totalVirtualHeight,
     updateLineFromHost,
     usesCompressedScroll,
+    usesFullDocumentRender,
     usesMeasuredLineHeights,
     visualScrollDeltaToScrollTopDelta,
     visibleRange,

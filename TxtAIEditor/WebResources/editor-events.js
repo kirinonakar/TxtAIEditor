@@ -3,6 +3,7 @@ import {
     scrollContainer
 } from './editor-dom.js';
 import {
+    clearMeasuredLineHeights,
     clearPreservedScrollTop,
     lineAt,
     lineTop,
@@ -146,6 +147,7 @@ export function bindEditorEvents({
     });
 
     window.addEventListener('resize', () => {
+        clearMeasuredLineHeights();
         setupVirtualHeight();
         queueRender(true);
     });

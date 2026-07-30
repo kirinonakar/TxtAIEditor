@@ -184,7 +184,9 @@ namespace TxtAIEditor.Editor
             }
 
             int lineCount = Math.Max(1, session.Model.LineCount);
-            int warmupLineCount = Math.Max(1, _modelWarmupLineCount);
+            int warmupLineCount = EditorInitialCachePolicy.GetInitialLineCount(
+                lineCount,
+                _modelWarmupLineCount);
             int initialStartLine = Math.Clamp(
                 _firstVisibleLine - (warmupLineCount / 4),
                 1,
