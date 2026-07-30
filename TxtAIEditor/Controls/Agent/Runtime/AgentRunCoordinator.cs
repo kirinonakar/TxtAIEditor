@@ -492,6 +492,23 @@ namespace TxtAIEditor.Controls
                             }
                         }
                     }
+                    else if (!planningMode &&
+                        responseHasToolSyntax &&
+                        !responseLooksLikeToolResultReplay &&
+                        !visibleTextFlushed)
+                    {
+                        int toolCallIndex = AgentToolCallParser.FindToolCallIndex(cleanResponse);
+                        if (toolCallIndex > 0)
+                        {
+                            string visiblePrefix = cleanResponse.Substring(0, toolCallIndex);
+                            if (!string.IsNullOrWhiteSpace(visiblePrefix))
+                            {
+                                visibleTextFlushed = true;
+                                await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, visiblePrefix);
+                                await _runOutputController.EndStreamedAnswerAsync(runContext);
+                            }
+                        }
+                    }
                     else if (!planningMode && !responseRequiresToolHandling && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(cleanResponse))
                     {
                         visibleTextFlushed = true;
