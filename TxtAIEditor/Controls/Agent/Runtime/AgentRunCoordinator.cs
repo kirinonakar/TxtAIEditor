@@ -705,6 +705,7 @@ namespace TxtAIEditor.Controls
 
                     bool stopAfterLoopGuard = false;
                     var toolCallResults = new List<(string Name, JsonElement Args, string Result, string ResultForTranscript, bool Skipped, string NormalizedName)>();
+                    bool hasWebSearchCallInBatch = false;
 
                     foreach (var tc in toolCalls)
                     {
@@ -714,6 +715,17 @@ namespace TxtAIEditor.Controls
                         JsonElement currentArguments = tc.Arguments;
 
                         string normalizedToolName = NormalizeToolName(currentToolName);
+                        if (toolCalls.Count > 1 && normalizedToolName == "web_search_exa")
+                        {
+                            if (hasWebSearchCallInBatch)
+                            {
+                                int delayMilliseconds = Random.Shared.Next(3000, 5001);
+                                await Task.Delay(delayMilliseconds, cancellationToken);
+                            }
+
+                            hasWebSearchCallInBatch = true;
+                        }
+
                         string toolInvocationKey = BuildToolInvocationKey(normalizedToolName, currentArguments);
                         toolInvocationCounts[toolInvocationKey] = toolInvocationCounts.TryGetValue(toolInvocationKey, out int prevCount) ? prevCount + 1 : 1;
                         int currentInvocationCount = toolInvocationCounts[toolInvocationKey];
