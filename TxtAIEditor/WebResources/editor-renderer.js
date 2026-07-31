@@ -8,6 +8,7 @@ import {
     queueRender,
     requestMissingLines,
     state,
+    setupVirtualHeight,
     syncCustomSelectionClass,
     trimHexCacheToRange,
     totalVirtualHeight,
@@ -263,7 +264,7 @@ function createEditorRenderer({
             : null;
 
         const offsetY = viewportTopForLine(renderStart);
-        viewport.style.transform = `translateY(${offsetY}px)`;
+        viewport.style.transform = renderFullDocument ? 'none' : `translateY(${offsetY}px)`;
 
         if (state.csvTableEnabled) {
             const activeCell = document.activeElement?.closest?.('.csv-cell');
@@ -457,7 +458,9 @@ function createEditorRenderer({
             rows.push(rowHtml);
         }
 
-        viewport.style.transform = `translateY(${viewportTopForLine(viewportLayoutStart)}px)`;
+        viewport.style.transform = renderFullDocument
+            ? 'none'
+            : `translateY(${viewportTopForLine(viewportLayoutStart)}px)`;
         viewport.innerHTML = rows.join('');
         state.renderedRangeStart = renderStart;
         state.renderedRangeEnd = renderEnd;
@@ -472,7 +475,11 @@ function createEditorRenderer({
         refreshHoveredLineFromLastPointer();
 
         watchLivePreviewImages();
-        measureRenderedRows(!renderFullDocument);
+        if (renderFullDocument) {
+            setupVirtualHeight();
+        } else {
+            measureRenderedRows(true);
+        }
         renderMermaidBlocks(viewport, () => measureRenderedRows(true, true));
 
         if (pendingInlineLivePreviewFocus) {

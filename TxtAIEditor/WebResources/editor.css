@@ -159,6 +159,19 @@ body.no-horizontal-overflow #scroll-container {
     will-change: transform;
 }
 
+body.full-document-render #virtual-spacer {
+    /* The real viewport content supplies the scroll height in this mode. */
+    display: none;
+}
+
+body.full-document-render #viewport {
+    position: relative;
+    right: auto;
+    min-height: 100%;
+    transform: none !important;
+    will-change: auto;
+}
+
 #viewport::before {
     content: "";
     position: absolute;

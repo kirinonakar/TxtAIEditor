@@ -11,7 +11,6 @@ const HEX_CACHE_RETAIN_LINES = 512;
 const HEX_SELECTION_CACHE_RETAIN_LIMIT = 2048;
 // Keep this aligned with EditorInitialCachePolicy.FullDocumentLineLimit.
 const FULL_DOCUMENT_RENDER_LINE_LIMIT = 1000;
-const FULL_DOCUMENT_MEASURE_BATCH_SIZE = 24;
 
 const runtime = {
     drawEditableSelectionOverlays: () => { },
@@ -23,9 +22,6 @@ const runtime = {
     normalizeSelection: () => null,
     render: () => { }
 };
-
-let deferredRowMeasurementToken = 0;
-let deferredRowMeasurementFrame = 0;
 
 function configureEditorCoreRuntime(deps) {
     Object.assign(runtime, deps || {});
@@ -750,6 +746,18 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
 
 function setupVirtualHeight() {
     const savedScroll = scrollContainer.scrollTop;
+
+    // Small documents are rendered in normal flow. Let the browser derive the
+    // document height instead of maintaining a second, measured height model.
+    document.body.classList.toggle('full-document-render', usesFullDocumentRender());
+    if (usesFullDocumentRender()) {
+        const maximumScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+        if (savedScroll > maximumScrollTop) {
+            scrollContainer.scrollTop = maximumScrollTop;
+        }
+        return;
+    }
+
     const maximumScrollTop = maximumVirtualScrollTop();
     if (state.preservedScrollTop !== null) {
         state.preservedScrollTop = Math.min(
@@ -781,7 +789,7 @@ function clearPreservedScrollTop() {
 }
 
 function usesMeasuredLineHeights() {
-    return state.wordWrap || state.inlineLivePreviewEnabled;
+    return (state.wordWrap || state.inlineLivePreviewEnabled) && !usesFullDocumentRender();
 }
 
 function lineHeightFor(lineNumber) {
@@ -873,67 +881,8 @@ function deleteMeasuredLineHeight(lineNumber) {
 }
 
 function clearMeasuredLineHeights() {
-    cancelDeferredRowMeasurement();
     state.lineHeights.clear();
     resetLineHeightIndex();
-}
-
-function cancelDeferredRowMeasurement() {
-    deferredRowMeasurementToken++;
-    if (deferredRowMeasurementFrame) {
-        cancelAnimationFrame(deferredRowMeasurementFrame);
-        deferredRowMeasurementFrame = 0;
-    }
-}
-
-function scheduleFullDocumentRowMeasurement(renderOnChange) {
-    cancelDeferredRowMeasurement();
-
-    const rows = [...viewport.querySelectorAll('.line-row')];
-    if (rows.length === 0) return;
-
-    const token = deferredRowMeasurementToken;
-    let rowIndex = 0;
-    let changed = false;
-
-    const measureBatch = () => {
-        deferredRowMeasurementFrame = 0;
-        if (token !== deferredRowMeasurementToken) return;
-
-        let measuredCount = 0;
-        while (rowIndex < rows.length && measuredCount < FULL_DOCUMENT_MEASURE_BATCH_SIZE) {
-            const row = rows[rowIndex++];
-            if (!row.isConnected || !viewport.contains(row)) continue;
-
-            const lineNumber = Number(row.dataset.line || 0);
-            if (!lineNumber || state.lineHeights.has(lineNumber)) continue;
-
-            const rowRect = row.getBoundingClientRect();
-            const measuredHeight = rowRect.height || row.scrollHeight || 0;
-            const measured = Math.max(
-                state.lineHeight,
-                roundCssPixelsToDevicePixels(measuredHeight));
-            if (setMeasuredLineHeight(lineNumber, measured)) {
-                changed = true;
-            }
-            measuredCount++;
-        }
-
-        if (rowIndex < rows.length) {
-            deferredRowMeasurementFrame = requestAnimationFrame(measureBatch);
-            return;
-        }
-
-        if (token !== deferredRowMeasurementToken || !changed) return;
-
-        setupVirtualHeight();
-        if (renderOnChange) {
-            state.lastRangeKey = '';
-            requestAnimationFrame(() => runtime.render());
-        }
-    };
-
-    deferredRowMeasurementFrame = requestAnimationFrame(measureBatch);
 }
 
 function shiftMeasuredLineHeights(fromLine, delta) {
@@ -955,6 +904,10 @@ function shiftMeasuredLineHeights(fromLine, delta) {
 }
 
 function totalVirtualHeight() {
+    if (usesFullDocumentRender()) {
+        return Math.max(1, scrollContainer.scrollHeight || (effectiveLineCount() * state.lineHeight));
+    }
+
     const total = rawTotalVirtualHeight();
     if (usesCompressedScroll()) {
         const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
@@ -965,6 +918,10 @@ function totalVirtualHeight() {
 }
 
 function rawTotalVirtualHeight() {
+    if (usesFullDocumentRender()) {
+        return Math.max(1, scrollContainer.scrollHeight || (effectiveLineCount() * state.lineHeight));
+    }
+
     let total = effectiveLineCount() * state.lineHeight;
     if (usesMeasuredLineHeights()) {
         ensureLineHeightIndex();
@@ -980,10 +937,22 @@ function trailingScrollHeight() {
 }
 
 function maximumVirtualScrollTop() {
+    if (usesFullDocumentRender()) {
+        return Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+    }
+
     return Math.max(0, totalVirtualHeight() - scrollContainer.clientHeight);
 }
 
 function lineTop(lineNumber) {
+    if (usesFullDocumentRender()) {
+        const line = Math.max(1, Math.min(effectiveLineCount(), Number(lineNumber || 1)));
+        const row = viewport.children[line - 1];
+        if (row?.dataset?.line === String(line)) {
+            return Math.max(0, row.offsetTop);
+        }
+    }
+
     if (usesCompressedScroll()) {
         const metrics = compressedScrollMetrics();
         if (metrics.maxScrollTop <= 0 || metrics.maxFirstLine <= 1) return 0;
@@ -998,6 +967,30 @@ function lineTop(lineNumber) {
 
 function lineAt(scrollTop) {
     const lineCount = effectiveLineCount();
+
+    if (usesFullDocumentRender() && viewport.children.length > 0) {
+        const targetTop = Math.max(0, Number(scrollTop || 0));
+        let low = 0;
+        let high = viewport.children.length - 1;
+        let result = 0;
+        while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            const row = viewport.children[mid];
+            if (!row?.dataset?.line) {
+                break;
+            }
+
+            if (row.offsetTop <= targetTop) {
+                result = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+
+        return Math.min(lineCount, Math.max(1, Number(viewport.children[result]?.dataset?.line || 1)));
+    }
+
     if (usesCompressedScroll()) {
         const metrics = compressedScrollMetrics();
         if (metrics.maxScrollTop <= 0 || metrics.maxFirstLine <= 1) return 1;
@@ -1307,11 +1300,6 @@ function cancelPendingColumnTextInputs() {
 function measureRenderedRows(renderOnChange = true, force = false) {
     if (!usesMeasuredLineHeights()) return;
 
-    if (usesFullDocumentRender() && !force) {
-        scheduleFullDocumentRowMeasurement(renderOnChange);
-        return;
-    }
-
     measureRenderedRowsSynchronously(renderOnChange, force);
 }
 
@@ -1322,12 +1310,10 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
     const anchorOffset = scrollContainer.scrollTop - lineTop(anchorLine);
     const oldEditingLineTop = state.editingLine ? lineTop(state.editingLine) : null;
     const containerRect = scrollContainer.getBoundingClientRect();
-    const reuseMeasuredHeights = usesFullDocumentRender() && !force;
     let changed = false;
     for (const row of viewport.querySelectorAll('.line-row')) {
         const lineNumber = Number(row.dataset.line || 0);
         if (!lineNumber) continue;
-        if (reuseMeasuredHeights && state.lineHeights.has(lineNumber)) continue;
         const rowRect = row.getBoundingClientRect();
         // Live preview keeps a large lookbehind window in the DOM. Its first
         // line can move into the middle of a merged Markdown block as the
