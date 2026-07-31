@@ -821,6 +821,9 @@
   <data name="ExplorerUpTooltip" xml:space="preserve">
     <value>Parent Folder</value>
   </data>
+  <data name="ExplorerBackTooltip" xml:space="preserve">
+    <value>Previous Folder</value>
+  </data>
   <data name="ExplorerSelectFolder" xml:space="preserve">
     <value>Select Folder...</value>
   </data>

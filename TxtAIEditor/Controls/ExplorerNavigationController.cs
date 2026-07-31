@@ -40,12 +40,29 @@ namespace TxtAIEditor.Controls
         private string _currentArchiveRemotePath = string.Empty;
         private readonly HashSet<string> _loadingRemoteArchivePaths =
             new(StringComparer.OrdinalIgnoreCase);
+        private const int MaxFolderHistory = 200;
+        private readonly Stack<ExplorerHistoryEntry> _folderHistory = new();
+        private bool _isBackNavigation;
 
         public enum ExplorerSortMode
         {
             Name,
             Newest,
             Oldest
+        }
+
+        private sealed class ExplorerHistoryEntry
+        {
+            public ExplorerHistoryEntry(string path, string secondaryPath = "", bool isArchive = false)
+            {
+                Path = path;
+                SecondaryPath = secondaryPath;
+                IsArchive = isArchive;
+            }
+
+            public string Path { get; }
+            public string SecondaryPath { get; }
+            public bool IsArchive { get; }
         }
 
         private ExplorerSortMode _currentSortMode = ExplorerSortMode.Name;
@@ -114,6 +131,7 @@ namespace TxtAIEditor.Controls
             _lastFilterQuery = string.Empty;
             _leftSidebar.ClearExplorerFilter();
             _leftSidebar.SetExplorerTreeMode(IsTreeMode);
+            UpdateBackButtonState();
 
             if (IsViewingRemote)
             {
@@ -248,9 +266,29 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
+                string normalizedEntryDirectory = ArchiveExplorerService.NormalizeEntryPath(entryDirectory);
+                if (!_isBackNavigation)
+                {
+                    if (string.IsNullOrEmpty(CurrentArchivePath))
+                    {
+                        if (!string.IsNullOrWhiteSpace(CurrentFolderPath))
+                        {
+                            PushHistory(new ExplorerHistoryEntry(CurrentFolderPath));
+                        }
+                    }
+                    else if (!string.Equals(CurrentArchivePath, archivePath, StringComparison.OrdinalIgnoreCase) ||
+                             !string.Equals(CurrentArchiveDirectory, normalizedEntryDirectory, StringComparison.OrdinalIgnoreCase))
+                    {
+                        PushHistory(new ExplorerHistoryEntry(
+                            CurrentArchivePath,
+                            CurrentArchiveDirectory,
+                            isArchive: true));
+                    }
+                }
+
                 _viewModel.ExplorerItems.Clear();
                 CurrentArchivePath = archivePath;
-                CurrentArchiveDirectory = ArchiveExplorerService.NormalizeEntryPath(entryDirectory);
+                CurrentArchiveDirectory = normalizedEntryDirectory;
 
                 bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
                 foreach (var item in SortItems(_archiveExplorerService.CreateArchiveItems(archivePath, CurrentArchiveDirectory)))
@@ -620,6 +658,7 @@ namespace TxtAIEditor.Controls
         private void WireEvents()
         {
             _leftSidebar.ExplorerUpClick += OnExplorerUpClick;
+            _leftSidebar.ExplorerBackClick += OnExplorerBackClick;
             _leftSidebar.SelectFolderClick += OnSelectFolderClick;
             _leftSidebar.RefreshClick += OnExplorerRefreshClick;
             _leftSidebar.SortClick += OnExplorerSortClick;
@@ -1152,6 +1191,38 @@ namespace TxtAIEditor.Controls
             LoadDirectoryRoot(parent.FullName);
         }
 
+        private void OnExplorerBackClick(object sender, RoutedEventArgs e)
+        {
+            if (_folderHistory.Count == 0)
+            {
+                return;
+            }
+
+            ExplorerHistoryEntry entry = _folderHistory.Pop();
+            UpdateBackButtonState();
+            _isBackNavigation = true;
+            try
+            {
+                if (entry.IsArchive)
+                {
+                    LoadArchiveDirectoryRoot(entry.Path, entry.SecondaryPath);
+                }
+                else if (RemotePath.IsRemote(entry.Path))
+                {
+                    _ = NavigateRemoteVirtualPathAsync(entry.Path, revealInLeftPanel: false);
+                }
+                else if (Directory.Exists(entry.Path))
+                {
+                    UpdateRepoPath(entry.Path);
+                    LoadDirectoryRoot(entry.Path);
+                }
+            }
+            finally
+            {
+                _isBackNavigation = false;
+            }
+        }
+
         private void NavigateArchiveUp()
         {
             if (string.IsNullOrEmpty(CurrentArchiveDirectory))
@@ -1230,8 +1301,36 @@ namespace TxtAIEditor.Controls
 
         private void SetCurrentFolderPath(string folderPath)
         {
+            if (!_isBackNavigation &&
+                !string.IsNullOrWhiteSpace(CurrentFolderPath) &&
+                !string.Equals(CurrentFolderPath, folderPath, StringComparison.OrdinalIgnoreCase))
+            {
+                PushHistory(new ExplorerHistoryEntry(CurrentFolderPath));
+            }
+
             CurrentFolderPath = folderPath;
             _currentFolderChanged(folderPath);
+        }
+
+        private void PushHistory(ExplorerHistoryEntry entry)
+        {
+            _folderHistory.Push(entry);
+            if (_folderHistory.Count > MaxFolderHistory)
+            {
+                ExplorerHistoryEntry[] entries = _folderHistory.ToArray();
+                _folderHistory.Clear();
+                for (int i = 0; i < entries.Length - 1; i++)
+                {
+                    _folderHistory.Push(entries[i]);
+                }
+            }
+
+            UpdateBackButtonState();
+        }
+
+        private void UpdateBackButtonState()
+        {
+            _leftSidebar.ExplorerBackBtn.IsEnabled = !IsTreeMode && _folderHistory.Count > 0;
         }
 
         private void UpdateRepoPath(string path)

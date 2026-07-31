@@ -821,6 +821,9 @@
   <data name="ExplorerUpTooltip" xml:space="preserve">
     <value>상위 폴더</value>
   </data>
+  <data name="ExplorerBackTooltip" xml:space="preserve">
+    <value>이전 폴더</value>
+  </data>
   <data name="ExplorerSelectFolder" xml:space="preserve">
     <value>폴더 선택...</value>
   </data>

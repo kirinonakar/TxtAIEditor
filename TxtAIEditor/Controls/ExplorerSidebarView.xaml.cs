@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
 
         public Grid Root => RootGrid;
         public TextBlock Status => ExplorerStatusText;
+        public Button BackButton => ExplorerBackButton;
         public Button UpButton => ExplorerUpButton;
         public Button SelectFolderButton => ExplorerSelectFolderButton;
         public Button CreateFolderButton => ExplorerCreateFolderButton;
@@ -29,6 +30,7 @@ namespace TxtAIEditor.Controls
         public TreeView Tree => ExplorerTreeView;
         public ListView FileList => FileListView;
 
+        public event RoutedEventHandler? BackClick;
         public event RoutedEventHandler? UpClick;
         public event RoutedEventHandler? SelectFolderClick;
         public event RoutedEventHandler? CreateFolderClick;
@@ -78,6 +80,7 @@ namespace TxtAIEditor.Controls
             FileListView.Visibility = isTreeMode ? Visibility.Collapsed : Visibility.Visible;
             ExplorerTreeView.Visibility = isTreeMode ? Visibility.Visible : Visibility.Collapsed;
             ExplorerFilterPanel.Visibility = isTreeMode ? Visibility.Collapsed : Visibility.Visible;
+            ExplorerBackButton.IsEnabled = !isTreeMode;
             ExplorerUpButton.IsEnabled = !isTreeMode;
         }
 
@@ -93,6 +96,8 @@ namespace TxtAIEditor.Controls
                 ExplorerStatusText.Text = getString("NoFolderSelected", "폴더를 선택하세요.");
             }
 
+            ToolTipService.SetToolTip(ExplorerBackButton, getString("ExplorerBackTooltip", "이전 폴더"));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerBackButton, getString("ExplorerBackTooltip", "이전 폴더"));
             ToolTipService.SetToolTip(ExplorerUpButton, getString("ExplorerUpTooltip", "상위 폴더"));
             var selectFolderText = getString("ExplorerSelectFolder", "폴더 선택...");
             ToolTipService.SetToolTip(ExplorerSelectFolderButton, selectFolderText);
@@ -126,6 +131,7 @@ namespace TxtAIEditor.Controls
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerTreeModeButton, treeModeText);
         }
 
+        private void OnExplorerBackClick(object sender, RoutedEventArgs e) => BackClick?.Invoke(sender, e);
         private void OnExplorerUpClick(object sender, RoutedEventArgs e) => UpClick?.Invoke(sender, e);
         private void OnSelectFolderClick(object sender, RoutedEventArgs e) => SelectFolderClick?.Invoke(sender, e);
         private void OnCreateFolderClick(object sender, RoutedEventArgs e) => CreateFolderClick?.Invoke(sender, e);

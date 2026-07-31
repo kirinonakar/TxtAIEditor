@@ -821,6 +821,9 @@
   <data name="ExplorerUpTooltip" xml:space="preserve">
     <value>父文件夹</value>
   </data>
+  <data name="ExplorerBackTooltip" xml:space="preserve">
+    <value>上一个文件夹</value>
+  </data>
   <data name="ExplorerSelectFolder" xml:space="preserve">
     <value>选择文件夹...</value>
   </data>

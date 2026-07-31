@@ -15,6 +15,7 @@ namespace TxtAIEditor.Controls
         }
 
         public event RoutedEventHandler? LeftActivityClick;
+        public event RoutedEventHandler? ExplorerBackClick { add => ExplorerView.BackClick += value; remove => ExplorerView.BackClick -= value; }
         public event RoutedEventHandler? ExplorerUpClick { add => ExplorerView.UpClick += value; remove => ExplorerView.UpClick -= value; }
         public event RoutedEventHandler? SelectFolderClick { add => ExplorerView.SelectFolderClick += value; remove => ExplorerView.SelectFolderClick -= value; }
         public event RoutedEventHandler? CreateFolderClick { add => ExplorerView.CreateFolderClick += value; remove => ExplorerView.CreateFolderClick -= value; }
@@ -137,6 +138,7 @@ namespace TxtAIEditor.Controls
         public Button GitRefreshBtn => GitView.RefreshButton;
         public TextBlock GitHistoryHeaderLabel => GitView.HistoryHeader;
         public Button ExplorerUpBtn => ExplorerView.UpButton;
+        public Button ExplorerBackBtn => ExplorerView.BackButton;
         public Button ExplorerSelectFolderBtn => ExplorerView.SelectFolderButton;
         public Button ExplorerCreateFolderBtn => ExplorerView.CreateFolderButton;
         public Button ExplorerRefreshBtn => ExplorerView.RefreshButton;
