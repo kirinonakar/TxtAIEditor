@@ -40,6 +40,7 @@ namespace TxtAIEditor.Core.Services
         private readonly Button _tokenUsageStatsButton;
         private readonly Button _tokenUsageHtmlButton;
         private readonly Button _tokenUsageResetButton;
+        private readonly TextBlock _tokenUsageSummaryHeaderTextBlock;
         private readonly TextBlock _tokenUsageSummaryText;
         private readonly Slider _maxToolCallsSlider;
 
@@ -101,6 +102,12 @@ namespace TxtAIEditor.Core.Services
             };
             _modelStatusText = SettingsDialogUi.CreateMutedTextBlock(
                 getString("SettingsLlmInfo", "LM Studio는 서버가 켜져 있을 때 http://localhost:1234/v1/models 에서 모델 목록을 불러옵니다."));
+            _tokenUsageSummaryHeaderTextBlock = new TextBlock
+            {
+                Text = getString("SettingsLlmTokenUsageSummaryHeader", "사용량 요약"),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 11
+            };
             _tokenUsageSummaryText = new TextBlock
             {
                 TextWrapping = TextWrapping.Wrap,
@@ -249,6 +256,11 @@ namespace TxtAIEditor.Core.Services
         private static Border CreateCard(string title, UIElement content, string fontIconGlyph)
         {
             return SettingsDialogUi.CreateCard(title, content, fontIconGlyph);
+        }
+
+        private static Border CreateSubGroup(UIElement headerElement, UIElement content)
+        {
+            return SettingsDialogUi.CreateSubGroup(headerElement, content);
         }
 
         private static Border CreateSubGroup(string title, UIElement content)
@@ -405,7 +417,7 @@ namespace TxtAIEditor.Core.Services
             var content = new StackPanel { Spacing = 8 };
 
             var summarySubGroup = CreateSubGroup(
-                _getString("SettingsLlmTokenUsageSummaryHeader", "사용량 요약"),
+                _tokenUsageSummaryHeaderTextBlock,
                 _tokenUsageSummaryText);
             content.Children.Add(summarySubGroup);
 
@@ -493,9 +505,32 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        private static string GetTokenUsagePeriodRange(LlmTokenUsageStats stats)
+        {
+            if (stats.ByDay != null && stats.ByDay.Count > 0)
+            {
+                var days = stats.ByDay.Select(b => b.Period).Where(p => !string.IsNullOrWhiteSpace(p)).OrderBy(p => p).ToList();
+                if (days.Count > 0)
+                {
+                    string minDay = days.First();
+                    string maxDay = days.Last();
+                    if (string.Equals(minDay, maxDay, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return minDay;
+                    }
+                    return $"{minDay} ~ {maxDay}";
+                }
+            }
+            return DateTime.Now.ToString("yyyy-MM-dd");
+        }
+
         private void RefreshTokenUsageStatsDisplay()
         {
             LlmTokenUsageStats stats = _llmService.TokenUsageStats;
+            string periodStr = GetTokenUsagePeriodRange(stats);
+            string baseHeader = _getString("SettingsLlmTokenUsageSummaryHeader", "사용량 요약");
+            _tokenUsageSummaryHeaderTextBlock.Text = $"{baseHeader} ({periodStr})";
+
             if (!stats.HasAny)
             {
                 string empty = _getString("SettingsLlmTokenUsageStatsEmpty", "아직 관측된 LLM token usage가 없습니다.");

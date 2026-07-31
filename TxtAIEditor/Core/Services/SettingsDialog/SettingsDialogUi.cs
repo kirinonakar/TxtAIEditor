@@ -112,16 +112,9 @@ namespace TxtAIEditor.Core.Services
             return card;
         }
 
-        public static Border CreateSubGroup(string title, UIElement content)
+        public static Border CreateSubGroup(UIElement headerElement, UIElement content)
         {
             var container = new StackPanel { Spacing = 6 };
-
-            var subHeader = new TextBlock
-            {
-                Text = title,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 11
-            };
 
             var border = new Border
             {
@@ -142,25 +135,25 @@ namespace TxtAIEditor.Core.Services
                     // Pastel Dark SubGroup
                     border.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 33, 35, 54)); // #212336
                     border.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 54, 57, 79)); // #36394f
-                    subHeader.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 165, 173, 203)); // #a5adcb
+                    if (headerElement is TextBlock tb) tb.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 165, 173, 203)); // #a5adcb
                 }
                 else if (isLight)
                 {
                     // Light SubGroup
                     border.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 241, 245, 249)); // #f1f5f9
                     border.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)); // #e2e8f0
-                    subHeader.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 100, 116, 139)); // #64748b
+                    if (headerElement is TextBlock tb) tb.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 100, 116, 139)); // #64748b
                 }
                 else
                 {
                     // Dark SubGroup
                     border.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 31, 31, 35)); // #1f1f23
                     border.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 51, 51, 55)); // #333337
-                    subHeader.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 161, 161, 170)); // #a1a1aa
+                    if (headerElement is TextBlock tb) tb.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 161, 161, 170)); // #a1a1aa
                 }
             };
 
-            container.Children.Add(subHeader);
+            container.Children.Add(headerElement);
             container.Children.Add(content);
 
             border.Loaded += (_, _) => updateSubGroupThemeBrushes();
@@ -168,6 +161,17 @@ namespace TxtAIEditor.Core.Services
 
             border.Child = container;
             return border;
+        }
+
+        public static Border CreateSubGroup(string title, UIElement content)
+        {
+            var subHeader = new TextBlock
+            {
+                Text = title,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 11
+            };
+            return CreateSubGroup(subHeader, content);
         }
 
         public static TextBlock CreateMutedTextBlock(string text)
