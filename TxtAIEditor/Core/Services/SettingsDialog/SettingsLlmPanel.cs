@@ -77,8 +77,28 @@ namespace TxtAIEditor.Core.Services
             _sourceLangCombo = CreateSourceLanguageCombo(settings, getString);
             _targetLangCombo = CreateTargetLanguageCombo(settings, getString);
             _llmThinkingLevelCombo = CreateThinkingLevelCombo(settings, getString);
-            _refreshModelsButton = new Button { Content = getString("SettingsLlmLoadModels", "LM Studio 모델 불러오기"), HorizontalAlignment = HorizontalAlignment.Stretch };
-            _visionFallbackRefreshModelsButton = new Button { Content = getString("SettingsLlmLoadModels", "모델 불러오기"), HorizontalAlignment = HorizontalAlignment.Stretch };
+            _refreshModelsButton = new Button
+            {
+                Content = new FontIcon { Glyph = "\uE72C", FontSize = 12 },
+                HorizontalAlignment = HorizontalAlignment.Right,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Width = 32,
+                MinWidth = 32,
+                Padding = new Thickness(0),
+                Tag = "IconOnlyButton"
+            };
+            _visionFallbackRefreshModelsButton = new Button
+            {
+                Content = new FontIcon { Glyph = "\uE72C", FontSize = 12 },
+                HorizontalAlignment = HorizontalAlignment.Right,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Width = 32,
+                MinWidth = 32,
+                Padding = new Thickness(0),
+                Tag = "IconOnlyButton"
+            };
             _modelStatusText = new TextBlock
             {
                 Text = getString("SettingsLlmInfo", "LM Studio는 서버가 켜져 있을 때 http://localhost:1234/v1/models 에서 모델 목록을 불러옵니다."),
@@ -881,49 +901,49 @@ namespace TxtAIEditor.Core.Services
 
             if (provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase))
             {
-                _refreshModelsButton.Content = _getString("SettingsLlmLoadModels", "LM Studio 모델 불러오기");
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadModels", "LM Studio 모델 불러오기"));
                 _refreshModelsButton.Visibility = Visibility.Visible;
                 _modelStatusText.Text = _getString("SettingsLlmInfo", "LM Studio는 서버가 켜져 있을 때 http://localhost:1234/v1/models 에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
             }
             else if (provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase))
             {
-                _refreshModelsButton.Content = _getString("SettingsLlmLoadOpenRouterModels", "OpenRouter 모델 불러오기");
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadOpenRouterModels", "OpenRouter 모델 불러오기"));
                 _refreshModelsButton.Visibility = Visibility.Visible;
                 _modelStatusText.Text = _getString("SettingsLlmOpenRouterInfo", "OpenRouter는 https://openrouter.ai/api/v1/models 에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
             }
             else if (provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase))
             {
-                _refreshModelsButton.Content = _getString("SettingsLlmLoadCerebrasModels", "Cerebras 모델 불러오기");
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadCerebrasModels", "Cerebras 모델 불러오기"));
                 _refreshModelsButton.Visibility = Visibility.Visible;
                 _modelStatusText.Text = _getString("SettingsLlmCerebrasInfo", "Cerebras는 https://api.cerebras.ai/v1/models 에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
             }
             else if (provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase))
             {
-                _refreshModelsButton.Content = _getString("SettingsLlmLoadOpenCodeGoModels", "OpenCode Go 모델 불러오기");
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadOpenCodeGoModels", "OpenCode Go 모델 불러오기"));
                 _refreshModelsButton.Visibility = Visibility.Visible;
                 _modelStatusText.Text = _getString("SettingsLlmOpenCodeGoInfo", "OpenCode Go는 https://opencode.ai/zen/go/v1/models 에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
             }
             else if (provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase))
             {
-                _refreshModelsButton.Content = _getString("SettingsLlmLoadOpenCodeZenModels", "OpenCode Zen 모델 불러오기");
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadOpenCodeZenModels", "OpenCode Zen 모델 불러오기"));
                 _refreshModelsButton.Visibility = Visibility.Visible;
                 _modelStatusText.Text = _getString("SettingsLlmOpenCodeZenInfo", "OpenCode Zen는 https://opencode.ai/zen/v1/models 에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
             }
             else if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
             {
-                _refreshModelsButton.Content = _getString("SettingsLlmLoadOllamaModels", "Ollama 모델 불러오기");
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadOllamaModels", "Ollama 모델 불러오기"));
                 _refreshModelsButton.Visibility = Visibility.Visible;
                 _modelStatusText.Text = _getString("SettingsLlmOllamaInfo", "Ollama는 서버가 켜져 있을 때 http://localhost:11434/v1/models 에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
             }
             else if (provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
             {
-                _refreshModelsButton.Content = _getString("SettingsLlmLoadOllamaCloudModels", "Ollama Cloud 모델 불러오기");
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadOllamaCloudModels", "Ollama Cloud 모델 불러오기"));
                 _refreshModelsButton.Visibility = Visibility.Visible;
                 _modelStatusText.Text = _getString("SettingsLlmOllamaCloudInfo", "Ollama Cloud는 지정된 endpoint에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
@@ -945,31 +965,31 @@ namespace TxtAIEditor.Core.Services
 
             if (provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase))
             {
-                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadOpenRouterModels", "OpenRouter 모델 불러오기");
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadOpenRouterModels", "OpenRouter 모델 불러오기"));
             }
             else if (provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase))
             {
-                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadCerebrasModels", "Cerebras 모델 불러오기");
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadCerebrasModels", "Cerebras 모델 불러오기"));
             }
             else if (provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase))
             {
-                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadOpenCodeGoModels", "OpenCode Go 모델 불러오기");
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadOpenCodeGoModels", "OpenCode Go 모델 불러오기"));
             }
             else if (provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase))
             {
-                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadOpenCodeZenModels", "OpenCode Zen 모델 불러오기");
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadOpenCodeZenModels", "OpenCode Zen 모델 불러오기"));
             }
             else if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
             {
-                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadOllamaModels", "Ollama 모델 불러오기");
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadOllamaModels", "Ollama 모델 불러오기"));
             }
             else if (provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
             {
-                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadOllamaCloudModels", "Ollama Cloud 모델 불러오기");
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadOllamaCloudModels", "Ollama Cloud 모델 불러오기"));
             }
             else
             {
-                _visionFallbackRefreshModelsButton.Content = _getString("SettingsLlmLoadModels", "LM Studio 모델 불러오기");
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadModels", "LM Studio 모델 불러오기"));
             }
         }
 

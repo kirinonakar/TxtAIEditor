@@ -54,7 +54,9 @@ namespace TxtAIEditor.Core.Services
                     ctrl.Height = 26;
                     ctrl.Padding = ctrl.Tag as string == "LlmModelCombo"
                         ? new Thickness(4, 1, 4, 1)
-                        : new Thickness(8, 2, 8, 2);
+                        : (ctrl.Tag as string == "IconOnlyButton"
+                            ? new Thickness(0)
+                            : new Thickness(8, 2, 8, 2));
                     ctrl.VerticalAlignment = VerticalAlignment.Center;
                 }
                 else if (ctrl is CheckBox chk)
