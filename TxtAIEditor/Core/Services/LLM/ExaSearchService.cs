@@ -86,7 +86,11 @@ namespace TxtAIEditor.Core.Services.LLM
                             apiKey,
                             cancellationToken);
                         // Keep the existing rate-limit notice visible even when the key fallback succeeds.
-                        return rateLimitNotice + Environment.NewLine + keyResult;
+                        return BuildExaMcpRateLimitNotice(
+                                ex,
+                                McpToolRateLimitException.ExaApiKeyFallbackMarker) +
+                            Environment.NewLine +
+                            keyResult;
                     }
                     catch (OperationCanceledException)
                     {
@@ -98,7 +102,10 @@ namespace TxtAIEditor.Core.Services.LLM
                             query,
                             numResults,
                             cancellationToken,
-                            rateLimitNotice + Environment.NewLine +
+                            BuildExaMcpRateLimitNotice(
+                                ex,
+                                McpToolRateLimitException.ExaApiKeyFallbackFailedMarker) +
+                            Environment.NewLine +
                             $"[Exa fallback: DuckDuckGo]\nExa API key search failed: {keyException.Message}");
                     }
                 }
@@ -326,7 +333,16 @@ namespace TxtAIEditor.Core.Services.LLM
 
         private static string BuildExaMcpRateLimitNotice(McpToolRateLimitException exception)
         {
-            return $"[Exa MCP fallback: DuckDuckGo]" + Environment.NewLine +
+            return BuildExaMcpRateLimitNotice(
+                exception,
+                McpToolRateLimitException.ExaDuckDuckGoFallbackMarker);
+        }
+
+        private static string BuildExaMcpRateLimitNotice(
+            McpToolRateLimitException exception,
+            string fallbackMarker)
+        {
+            return fallbackMarker + Environment.NewLine +
                 $"{McpToolRateLimitException.ExaFreeMcpRateLimitMarker}." + Environment.NewLine +
                 $"Approximately {exception.GetApproximateRemainingHours()} hours until the next reset.";
         }

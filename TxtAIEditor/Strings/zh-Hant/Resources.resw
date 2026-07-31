@@ -2398,6 +2398,12 @@
   <data name="SettingsExaApiKeyInfo" xml:space="preserve">
     <value>Exa API Key 用於 Agent 的網路搜尋 (Exa) 功能，並安全地儲存在 Windows Credential Manager 中。</value>
   </data>
+  <data name="AgentExaApiKeyFallbackUsed" xml:space="preserve">
+    <value>已使用 Exa API Key fallback。</value>
+  </data>
+  <data name="AgentExaApiKeyFallbackFailedToDuckDuckGo" xml:space="preserve">
+    <value>Exa API Key fallback 失敗 -&gt; 已使用 DuckDuckGo fallback。</value>
+  </data>
   <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
     <value>Exa 網頁搜尋：{0}</value>
   </data>

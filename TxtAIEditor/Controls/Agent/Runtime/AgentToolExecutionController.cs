@@ -350,7 +350,7 @@ namespace TxtAIEditor.Controls
             return displayToolResult;
         }
 
-        private static string BuildExaRateLimitDisplayResult(string toolResult)
+        private string BuildExaRateLimitDisplayResult(string toolResult)
         {
             string rateLimitLine = toolResult
                 .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
@@ -362,12 +362,23 @@ namespace TxtAIEditor.Controls
                 .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
                 .FirstOrDefault(line => line.StartsWith("Approximately ", StringComparison.OrdinalIgnoreCase))
                 ?? "Approximately unknown hours until the next reset.";
+            string fallbackLine = toolResult.Contains(
+                    McpToolRateLimitException.ExaApiKeyFallbackFailedMarker,
+                    StringComparison.OrdinalIgnoreCase)
+                ? _getString(
+                    "AgentExaApiKeyFallbackFailedToDuckDuckGo",
+                    "Exa API key fallback failed -> DuckDuckGo fallback was used.")
+                : toolResult.Contains(
+                    McpToolRateLimitException.ExaApiKeyFallbackMarker,
+                    StringComparison.OrdinalIgnoreCase)
+                    ? _getString("AgentExaApiKeyFallbackUsed", "Exa API key fallback was used.")
+                    : "DuckDuckGo fallback was used.";
 
             return string.Join(
                 Environment.NewLine,
                 rateLimitLine,
                 resetLine,
-                "DuckDuckGo fallback was used.");
+                fallbackLine);
         }
 
         private async Task<string> ReadImageToolAsync(JsonElement arguments)

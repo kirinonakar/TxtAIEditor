@@ -2398,6 +2398,12 @@
   <data name="SettingsExaApiKeyInfo" xml:space="preserve">
     <value>Exa API Key는 Agent의 웹 검색(Exa) 기능에 사용되며, Windows 자격 증명 관리자에 안전하게 저장됩니다.</value>
   </data>
+  <data name="AgentExaApiKeyFallbackUsed" xml:space="preserve">
+    <value>Exa API Key fallback을 사용했습니다.</value>
+  </data>
+  <data name="AgentExaApiKeyFallbackFailedToDuckDuckGo" xml:space="preserve">
+    <value>Exa API Key fallback 실패 -&gt; DuckDuckGo fallback을 사용했습니다.</value>
+  </data>
   <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
     <value>Exa 웹 검색 중: {0}</value>
   </data>

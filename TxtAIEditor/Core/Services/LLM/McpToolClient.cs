@@ -670,6 +670,9 @@ namespace TxtAIEditor.Core.Services.LLM
     internal sealed class McpToolRateLimitException : HttpRequestException
     {
         public const string ExaFreeMcpRateLimitMarker = "You've hit Exa's free MCP rate limit";
+        public const string ExaDuckDuckGoFallbackMarker = "[Exa MCP fallback: DuckDuckGo]";
+        public const string ExaApiKeyFallbackMarker = "[Exa MCP fallback: Exa API Key]";
+        public const string ExaApiKeyFallbackFailedMarker = "[Exa API key fallback failed -> DuckDuckGo fallback]";
 
         public McpToolRateLimitException(
             HttpStatusCode statusCode,

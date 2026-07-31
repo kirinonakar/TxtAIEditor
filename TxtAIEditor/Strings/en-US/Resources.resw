@@ -2398,6 +2398,12 @@ Plan: {0}</value>
   <data name="SettingsExaApiKeyInfo" xml:space="preserve">
     <value>The Exa API Key is used for the Agent's web search (Exa) function and is securely stored in the Windows Credential Manager.</value>
   </data>
+  <data name="AgentExaApiKeyFallbackUsed" xml:space="preserve">
+    <value>Exa API key fallback was used.</value>
+  </data>
+  <data name="AgentExaApiKeyFallbackFailedToDuckDuckGo" xml:space="preserve">
+    <value>Exa API key fallback failed -&gt; DuckDuckGo fallback was used.</value>
+  </data>
   <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
     <value>Exa web searching: {0}</value>
   </data>
