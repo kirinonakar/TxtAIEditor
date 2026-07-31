@@ -503,13 +503,18 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
+            double cachedPct = stats.PromptTokens > 0
+                ? ((double)stats.CachedTokens / stats.PromptTokens * 100)
+                : 0;
+
             string summary = string.Format(
-                _getString("SettingsLlmTokenUsageStatsSummaryFormat", "누적: 요청 {0:N0}회 · 입력 {1:N0} · 출력 {2:N0} · 전체 {3:N0} · cached {4:N0} 토큰"),
+                _getString("SettingsLlmTokenUsageStatsSummaryFormat", "누적: 요청 {0:N0}회 · 입력 {1:N0} · 출력 {2:N0}\n전체 {3:N0} · cached {4:N0} ({5:0}%) 토큰"),
                 stats.RequestCount,
                 stats.PromptTokens,
                 stats.CompletionTokens,
                 stats.TotalTokens,
-                stats.CachedTokens);
+                stats.CachedTokens,
+                cachedPct);
             _tokenUsageSummaryText.Text = summary;
         }
 
@@ -521,13 +526,18 @@ namespace TxtAIEditor.Core.Services
                 return _getString("SettingsLlmTokenUsageStatsEmpty", "아직 관측된 LLM token usage가 없습니다.");
             }
 
+            double cachedPct = stats.PromptTokens > 0
+                ? ((double)stats.CachedTokens / stats.PromptTokens * 100)
+                : 0;
+
             string summary = string.Format(
-                _getString("SettingsLlmTokenUsageStatsSummaryFormat", "누적: 요청 {0:N0}회 · 입력 {1:N0} · 출력 {2:N0} · 전체 {3:N0} · cached {4:N0} 토큰"),
+                _getString("SettingsLlmTokenUsageStatsSummaryFormat", "누적: 요청 {0:N0}회 · 입력 {1:N0} · 출력 {2:N0}\n전체 {3:N0} · cached {4:N0} ({5:0}%) 토큰"),
                 stats.RequestCount,
                 stats.PromptTokens,
                 stats.CompletionTokens,
                 stats.TotalTokens,
-                stats.CachedTokens);
+                stats.CachedTokens,
+                cachedPct);
 
             var details = new StringBuilder();
             details.AppendLine(summary);

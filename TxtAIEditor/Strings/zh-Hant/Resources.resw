@@ -480,7 +480,7 @@
     <value>尚未觀測到 LLM token usage。</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsSummaryFormat" xml:space="preserve">
-    <value>累計：請求 {0:N0} 次 · 輸入 {1:N0} · 輸出 {2:N0} · 總計 {3:N0} · cached {4:N0} tokens</value>
+    <value>累計：請求 {0:N0} 次 · 輸入 {1:N0} · 輸出 {2:N0}&#10;總計 {3:N0} · cached {4:N0} ({5:0}%) Token</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsLastFormat" xml:space="preserve">
     <value>最後一次：{0} / {1} · 請求 {2:N0} 次 · 輸入 {3:N0} · 輸出 {4:N0} · 總計 {5:N0} · cached {6:N0} tokens</value>

@@ -480,7 +480,7 @@
     <value>아직 관측된 LLM token usage가 없습니다.</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsSummaryFormat" xml:space="preserve">
-    <value>누적: 요청 {0:N0}회 · 입력 {1:N0} · 출력 {2:N0} · 전체 {3:N0} · cached {4:N0} 토큰</value>
+    <value>누적: 요청 {0:N0}회 · 입력 {1:N0} · 출력 {2:N0}&#10;전체 {3:N0} · cached {4:N0} ({5:0}%) 토큰</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsLastFormat" xml:space="preserve">
     <value>마지막: {0} / {1} · 요청 {2:N0}회 · 입력 {3:N0} · 출력 {4:N0} · 전체 {5:N0} · cached {6:N0} 토큰</value>

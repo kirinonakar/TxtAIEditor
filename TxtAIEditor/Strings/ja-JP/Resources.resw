@@ -480,7 +480,7 @@
     <value>まだLLM token usageは観測されていません。</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsSummaryFormat" xml:space="preserve">
-    <value>累計: リクエスト {0:N0}回 · 入力 {1:N0} · 出力 {2:N0} · 合計 {3:N0} · cached {4:N0}トークン</value>
+    <value>累計: リクエスト {0:N0}回 · 入力 {1:N0} · 出力 {2:N0}&#10;全体 {3:N0} · cached {4:N0} ({5:0}%) トークン</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsLastFormat" xml:space="preserve">
     <value>最後: {0} / {1} · リクエスト {2:N0}回 · 入力 {3:N0} · 出力 {4:N0} · 合計 {5:N0} · cached {6:N0}トークン</value>
