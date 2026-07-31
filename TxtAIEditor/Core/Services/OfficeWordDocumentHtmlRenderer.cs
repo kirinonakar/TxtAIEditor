@@ -80,15 +80,49 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyDictionary<string, string> relationships,
             XElement paragraph)
         {
+            string paragraphStyle = BuildParagraphStyle(paragraph);
             var content = new StringBuilder();
             foreach (XElement child in paragraph.Elements())
             {
+                if (child.Name.LocalName == "pPr")
+                {
+                    continue;
+                }
+
                 AppendInlineHtml(content, archive, relationships, child);
             }
 
+            string styleAttribute = string.IsNullOrWhiteSpace(paragraphStyle)
+                ? string.Empty
+                : " style=\"" + Html(paragraphStyle) + "\"";
             return content.Length == 0
-                ? "<p class=\"doc-paragraph empty-paragraph\"></p>"
-                : "<p class=\"doc-paragraph\">" + content + "</p>";
+                ? "<p class=\"doc-paragraph empty-paragraph\"" + styleAttribute + "></p>"
+                : "<p class=\"doc-paragraph\"" + styleAttribute + ">" + content + "</p>";
+        }
+
+        private static string BuildParagraphStyle(XElement paragraph)
+        {
+            XElement? paragraphProperties = GetDirectProperty(paragraph, "pPr");
+            XElement? justification = GetDirectProperty(paragraphProperties, "jc");
+            string value = GetAttributeValue(justification, "val").ToLowerInvariant();
+            string? alignment = value switch
+            {
+                "center" => "center",
+                "right" or "end" => "right",
+                "both" or "justify" => "justify",
+                "distribute" => "justify",
+                "left" or "start" => "left",
+                _ => null
+            };
+
+            if (string.IsNullOrWhiteSpace(alignment))
+            {
+                return string.Empty;
+            }
+
+            return value == "distribute"
+                ? "text-align:justify;text-align-last:justify"
+                : "text-align:" + alignment;
         }
 
         private static void AppendInlineHtml(
@@ -185,6 +219,21 @@ namespace TxtAIEditor.Core.Services
             if (properties.Elements().Any(e => e.Name.LocalName == "u"))
             {
                 styles.Add("text-decoration:underline");
+            }
+
+            XElement? size = properties.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "sz") ??
+                properties.Elements().FirstOrDefault(e => e.Name.LocalName == "szCs");
+            if (int.TryParse(
+                    GetAttributeValue(size, "val"),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int halfPoints) &&
+                halfPoints > 0)
+            {
+                styles.Add("font-size:" +
+                    (halfPoints / 2.0).ToString("0.###", CultureInfo.InvariantCulture) +
+                    "pt");
             }
 
             XElement? color = properties.Elements().FirstOrDefault(e => e.Name.LocalName == "color");
