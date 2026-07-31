@@ -379,7 +379,7 @@ namespace TxtAIEditor.Core.Services
             content.Children.Add(_llmThinkingLevelCombo);
 
             return CreateCard(
-                _getString("SettingsLlmGroupMain", "기본 서비스 & 모델"),
+                _getString("SettingsLlmGroupMain", "LLM 공급자 & 모델"),
                 content,
                 "\uE99A");
         }

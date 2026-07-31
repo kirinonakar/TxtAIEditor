@@ -3613,4 +3613,25 @@
   <data name="StatusImageFormatTooltip" xml:space="preserve">
     <value>按一下以檢視圖像資訊</value>
   </data>
+  <data name="SettingsLlmGroupMain" xml:space="preserve">
+    <value>LLM 提供商與模型</value>
+  </data>
+  <data name="SettingsLlmGroupVisionFallback" xml:space="preserve">
+    <value>Vision 後備模型</value>
+  </data>
+  <data name="SettingsLlmGroupAgent" xml:space="preserve">
+    <value>智能體與權限</value>
+  </data>
+  <data name="SettingsLlmGroupAutoApprove" xml:space="preserve">
+    <value>自動批准權限</value>
+  </data>
+  <data name="SettingsLlmGroupTranslation" xml:space="preserve">
+    <value>翻譯設定</value>
+  </data>
+  <data name="SettingsLlmGroupWebSearch" xml:space="preserve">
+    <value>Web 搜尋擴充 (Exa)</value>
+  </data>
+  <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
+    <value>Token 使用量統計</value>
+  </data>
 </root>

@@ -3649,4 +3649,25 @@ Plan: {0}</value>
   <data name="StatusImageFormatTooltip" xml:space="preserve">
     <value>Click to view image info</value>
   </data>
+  <data name="SettingsLlmGroupMain" xml:space="preserve">
+    <value>LLM Provider &amp; Model</value>
+  </data>
+  <data name="SettingsLlmGroupVisionFallback" xml:space="preserve">
+    <value>Vision Fallback Model</value>
+  </data>
+  <data name="SettingsLlmGroupAgent" xml:space="preserve">
+    <value>Agent &amp; Permissions</value>
+  </data>
+  <data name="SettingsLlmGroupAutoApprove" xml:space="preserve">
+    <value>Auto-Approve Permissions</value>
+  </data>
+  <data name="SettingsLlmGroupTranslation" xml:space="preserve">
+    <value>Translation Settings</value>
+  </data>
+  <data name="SettingsLlmGroupWebSearch" xml:space="preserve">
+    <value>Web Search Extension (Exa)</value>
+  </data>
+  <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
+    <value>Token Usage Statistics</value>
+  </data>
 </root>

@@ -3649,4 +3649,25 @@
   <data name="StatusImageFormatTooltip" xml:space="preserve">
     <value>클릭하여 이미지 정보 보기</value>
   </data>
+  <data name="SettingsLlmGroupMain" xml:space="preserve">
+    <value>LLM 공급자 &amp; 모델</value>
+  </data>
+  <data name="SettingsLlmGroupVisionFallback" xml:space="preserve">
+    <value>비전 대체 모델</value>
+  </data>
+  <data name="SettingsLlmGroupAgent" xml:space="preserve">
+    <value>에이전트 &amp; 권한</value>
+  </data>
+  <data name="SettingsLlmGroupAutoApprove" xml:space="preserve">
+    <value>자동 승인 권한</value>
+  </data>
+  <data name="SettingsLlmGroupTranslation" xml:space="preserve">
+    <value>번역 설정</value>
+  </data>
+  <data name="SettingsLlmGroupWebSearch" xml:space="preserve">
+    <value>웹 검색 확장 (Exa)</value>
+  </data>
+  <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
+    <value>토큰 사용량 통계</value>
+  </data>
 </root>

@@ -3613,4 +3613,25 @@
   <data name="StatusImageFormatTooltip" xml:space="preserve">
     <value>クリックして画像情報を表示</value>
   </data>
+  <data name="SettingsLlmGroupMain" xml:space="preserve">
+    <value>LLMプロバイダー＆モデル</value>
+  </data>
+  <data name="SettingsLlmGroupVisionFallback" xml:space="preserve">
+    <value>Visionフォールバックモデル</value>
+  </data>
+  <data name="SettingsLlmGroupAgent" xml:space="preserve">
+    <value>エージェント＆権限</value>
+  </data>
+  <data name="SettingsLlmGroupAutoApprove" xml:space="preserve">
+    <value>自動承認権限</value>
+  </data>
+  <data name="SettingsLlmGroupTranslation" xml:space="preserve">
+    <value>翻訳設定</value>
+  </data>
+  <data name="SettingsLlmGroupWebSearch" xml:space="preserve">
+    <value>Web検索拡張 (Exa)</value>
+  </data>
+  <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
+    <value>トークン使用量統計</value>
+  </data>
 </root>
