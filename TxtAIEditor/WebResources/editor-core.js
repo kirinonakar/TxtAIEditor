@@ -751,6 +751,7 @@ function setupVirtualHeight() {
     // document height instead of maintaining a second, measured height model.
     document.body.classList.toggle('full-document-render', usesFullDocumentRender());
     if (usesFullDocumentRender()) {
+        syncFullDocumentTrailingSpace();
         const maximumScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
         if (savedScroll > maximumScrollTop) {
             scrollContainer.scrollTop = maximumScrollTop;
@@ -758,6 +759,7 @@ function setupVirtualHeight() {
         return;
     }
 
+    viewport.style.removeProperty('--full-document-trailing-height');
     const maximumScrollTop = maximumVirtualScrollTop();
     if (state.preservedScrollTop !== null) {
         state.preservedScrollTop = Math.min(
@@ -774,6 +776,13 @@ function setupVirtualHeight() {
     if (savedScroll > maxScroll) {
         scrollContainer.scrollTop = maxScroll;
     }
+}
+
+function syncFullDocumentTrailingSpace() {
+    const lastRow = viewport.lastElementChild;
+    const lastRowHeight = Math.max(1, lastRow?.offsetHeight || state.lineHeight);
+    const trailingHeight = Math.max(0, scrollContainer.clientHeight - lastRowHeight);
+    viewport.style.setProperty('--full-document-trailing-height', `${trailingHeight}px`);
 }
 
 function preserveScrollTop(scrollTop) {

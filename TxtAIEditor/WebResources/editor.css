@@ -168,6 +168,7 @@ body.full-document-render #viewport {
     position: relative;
     right: auto;
     min-height: 100%;
+    padding-bottom: var(--full-document-trailing-height, 0px);
     transform: none !important;
     will-change: auto;
 }
