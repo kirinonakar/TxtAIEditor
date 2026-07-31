@@ -270,7 +270,7 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "apply_patch",
-                    Description = "Apply a unified diff patch to a file.",
+                    Description = "Apply a unified diff patch to a file. Hunk line ranges may be omitted when each hunk has a unique context or deleted block.",
                     Parameters = new
                     {
                         type = "object",

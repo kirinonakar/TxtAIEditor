@@ -593,6 +593,7 @@ namespace TxtAIEditor.Controls
 
             string[] patchLines = NormalizeNewlines(patchText).Split('\n');
             var hunkHeaderRegex = new Regex(@"^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@", RegexOptions.Compiled);
+            var unlocatedHunkHeaderRegex = new Regex(@"^\s*@@(?:\s+(?![-+]\d).*)?\s*$", RegexOptions.Compiled);
             var hunks = new List<PatchHunk>();
             PatchHunk? currentHunk = null;
 
@@ -611,8 +612,14 @@ namespace TxtAIEditor.Controls
                         OldStart = oldStart,
                         OldCount = oldCount,
                         NewStart = newStart,
-                        NewCount = newCount
+                        NewCount = newCount,
+                        HasExplicitLocation = true
                     };
+                    hunks.Add(currentHunk);
+                }
+                else if (unlocatedHunkHeaderRegex.IsMatch(line))
+                {
+                    currentHunk = new PatchHunk();
                     hunks.Add(currentHunk);
                 }
                 else if (currentHunk != null)
@@ -629,12 +636,28 @@ namespace TxtAIEditor.Controls
                 return "apply_patch failed: no valid hunks found in patch.";
             }
 
-            var sortedHunks = hunks.OrderByDescending(h => h.OldStart).ToList();
+            var sortedHunks = hunks
+                .OrderByDescending(h => h.HasExplicitLocation)
+                .ThenByDescending(h => h.OldStart)
+                .ToList();
             foreach (var hunk in sortedHunks)
             {
-                int matchIndex = FindHunkMatch(lines, hunk);
+                bool ambiguousUnlocatedMatch = false;
+                int matchIndex = hunk.HasExplicitLocation
+                    ? FindHunkMatch(lines, hunk)
+                    : FindUniqueHunkMatch(lines, hunk, out ambiguousUnlocatedMatch);
                 if (matchIndex < 0)
                 {
+                    if (!hunk.HasExplicitLocation)
+                    {
+                        if (ambiguousUnlocatedMatch)
+                        {
+                            return $"apply_patch failed: hunk without a line range is ambiguous in file {path}; its context block must occur exactly once.";
+                        }
+
+                        return $"apply_patch failed: hunk without a line range requires a unique context or deleted block in file {path}.";
+                    }
+
                     int targetEndLine = hunk.OldStart + Math.Max(hunk.OldCount, 1) - 1;
                     return AppendEditFailureContext(
                         $"apply_patch failed: could not match hunk starting at line {hunk.OldStart} in file {path}.",
@@ -1477,6 +1500,54 @@ namespace TxtAIEditor.Controls
             return -1;
         }
 
+        private static int FindUniqueHunkMatch(
+            List<string> lines,
+            PatchHunk hunk,
+            out bool ambiguous)
+        {
+            ambiguous = false;
+            List<string> oldLines = hunk.Lines
+                .Where(line => line.StartsWith(' ') || line.StartsWith('-'))
+                .Select(line => line.Substring(1))
+                .ToList();
+            if (oldLines.Count == 0)
+            {
+                return -1;
+            }
+
+            int matchIndex = -1;
+            for (int candidateIndex = 0; candidateIndex <= lines.Count - oldLines.Count; candidateIndex++)
+            {
+                bool matches = true;
+                for (int offset = 0; offset < oldLines.Count; offset++)
+                {
+                    if (!string.Equals(
+                            lines[candidateIndex + offset],
+                            oldLines[offset],
+                            StringComparison.Ordinal))
+                    {
+                        matches = false;
+                        break;
+                    }
+                }
+
+                if (!matches)
+                {
+                    continue;
+                }
+
+                if (matchIndex >= 0)
+                {
+                    ambiguous = true;
+                    return -1;
+                }
+
+                matchIndex = candidateIndex;
+            }
+
+            return matchIndex;
+        }
+
         private bool IsHunkMatch(List<string> lines, int fileIndex, PatchHunk hunk)
         {
             int fileLineIdx = fileIndex;
@@ -1505,6 +1576,7 @@ namespace TxtAIEditor.Controls
             public int OldCount { get; set; }
             public int NewStart { get; set; }
             public int NewCount { get; set; }
+            public bool HasExplicitLocation { get; set; }
             public List<string> Lines { get; } = new List<string>();
         }
     }
