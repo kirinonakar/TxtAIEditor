@@ -24,6 +24,7 @@ namespace TxtAIEditor.Core.Services
         private readonly PasswordBox _llmApiKeyBox;
         private readonly TextBox _exaEndpointBox;
         private readonly PasswordBox _exaApiKeyBox;
+        private readonly CheckBox _exaUseApiKeyAfterFreeLimitCheck;
         private readonly CheckBox _confirmBeforeSendingCheck;
         private readonly CheckBox _agentVerboseCheck;
         private readonly CheckBox _retainThinkingCheck;
@@ -61,6 +62,11 @@ namespace TxtAIEditor.Core.Services
             _llmApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsLlmCredentialPlaceholder", "API Key 입력 (비워두면 저장된 자격 증명 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
             _exaEndpointBox = new TextBox { PlaceholderText = getString("SettingsExaEndpointPlaceholder", "예: https://mcp.exa.ai/mcp"), Text = settings.ExaEndpoint, HorizontalAlignment = HorizontalAlignment.Stretch };
             _exaApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsExaApiKeyPlaceholder", "Exa API Key 입력 (비워두면 저장된 Key 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
+            _exaUseApiKeyAfterFreeLimitCheck = new CheckBox
+            {
+                Content = getString("SettingsExaUseApiKeyAfterFreeLimit", "무료 한도 사용 후 API Key 사용"),
+                IsChecked = settings.ExaUseApiKeyAfterFreeLimit
+            };
 
             _confirmBeforeSendingCheck = new CheckBox { Content = getString("SettingsLlmConfirmBeforeSending", "전송 전 확인"), IsChecked = settings.LlmConfirmBeforeSending };
             _agentVerboseCheck = new CheckBox { Content = getString("SettingsLlmAgentVerbose", "Agent 상세 출력 활성화 (Verbose)"), IsChecked = settings.LlmAgentVerbose };
@@ -185,6 +191,7 @@ namespace TxtAIEditor.Core.Services
             };
             SettingsLlmModelCatalog.SaveProviderModel(settings);
             settings.ExaEndpoint = _exaEndpointBox.Text.Trim();
+            settings.ExaUseApiKeyAfterFreeLimit = _exaUseApiKeyAfterFreeLimitCheck.IsChecked == true;
         }
 
         public async Task SaveSecretsAsync(EditorSettings settings)
@@ -236,6 +243,7 @@ namespace TxtAIEditor.Core.Services
             section.Children.Add(_llmThinkingLevelCombo);
             SettingsDialogUi.AddLabel(section, _getString("SettingsExaEndpoint", "Exa 검색 API / MCP Endpoint"));
             section.Children.Add(_exaEndpointBox);
+            section.Children.Add(_exaUseApiKeyAfterFreeLimitCheck);
             SettingsDialogUi.AddLabel(section, _getString("SettingsExaApiKey", "Exa API Key (웹 검색 기능용)"));
             section.Children.Add(_exaApiKeyBox);
             section.Children.Add(new TextBlock

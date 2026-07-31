@@ -2413,6 +2413,9 @@
   <data name="SettingsExaEndpointPlaceholder" xml:space="preserve">
     <value>例: https://mcp.exa.ai/mcp</value>
   </data>
+  <data name="SettingsExaUseApiKeyAfterFreeLimit" xml:space="preserve">
+    <value>無料枠の上限到達後に API Key を使用</value>
+  </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell 実行の確認</value>
   </data>

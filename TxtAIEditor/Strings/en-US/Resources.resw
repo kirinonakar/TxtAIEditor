@@ -2413,6 +2413,9 @@ Plan: {0}</value>
   <data name="SettingsExaEndpointPlaceholder" xml:space="preserve">
     <value>e.g., https://mcp.exa.ai/mcp</value>
   </data>
+  <data name="SettingsExaUseApiKeyAfterFreeLimit" xml:space="preserve">
+    <value>Use API key after the free limit is reached</value>
+  </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell Execution Confirmation</value>
   </data>
