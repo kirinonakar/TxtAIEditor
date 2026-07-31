@@ -483,8 +483,7 @@ namespace TxtAIEditor.Core.Services
                 sequenceEnd++;
             }
 
-            if (sequenceEnd - sequenceStart + 1 < 2 ||
-                sequenceStart == 0 ||
+            if (sequenceStart == 0 ||
                 sequenceEnd + 1 >= inlineNodes.Count ||
                 inlineNodes[sequenceStart - 1] is not XText ||
                 inlineNodes[sequenceEnd + 1] is not XText suffix ||
@@ -507,15 +506,32 @@ namespace TxtAIEditor.Core.Services
                     .Select(textNode => textNode.Value));
             Match markerMatch = Regex.Match(
                 markerPrefix,
-                @"(?:^|\s)(?:[가-힣]\.|(?<numeric>\d+\)))$");
+                @"(?:^|\s)(?:[가-힣]\.|(?<numeric>\d+\))|(?<note>※)|(?<dash>-))$");
             if (!markerMatch.Success)
             {
                 return null;
             }
 
-            return markerMatch.Groups["numeric"].Success && spaceIndex == sequenceStart
-                ? " "
-                : string.Empty;
+            if (sequenceEnd - sequenceStart + 1 < 2 &&
+                !markerMatch.Groups["dash"].Success)
+            {
+                return null;
+            }
+
+            if (spaceIndex != sequenceStart)
+            {
+                return string.Empty;
+            }
+
+            if (markerMatch.Groups["numeric"].Success ||
+                markerMatch.Groups["note"].Success)
+            {
+                return " ";
+            }
+
+            return suffix.Value.StartsWith(' ')
+                ? string.Empty
+                : " ";
         }
 
         private static string BuildHwpxTableHtml(
