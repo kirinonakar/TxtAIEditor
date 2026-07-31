@@ -3670,4 +3670,28 @@ Plan: {0}</value>
   <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
     <value>Token Usage Statistics</value>
   </data>
+  <data name="SettingsEditingGroupDisplay" xml:space="preserve">
+    <value>Editor Display &amp; Formatting</value>
+  </data>
+  <data name="SettingsEditingGroupAutocomplete" xml:space="preserve">
+    <value>Autocomplete &amp; Saving</value>
+  </data>
+  <data name="SettingsEditingGroupAutoSave" xml:space="preserve">
+    <value>Autosave</value>
+  </data>
+  <data name="SettingsEditingGroupMarkdown" xml:space="preserve">
+    <value>Markdown &amp; Preview</value>
+  </data>
+  <data name="SettingsEditingGroupPaths" xml:space="preserve">
+    <value>Paths &amp; External Viewer</value>
+  </data>
+  <data name="SettingsEditingGroupBackup" xml:space="preserve">
+    <value>Backup &amp; Restore</value>
+  </data>
+  <data name="SettingsBrowseFolder" xml:space="preserve">
+    <value>Browse Folder</value>
+  </data>
+  <data name="SettingsBrowseFile" xml:space="preserve">
+    <value>Browse File</value>
+  </data>
 </root>

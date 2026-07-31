@@ -3634,4 +3634,28 @@
   <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
     <value>トークン使用量統計</value>
   </data>
+  <data name="SettingsEditingGroupDisplay" xml:space="preserve">
+    <value>エディター画面と表示</value>
+  </data>
+  <data name="SettingsEditingGroupAutocomplete" xml:space="preserve">
+    <value>自動補完と保存</value>
+  </data>
+  <data name="SettingsEditingGroupAutoSave" xml:space="preserve">
+    <value>自動保存 (Autosave)</value>
+  </data>
+  <data name="SettingsEditingGroupMarkdown" xml:space="preserve">
+    <value>ドキュメントとプレビュー</value>
+  </data>
+  <data name="SettingsEditingGroupPaths" xml:space="preserve">
+    <value>パスと外部ビューア</value>
+  </data>
+  <data name="SettingsEditingGroupBackup" xml:space="preserve">
+    <value>バックアップと復元</value>
+  </data>
+  <data name="SettingsBrowseFolder" xml:space="preserve">
+    <value>フォルダ参照</value>
+  </data>
+  <data name="SettingsBrowseFile" xml:space="preserve">
+    <value>ファイル参照</value>
+  </data>
 </root>

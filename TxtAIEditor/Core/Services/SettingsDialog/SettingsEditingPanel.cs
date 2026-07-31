@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Models;
 using Windows.Storage.Pickers;
 using AppFileOpenPicker = Microsoft.Windows.Storage.Pickers.FileOpenPicker;
@@ -54,8 +55,8 @@ namespace TxtAIEditor.Core.Services
             _defaultMarkdownToolbarCheck = new CheckBox { Content = getString("SettingsMarkdownToolbar", "기본 마크다운 툴바 활성화"), IsChecked = settings.DefaultMarkdownToolbarEnabled };
             _startInTreeModeCheck = new CheckBox { Content = getString("SettingsStartInTreeMode", "트리 모드로 시작"), IsChecked = settings.StartInTreeMode };
             _tabSizeBox = new TextBox { PlaceholderText = "예: 4", Text = settings.TabSize.ToString(), HorizontalAlignment = HorizontalAlignment.Stretch };
-            _homeFolderBox = new TextBox { PlaceholderText = getString("SettingsHomeFolderPlaceholder", "C:\\Users\\..."), Text = settings.HomeFolderPath, Width = 420, IsSpellCheckEnabled = false };
-            _externalViewerPathBox = new TextBox { PlaceholderText = getString("SettingsExternalViewerPathPlaceholder", "uviewer 또는 C:\\Program Files\\Viewer\\viewer.exe"), Text = settings.ExternalViewerPath, Width = 420, IsSpellCheckEnabled = false };
+            _homeFolderBox = new TextBox { PlaceholderText = getString("SettingsHomeFolderPlaceholder", "C:\\Users\\..."), Text = settings.HomeFolderPath, HorizontalAlignment = HorizontalAlignment.Stretch, IsSpellCheckEnabled = false };
+            _externalViewerPathBox = new TextBox { PlaceholderText = getString("SettingsExternalViewerPathPlaceholder", "uviewer 또는 C:\\Program Files\\Viewer\\viewer.exe"), Text = settings.ExternalViewerPath, HorizontalAlignment = HorizontalAlignment.Stretch, IsSpellCheckEnabled = false };
             _externalViewerArgumentsBox = new TextBox
             {
                 PlaceholderText = getString("SettingsExternalViewerArgumentsPlaceholder", "예: --open {file}"),
@@ -64,25 +65,12 @@ namespace TxtAIEditor.Core.Services
                 IsSpellCheckEnabled = false
             };
 
-            var section = SettingsDialogUi.CreateSection();
-            section.Children.Add(_wordWrapCheck);
-            section.Children.Add(_syntaxHighlightingCheck);
-            section.Children.Add(_showDirtyLinesCheck);
-            section.Children.Add(_bracketColorCheck);
-            section.Children.Add(_autocompleteEnterCheck);
-            section.Children.Add(_autocompleteTabCheck);
-            section.Children.Add(_autoSaveCheck);
-            section.Children.Add(_autoSaveAllowNonGitCheck);
-            section.Children.Add(_stripJupyterOutputsOnCommitCheck);
-            section.Children.Add(_defaultMarkdownCheck);
-            section.Children.Add(_defaultMarkdownToolbarCheck);
-            section.Children.Add(_startInTreeModeCheck);
-            SettingsDialogUi.AddLabel(section, getString("SettingsTabSize", "Tab size"));
-            section.Children.Add(_tabSizeBox);
-
-            AddHomeFolderPicker(section, getString, initializePickerWindow);
-            AddExternalViewerPicker(section, getString, initializePickerWindow);
-            AddSettingsBackupActions(section, getString, pickerWindowId);
+            var section = new StackPanel { Spacing = 10, Width = 460, Padding = new Thickness(2, 6, 2, 2) };
+            section.Children.Add(CreateDisplayCard(getString));
+            section.Children.Add(CreateAutocompleteSaveCard(getString));
+            section.Children.Add(CreateMarkdownWorkspaceCard(getString));
+            section.Children.Add(CreatePathsCard(getString, initializePickerWindow));
+            section.Children.Add(CreateBackupRestoreCard(getString, pickerWindowId));
             Content = section;
         }
 
@@ -111,121 +99,319 @@ namespace TxtAIEditor.Core.Services
             settings.StartInTreeMode = _startInTreeModeCheck.IsChecked == true;
         }
 
-        private void AddHomeFolderPicker(
-            StackPanel section,
+        private Border CreateCard(string title, UIElement content, string fontIconGlyph)
+        {
+            var container = new StackPanel { Spacing = 8 };
+
+            var headerPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                Margin = new Thickness(0, 0, 0, 2)
+            };
+
+            if (!string.IsNullOrEmpty(fontIconGlyph))
+            {
+                headerPanel.Children.Add(new FontIcon
+                {
+                    Glyph = fontIconGlyph,
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+            }
+
+            headerPanel.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 12.5,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            container.Children.Add(headerPanel);
+            container.Children.Add(content);
+
+            var card = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(12, 10, 12, 12),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            card.Loaded += (s, e) =>
+            {
+                if (Application.Current.Resources.TryGetValue("CardBackgroundFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
+                {
+                    card.Background = bgBrush;
+                }
+                else
+                {
+                    card.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(15, 128, 128, 128));
+                }
+
+                if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out object? border) && border is Brush borderBrush)
+                {
+                    card.BorderBrush = borderBrush;
+                }
+                else
+                {
+                    card.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(35, 128, 128, 128));
+                }
+            };
+
+            card.Child = container;
+            return card;
+        }
+
+        private Border CreateSubGroup(string title, UIElement content)
+        {
+            var container = new StackPanel { Spacing = 6 };
+            container.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
+            });
+            container.Children.Add(content);
+
+            var border = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(10, 8, 10, 8),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            border.Loaded += (s, e) =>
+            {
+                if (Application.Current.Resources.TryGetValue("ControlFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
+                {
+                    border.Background = bgBrush;
+                }
+                else
+                {
+                    border.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(10, 128, 128, 128));
+                }
+
+                if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out object? bBorder) && bBorder is Brush borderBrush)
+                {
+                    border.BorderBrush = borderBrush;
+                }
+                else
+                {
+                    border.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(20, 128, 128, 128));
+                }
+            };
+
+            border.Child = container;
+            return border;
+        }
+
+        private Border CreateDisplayCard(Func<string, string, string> getString)
+        {
+            var content = new StackPanel { Spacing = 6 };
+            content.Children.Add(_wordWrapCheck);
+            content.Children.Add(_syntaxHighlightingCheck);
+            content.Children.Add(_showDirtyLinesCheck);
+            content.Children.Add(_bracketColorCheck);
+
+            var tabSizeGrid = new Grid();
+            tabSizeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            tabSizeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80, GridUnitType.Pixel) });
+
+            var tabLabel = new TextBlock
+            {
+                Text = getString("SettingsTabSize", "Tab size"),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(tabLabel, 0);
+            Grid.SetColumn(_tabSizeBox, 1);
+            tabSizeGrid.Children.Add(tabLabel);
+            tabSizeGrid.Children.Add(_tabSizeBox);
+            content.Children.Add(tabSizeGrid);
+
+            return CreateCard(
+                getString("SettingsEditingGroupDisplay", "에디터 화면 & 옵션"),
+                content,
+                "\uE8AC");
+        }
+
+        private Border CreateAutocompleteSaveCard(Func<string, string, string> getString)
+        {
+            var content = new StackPanel { Spacing = 6 };
+            content.Children.Add(_autocompleteEnterCheck);
+            content.Children.Add(_autocompleteTabCheck);
+
+            var autoSavePanel = new StackPanel { Spacing = 4 };
+            autoSavePanel.Children.Add(_autoSaveCheck);
+            autoSavePanel.Children.Add(_autoSaveAllowNonGitCheck);
+
+            var autoSaveSubGroup = CreateSubGroup(
+                getString("SettingsEditingGroupAutoSave", "자동 저장 (Autosave)"),
+                autoSavePanel);
+            content.Children.Add(autoSaveSubGroup);
+
+            return CreateCard(
+                getString("SettingsEditingGroupAutocomplete", "자동완성 & 저장"),
+                content,
+                "\uE74E");
+        }
+
+        private Border CreateMarkdownWorkspaceCard(Func<string, string, string> getString)
+        {
+            var content = new StackPanel { Spacing = 6 };
+            content.Children.Add(_defaultMarkdownCheck);
+            content.Children.Add(_defaultMarkdownToolbarCheck);
+            content.Children.Add(_startInTreeModeCheck);
+            content.Children.Add(_stripJupyterOutputsOnCommitCheck);
+
+            return CreateCard(
+                getString("SettingsEditingGroupMarkdown", "문서 & 미리보기"),
+                content,
+                "\uE8D2");
+        }
+
+        private Border CreatePathsCard(
             Func<string, string, string> getString,
             Action<object>? initializePickerWindow)
         {
-            SettingsDialogUi.AddLabel(section, getString("SettingsHomeFolder", "홈 폴더"));
-            var homeFolderBrowseButton = new Button { Content = "...", Width = 32, Height = 32, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-            var homeFolderPanel = new StackPanel { Orientation = Orientation.Horizontal };
-            homeFolderPanel.Children.Add(_homeFolderBox);
-            homeFolderPanel.Children.Add(homeFolderBrowseButton);
-            section.Children.Add(homeFolderPanel);
+            var content = new StackPanel { Spacing = 6 };
+
+            // Home Folder
+            SettingsDialogUi.AddLabel(content, getString("SettingsHomeFolder", "홈 폴더"));
+            var homeFolderBrowseButton = new Button
+            {
+                Content = new FontIcon { Glyph = "\uE8B7", FontSize = 12 },
+                Width = 32,
+                Height = 26,
+                MinWidth = 32,
+                Margin = new Thickness(6, 0, 0, 0),
+                Padding = new Thickness(0),
+                Tag = "IconOnlyButton",
+                HorizontalAlignment = HorizontalAlignment.Right,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            ToolTipService.SetToolTip(homeFolderBrowseButton, getString("SettingsBrowseFolder", "폴더 찾기"));
+
+            var homeFolderGrid = new Grid();
+            homeFolderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            homeFolderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(_homeFolderBox, 0);
+            Grid.SetColumn(homeFolderBrowseButton, 1);
+            homeFolderGrid.Children.Add(_homeFolderBox);
+            homeFolderGrid.Children.Add(homeFolderBrowseButton);
+            content.Children.Add(homeFolderGrid);
 
             homeFolderBrowseButton.Click += async (_, _) =>
             {
-                if (initializePickerWindow == null)
-                {
-                    return;
-                }
-
+                if (initializePickerWindow == null) return;
                 var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.ComputerFolder };
                 initializePickerWindow(picker);
                 picker.FileTypeFilter.Add("*");
                 var folder = await picker.PickSingleFolderAsync();
-                if (folder != null)
-                {
-                    _homeFolderBox.Text = folder.Path;
-                }
+                if (folder != null) _homeFolderBox.Text = folder.Path;
             };
-        }
 
-        private void AddExternalViewerPicker(
-            StackPanel section,
-            Func<string, string, string> getString,
-            Action<object>? initializePickerWindow)
-        {
-            SettingsDialogUi.AddLabel(section, getString("SettingsExternalViewerPath", "외부 뷰어 경로"));
-            var externalViewerBrowseButton = new Button { Content = "...", Width = 32, Height = 32, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-            var externalViewerPanel = new StackPanel { Orientation = Orientation.Horizontal };
-            externalViewerPanel.Children.Add(_externalViewerPathBox);
-            externalViewerPanel.Children.Add(externalViewerBrowseButton);
-            section.Children.Add(externalViewerPanel);
-
-            SettingsDialogUi.AddLabel(section, getString("SettingsExternalViewerArguments", "외부 뷰어 파라미터"));
-            section.Children.Add(_externalViewerArgumentsBox);
-            section.Children.Add(new TextBlock
+            // External Viewer Path
+            SettingsDialogUi.AddLabel(content, getString("SettingsExternalViewerPath", "외부 뷰어 경로"));
+            var externalViewerBrowseButton = new Button
             {
-                Text = getString("SettingsExternalViewerArgumentsInfo", "{file} 위치에 현재 파일 경로를 넣습니다. {file}이 없으면 마지막 인자로 파일 경로를 자동 추가합니다."),
-                TextWrapping = TextWrapping.Wrap,
-                FontSize = 11
-            });
+                Content = new FontIcon { Glyph = "\uE8B7", FontSize = 12 },
+                Width = 32,
+                Height = 26,
+                MinWidth = 32,
+                Margin = new Thickness(6, 0, 0, 0),
+                Padding = new Thickness(0),
+                Tag = "IconOnlyButton",
+                HorizontalAlignment = HorizontalAlignment.Right,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            ToolTipService.SetToolTip(externalViewerBrowseButton, getString("SettingsBrowseFile", "파일 찾기"));
+
+            var externalViewerGrid = new Grid();
+            externalViewerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            externalViewerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(_externalViewerPathBox, 0);
+            Grid.SetColumn(externalViewerBrowseButton, 1);
+            externalViewerGrid.Children.Add(_externalViewerPathBox);
+            externalViewerGrid.Children.Add(externalViewerBrowseButton);
+            content.Children.Add(externalViewerGrid);
 
             externalViewerBrowseButton.Click += async (_, _) =>
             {
-                if (initializePickerWindow == null)
-                {
-                    return;
-                }
-
+                if (initializePickerWindow == null) return;
                 var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.ComputerFolder };
                 initializePickerWindow(picker);
                 picker.FileTypeFilter.Add(".exe");
                 picker.FileTypeFilter.Add(".bat");
                 picker.FileTypeFilter.Add(".cmd");
                 var file = await picker.PickSingleFileAsync();
-                if (file != null)
-                {
-                    _externalViewerPathBox.Text = file.Path;
-                }
+                if (file != null) _externalViewerPathBox.Text = file.Path;
             };
+
+            // External Viewer Arguments
+            SettingsDialogUi.AddLabel(content, getString("SettingsExternalViewerArguments", "외부 뷰어 파라미터"));
+            content.Children.Add(_externalViewerArgumentsBox);
+            content.Children.Add(new TextBlock
+            {
+                Text = getString("SettingsExternalViewerArgumentsInfo", "{file} 위치에 현재 파일 경로를 넣습니다. {file}이 없으면 마지막 인자로 파일 경로를 자동 추가합니다."),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
+            });
+
+            return CreateCard(
+                getString("SettingsEditingGroupPaths", "경로 & 외부 뷰어"),
+                content,
+                "\uE8B7");
         }
 
-        private void AddSettingsBackupActions(
-            StackPanel section,
+        private Border CreateBackupRestoreCard(
             Func<string, string, string> getString,
             Microsoft.UI.WindowId pickerWindowId)
         {
-            SettingsDialogUi.AddLabel(section, getString("SettingsBackupTitle", "전체 설정"));
+            var content = new StackPanel { Spacing = 8 };
 
-            var actionsPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 6
-            };
+            var buttonGrid = new Grid();
+            buttonGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            buttonGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6, GridUnitType.Pixel) });
+            buttonGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
             var exportButton = new Button
             {
                 Content = getString("SettingsExportAllButton", "전체 설정 내보내기"),
-                MinWidth = 130
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
             var importButton = new Button
             {
                 Content = getString("SettingsImportAllButton", "전체 설정 불러오기"),
-                MinWidth = 130
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            actionsPanel.Children.Add(exportButton);
-            actionsPanel.Children.Add(importButton);
-            section.Children.Add(actionsPanel);
+            Grid.SetColumn(exportButton, 0);
+            Grid.SetColumn(importButton, 2);
+            buttonGrid.Children.Add(exportButton);
+            buttonGrid.Children.Add(importButton);
+            content.Children.Add(buttonGrid);
 
             var statusText = new TextBlock
             {
                 Text = getString("SettingsBackupDescription", ".TxtAIEditor 폴더 전체를 txtaieditor-setting.zip으로 내보내거나 zip에서 불러옵니다."),
                 TextWrapping = TextWrapping.Wrap,
-                FontSize = 11
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
             };
-            section.Children.Add(statusText);
+            content.Children.Add(statusText);
 
             bool backupOperationActive = false;
 
             exportButton.Click += async (_, _) =>
             {
-                if (backupOperationActive)
-                {
-                    return;
-                }
-
+                if (backupOperationActive) return;
                 backupOperationActive = true;
                 exportButton.IsEnabled = false;
                 importButton.IsEnabled = false;
@@ -242,10 +428,7 @@ namespace TxtAIEditor.Core.Services
                         new List<string> { ".zip" });
 
                     var file = await picker.PickSaveFileAsync();
-                    if (file == null)
-                    {
-                        return;
-                    }
+                    if (file == null) return;
 
                     statusText.Text = getString("SettingsBackupExporting", "전체 설정을 내보내는 중...");
                     await SettingsBackupService.ExportAsync(file.Path);
@@ -269,11 +452,7 @@ namespace TxtAIEditor.Core.Services
 
             importButton.Click += async (_, _) =>
             {
-                if (backupOperationActive)
-                {
-                    return;
-                }
-
+                if (backupOperationActive) return;
                 backupOperationActive = true;
                 exportButton.IsEnabled = false;
                 importButton.IsEnabled = false;
@@ -286,10 +465,7 @@ namespace TxtAIEditor.Core.Services
                     picker.FileTypeFilter.Add(".zip");
 
                     var file = await picker.PickSingleFileAsync();
-                    if (file == null)
-                    {
-                        return;
-                    }
+                    if (file == null) return;
 
                     statusText.Text = getString("SettingsBackupImporting", "전체 설정을 불러오는 중...");
                     await SettingsBackupService.ImportAsync(file.Path);
@@ -310,6 +486,10 @@ namespace TxtAIEditor.Core.Services
                 }
             };
 
+            return CreateCard(
+                getString("SettingsEditingGroupBackup", "전체 설정 백업 & 복원"),
+                content,
+                "\uE8F7");
         }
     }
 }

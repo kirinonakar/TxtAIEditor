@@ -3634,4 +3634,28 @@
   <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
     <value>Token 使用量统计</value>
   </data>
+  <data name="SettingsEditingGroupDisplay" xml:space="preserve">
+    <value>编辑器显示与格式</value>
+  </data>
+  <data name="SettingsEditingGroupAutocomplete" xml:space="preserve">
+    <value>自动完成与保存</value>
+  </data>
+  <data name="SettingsEditingGroupAutoSave" xml:space="preserve">
+    <value>自动保存 (Autosave)</value>
+  </data>
+  <data name="SettingsEditingGroupMarkdown" xml:space="preserve">
+    <value>文档与预览</value>
+  </data>
+  <data name="SettingsEditingGroupPaths" xml:space="preserve">
+    <value>路径与外部查看器</value>
+  </data>
+  <data name="SettingsEditingGroupBackup" xml:space="preserve">
+    <value>备份与恢复</value>
+  </data>
+  <data name="SettingsBrowseFolder" xml:space="preserve">
+    <value>浏览文件夹</value>
+  </data>
+  <data name="SettingsBrowseFile" xml:space="preserve">
+    <value>浏览文件</value>
+  </data>
 </root>

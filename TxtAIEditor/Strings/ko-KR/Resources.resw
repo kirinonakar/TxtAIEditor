@@ -3670,4 +3670,28 @@
   <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
     <value>토큰 사용량 통계</value>
   </data>
+  <data name="SettingsEditingGroupDisplay" xml:space="preserve">
+    <value>에디터 화면 &amp; 옵션</value>
+  </data>
+  <data name="SettingsEditingGroupAutocomplete" xml:space="preserve">
+    <value>자동완성 &amp; 저장</value>
+  </data>
+  <data name="SettingsEditingGroupAutoSave" xml:space="preserve">
+    <value>자동 저장 (Autosave)</value>
+  </data>
+  <data name="SettingsEditingGroupMarkdown" xml:space="preserve">
+    <value>문서 &amp; 미리보기</value>
+  </data>
+  <data name="SettingsEditingGroupPaths" xml:space="preserve">
+    <value>경로 &amp; 외부 뷰어</value>
+  </data>
+  <data name="SettingsEditingGroupBackup" xml:space="preserve">
+    <value>전체 설정 백업 &amp; 복원</value>
+  </data>
+  <data name="SettingsBrowseFolder" xml:space="preserve">
+    <value>폴더 찾기</value>
+  </data>
+  <data name="SettingsBrowseFile" xml:space="preserve">
+    <value>파일 찾기</value>
+  </data>
 </root>
