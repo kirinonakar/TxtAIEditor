@@ -147,6 +147,18 @@ namespace TxtAIEditor.Controls
                 _appendActivity(_getString("AgentActivityToolCancelled", "도구 실행 중단됨"));
                 throw;
             }
+            catch (McpToolRateLimitException ex)
+            {
+                string result = string.Format(
+                    _getString(
+                        "AgentExaMcpRateLimitHistoryFormat",
+                        "Tool failed: Exa MCP request unavailable.\nYou've hit Exa's free MCP rate limit.\nApproximately {0} hours until the next reset."),
+                    ex.GetApproximateRemainingHours());
+                _appendActivity(string.Format(
+                    _getString("AgentActivityToolFailedFormat", "도구 실패: {0}"),
+                    toolName));
+                return result;
+            }
             catch (Exception ex)
             {
                 string result = $"Tool failed: {ex.Message}";

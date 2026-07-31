@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using TxtAIEditor.Core.Services.LLM;
 
 namespace TxtAIEditor.Controls
 {
@@ -493,7 +494,15 @@ namespace TxtAIEditor.Controls
                 }
                 else
                 {
-                    if (inToolCall && !toolCallSyntaxReached)
+                    if (inToolResult &&
+                        (line.Contains(
+                            McpToolRateLimitException.ExaFreeMcpRateLimitMarker,
+                            StringComparison.OrdinalIgnoreCase) ||
+                         line.StartsWith("Approximately ", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        result.AppendLine(line);
+                    }
+                    else if (inToolCall && !toolCallSyntaxReached)
                     {
                         int toolCallIndex = AgentToolCallParser.FindToolCallIndex(line);
                         if (toolCallIndex < 0)

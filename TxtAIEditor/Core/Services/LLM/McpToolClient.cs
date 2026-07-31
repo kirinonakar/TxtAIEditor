@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -26,6 +27,10 @@ namespace TxtAIEditor.Core.Services.LLM
                 try
                 {
                     return await CallMcpHttpToolAsync(endpointUrl, apiKey, toolName, arguments, cancellationToken);
+                }
+                catch (McpToolRateLimitException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -245,6 +250,11 @@ namespace TxtAIEditor.Core.Services.LLM
                                     if (!callResponse.IsSuccessStatusCode)
                                     {
                                         string errBody = await callResponse.Content.ReadAsStringAsync(cancellationToken);
+                                        if (callResponse.StatusCode == HttpStatusCode.TooManyRequests)
+                                        {
+                                            throw CreateRateLimitException(callResponse, errBody);
+                                        }
+
                                         throw new HttpRequestException($"MCP tool call POST failed: {callResponse.StatusCode}\n{errBody}");
                                     }
                                 }
@@ -391,6 +401,11 @@ namespace TxtAIEditor.Core.Services.LLM
                         string callBody = await callResponse.Content.ReadAsStringAsync(cancellationToken);
                         if (!callResponse.IsSuccessStatusCode)
                         {
+                            if (callResponse.StatusCode == HttpStatusCode.TooManyRequests)
+                            {
+                                throw CreateRateLimitException(callResponse, callBody);
+                            }
+
                             throw new HttpRequestException($"MCP HTTP tool call failed: {callResponse.StatusCode}\n{callBody}");
                         }
 
@@ -448,6 +463,44 @@ namespace TxtAIEditor.Core.Services.LLM
             }
 
             return string.Empty;
+        }
+
+        private static McpToolRateLimitException CreateRateLimitException(
+            HttpResponseMessage response,
+            string responseBody)
+        {
+            TimeSpan? retryAfter = response.Headers.RetryAfter?.Delta;
+            if (!retryAfter.HasValue && response.Headers.RetryAfter?.Date is DateTimeOffset retryAt)
+            {
+                retryAfter = retryAt - DateTimeOffset.UtcNow;
+            }
+
+            DateTimeOffset? resetAt = null;
+            if (response.Headers.TryGetValues("X-Ratelimit-Reset", out var resetValues))
+            {
+                foreach (string value in resetValues)
+                {
+                    if (!long.TryParse(value, out long unixValue))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        resetAt = unixValue >= 1_000_000_000_000
+                            ? DateTimeOffset.FromUnixTimeMilliseconds(unixValue)
+                            : DateTimeOffset.FromUnixTimeSeconds(unixValue);
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
+                        // Ignore malformed server metadata and use Retry-After instead.
+                    }
+
+                    break;
+                }
+            }
+
+            return new McpToolRateLimitException(response.StatusCode, responseBody, retryAfter, resetAt);
         }
 
         private static JsonElement ParseMcpHttpResponse(string responseBody, string expectedId)
@@ -612,5 +665,42 @@ namespace TxtAIEditor.Core.Services.LLM
             return sb.ToString().TrimEnd();
         }
 
+    }
+
+    internal sealed class McpToolRateLimitException : HttpRequestException
+    {
+        public const string ExaFreeMcpRateLimitMarker = "You've hit Exa's free MCP rate limit";
+
+        public McpToolRateLimitException(
+            HttpStatusCode statusCode,
+            string responseBody,
+            TimeSpan? retryAfter,
+            DateTimeOffset? resetAt)
+            : base($"MCP rate limit exceeded ({statusCode}).\n{responseBody}")
+        {
+            McpStatusCode = statusCode;
+            ResponseBody = responseBody ?? string.Empty;
+            RetryAfter = retryAfter;
+            ResetAt = resetAt;
+        }
+
+        public HttpStatusCode McpStatusCode { get; }
+        public string ResponseBody { get; }
+        public TimeSpan? RetryAfter { get; }
+        public DateTimeOffset? ResetAt { get; }
+
+        public int GetApproximateRemainingHours()
+        {
+            TimeSpan remaining = ResetAt.HasValue
+                ? ResetAt.Value - DateTimeOffset.UtcNow
+                : RetryAfter ?? TimeSpan.Zero;
+
+            if (remaining <= TimeSpan.Zero)
+            {
+                return 0;
+            }
+
+            return Math.Max(1, (int)Math.Floor(remaining.TotalHours));
+        }
     }
 }

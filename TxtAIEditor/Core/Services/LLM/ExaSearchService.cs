@@ -70,10 +70,22 @@ namespace TxtAIEditor.Core.Services.LLM
                     };
                     return await _mcpToolClient.CallToolAsync(endpoint, apiKey, "web_search_exa", arguments, cancellationToken);
                 }
+                catch (McpToolRateLimitException ex)
+                {
+                    return await SearchWithDuckDuckGoFallbackAsync(
+                        query,
+                        numResults,
+                        cancellationToken,
+                        BuildExaMcpRateLimitNotice(ex));
+                }
                 catch (Exception ex)
                 {
-                    // Fallback to direct REST search if MCP fails
-                    System.Diagnostics.Debug.WriteLine($"Exa MCP failed, falling back to direct search: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Exa MCP failed, falling back to DuckDuckGo: {ex.Message}");
+                    return await SearchWithDuckDuckGoFallbackAsync(
+                        query,
+                        numResults,
+                        cancellationToken,
+                        $"[Exa fallback: DuckDuckGo]\nExa MCP search failed: {ex.Message}");
                 }
             }
 
@@ -91,6 +103,14 @@ namespace TxtAIEditor.Core.Services.LLM
                             highlights = true
                         };
                         return await _mcpToolClient.CallToolAsync(DefaultExaMcpEndpoint, apiKey, "web_search_exa", arguments, cancellationToken);
+                    }
+                    catch (McpToolRateLimitException ex)
+                    {
+                        return await SearchWithDuckDuckGoFallbackAsync(
+                            query,
+                            numResults,
+                            cancellationToken,
+                            BuildExaMcpRateLimitNotice(ex));
                     }
                     catch (Exception ex)
                     {
@@ -141,7 +161,11 @@ namespace TxtAIEditor.Core.Services.LLM
                         string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
                         if (!response.IsSuccessStatusCode)
                         {
-                            return $"Exa search API failed ({response.StatusCode}): {responseBody}";
+                            return await SearchWithDuckDuckGoFallbackAsync(
+                                query,
+                                numResults,
+                                cancellationToken,
+                                $"[Exa fallback: DuckDuckGo]\nExa search API failed ({response.StatusCode}).");
                         }
 
                         using (var doc = JsonDocument.Parse(responseBody))
@@ -149,7 +173,11 @@ namespace TxtAIEditor.Core.Services.LLM
                             var root = doc.RootElement;
                             if (!root.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
                             {
-                                return "Exa search returned no results format.";
+                                return await SearchWithDuckDuckGoFallbackAsync(
+                                    query,
+                                    numResults,
+                                    cancellationToken,
+                                    "[Exa fallback: DuckDuckGo]\nExa search returned an invalid results format.");
                             }
 
                             var sb = new StringBuilder();
@@ -187,8 +215,34 @@ namespace TxtAIEditor.Core.Services.LLM
             }
             catch (Exception ex)
             {
-                return $"Exa search exception occurred: {ex.Message}";
+                return await SearchWithDuckDuckGoFallbackAsync(
+                    query,
+                    numResults,
+                    cancellationToken,
+                    $"[Exa fallback: DuckDuckGo]\nExa search exception occurred: {ex.Message}");
             }
+        }
+
+        private async Task<string> SearchWithDuckDuckGoFallbackAsync(
+            string query,
+            int numResults,
+            CancellationToken cancellationToken,
+            string? notice = null)
+        {
+            string fallbackResult = await SearchWebWithoutApiKeyAsync(query, numResults, cancellationToken);
+            if (string.IsNullOrWhiteSpace(notice))
+            {
+                return fallbackResult;
+            }
+
+            return notice + Environment.NewLine + fallbackResult;
+        }
+
+        private static string BuildExaMcpRateLimitNotice(McpToolRateLimitException exception)
+        {
+            return $"[Exa MCP fallback: DuckDuckGo]" + Environment.NewLine +
+                $"{McpToolRateLimitException.ExaFreeMcpRateLimitMarker}." + Environment.NewLine +
+                $"Approximately {exception.GetApproximateRemainingHours()} hours until the next reset.";
         }
 
         private async Task<string> SearchWebWithoutApiKeyAsync(string query, int numResults, CancellationToken cancellationToken)
@@ -341,6 +395,10 @@ namespace TxtAIEditor.Core.Services.LLM
                         urls = urls
                     };
                     return await _mcpToolClient.CallToolAsync(endpoint, apiKey, "web_fetch_exa", arguments, cancellationToken);
+                }
+                catch (McpToolRateLimitException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
