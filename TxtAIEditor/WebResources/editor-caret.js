@@ -7,6 +7,7 @@ import {
     queueRender,
     reportCursorAndSelection,
     state,
+    usesFullDocumentRender,
     usesCompressedScroll,
     visualScrollDeltaToScrollTopDelta
 } from './editor-core.js';
@@ -294,7 +295,11 @@ function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = tr
     const oldActiveElement = document.activeElement?.closest?.('.line-text');
     const oldActiveLine = oldActiveElement ? Number(oldActiveElement.dataset.line || 0) : null;
 
+    const previousEditingLine = state.editingLine;
     state.editingLine = Number(element.dataset.line || state.currentLine || 1);
+    const fullDocumentEditingRowPatched = updateFullDocumentEditingRow(
+        previousEditingLine,
+        state.editingLine);
     if (state.inlineLivePreviewEnabled && state.inlineLivePreviewSourceLine) {
         state.inlineLivePreviewSourceLine = state.editingLine;
     }
@@ -366,7 +371,9 @@ function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = tr
 
     const preserveSelectionInputContext = state.isSelecting || !!state.selection?.isColumn;
     if (oldActiveLine !== null && oldActiveLine !== state.editingLine && !preserveSelectionInputContext) {
-        queueRender(true);
+        if (!fullDocumentEditingRowPatched) {
+            queueRender(true);
+        }
     } else {
         drawEditableSelectionOverlays();
     }
@@ -534,12 +541,30 @@ function offsetFromPointInElement(element, clientX, clientY, referenceRect = nul
 
 let _focusRetryTimer = 0;
 
+function updateFullDocumentEditingRow(previousLine, nextLine) {
+    if (!usesFullDocumentRender()) return false;
+
+    if (previousLine) {
+        viewport.querySelector(`.line-row[data-line="${previousLine}"]`)?.classList.remove('editing-row');
+    }
+
+    const targetRow = viewport.querySelector(`.line-row[data-line="${nextLine}"]`);
+    if (!targetRow) return false;
+
+    targetRow.classList.add('editing-row');
+    return true;
+}
+
 function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
     if (_focusRetryTimer) {
         clearTimeout(_focusRetryTimer);
         _focusRetryTimer = 0;
     }
+    const previousEditingLine = state.editingLine;
     state.editingLine = Math.min(Math.max(1, Number(lineNumber || 1)), state.lineCount);
+    const fullDocumentEditingRowPatched = updateFullDocumentEditingRow(
+        previousEditingLine,
+        state.editingLine);
     if (state.inlineLivePreviewEnabled && state.inlineLivePreviewSourceLine) {
         state.inlineLivePreviewSourceLine = state.editingLine;
         const targetLine = state.editingLine;
@@ -622,7 +647,9 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
         }
     }
 
-    queueRender(true);
+    if (!fullDocumentEditingRowPatched) {
+        queueRender(true);
+    }
     let retries = 10;
     function tryFocus() {
         const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);

@@ -11,6 +11,7 @@ const HEX_CACHE_RETAIN_LINES = 512;
 const HEX_SELECTION_CACHE_RETAIN_LIMIT = 2048;
 // Keep this aligned with EditorInitialCachePolicy.FullDocumentLineLimit.
 const FULL_DOCUMENT_RENDER_LINE_LIMIT = 1000;
+const FULL_DOCUMENT_MEASURE_BATCH_SIZE = 24;
 
 const runtime = {
     drawEditableSelectionOverlays: () => { },
@@ -22,6 +23,9 @@ const runtime = {
     normalizeSelection: () => null,
     render: () => { }
 };
+
+let deferredRowMeasurementToken = 0;
+let deferredRowMeasurementFrame = 0;
 
 function configureEditorCoreRuntime(deps) {
     Object.assign(runtime, deps || {});
@@ -869,8 +873,67 @@ function deleteMeasuredLineHeight(lineNumber) {
 }
 
 function clearMeasuredLineHeights() {
+    cancelDeferredRowMeasurement();
     state.lineHeights.clear();
     resetLineHeightIndex();
+}
+
+function cancelDeferredRowMeasurement() {
+    deferredRowMeasurementToken++;
+    if (deferredRowMeasurementFrame) {
+        cancelAnimationFrame(deferredRowMeasurementFrame);
+        deferredRowMeasurementFrame = 0;
+    }
+}
+
+function scheduleFullDocumentRowMeasurement(renderOnChange) {
+    cancelDeferredRowMeasurement();
+
+    const rows = [...viewport.querySelectorAll('.line-row')];
+    if (rows.length === 0) return;
+
+    const token = deferredRowMeasurementToken;
+    let rowIndex = 0;
+    let changed = false;
+
+    const measureBatch = () => {
+        deferredRowMeasurementFrame = 0;
+        if (token !== deferredRowMeasurementToken) return;
+
+        let measuredCount = 0;
+        while (rowIndex < rows.length && measuredCount < FULL_DOCUMENT_MEASURE_BATCH_SIZE) {
+            const row = rows[rowIndex++];
+            if (!row.isConnected || !viewport.contains(row)) continue;
+
+            const lineNumber = Number(row.dataset.line || 0);
+            if (!lineNumber || state.lineHeights.has(lineNumber)) continue;
+
+            const rowRect = row.getBoundingClientRect();
+            const measuredHeight = rowRect.height || row.scrollHeight || 0;
+            const measured = Math.max(
+                state.lineHeight,
+                roundCssPixelsToDevicePixels(measuredHeight));
+            if (setMeasuredLineHeight(lineNumber, measured)) {
+                changed = true;
+            }
+            measuredCount++;
+        }
+
+        if (rowIndex < rows.length) {
+            deferredRowMeasurementFrame = requestAnimationFrame(measureBatch);
+            return;
+        }
+
+        if (token !== deferredRowMeasurementToken || !changed) return;
+
+        setupVirtualHeight();
+        if (renderOnChange) {
+            state.lastRangeKey = '';
+            requestAnimationFrame(() => runtime.render());
+        }
+    };
+
+    deferredRowMeasurementFrame = requestAnimationFrame(measureBatch);
 }
 
 function shiftMeasuredLineHeights(fromLine, delta) {
@@ -1242,6 +1305,17 @@ function cancelPendingColumnTextInputs() {
 }
 
 function measureRenderedRows(renderOnChange = true, force = false) {
+    if (!usesMeasuredLineHeights()) return;
+
+    if (usesFullDocumentRender() && !force) {
+        scheduleFullDocumentRowMeasurement(renderOnChange);
+        return;
+    }
+
+    measureRenderedRowsSynchronously(renderOnChange, force);
+}
+
+function measureRenderedRowsSynchronously(renderOnChange = true, force = false) {
     if (!usesMeasuredLineHeights()) return;
 
     const anchorLine = lineAt(scrollContainer.scrollTop);
