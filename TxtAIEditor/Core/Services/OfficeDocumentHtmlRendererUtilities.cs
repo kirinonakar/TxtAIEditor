@@ -163,6 +163,7 @@ body { padding: 28px 16px 44px; }
 }
 .hwpx-group-shape-text-positioned {
     display: block;
+    overflow: visible;
 }
 .hwpx-group-shape-paragraph {
     display: block;
