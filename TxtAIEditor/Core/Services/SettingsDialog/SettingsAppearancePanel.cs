@@ -140,15 +140,27 @@ namespace TxtAIEditor.Core.Services
             content.Children.Add(_editorSizeSlider);
             _editorSizeSlider.ValueChanged += (_, args) => editorSizeLabel.Text = getString("SettingsFontSize", "에디터 글자 크기") + $" ({args.NewValue:0}pt)";
 
-            var colorPanel = new StackPanel { Spacing = 4 };
-            colorPanel.Children.Add(_customBgCheck);
-            colorPanel.Children.Add(customBgDropdown);
-            colorPanel.Children.Add(_customFgCheck);
-            colorPanel.Children.Add(customFgDropdown);
+            var colorGrid = new Grid();
+            colorGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            colorGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12, GridUnitType.Pixel) });
+            colorGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var bgStack = new StackPanel { Spacing = 4 };
+            bgStack.Children.Add(_customBgCheck);
+            bgStack.Children.Add(customBgDropdown);
+            Grid.SetColumn(bgStack, 0);
+
+            var fgStack = new StackPanel { Spacing = 4 };
+            fgStack.Children.Add(_customFgCheck);
+            fgStack.Children.Add(customFgDropdown);
+            Grid.SetColumn(fgStack, 2);
+
+            colorGrid.Children.Add(bgStack);
+            colorGrid.Children.Add(fgStack);
 
             var colorSubGroup = CreateSubGroup(
                 getString("SettingsAppearanceGroupCustomColors", "커스텀 색상 설정"),
-                colorPanel);
+                colorGrid);
             content.Children.Add(colorSubGroup);
 
             return CreateCard(
@@ -177,15 +189,27 @@ namespace TxtAIEditor.Core.Services
             content.Children.Add(_previewSizeSlider);
             _previewSizeSlider.ValueChanged += (_, args) => previewSizeLabel.Text = getString("SettingsPreviewFontSize", "프리뷰 글자 크기") + $" ({args.NewValue:0}pt)";
 
-            var colorPanel = new StackPanel { Spacing = 4 };
-            colorPanel.Children.Add(_previewBgCheck);
-            colorPanel.Children.Add(previewBgDropdown);
-            colorPanel.Children.Add(_previewFgCheck);
-            colorPanel.Children.Add(previewFgDropdown);
+            var colorGrid = new Grid();
+            colorGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            colorGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12, GridUnitType.Pixel) });
+            colorGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var bgStack = new StackPanel { Spacing = 4 };
+            bgStack.Children.Add(_previewBgCheck);
+            bgStack.Children.Add(previewBgDropdown);
+            Grid.SetColumn(bgStack, 0);
+
+            var fgStack = new StackPanel { Spacing = 4 };
+            fgStack.Children.Add(_previewFgCheck);
+            fgStack.Children.Add(previewFgDropdown);
+            Grid.SetColumn(fgStack, 2);
+
+            colorGrid.Children.Add(bgStack);
+            colorGrid.Children.Add(fgStack);
 
             var colorSubGroup = CreateSubGroup(
                 getString("SettingsAppearanceGroupCustomColors", "커스텀 색상 설정"),
-                colorPanel);
+                colorGrid);
             content.Children.Add(colorSubGroup);
 
             return CreateCard(
