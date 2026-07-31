@@ -474,7 +474,7 @@
     <value>Token statistics</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsButton" xml:space="preserve">
-    <value>Open token statistics in editor</value>
+    <value>View in Editor</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsEmpty" xml:space="preserve">
     <value>No LLM token usage has been observed yet.</value>

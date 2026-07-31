@@ -474,7 +474,7 @@
     <value>Token 统计</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsButton" xml:space="preserve">
-    <value>在编辑器中打开 token 统计</value>
+    <value>在编辑器中查看</value>
   </data>
   <data name="SettingsLlmTokenUsageStatsEmpty" xml:space="preserve">
     <value>尚未观测到 LLM token usage。</value>

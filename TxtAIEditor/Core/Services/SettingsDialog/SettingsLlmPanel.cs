@@ -112,7 +112,7 @@ namespace TxtAIEditor.Core.Services
             };
             _tokenUsageStatsButton = new Button
             {
-                Content = getString("SettingsLlmTokenUsageStatsButton", "token 통계 에디터에서 열기"),
+                Content = getString("SettingsLlmTokenUsageStatsButton", "에디터에서 보기"),
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
             _tokenUsageHtmlButton = new Button
