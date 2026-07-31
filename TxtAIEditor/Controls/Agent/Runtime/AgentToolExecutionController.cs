@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -216,6 +217,15 @@ namespace TxtAIEditor.Controls
                 }
             }
 
+            if (!verbose &&
+                normalizedToolName == "web_search_exa" &&
+                toolResult.Contains(
+                    McpToolRateLimitException.ExaFreeMcpRateLimitMarker,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return BuildExaRateLimitDisplayResult(toolResult);
+            }
+
             if (_mcpController.TryGetToolAlias(normalizedToolName, out _))
             {
                 if (verbose)
@@ -338,6 +348,26 @@ namespace TxtAIEditor.Controls
             }
 
             return displayToolResult;
+        }
+
+        private static string BuildExaRateLimitDisplayResult(string toolResult)
+        {
+            string rateLimitLine = toolResult
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+                .FirstOrDefault(line => line.Contains(
+                    McpToolRateLimitException.ExaFreeMcpRateLimitMarker,
+                    StringComparison.OrdinalIgnoreCase))
+                ?? $"{McpToolRateLimitException.ExaFreeMcpRateLimitMarker}.";
+            string resetLine = toolResult
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+                .FirstOrDefault(line => line.StartsWith("Approximately ", StringComparison.OrdinalIgnoreCase))
+                ?? "Approximately unknown hours until the next reset.";
+
+            return string.Join(
+                Environment.NewLine,
+                rateLimitLine,
+                resetLine,
+                "DuckDuckGo fallback was used.");
         }
 
         private async Task<string> ReadImageToolAsync(JsonElement arguments)
