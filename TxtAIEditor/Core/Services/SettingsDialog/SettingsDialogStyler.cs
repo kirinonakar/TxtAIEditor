@@ -88,6 +88,10 @@ namespace TxtAIEditor.Core.Services
             {
                 ApplyCompactStyleToLogicalTree(sv.Content);
             }
+            else if (element is Border border)
+            {
+                ApplyCompactStyleToLogicalTree(border.Child);
+            }
             else if (element is Pivot pivot)
             {
                 foreach (var item in pivot.Items)

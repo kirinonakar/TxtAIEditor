@@ -220,33 +220,267 @@ namespace TxtAIEditor.Core.Services
 
         private StackPanel CreateSection()
         {
-            var section = SettingsDialogUi.CreateSection();
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmProvider", "LLM 공급자"));
-            section.Children.Add(_llmProviderCombo);
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmEndpoint", "LLM API Endpoint"));
-            section.Children.Add(_llmEndpointBox);
+            var section = new StackPanel { Spacing = 10, Width = 460, Padding = new Thickness(2, 6, 2, 2) };
+            section.Children.Add(CreateMainServiceCard());
+            section.Children.Add(CreateVisionFallbackCard());
+            section.Children.Add(CreateAgentPermissionsCard());
+            section.Children.Add(CreateTranslationCard());
+            section.Children.Add(CreateWebSearchCard());
+            section.Children.Add(CreateTokenUsageCard());
+            return section;
+        }
 
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmCredential", "LLM API Key"));
-            section.Children.Add(_llmApiKeyBox);
-            section.Children.Add(new TextBlock
+        private Border CreateCard(string title, UIElement content, string fontIconGlyph)
+        {
+            var container = new StackPanel { Spacing = 8 };
+
+            var headerPanel = new StackPanel
             {
-                Text = _getString("SettingsLlmCredentialInfo", "API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다."),
-                TextWrapping = TextWrapping.Wrap
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                Margin = new Thickness(0, 0, 0, 2)
+            };
+
+            if (!string.IsNullOrEmpty(fontIconGlyph))
+            {
+                headerPanel.Children.Add(new FontIcon
+                {
+                    Glyph = fontIconGlyph,
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+            }
+
+            headerPanel.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 12.5,
+                VerticalAlignment = VerticalAlignment.Center
             });
 
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmModel", "LLM 모델명"));
-            section.Children.Add(_llmModelCombo);
-            section.Children.Add(_refreshModelsButton);
-            section.Children.Add(_modelStatusText);
+            container.Children.Add(headerPanel);
+            container.Children.Add(content);
 
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmThinkingLevel", "Thinking Level"));
-            section.Children.Add(_llmThinkingLevelCombo);
-            SettingsDialogUi.AddLabel(section, _getString("SettingsExaEndpoint", "Exa 검색 API / MCP Endpoint"));
-            section.Children.Add(_exaEndpointBox);
-            section.Children.Add(_exaUseApiKeyAfterFreeLimitCheck);
-            SettingsDialogUi.AddLabel(section, _getString("SettingsExaApiKey", "Exa API Key (웹 검색 기능용)"));
-            section.Children.Add(_exaApiKeyBox);
-            section.Children.Add(new TextBlock
+            var card = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(12, 10, 12, 12),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            card.Loaded += (s, e) =>
+            {
+                if (Application.Current.Resources.TryGetValue("CardBackgroundFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
+                {
+                    card.Background = bgBrush;
+                }
+                else
+                {
+                    card.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(15, 128, 128, 128));
+                }
+
+                if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out object? border) && border is Brush borderBrush)
+                {
+                    card.BorderBrush = borderBrush;
+                }
+                else
+                {
+                    card.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(35, 128, 128, 128));
+                }
+            };
+
+            card.Child = container;
+            return card;
+        }
+
+        private Border CreateSubGroup(string title, UIElement content)
+        {
+            var container = new StackPanel { Spacing = 6 };
+            container.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
+            });
+            container.Children.Add(content);
+
+            var border = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(10, 8, 10, 8),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            border.Loaded += (s, e) =>
+            {
+                if (Application.Current.Resources.TryGetValue("ControlFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
+                {
+                    border.Background = bgBrush;
+                }
+                else
+                {
+                    border.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(10, 128, 128, 128));
+                }
+
+                if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out object? bBorder) && bBorder is Brush borderBrush)
+                {
+                    border.BorderBrush = borderBrush;
+                }
+                else
+                {
+                    border.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(20, 128, 128, 128));
+                }
+            };
+
+            border.Child = container;
+            return border;
+        }
+
+        private Border CreateMainServiceCard()
+        {
+            var content = new StackPanel { Spacing = 6 };
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmProvider", "LLM 공급자"));
+            content.Children.Add(_llmProviderCombo);
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmEndpoint", "LLM API Endpoint"));
+            content.Children.Add(_llmEndpointBox);
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmCredential", "LLM API Key"));
+            content.Children.Add(_llmApiKeyBox);
+            content.Children.Add(new TextBlock
+            {
+                Text = _getString("SettingsLlmCredentialInfo", "API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다."),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
+            });
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmModel", "LLM 모델명"));
+            var modelGrid = new Grid();
+            modelGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            modelGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            _llmModelCombo.HorizontalAlignment = HorizontalAlignment.Stretch;
+            _refreshModelsButton.HorizontalAlignment = HorizontalAlignment.Right;
+            _refreshModelsButton.Margin = new Thickness(6, 0, 0, 0);
+            Grid.SetColumn(_llmModelCombo, 0);
+            Grid.SetColumn(_refreshModelsButton, 1);
+            modelGrid.Children.Add(_llmModelCombo);
+            modelGrid.Children.Add(_refreshModelsButton);
+            content.Children.Add(modelGrid);
+
+            content.Children.Add(_modelStatusText);
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmThinkingLevel", "Thinking Level"));
+            content.Children.Add(_llmThinkingLevelCombo);
+
+            return CreateCard(
+                _getString("SettingsLlmGroupMain", "기본 서비스 & 모델"),
+                content,
+                "\uE99A");
+        }
+
+        private Border CreateVisionFallbackCard()
+        {
+            var content = new StackPanel { Spacing = 6 };
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmVisionFallbackProvider", "Vision fallback 공급자"));
+            content.Children.Add(_visionFallbackProviderCombo);
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmVisionFallbackModel", "Vision fallback 모델"));
+            var visionModelGrid = new Grid();
+            visionModelGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            visionModelGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            _visionFallbackModelCombo.HorizontalAlignment = HorizontalAlignment.Stretch;
+            _visionFallbackRefreshModelsButton.HorizontalAlignment = HorizontalAlignment.Right;
+            _visionFallbackRefreshModelsButton.Margin = new Thickness(6, 0, 0, 0);
+            Grid.SetColumn(_visionFallbackModelCombo, 0);
+            Grid.SetColumn(_visionFallbackRefreshModelsButton, 1);
+            visionModelGrid.Children.Add(_visionFallbackModelCombo);
+            visionModelGrid.Children.Add(_visionFallbackRefreshModelsButton);
+            content.Children.Add(visionModelGrid);
+
+            return CreateCard(
+                _getString("SettingsLlmGroupVisionFallback", "비전 대체 모델"),
+                content,
+                "\uE8B9");
+        }
+
+        private Border CreateAgentPermissionsCard()
+        {
+            var content = new StackPanel { Spacing = 6 };
+
+            content.Children.Add(_confirmBeforeSendingCheck);
+            content.Children.Add(_agentVerboseCheck);
+            content.Children.Add(_retainThinkingCheck);
+
+            var maxToolCallsLabel = new TextBlock
+            {
+                Text = _getString("SettingsLlmMaxToolCalls", "도구 호출 최대 횟수 (Max Tool Calls)") + $" ({_maxToolCallsSlider.Value:0})",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+            content.Children.Add(maxToolCallsLabel);
+            content.Children.Add(_maxToolCallsSlider);
+            _maxToolCallsSlider.ValueChanged += (_, args) =>
+                maxToolCallsLabel.Text = _getString("SettingsLlmMaxToolCalls", "도구 호출 최대 횟수 (Max Tool Calls)") + $" ({args.NewValue:0})";
+
+            var autoApprovePanel = new StackPanel { Spacing = 4 };
+            autoApprovePanel.Children.Add(_agentAutoApproveGitEditsCheck);
+            autoApprovePanel.Children.Add(_agentAutoApprovePowerShellCheck);
+            autoApprovePanel.Children.Add(_agentAutoApprovePlanningCheck);
+
+            var autoApproveSubGroup = CreateSubGroup(
+                _getString("SettingsLlmGroupAutoApprove", "자동 승인 권한"),
+                autoApprovePanel);
+            content.Children.Add(autoApproveSubGroup);
+
+            return CreateCard(
+                _getString("SettingsLlmGroupAgent", "에이전트 & 권한"),
+                content,
+                "\uE804");
+        }
+
+        private Border CreateTranslationCard()
+        {
+            var content = new Grid();
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12, GridUnitType.Pixel) });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var sourcePanel = new StackPanel { Spacing = 4 };
+            SettingsDialogUi.AddLabel(sourcePanel, _getString("SettingsLlmSourceLanguage", "번역 원본 언어"));
+            sourcePanel.Children.Add(_sourceLangCombo);
+            Grid.SetColumn(sourcePanel, 0);
+
+            var targetPanel = new StackPanel { Spacing = 4 };
+            SettingsDialogUi.AddLabel(targetPanel, _getString("SettingsLlmTargetLanguage", "번역 대상 언어"));
+            targetPanel.Children.Add(_targetLangCombo);
+            Grid.SetColumn(targetPanel, 2);
+
+            content.Children.Add(sourcePanel);
+            content.Children.Add(targetPanel);
+
+            return CreateCard(
+                _getString("SettingsLlmGroupTranslation", "번역 설정"),
+                content,
+                "\uE775");
+        }
+
+        private Border CreateWebSearchCard()
+        {
+            var content = new StackPanel { Spacing = 6 };
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsExaEndpoint", "Exa 검색 API / MCP Endpoint"));
+            content.Children.Add(_exaEndpointBox);
+            content.Children.Add(_exaUseApiKeyAfterFreeLimitCheck);
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsExaApiKey", "Exa API Key (웹 검색 기능용)"));
+            content.Children.Add(_exaApiKeyBox);
+            content.Children.Add(new TextBlock
             {
                 Text = _getString("SettingsExaApiKeyInfo", "Exa API Key는 Agent의 웹 검색(Exa) 기능에 사용되며, Windows 자격 증명 관리자에 안전하게 저장됩니다."),
                 TextWrapping = TextWrapping.Wrap,
@@ -254,34 +488,57 @@ namespace TxtAIEditor.Core.Services
                 Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
             });
 
-            section.Children.Add(_confirmBeforeSendingCheck);
-            section.Children.Add(_agentVerboseCheck);
-            section.Children.Add(_retainThinkingCheck);
-            section.Children.Add(_agentAutoApproveGitEditsCheck);
-            section.Children.Add(_agentAutoApprovePowerShellCheck);
-            section.Children.Add(_agentAutoApprovePlanningCheck);
+            return CreateCard(
+                _getString("SettingsLlmGroupWebSearch", "웹 검색 확장 (Exa)"),
+                content,
+                "\uE721");
+        }
 
-            var maxToolCallsLabel = new TextBlock { Text = _getString("SettingsLlmMaxToolCalls", "도구 호출 최대 횟수 (Max Tool Calls)") + $" ({_maxToolCallsSlider.Value:0})", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
-            section.Children.Add(maxToolCallsLabel);
-            section.Children.Add(_maxToolCallsSlider);
-            _maxToolCallsSlider.ValueChanged += (_, args) => maxToolCallsLabel.Text = _getString("SettingsLlmMaxToolCalls", "도구 호출 최대 횟수 (Max Tool Calls)") + $" ({args.NewValue:0})";
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmSourceLanguage", "번역 원본 언어 (Source Language)"));
-            section.Children.Add(_sourceLangCombo);
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTargetLanguage", "번역 대상 언어 (Target Language)"));
-            section.Children.Add(_targetLangCombo);
+        private Border CreateTokenUsageCard()
+        {
+            var content = new StackPanel { Spacing = 8 };
 
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmVisionFallbackProvider", "Vision fallback 공급자"));
-            section.Children.Add(_visionFallbackProviderCombo);
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmVisionFallbackModel", "Vision fallback 모델"));
-            section.Children.Add(_visionFallbackModelCombo);
-            section.Children.Add(_visionFallbackRefreshModelsButton);
+            var summaryBorder = new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(8, 6, 8, 6),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            summaryBorder.Loaded += (s, e) =>
+            {
+                if (Application.Current.Resources.TryGetValue("ControlFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
+                {
+                    summaryBorder.Background = bgBrush;
+                }
+                else
+                {
+                    summaryBorder.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(10, 128, 128, 128));
+                }
+            };
+            summaryBorder.Child = _tokenUsageSummaryText;
+            content.Children.Add(summaryBorder);
 
-            SettingsDialogUi.AddLabel(section, _getString("SettingsLlmTokenUsageStatsLabel", "token 통계"));
-            section.Children.Add(_tokenUsageSummaryText);
-            section.Children.Add(_tokenUsageStatsButton);
-            section.Children.Add(_tokenUsageHtmlButton);
-            section.Children.Add(_tokenUsageResetButton);
-            return section;
+            var buttonGrid = new Grid();
+            buttonGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            buttonGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6, GridUnitType.Pixel) });
+            buttonGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            buttonGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6, GridUnitType.Pixel) });
+            buttonGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            Grid.SetColumn(_tokenUsageStatsButton, 0);
+            Grid.SetColumn(_tokenUsageHtmlButton, 2);
+            Grid.SetColumn(_tokenUsageResetButton, 4);
+
+            buttonGrid.Children.Add(_tokenUsageStatsButton);
+            buttonGrid.Children.Add(_tokenUsageHtmlButton);
+            buttonGrid.Children.Add(_tokenUsageResetButton);
+
+            content.Children.Add(buttonGrid);
+
+            return CreateCard(
+                _getString("SettingsLlmGroupTokenUsage", "토큰 사용량 통계"),
+                content,
+                "\uE9D2");
         }
 
         private void AddEventHandlers()
