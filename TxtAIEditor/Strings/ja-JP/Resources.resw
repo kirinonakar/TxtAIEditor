@@ -3658,4 +3658,19 @@
   <data name="SettingsBrowseFile" xml:space="preserve">
     <value>ファイル参照</value>
   </data>
+  <data name="SettingsAppearanceGroupGeneral" xml:space="preserve">
+    <value>言語とテーマ</value>
+  </data>
+  <data name="SettingsAppearanceGroupUi" xml:space="preserve">
+    <value>UI シェルのフォント</value>
+  </data>
+  <data name="SettingsAppearanceGroupEditor" xml:space="preserve">
+    <value>エディターの外観と色</value>
+  </data>
+  <data name="SettingsAppearanceGroupPreview" xml:space="preserve">
+    <value>Markdown プレビューの外観と色</value>
+  </data>
+  <data name="SettingsAppearanceGroupCustomColors" xml:space="preserve">
+    <value>カスタムカラー設定</value>
+  </data>
 </root>

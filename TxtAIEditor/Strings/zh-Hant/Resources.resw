@@ -3658,4 +3658,19 @@
   <data name="SettingsBrowseFile" xml:space="preserve">
     <value>瀏覽檔案</value>
   </data>
+  <data name="SettingsAppearanceGroupGeneral" xml:space="preserve">
+    <value>語言與主題</value>
+  </data>
+  <data name="SettingsAppearanceGroupUi" xml:space="preserve">
+    <value>UI 外殼字型</value>
+  </data>
+  <data name="SettingsAppearanceGroupEditor" xml:space="preserve">
+    <value>編輯器外觀與色彩</value>
+  </data>
+  <data name="SettingsAppearanceGroupPreview" xml:space="preserve">
+    <value>Markdown 預覽外觀與色彩</value>
+  </data>
+  <data name="SettingsAppearanceGroupCustomColors" xml:space="preserve">
+    <value>自訂色彩設定</value>
+  </data>
 </root>

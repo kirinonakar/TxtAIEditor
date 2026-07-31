@@ -3694,4 +3694,19 @@ Plan: {0}</value>
   <data name="SettingsBrowseFile" xml:space="preserve">
     <value>Browse File</value>
   </data>
+  <data name="SettingsAppearanceGroupGeneral" xml:space="preserve">
+    <value>Language &amp; Theme</value>
+  </data>
+  <data name="SettingsAppearanceGroupUi" xml:space="preserve">
+    <value>UI Shell Font</value>
+  </data>
+  <data name="SettingsAppearanceGroupEditor" xml:space="preserve">
+    <value>Editor Appearance &amp; Colors</value>
+  </data>
+  <data name="SettingsAppearanceGroupPreview" xml:space="preserve">
+    <value>Markdown Preview Appearance &amp; Colors</value>
+  </data>
+  <data name="SettingsAppearanceGroupCustomColors" xml:space="preserve">
+    <value>Custom Colors</value>
+  </data>
 </root>

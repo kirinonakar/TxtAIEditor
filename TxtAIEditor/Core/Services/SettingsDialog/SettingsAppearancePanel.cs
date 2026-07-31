@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Core.Services
@@ -75,37 +76,222 @@ namespace TxtAIEditor.Core.Services
             BindEnabled(_previewBgCheck, previewBgDropdown);
             BindEnabled(_previewFgCheck, previewFgDropdown);
 
-            var section = SettingsDialogUi.CreateSection();
-            SettingsDialogUi.AddLabel(section, getString("SettingsLanguage", "애플리케이션 언어 (Language)"));
-            section.Children.Add(_languageCombo);
-            SettingsDialogUi.AddLabel(section, getString("SettingsTheme", "앱/에디터 테마"));
-            section.Children.Add(_themeCombo);
-            SettingsDialogUi.AddLabel(section, getString("SettingsUiFontFamily", "UI 쉘 폰트"));
-            section.Children.Add(_uiFontFamilyCombo);
-            SettingsDialogUi.AddLabel(section, getString("SettingsFontFamily", "에디터 폰트"));
-            section.Children.Add(_editorFontFamilyCombo);
-
-            var editorSizeLabel = new TextBlock { Text = getString("SettingsFontSize", "에디터 글자 크기") + $" ({settings.FontSize:0}pt)", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
-            section.Children.Add(editorSizeLabel);
-            section.Children.Add(_editorSizeSlider);
-            _editorSizeSlider.ValueChanged += (_, args) => editorSizeLabel.Text = getString("SettingsFontSize", "에디터 글자 크기") + $" ({args.NewValue:0}pt)";
-            section.Children.Add(_customBgCheck);
-            section.Children.Add(customBgDropdown);
-            section.Children.Add(_customFgCheck);
-            section.Children.Add(customFgDropdown);
-
-            SettingsDialogUi.AddLabel(section, getString("SettingsPreviewFontFamily", "프리뷰 폰트"));
-            section.Children.Add(_previewFontFamilyCombo);
-            var previewSizeLabel = new TextBlock { Text = getString("SettingsPreviewFontSize", "프리뷰 글자 크기") + $" ({settings.PreviewFontSize:0}pt)", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
-            section.Children.Add(previewSizeLabel);
-            section.Children.Add(_previewSizeSlider);
-            _previewSizeSlider.ValueChanged += (_, args) => previewSizeLabel.Text = getString("SettingsPreviewFontSize", "프리뷰 글자 크기") + $" ({args.NewValue:0}pt)";
-            section.Children.Add(_previewBgCheck);
-            section.Children.Add(previewBgDropdown);
-            section.Children.Add(_previewFgCheck);
-            section.Children.Add(previewFgDropdown);
-
+            var section = new StackPanel { Spacing = 10, Width = 460, Padding = new Thickness(2, 6, 2, 2) };
+            section.Children.Add(CreateGeneralCard(getString));
+            section.Children.Add(CreateUiCard(getString));
+            section.Children.Add(CreateEditorCard(getString, settings, customBgDropdown, customFgDropdown));
+            section.Children.Add(CreatePreviewCard(getString, settings, previewBgDropdown, previewFgDropdown));
             Content = section;
+        }
+
+        private Border CreateCard(string title, UIElement content, string fontIconGlyph)
+        {
+            var container = new StackPanel { Spacing = 8 };
+
+            var headerPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                Margin = new Thickness(0, 0, 0, 2)
+            };
+
+            if (!string.IsNullOrEmpty(fontIconGlyph))
+            {
+                headerPanel.Children.Add(new FontIcon
+                {
+                    Glyph = fontIconGlyph,
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+            }
+
+            headerPanel.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 12.5,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            container.Children.Add(headerPanel);
+            container.Children.Add(content);
+
+            var card = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(12, 10, 12, 12),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            card.Loaded += (s, e) =>
+            {
+                if (Application.Current.Resources.TryGetValue("CardBackgroundFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
+                {
+                    card.Background = bgBrush;
+                }
+                else
+                {
+                    card.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(15, 128, 128, 128));
+                }
+
+                if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out object? border) && border is Brush borderBrush)
+                {
+                    card.BorderBrush = borderBrush;
+                }
+                else
+                {
+                    card.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(35, 128, 128, 128));
+                }
+            };
+
+            card.Child = container;
+            return card;
+        }
+
+        private Border CreateSubGroup(string title, UIElement content)
+        {
+            var container = new StackPanel { Spacing = 6 };
+            container.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
+            });
+            container.Children.Add(content);
+
+            var border = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(10, 8, 10, 8),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            border.Loaded += (s, e) =>
+            {
+                if (Application.Current.Resources.TryGetValue("ControlFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
+                {
+                    border.Background = bgBrush;
+                }
+                else
+                {
+                    border.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(10, 128, 128, 128));
+                }
+
+                if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out object? bBorder) && bBorder is Brush borderBrush)
+                {
+                    border.BorderBrush = borderBrush;
+                }
+                else
+                {
+                    border.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(20, 128, 128, 128));
+                }
+            };
+
+            border.Child = container;
+            return border;
+        }
+
+        private Border CreateGeneralCard(Func<string, string, string> getString)
+        {
+            var content = new StackPanel { Spacing = 6 };
+            SettingsDialogUi.AddLabel(content, getString("SettingsLanguage", "애플리케이션 언어 (Language)"));
+            content.Children.Add(_languageCombo);
+            SettingsDialogUi.AddLabel(content, getString("SettingsTheme", "앱/에디터 테마"));
+            content.Children.Add(_themeCombo);
+
+            return CreateCard(
+                getString("SettingsAppearanceGroupGeneral", "언어 & 테마"),
+                content,
+                "\uE774");
+        }
+
+        private Border CreateUiCard(Func<string, string, string> getString)
+        {
+            var content = new StackPanel { Spacing = 6 };
+            SettingsDialogUi.AddLabel(content, getString("SettingsUiFontFamily", "UI 쉘 폰트"));
+            content.Children.Add(_uiFontFamilyCombo);
+
+            return CreateCard(
+                getString("SettingsAppearanceGroupUi", "UI 쉘 폰트"),
+                content,
+                "\uE8B9");
+        }
+
+        private Border CreateEditorCard(
+            Func<string, string, string> getString,
+            EditorSettings settings,
+            UIElement customBgDropdown,
+            UIElement customFgDropdown)
+        {
+            var content = new StackPanel { Spacing = 6 };
+
+            SettingsDialogUi.AddLabel(content, getString("SettingsFontFamily", "에디터 폰트"));
+            content.Children.Add(_editorFontFamilyCombo);
+
+            var editorSizeLabel = new TextBlock
+            {
+                Text = getString("SettingsFontSize", "에디터 글자 크기") + $" ({settings.FontSize:0}pt)",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+            content.Children.Add(editorSizeLabel);
+            content.Children.Add(_editorSizeSlider);
+            _editorSizeSlider.ValueChanged += (_, args) => editorSizeLabel.Text = getString("SettingsFontSize", "에디터 글자 크기") + $" ({args.NewValue:0}pt)";
+
+            var colorPanel = new StackPanel { Spacing = 4 };
+            colorPanel.Children.Add(_customBgCheck);
+            colorPanel.Children.Add(customBgDropdown);
+            colorPanel.Children.Add(_customFgCheck);
+            colorPanel.Children.Add(customFgDropdown);
+
+            var colorSubGroup = CreateSubGroup(
+                getString("SettingsAppearanceGroupCustomColors", "커스텀 색상 설정"),
+                colorPanel);
+            content.Children.Add(colorSubGroup);
+
+            return CreateCard(
+                getString("SettingsAppearanceGroupEditor", "에디터 모양 & 색상"),
+                content,
+                "\uE8AC");
+        }
+
+        private Border CreatePreviewCard(
+            Func<string, string, string> getString,
+            EditorSettings settings,
+            UIElement previewBgDropdown,
+            UIElement previewFgDropdown)
+        {
+            var content = new StackPanel { Spacing = 6 };
+
+            SettingsDialogUi.AddLabel(content, getString("SettingsPreviewFontFamily", "프리뷰 폰트"));
+            content.Children.Add(_previewFontFamilyCombo);
+
+            var previewSizeLabel = new TextBlock
+            {
+                Text = getString("SettingsPreviewFontSize", "프리뷰 글자 크기") + $" ({settings.PreviewFontSize:0}pt)",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+            content.Children.Add(previewSizeLabel);
+            content.Children.Add(_previewSizeSlider);
+            _previewSizeSlider.ValueChanged += (_, args) => previewSizeLabel.Text = getString("SettingsPreviewFontSize", "프리뷰 글자 크기") + $" ({args.NewValue:0}pt)";
+
+            var colorPanel = new StackPanel { Spacing = 4 };
+            colorPanel.Children.Add(_previewBgCheck);
+            colorPanel.Children.Add(previewBgDropdown);
+            colorPanel.Children.Add(_previewFgCheck);
+            colorPanel.Children.Add(previewFgDropdown);
+
+            var colorSubGroup = CreateSubGroup(
+                getString("SettingsAppearanceGroupCustomColors", "커스텀 색상 설정"),
+                colorPanel);
+            content.Children.Add(colorSubGroup);
+
+            return CreateCard(
+                getString("SettingsAppearanceGroupPreview", "마크다운 프리뷰 모양 & 색상"),
+                content,
+                "\uE8A5");
         }
 
         public void ApplyToSettings(EditorSettings settings)

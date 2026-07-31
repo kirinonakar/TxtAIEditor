@@ -3694,4 +3694,19 @@
   <data name="SettingsBrowseFile" xml:space="preserve">
     <value>파일 찾기</value>
   </data>
+  <data name="SettingsAppearanceGroupGeneral" xml:space="preserve">
+    <value>언어 &amp; 테마</value>
+  </data>
+  <data name="SettingsAppearanceGroupUi" xml:space="preserve">
+    <value>UI 쉘 폰트</value>
+  </data>
+  <data name="SettingsAppearanceGroupEditor" xml:space="preserve">
+    <value>에디터 모양 &amp; 색상</value>
+  </data>
+  <data name="SettingsAppearanceGroupPreview" xml:space="preserve">
+    <value>마크다운 프리뷰 모양 &amp; 색상</value>
+  </data>
+  <data name="SettingsAppearanceGroupCustomColors" xml:space="preserve">
+    <value>커스텀 색상 설정</value>
+  </data>
 </root>
