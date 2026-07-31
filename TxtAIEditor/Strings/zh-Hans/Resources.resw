@@ -3673,4 +3673,10 @@
   <data name="SettingsAppearanceGroupCustomColors" xml:space="preserve">
     <value>自定义颜色设置</value>
   </data>
+  <data name="SettingsTerminalGroup" xml:space="preserve">
+    <value>终端 Shell 与字体</value>
+  </data>
+  <data name="SettingsLlmTokenUsageSummaryHeader" xml:space="preserve">
+    <value>用量摘要</value>
+  </data>
 </root>

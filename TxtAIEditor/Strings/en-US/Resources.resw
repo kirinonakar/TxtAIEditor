@@ -3709,4 +3709,10 @@ Plan: {0}</value>
   <data name="SettingsAppearanceGroupCustomColors" xml:space="preserve">
     <value>Custom Colors</value>
   </data>
+  <data name="SettingsTerminalGroup" xml:space="preserve">
+    <value>Terminal Shell &amp; Font</value>
+  </data>
+  <data name="SettingsLlmTokenUsageSummaryHeader" xml:space="preserve">
+    <value>Usage Summary</value>
+  </data>
 </root>

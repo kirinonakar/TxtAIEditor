@@ -99,12 +99,8 @@ namespace TxtAIEditor.Core.Services
                 Padding = new Thickness(0),
                 Tag = "IconOnlyButton"
             };
-            _modelStatusText = new TextBlock
-            {
-                Text = getString("SettingsLlmInfo", "LM Studio는 서버가 켜져 있을 때 http://localhost:1234/v1/models 에서 모델 목록을 불러옵니다."),
-                TextWrapping = TextWrapping.Wrap,
-                FontSize = 11
-            };
+            _modelStatusText = SettingsDialogUi.CreateMutedTextBlock(
+                getString("SettingsLlmInfo", "LM Studio는 서버가 켜져 있을 때 http://localhost:1234/v1/models 에서 모델 목록을 불러옵니다."));
             _tokenUsageSummaryText = new TextBlock
             {
                 TextWrapping = TextWrapping.Wrap,
@@ -250,114 +246,14 @@ namespace TxtAIEditor.Core.Services
             return section;
         }
 
-        private Border CreateCard(string title, UIElement content, string fontIconGlyph)
+        private static Border CreateCard(string title, UIElement content, string fontIconGlyph)
         {
-            var container = new StackPanel { Spacing = 8 };
-
-            var headerPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 6,
-                Margin = new Thickness(0, 0, 0, 2)
-            };
-
-            if (!string.IsNullOrEmpty(fontIconGlyph))
-            {
-                headerPanel.Children.Add(new FontIcon
-                {
-                    Glyph = fontIconGlyph,
-                    FontSize = 13,
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-            }
-
-            headerPanel.Children.Add(new TextBlock
-            {
-                Text = title,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 12.5,
-                VerticalAlignment = VerticalAlignment.Center
-            });
-
-            container.Children.Add(headerPanel);
-            container.Children.Add(content);
-
-            var card = new Border
-            {
-                CornerRadius = new CornerRadius(8),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(12, 10, 12, 12),
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-
-            card.Loaded += (s, e) =>
-            {
-                if (Application.Current.Resources.TryGetValue("CardBackgroundFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
-                {
-                    card.Background = bgBrush;
-                }
-                else
-                {
-                    card.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(15, 128, 128, 128));
-                }
-
-                if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out object? border) && border is Brush borderBrush)
-                {
-                    card.BorderBrush = borderBrush;
-                }
-                else
-                {
-                    card.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(35, 128, 128, 128));
-                }
-            };
-
-            card.Child = container;
-            return card;
+            return SettingsDialogUi.CreateCard(title, content, fontIconGlyph);
         }
 
-        private Border CreateSubGroup(string title, UIElement content)
+        private static Border CreateSubGroup(string title, UIElement content)
         {
-            var container = new StackPanel { Spacing = 6 };
-            container.Children.Add(new TextBlock
-            {
-                Text = title,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 11,
-                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
-            });
-            container.Children.Add(content);
-
-            var border = new Border
-            {
-                CornerRadius = new CornerRadius(6),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(10, 8, 10, 8),
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-
-            border.Loaded += (s, e) =>
-            {
-                if (Application.Current.Resources.TryGetValue("ControlFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
-                {
-                    border.Background = bgBrush;
-                }
-                else
-                {
-                    border.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(10, 128, 128, 128));
-                }
-
-                if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out object? bBorder) && bBorder is Brush borderBrush)
-                {
-                    border.BorderBrush = borderBrush;
-                }
-                else
-                {
-                    border.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(20, 128, 128, 128));
-                }
-            };
-
-            border.Child = container;
-            return border;
+            return SettingsDialogUi.CreateSubGroup(title, content);
         }
 
         private Border CreateMainServiceCard()
@@ -372,13 +268,8 @@ namespace TxtAIEditor.Core.Services
 
             SettingsDialogUi.AddLabel(content, _getString("SettingsLlmCredential", "LLM API Key"));
             content.Children.Add(_llmApiKeyBox);
-            content.Children.Add(new TextBlock
-            {
-                Text = _getString("SettingsLlmCredentialInfo", "API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다."),
-                TextWrapping = TextWrapping.Wrap,
-                FontSize = 11,
-                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
-            });
+            content.Children.Add(SettingsDialogUi.CreateMutedTextBlock(
+                _getString("SettingsLlmCredentialInfo", "API Key는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.")));
 
             SettingsDialogUi.AddLabel(content, _getString("SettingsLlmModel", "LLM 모델명"));
             var modelGrid = new Grid();
@@ -500,13 +391,8 @@ namespace TxtAIEditor.Core.Services
 
             SettingsDialogUi.AddLabel(content, _getString("SettingsExaApiKey", "Exa API Key (웹 검색 기능용)"));
             content.Children.Add(_exaApiKeyBox);
-            content.Children.Add(new TextBlock
-            {
-                Text = _getString("SettingsExaApiKeyInfo", "Exa API Key는 Agent의 웹 검색(Exa) 기능에 사용되며, Windows 자격 증명 관리자에 안전하게 저장됩니다."),
-                TextWrapping = TextWrapping.Wrap,
-                FontSize = 11,
-                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
-            });
+            content.Children.Add(SettingsDialogUi.CreateMutedTextBlock(
+                _getString("SettingsExaApiKeyInfo", "Exa API Key는 Agent의 웹 검색(Exa) 기능에 사용되며, Windows 자격 증명 관리자에 안전하게 저장됩니다.")));
 
             return CreateCard(
                 _getString("SettingsLlmGroupWebSearch", "웹 검색 확장 (Exa)"),
@@ -518,25 +404,10 @@ namespace TxtAIEditor.Core.Services
         {
             var content = new StackPanel { Spacing = 8 };
 
-            var summaryBorder = new Border
-            {
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(8, 6, 8, 6),
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            summaryBorder.Loaded += (s, e) =>
-            {
-                if (Application.Current.Resources.TryGetValue("ControlFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
-                {
-                    summaryBorder.Background = bgBrush;
-                }
-                else
-                {
-                    summaryBorder.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(10, 128, 128, 128));
-                }
-            };
-            summaryBorder.Child = _tokenUsageSummaryText;
-            content.Children.Add(summaryBorder);
+            var summarySubGroup = CreateSubGroup(
+                _getString("SettingsLlmTokenUsageSummaryHeader", "사용량 요약"),
+                _tokenUsageSummaryText);
+            content.Children.Add(summarySubGroup);
 
             var buttonGrid = new Grid();
             buttonGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });

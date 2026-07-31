@@ -36,7 +36,8 @@ namespace TxtAIEditor.Core.Services
             SettingsDialogStyler.ApplyCompactStyleToLogicalTree(dialogView);
             dialogView.RestoreCustomFontSizes();
 
-            bool isDarkTheme = xamlRoot.Content is FrameworkElement fe && fe.ActualTheme == ElementTheme.Dark;
+            bool isPastelDark = string.Equals(SettingsDialogUi.GetActiveThemeName(), "PastelDark", StringComparison.OrdinalIgnoreCase);
+            bool isDarkTheme = isPastelDark || (xamlRoot.Content is FrameworkElement fe && fe.ActualTheme == ElementTheme.Dark);
             bool settingsImported = false;
             string? editorTextTitle = null;
             string? editorTextContent = null;
@@ -49,6 +50,11 @@ namespace TxtAIEditor.Core.Services
                 XamlRoot = xamlRoot,
                 RequestedTheme = isDarkTheme ? ElementTheme.Dark : ElementTheme.Light
             };
+            if (isPastelDark)
+            {
+                dialog.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 36, 39, 58));
+            }
+
             dialogView.SettingsImported += (_, _) =>
             {
                 settingsImported = true;

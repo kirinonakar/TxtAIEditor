@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Core.Services
@@ -24,22 +25,25 @@ namespace TxtAIEditor.Core.Services
             _terminalFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.TerminalFontFamily, fontFamilies);
             _terminalSizeSlider = new Slider { Minimum = 8, Maximum = 36, Value = Math.Clamp(settings.TerminalFontSize, 8, 36), StepFrequency = 1 };
 
-            var section = SettingsDialogUi.CreateSection();
-            SettingsDialogUi.AddLabel(section, getString("SettingsTerminalProfile", "터미널 셸"));
-            section.Children.Add(_terminalProfileCombo);
-            SettingsDialogUi.AddLabel(section, getString("SettingsTerminalFontFamily", "터미널 폰트"));
-            section.Children.Add(_terminalFontFamilyCombo);
+            var cardContent = new StackPanel { Spacing = 6 };
+            SettingsDialogUi.AddLabel(cardContent, getString("SettingsTerminalProfile", "터미널 셸"));
+            cardContent.Children.Add(_terminalProfileCombo);
+            SettingsDialogUi.AddLabel(cardContent, getString("SettingsTerminalFontFamily", "터미널 폰트"));
+            cardContent.Children.Add(_terminalFontFamilyCombo);
             var terminalSizeLabel = new TextBlock { Text = getString("SettingsTerminalFontSize", "터미널 글자 크기") + $" ({settings.TerminalFontSize:0}pt)", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
-            section.Children.Add(terminalSizeLabel);
-            section.Children.Add(_terminalSizeSlider);
+            cardContent.Children.Add(terminalSizeLabel);
+            cardContent.Children.Add(_terminalSizeSlider);
             _terminalSizeSlider.ValueChanged += (_, args) => terminalSizeLabel.Text = getString("SettingsTerminalFontSize", "터미널 글자 크기") + $" ({args.NewValue:0}pt)";
-            section.Children.Add(new TextBlock
-            {
-                Text = getString("SettingsTerminalProfileInfo", "PowerShell은 PowerShell 7(pwsh)이 설치되어 있으면 자동으로 PowerShell 7을 사용합니다. CMD, Git Bash, WSL도 선택할 수 있으며 새 설정은 다음 새 터미널부터 적용됩니다."),
-                TextWrapping = TextWrapping.Wrap,
-                FontSize = 11
-            });
+            cardContent.Children.Add(SettingsDialogUi.CreateMutedTextBlock(
+                getString("SettingsTerminalProfileInfo", "PowerShell은 PowerShell 7(pwsh)이 설치되어 있으면 자동으로 PowerShell 7을 사용합니다. CMD, Git Bash, WSL도 선택할 수 있으며 새 설정은 다음 새 터미널부터 적용됩니다.")));
 
+            var card = SettingsDialogUi.CreateCard(
+                getString("SettingsTerminalGroup", "터미널 셸 & 폰트"),
+                cardContent,
+                "\uE756");
+
+            var section = new StackPanel { Spacing = 10, Width = 460, Padding = new Thickness(2, 6, 2, 2) };
+            section.Children.Add(card);
             Content = section;
         }
 

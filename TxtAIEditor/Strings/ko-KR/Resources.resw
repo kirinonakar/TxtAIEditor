@@ -3709,4 +3709,10 @@
   <data name="SettingsAppearanceGroupCustomColors" xml:space="preserve">
     <value>커스텀 색상 설정</value>
   </data>
+  <data name="SettingsTerminalGroup" xml:space="preserve">
+    <value>터미널 셸 &amp; 폰트</value>
+  </data>
+  <data name="SettingsLlmTokenUsageSummaryHeader" xml:space="preserve">
+    <value>사용량 요약</value>
+  </data>
 </root>

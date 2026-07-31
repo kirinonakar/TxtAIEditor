@@ -19,6 +19,191 @@ namespace TxtAIEditor.Core.Services
             target.Children.Add(new TextBlock { Text = text, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
         }
 
+        public static string GetActiveThemeName()
+        {
+            if (Application.Current?.Resources != null &&
+                Application.Current.Resources.TryGetValue("ActiveTheme", out object? themeObj) &&
+                themeObj is string themeStr)
+            {
+                return themeStr;
+            }
+            return string.Empty;
+        }
+
+        public static Border CreateCard(string title, UIElement content, string fontIconGlyph)
+        {
+            var container = new StackPanel { Spacing = 8 };
+
+            var headerPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                Margin = new Thickness(0, 0, 0, 2)
+            };
+
+            FontIcon? icon = null;
+            if (!string.IsNullOrEmpty(fontIconGlyph))
+            {
+                icon = new FontIcon
+                {
+                    Glyph = fontIconGlyph,
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                headerPanel.Children.Add(icon);
+            }
+
+            var titleText = new TextBlock
+            {
+                Text = title,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 12.5,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            headerPanel.Children.Add(titleText);
+
+            container.Children.Add(headerPanel);
+            container.Children.Add(content);
+
+            var card = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(12, 10, 12, 12),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            Action updateThemeBrushes = () =>
+            {
+                string activeTheme = GetActiveThemeName();
+                bool isPastel = string.Equals(activeTheme, "PastelDark", StringComparison.OrdinalIgnoreCase);
+                bool isLight = !isPastel && card.ActualTheme == ElementTheme.Light;
+
+                if (isPastel)
+                {
+                    // Pastel Dark (Catppuccin Macchiato)
+                    card.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 45, 48, 71)); // #2d3047
+                    card.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 73, 77, 100)); // #494d64
+                    titleText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 202, 211, 245)); // #cad3f5
+                    if (icon != null) icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 198, 160, 246)); // #c6a0f6 (mauve)
+                }
+                else if (isLight)
+                {
+                    // Light Theme
+                    card.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 249, 250)); // #f8f9fa
+                    card.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 228, 228, 231)); // #e4e4e7
+                    titleText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 24, 24, 27)); // #18181b
+                    if (icon != null) icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 99, 235)); // #2563eb
+                }
+                else
+                {
+                    // Dark Theme (vs-dark)
+                    card.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 39, 39, 42)); // #27272a
+                    card.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 63, 63, 70)); // #3f3f46
+                    titleText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 244, 244, 245)); // #f4f4f5
+                    if (icon != null) icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 96, 165, 250)); // #60a5fa
+                }
+            };
+
+            card.Loaded += (_, _) => updateThemeBrushes();
+            card.ActualThemeChanged += (_, _) => updateThemeBrushes();
+
+            card.Child = container;
+            return card;
+        }
+
+        public static Border CreateSubGroup(string title, UIElement content)
+        {
+            var container = new StackPanel { Spacing = 6 };
+
+            var subHeader = new TextBlock
+            {
+                Text = title,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 11
+            };
+
+            var border = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(10, 8, 10, 8),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            Action updateSubGroupThemeBrushes = () =>
+            {
+                string activeTheme = GetActiveThemeName();
+                bool isPastel = string.Equals(activeTheme, "PastelDark", StringComparison.OrdinalIgnoreCase);
+                bool isLight = !isPastel && border.ActualTheme == ElementTheme.Light;
+
+                if (isPastel)
+                {
+                    // Pastel Dark SubGroup
+                    border.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 33, 35, 54)); // #212336
+                    border.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 54, 57, 79)); // #36394f
+                    subHeader.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 165, 173, 203)); // #a5adcb
+                }
+                else if (isLight)
+                {
+                    // Light SubGroup
+                    border.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 241, 245, 249)); // #f1f5f9
+                    border.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)); // #e2e8f0
+                    subHeader.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 100, 116, 139)); // #64748b
+                }
+                else
+                {
+                    // Dark SubGroup
+                    border.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 31, 31, 35)); // #1f1f23
+                    border.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 51, 51, 55)); // #333337
+                    subHeader.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 161, 161, 170)); // #a1a1aa
+                }
+            };
+
+            container.Children.Add(subHeader);
+            container.Children.Add(content);
+
+            border.Loaded += (_, _) => updateSubGroupThemeBrushes();
+            border.ActualThemeChanged += (_, _) => updateSubGroupThemeBrushes();
+
+            border.Child = container;
+            return border;
+        }
+
+        public static TextBlock CreateMutedTextBlock(string text)
+        {
+            var tb = new TextBlock
+            {
+                Text = text,
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11
+            };
+
+            Action updateMutedColor = () =>
+            {
+                string activeTheme = GetActiveThemeName();
+                bool isPastel = string.Equals(activeTheme, "PastelDark", StringComparison.OrdinalIgnoreCase);
+                bool isLight = !isPastel && tb.ActualTheme == ElementTheme.Light;
+
+                if (isPastel)
+                {
+                    tb.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 165, 173, 203)); // #a5adcb
+                }
+                else if (isLight)
+                {
+                    tb.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 100, 116, 139)); // #64748b
+                }
+                else
+                {
+                    tb.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 161, 161, 170)); // #a1a1aa
+                }
+            };
+
+            tb.Loaded += (_, _) => updateMutedColor();
+            tb.ActualThemeChanged += (_, _) => updateMutedColor();
+            return tb;
+        }
+
         public static ComboBox CreateFontComboBox(string currentFontFamily, IReadOnlyList<string> fontFamilies)
         {
             var comboBox = new ComboBox

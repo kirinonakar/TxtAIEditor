@@ -84,114 +84,14 @@ namespace TxtAIEditor.Core.Services
             Content = section;
         }
 
-        private Border CreateCard(string title, UIElement content, string fontIconGlyph)
+        private static Border CreateCard(string title, UIElement content, string fontIconGlyph)
         {
-            var container = new StackPanel { Spacing = 8 };
-
-            var headerPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 6,
-                Margin = new Thickness(0, 0, 0, 2)
-            };
-
-            if (!string.IsNullOrEmpty(fontIconGlyph))
-            {
-                headerPanel.Children.Add(new FontIcon
-                {
-                    Glyph = fontIconGlyph,
-                    FontSize = 13,
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-            }
-
-            headerPanel.Children.Add(new TextBlock
-            {
-                Text = title,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 12.5,
-                VerticalAlignment = VerticalAlignment.Center
-            });
-
-            container.Children.Add(headerPanel);
-            container.Children.Add(content);
-
-            var card = new Border
-            {
-                CornerRadius = new CornerRadius(8),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(12, 10, 12, 12),
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-
-            card.Loaded += (s, e) =>
-            {
-                if (Application.Current.Resources.TryGetValue("CardBackgroundFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
-                {
-                    card.Background = bgBrush;
-                }
-                else
-                {
-                    card.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(15, 128, 128, 128));
-                }
-
-                if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out object? border) && border is Brush borderBrush)
-                {
-                    card.BorderBrush = borderBrush;
-                }
-                else
-                {
-                    card.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(35, 128, 128, 128));
-                }
-            };
-
-            card.Child = container;
-            return card;
+            return SettingsDialogUi.CreateCard(title, content, fontIconGlyph);
         }
 
-        private Border CreateSubGroup(string title, UIElement content)
+        private static Border CreateSubGroup(string title, UIElement content)
         {
-            var container = new StackPanel { Spacing = 6 };
-            container.Children.Add(new TextBlock
-            {
-                Text = title,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 11,
-                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Gray)
-            });
-            container.Children.Add(content);
-
-            var border = new Border
-            {
-                CornerRadius = new CornerRadius(6),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(10, 8, 10, 8),
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-
-            border.Loaded += (s, e) =>
-            {
-                if (Application.Current.Resources.TryGetValue("ControlFillColorDefaultBrush", out object? bg) && bg is Brush bgBrush)
-                {
-                    border.Background = bgBrush;
-                }
-                else
-                {
-                    border.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(10, 128, 128, 128));
-                }
-
-                if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out object? bBorder) && bBorder is Brush borderBrush)
-                {
-                    border.BorderBrush = borderBrush;
-                }
-                else
-                {
-                    border.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(20, 128, 128, 128));
-                }
-            };
-
-            border.Child = container;
-            return border;
+            return SettingsDialogUi.CreateSubGroup(title, content);
         }
 
         private Border CreateGeneralCard(Func<string, string, string> getString)
