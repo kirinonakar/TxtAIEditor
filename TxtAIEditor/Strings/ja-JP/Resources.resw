@@ -3679,4 +3679,13 @@
   <data name="SettingsLlmTokenUsageSummaryHeader" xml:space="preserve">
     <value>使用状況の概要</value>
   </data>
+  <data name="SettingsToolbarGroupGeneral" xml:space="preserve">
+    <value>ツールバーのオプションとリセット</value>
+  </data>
+  <data name="SettingsToolbarGroupVisibility" xml:space="preserve">
+    <value>ツールバーボタンの表示/非表示</value>
+  </data>
+  <data name="SettingsToolbarGroupOrder" xml:space="preserve">
+    <value>ツールバーボタンの順序と配置</value>
+  </data>
 </root>

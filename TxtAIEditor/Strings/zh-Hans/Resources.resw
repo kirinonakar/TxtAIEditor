@@ -3679,4 +3679,13 @@
   <data name="SettingsLlmTokenUsageSummaryHeader" xml:space="preserve">
     <value>用量摘要</value>
   </data>
+  <data name="SettingsToolbarGroupGeneral" xml:space="preserve">
+    <value>工具栏选项与重置</value>
+  </data>
+  <data name="SettingsToolbarGroupVisibility" xml:space="preserve">
+    <value>工具栏按钮显示与隐藏</value>
+  </data>
+  <data name="SettingsToolbarGroupOrder" xml:space="preserve">
+    <value>工具栏按钮顺序与对齐</value>
+  </data>
 </root>

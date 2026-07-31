@@ -3715,4 +3715,13 @@
   <data name="SettingsLlmTokenUsageSummaryHeader" xml:space="preserve">
     <value>사용량 요약</value>
   </data>
+  <data name="SettingsToolbarGroupGeneral" xml:space="preserve">
+    <value>툴바 옵션 &amp; 초기화</value>
+  </data>
+  <data name="SettingsToolbarGroupVisibility" xml:space="preserve">
+    <value>툴바 버튼 표시 &amp; 숨기기</value>
+  </data>
+  <data name="SettingsToolbarGroupOrder" xml:space="preserve">
+    <value>툴바 버튼 순서 &amp; 정렬</value>
+  </data>
 </root>

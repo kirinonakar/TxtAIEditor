@@ -3715,4 +3715,13 @@ Plan: {0}</value>
   <data name="SettingsLlmTokenUsageSummaryHeader" xml:space="preserve">
     <value>Usage Summary</value>
   </data>
+  <data name="SettingsToolbarGroupGeneral" xml:space="preserve">
+    <value>Toolbar Options &amp; Reset</value>
+  </data>
+  <data name="SettingsToolbarGroupVisibility" xml:space="preserve">
+    <value>Toolbar Button Visibility</value>
+  </data>
+  <data name="SettingsToolbarGroupOrder" xml:space="preserve">
+    <value>Toolbar Button Order &amp; Alignment</value>
+  </data>
 </root>
