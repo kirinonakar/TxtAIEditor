@@ -435,7 +435,10 @@
     <value>높음 (High)</value>
   </data>
   <data name="SettingsLlmThinkingLevelXHigh" xml:space="preserve">
-    <value>최고 (X-High)</value>
+    <value>매우 높음 (Very High)</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelMax" xml:space="preserve">
+    <value>최대 (Max)</value>
   </data>
   <data name="SettingsLlmLoadOpenCodeGoModels" xml:space="preserve">
     <value>OpenCode Go 모델 불러오기</value>

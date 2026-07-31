@@ -435,7 +435,10 @@
     <value>高い (High)</value>
   </data>
   <data name="SettingsLlmThinkingLevelXHigh" xml:space="preserve">
-    <value>最高 (X-High)</value>
+    <value>非常に高い (Very High)</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelMax" xml:space="preserve">
+    <value>最大 (Max)</value>
   </data>
   <data name="SettingsLlmLoadOpenCodeGoModels" xml:space="preserve">
     <value>OpenCode Goモデルを取得</value>

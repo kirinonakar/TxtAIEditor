@@ -14,15 +14,22 @@ namespace TxtAIEditor.Core.Services.LLM
     public class OpenRouterProvider : ILLMProvider
     {
         private readonly ILocalizationService _localizationService;
+        private readonly string _thinkingLevel;
         private readonly string _providerName;
 
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public OpenRouterProvider(ILocalizationService localizationService, string providerName = "OpenRouter")
+        public OpenRouterProvider(ILocalizationService localizationService, string thinkingLevel = "", string providerName = "OpenRouter")
         {
             _localizationService = localizationService;
+            _thinkingLevel = thinkingLevel ?? string.Empty;
             _providerName = providerName ?? "OpenRouter";
         }
+
+        private bool HasThinking => !string.IsNullOrEmpty(_thinkingLevel) &&
+                                    !_thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase) &&
+                                    !_thinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase) &&
+                                    !_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase);
 
         private async Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken)
         {
@@ -96,6 +103,22 @@ namespace TxtAIEditor.Core.Services.LLM
             if (outputLimit > 0)
             {
                 payloadDict["max_tokens"] = outputLimit;
+            }
+
+            if (HasThinking)
+            {
+                payloadDict["reasoning"] = new Dictionary<string, object>
+                {
+                    ["effort"] = _thinkingLevel.ToLowerInvariant()
+                };
+            }
+            else if (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
+                     _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                payloadDict["reasoning"] = new Dictionary<string, object>
+                {
+                    ["effort"] = "none"
+                };
             }
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);

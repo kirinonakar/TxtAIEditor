@@ -405,7 +405,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 return IsGptOssModel(model) ? null : "none";
             }
 
-            if (level == "xhigh")
+            if (level == "xhigh" || level == "max")
             {
                 return "high";
             }

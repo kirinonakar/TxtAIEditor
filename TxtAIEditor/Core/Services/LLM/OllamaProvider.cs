@@ -15,15 +15,29 @@ namespace TxtAIEditor.Core.Services.LLM
     {
         private readonly ILocalizationService _localizationService;
         private readonly bool _isCloud;
+        private readonly string _thinkingLevel;
         private readonly string _providerName;
 
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public OllamaProvider(ILocalizationService localizationService, bool isCloud, string providerName = "")
+        public OllamaProvider(ILocalizationService localizationService, bool isCloud, string thinkingLevel = "", string providerName = "")
         {
             _localizationService = localizationService;
             _isCloud = isCloud;
+            _thinkingLevel = thinkingLevel ?? string.Empty;
             _providerName = providerName ?? (isCloud ? "Ollama Cloud" : "Ollama");
+        }
+
+        private bool HasThinking => _isCloud &&
+                                    !string.IsNullOrEmpty(_thinkingLevel) &&
+                                    !_thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase) &&
+                                    !_thinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase) &&
+                                    !_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase);
+
+        private string GetReasoningEffort()
+        {
+            string level = _thinkingLevel.ToLowerInvariant();
+            return level == "xhigh" || level == "max" ? "high" : level;
         }
 
         private async Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken)
@@ -89,6 +103,21 @@ namespace TxtAIEditor.Core.Services.LLM
             if (outputLimit > 0)
             {
                 payloadDict["max_tokens"] = outputLimit;
+            }
+            if (HasThinking)
+            {
+                payloadDict["reasoning"] = new Dictionary<string, object>
+                {
+                    ["effort"] = GetReasoningEffort()
+                };
+            }
+            else if (_isCloud && (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
+                                  _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase)))
+            {
+                payloadDict["reasoning"] = new Dictionary<string, object>
+                {
+                    ["effort"] = "none"
+                };
             }
             if (_isCloud)
             {

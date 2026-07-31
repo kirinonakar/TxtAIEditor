@@ -417,25 +417,28 @@
     <value>Cerebras 從 https://api.cerebras.ai/v1/models. 載入模型列表</value>
   </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
-    <value>思維層面</value>
+    <value>思考級別 (Thinking Level)</value>
   </data>
   <data name="SettingsLlmThinkingLevelDefault" xml:space="preserve">
-    <value>Default</value>
+    <value>預設 (Default)</value>
   </data>
   <data name="SettingsLlmThinkingLevelDisabled" xml:space="preserve">
-    <value>Disable</value>
+    <value>停用 (Disable)</value>
   </data>
   <data name="SettingsLlmThinkingLevelLow" xml:space="preserve">
-    <value>Low</value>
+    <value>低 (Low)</value>
   </data>
   <data name="SettingsLlmThinkingLevelMedium" xml:space="preserve">
-    <value>Medium</value>
+    <value>中 (Medium)</value>
   </data>
   <data name="SettingsLlmThinkingLevelHigh" xml:space="preserve">
-    <value>High</value>
+    <value>高 (High)</value>
   </data>
   <data name="SettingsLlmThinkingLevelXHigh" xml:space="preserve">
-    <value>X-High</value>
+    <value>非常高 (Very High)</value>
+  </data>
+  <data name="SettingsLlmThinkingLevelMax" xml:space="preserve">
+    <value>最高 (Max)</value>
   </data>
   <data name="SettingsLlmLoadOpenCodeGoModels" xml:space="preserve">
     <value>載入 OpenCode Go 模型</value>

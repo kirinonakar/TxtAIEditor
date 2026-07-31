@@ -327,7 +327,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 {
                     levelStr = "MINIMAL";
                 }
-                else if (levelStr == "XHIGH")
+                else if (levelStr == "XHIGH" || levelStr == "MAX")
                 {
                     levelStr = "HIGH";
                 }
@@ -468,7 +468,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 {
                     levelStr = "MINIMAL";
                 }
-                else if (levelStr == "XHIGH")
+                else if (levelStr == "XHIGH" || levelStr == "MAX")
                 {
                     levelStr = "HIGH";
                 }
