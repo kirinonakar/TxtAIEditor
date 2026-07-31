@@ -261,26 +261,53 @@ namespace TxtAIEditor.Core.Services
                 return string.Empty;
             }
 
+            WordTableLayout layout = BuildTableLayout(table);
+            XElement? tableProperties = GetDirectProperty(table, "tblPr");
+            XElement? tableBorders = GetDirectProperty(tableProperties, "tblBorders");
             var builder = new StringBuilder();
-            builder.Append("<div class=\"doc-table-wrap\"><table class=\"doc-table\"><tbody>");
-            foreach (XElement row in table.Elements().Where(e => e.Name.LocalName == "tr"))
+            builder.Append("<div class=\"doc-table-wrap\"><table class=\"doc-table\"");
+            AppendStyleAttribute(builder, BuildTableStyle(tableProperties));
+            builder.Append("><tbody>");
+            for (int rowIndex = 0; rowIndex < layout.Rows.Count; rowIndex++)
             {
-                builder.Append("<tr>");
-                foreach (XElement cell in row.Elements().Where(e => e.Name.LocalName == "tc"))
+                XElement row = layout.Rows[rowIndex];
+                XElement? rowProperties = GetDirectProperty(row, "trPr");
+                builder.Append("<tr");
+                AppendStyleAttribute(builder, BuildRowStyle(rowProperties));
+                builder.Append('>');
+                foreach (WordTableCellLayout cell in layout.CellsByRow[rowIndex])
                 {
-                    string colspan = ReadGridSpan(cell);
                     builder.Append("<td");
-                    if (!string.IsNullOrWhiteSpace(colspan))
+                    if (cell.ColumnSpan > 1)
                     {
                         builder.Append(" colspan=\"")
-                            .Append(Html(colspan))
+                            .Append(cell.ColumnSpan.ToString(CultureInfo.InvariantCulture))
                             .Append('"');
                     }
 
+                    if (cell.RowSpan > 1)
+                    {
+                        builder.Append(" rowspan=\"")
+                            .Append(cell.RowSpan.ToString(CultureInfo.InvariantCulture))
+                            .Append('"');
+                    }
+
+                    AppendStyleAttribute(
+                        builder,
+                        BuildCellStyle(
+                            cell,
+                            tableBorders,
+                            layout.Rows.Count,
+                            layout.ColumnCount));
                     builder.Append('>');
                     int before = builder.Length;
-                    foreach (XElement child in cell.Elements())
+                    foreach (XElement child in cell.Element.Elements())
                     {
+                        if (child.Name.LocalName == "tcPr")
+                        {
+                            continue;
+                        }
+
                         AppendBlockHtml(builder, archive, relationships, child);
                     }
 
@@ -299,26 +326,392 @@ namespace TxtAIEditor.Core.Services
             return builder.ToString();
         }
 
+        private static WordTableLayout BuildTableLayout(XElement table)
+        {
+            var rows = table.Elements()
+                .Where(e => e.Name.LocalName == "tr")
+                .ToList();
+            var cellsByRow = new List<List<WordTableCellLayout>>(rows.Count);
+            var activeVerticalMerges = new Dictionary<int, WordTableCellLayout>();
+            int columnCount = 0;
+
+            for (int rowIndex = 0; rowIndex < rows.Count; rowIndex++)
+            {
+                XElement row = rows[rowIndex];
+                var renderedCells = new List<WordTableCellLayout>();
+                var nextVerticalMerges = new Dictionary<int, WordTableCellLayout>();
+                WordTableCellLayout? previousCell = null;
+                int columnIndex = 0;
+
+                foreach (XElement cell in row.Elements().Where(e => e.Name.LocalName == "tc"))
+                {
+                    int columnSpan = ReadGridSpanValue(cell);
+                    WordMergeKind verticalMerge = ReadMergeKind(cell, "vMerge");
+                    if (verticalMerge == WordMergeKind.Continue &&
+                        activeVerticalMerges.TryGetValue(columnIndex, out WordTableCellLayout? mergedCell))
+                    {
+                        mergedCell.RowSpan++;
+                        AddActiveVerticalMerge(nextVerticalMerges, mergedCell);
+                        columnIndex = mergedCell.ColumnIndex + mergedCell.ColumnSpan;
+                        previousCell = null;
+                        continue;
+                    }
+
+                    WordMergeKind horizontalMerge = ReadMergeKind(cell, "hMerge");
+                    if (horizontalMerge == WordMergeKind.Continue &&
+                        previousCell != null &&
+                        previousCell.RowIndex == rowIndex &&
+                        previousCell.ColumnIndex + previousCell.ColumnSpan == columnIndex)
+                    {
+                        previousCell.ColumnSpan += columnSpan;
+                        if (nextVerticalMerges.Values.Any(value => ReferenceEquals(value, previousCell)))
+                        {
+                            AddActiveVerticalMerge(nextVerticalMerges, previousCell);
+                        }
+
+                        columnIndex += columnSpan;
+                        continue;
+                    }
+
+                    var renderedCell = new WordTableCellLayout(cell, rowIndex, columnIndex, columnSpan);
+                    renderedCells.Add(renderedCell);
+                    if (verticalMerge == WordMergeKind.Restart)
+                    {
+                        AddActiveVerticalMerge(nextVerticalMerges, renderedCell);
+                    }
+
+                    previousCell = renderedCell;
+                    columnIndex += columnSpan;
+                }
+
+                columnCount = Math.Max(columnCount, columnIndex);
+                cellsByRow.Add(renderedCells);
+                activeVerticalMerges = nextVerticalMerges;
+            }
+
+            return new WordTableLayout(rows, cellsByRow, Math.Max(1, columnCount));
+        }
+
+        private static void AddActiveVerticalMerge(
+            IDictionary<int, WordTableCellLayout> activeMerges,
+            WordTableCellLayout cell)
+        {
+            for (int offset = 0; offset < cell.ColumnSpan; offset++)
+            {
+                activeMerges[cell.ColumnIndex + offset] = cell;
+            }
+        }
+
+        private static string BuildTableStyle(XElement? tableProperties)
+        {
+            var styles = new List<string>();
+            AppendStyle(styles, ReadShadingStyle(tableProperties));
+
+            XElement? borders = GetDirectProperty(tableProperties, "tblBorders");
+            foreach (string edge in new[] { "top", "right", "bottom", "left" })
+            {
+                AppendStyle(styles, ReadBorderStyle(borders, edge));
+            }
+
+            return string.Join(';', styles);
+        }
+
+        private static string BuildRowStyle(XElement? rowProperties)
+        {
+            var styles = new List<string>();
+            AppendStyle(styles, ReadShadingStyle(rowProperties));
+            return string.Join(';', styles);
+        }
+
+        private static string BuildCellStyle(
+            WordTableCellLayout cell,
+            XElement? tableBorders,
+            int rowCount,
+            int columnCount)
+        {
+            XElement? cellProperties = GetDirectProperty(cell.Element, "tcPr");
+            XElement? cellBorders = GetDirectProperty(cellProperties, "tcBorders");
+            var styles = new List<string>();
+            AppendStyle(styles, ReadShadingStyle(cellProperties));
+
+            XElement? verticalAlignment = GetDirectProperty(cellProperties, "vAlign");
+            string alignment = GetAttributeValue(verticalAlignment, "val").ToLowerInvariant();
+            if (alignment is "center" or "middle")
+            {
+                styles.Add("vertical-align:middle");
+            }
+            else if (alignment is "bottom")
+            {
+                styles.Add("vertical-align:bottom");
+            }
+
+            bool hasExplicitBorders = cellBorders != null || tableBorders != null;
+            foreach (string edge in new[] { "top", "right", "bottom", "left" })
+            {
+                string? borderStyle = ReadBorderStyle(cellBorders, edge);
+                if (borderStyle == null)
+                {
+                    string tableEdge = GetTableBorderEdge(cell, edge, rowCount, columnCount);
+                    borderStyle = ReadBorderStyle(tableBorders, tableEdge, edge);
+                }
+
+                if (borderStyle != null)
+                {
+                    styles.Add(borderStyle);
+                }
+                else if (hasExplicitBorders)
+                {
+                    styles.Add("border-" + edge + ":0");
+                }
+            }
+
+            return string.Join(';', styles);
+        }
+
+        private static string GetTableBorderEdge(
+            WordTableCellLayout cell,
+            string edge,
+            int rowCount,
+            int columnCount)
+        {
+            return edge switch
+            {
+                "top" when cell.RowIndex == 0 => "top",
+                "bottom" when cell.RowIndex + cell.RowSpan >= rowCount => "bottom",
+                "left" when cell.ColumnIndex == 0 => "left",
+                "right" when cell.ColumnIndex + cell.ColumnSpan >= columnCount => "right",
+                "top" or "bottom" => "insideH",
+                "left" or "right" => "insideV",
+                _ => edge
+            };
+        }
+
+        private static string? ReadShadingStyle(XElement? properties)
+        {
+            XElement? shading = GetDirectProperty(properties, "shd");
+            if (shading == null)
+            {
+                return null;
+            }
+
+            string pattern = GetAttributeValue(shading, "val").ToLowerInvariant();
+            if (pattern is "nil" or "none")
+            {
+                return "background-color:transparent";
+            }
+
+            string fill = GetAttributeValue(shading, "fill");
+            if (TryNormalizeHexColor(fill, out string normalizedFill))
+            {
+                return "background-color:#" + normalizedFill;
+            }
+
+            if (pattern == "solid" &&
+                TryNormalizeHexColor(GetAttributeValue(shading, "color"), out string normalizedColor))
+            {
+                return "background-color:#" + normalizedColor;
+            }
+
+            return fill.Equals("auto", StringComparison.OrdinalIgnoreCase)
+                ? "background-color:transparent"
+                : null;
+        }
+
+        private static string? ReadBorderStyle(
+            XElement? borders,
+            string edge,
+            string? cssEdge = null)
+        {
+            XElement? border = GetBorderElement(borders, edge);
+            if (border == null)
+            {
+                return null;
+            }
+
+            string property = "border-" + (cssEdge ?? edge);
+            string value = GetAttributeValue(border, "val").ToLowerInvariant();
+            if (value is "nil" or "none")
+            {
+                return property + ":0";
+            }
+
+            string width = ReadBorderWidth(border);
+            string borderKind = value switch
+            {
+                "double" or "triple" => "double",
+                "dotted" or "dotdash" or "dotdotdash" => "dotted",
+                "dashed" or "dashsmallgap" or "dashdotstroked" or "dashdotdot" => "dashed",
+                _ => "solid"
+            };
+            string color = ReadBorderColor(border);
+            return property + ":" + width + " " + borderKind + " " + color;
+        }
+
+        private static XElement? GetBorderElement(XElement? borders, string edge)
+        {
+            if (borders == null)
+            {
+                return null;
+            }
+
+            string[] candidates = edge switch
+            {
+                "left" => new[] { "left", "start" },
+                "right" => new[] { "right", "end" },
+                _ => new[] { edge }
+            };
+            return borders.Elements()
+                .FirstOrDefault(element => candidates.Contains(element.Name.LocalName, StringComparer.Ordinal));
+        }
+
+        private static string ReadBorderWidth(XElement border)
+        {
+            string sizeValue = GetAttributeValue(border, "sz");
+            if (int.TryParse(
+                    sizeValue,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int size) &&
+                size > 0)
+            {
+                return (size / 8.0).ToString("0.###", CultureInfo.InvariantCulture) + "pt";
+            }
+
+            return "1px";
+        }
+
+        private static string ReadBorderColor(XElement border)
+        {
+            string value = GetAttributeValue(border, "color");
+            return TryNormalizeHexColor(value, out string normalizedColor)
+                ? "#" + normalizedColor
+                : "currentColor";
+        }
+
+        private static bool TryNormalizeHexColor(string value, out string normalizedColor)
+        {
+            normalizedColor = string.Empty;
+            value = value.Trim().TrimStart('#');
+            if (!Regex.IsMatch(value, "^[0-9A-Fa-f]{6}$"))
+            {
+                return false;
+            }
+
+            normalizedColor = value.ToUpperInvariant();
+            return true;
+        }
+
+        private static void AppendStyle(List<string> styles, string? style)
+        {
+            if (!string.IsNullOrWhiteSpace(style))
+            {
+                styles.Add(style);
+            }
+        }
+
+        private static void AppendStyleAttribute(StringBuilder builder, string style)
+        {
+            if (string.IsNullOrWhiteSpace(style))
+            {
+                return;
+            }
+
+            builder.Append(" style=\"")
+                .Append(Html(style))
+                .Append('"');
+        }
+
         private static bool HasTableContent(XElement table)
         {
             return table.Descendants().Any(element =>
                 element.Name.LocalName is "drawing" or "pict" ||
+                element.Name.LocalName is "shd" or "tblBorders" or "tcBorders" or "gridSpan" or "hMerge" or "vMerge" ||
                 (element.Name.LocalName == "t" && !string.IsNullOrWhiteSpace(element.Value)));
         }
 
-        private static string ReadGridSpan(XElement cell)
+        private static int ReadGridSpanValue(XElement cell)
         {
-            XElement? gridSpan = cell.Descendants().FirstOrDefault(e => e.Name.LocalName == "gridSpan");
+            XElement? cellProperties = GetDirectProperty(cell, "tcPr");
+            XElement? gridSpan = GetDirectProperty(cellProperties, "gridSpan");
             string value = GetAttributeValue(gridSpan, "val");
-            return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int span) && span > 1
-                ? span.ToString(CultureInfo.InvariantCulture)
-                : string.Empty;
+            return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int span) && span > 0
+                ? span
+                : 1;
+        }
+
+        private static WordMergeKind ReadMergeKind(XElement cell, string propertyName)
+        {
+            XElement? cellProperties = GetDirectProperty(cell, "tcPr");
+            XElement? merge = GetDirectProperty(cellProperties, propertyName);
+            if (merge == null)
+            {
+                return WordMergeKind.None;
+            }
+
+            return string.Equals(
+                GetAttributeValue(merge, "val"),
+                "restart",
+                StringComparison.OrdinalIgnoreCase)
+                ? WordMergeKind.Restart
+                : WordMergeKind.Continue;
+        }
+
+        private static XElement? GetDirectProperty(XElement? parent, string localName)
+        {
+            return parent?.Elements().FirstOrDefault(element => element.Name.LocalName == localName);
         }
 
         private static string GetAttributeValue(XElement? element, string localName)
         {
             return element?.Attributes().FirstOrDefault(attribute => attribute.Name.LocalName == localName)?.Value
                 ?? string.Empty;
+        }
+
+        private enum WordMergeKind
+        {
+            None,
+            Restart,
+            Continue
+        }
+
+        private sealed class WordTableLayout
+        {
+            public WordTableLayout(
+                IReadOnlyList<XElement> rows,
+                IReadOnlyList<List<WordTableCellLayout>> cellsByRow,
+                int columnCount)
+            {
+                Rows = rows;
+                CellsByRow = cellsByRow;
+                ColumnCount = columnCount;
+            }
+
+            public IReadOnlyList<XElement> Rows { get; }
+
+            public IReadOnlyList<List<WordTableCellLayout>> CellsByRow { get; }
+
+            public int ColumnCount { get; }
+        }
+
+        private sealed class WordTableCellLayout
+        {
+            public WordTableCellLayout(XElement element, int rowIndex, int columnIndex, int columnSpan)
+            {
+                Element = element;
+                RowIndex = rowIndex;
+                ColumnIndex = columnIndex;
+                ColumnSpan = columnSpan;
+            }
+
+            public XElement Element { get; }
+
+            public int RowIndex { get; }
+
+            public int ColumnIndex { get; }
+
+            public int ColumnSpan { get; set; }
+
+            public int RowSpan { get; set; } = 1;
         }
     }
 }
