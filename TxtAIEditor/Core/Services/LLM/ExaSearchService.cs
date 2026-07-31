@@ -248,7 +248,7 @@ namespace TxtAIEditor.Core.Services.LLM
         private async Task<string> SearchWebWithoutApiKeyAsync(string query, int numResults, CancellationToken cancellationToken)
         {
             int resultsCount = numResults <= 0 ? 5 : Math.Min(numResults, 10);
-            string requestUrl = "https://duckduckgo.com/html/?q=" + Uri.EscapeDataString(query);
+            string requestUrl = "https://html.duckduckgo.com/html/?q=" + Uri.EscapeDataString(query);
 
             try
             {
