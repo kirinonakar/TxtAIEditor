@@ -1241,6 +1241,30 @@ namespace TxtAIEditor.Editor
             _document.IsDirty = true;
         }
 
+        public int ApplyHexEdit(long offset, ReadOnlySpan<byte> bytes)
+        {
+            if (Model is not HexDumpTextModel hexModel)
+            {
+                return 0;
+            }
+
+            int written = hexModel.ApplyByteEdit(offset, bytes);
+            if (written <= 0)
+            {
+                return 0;
+            }
+
+            MarkUnsavedState();
+            int startLine = checked((int)(offset / 16) + 2);
+            int endLine = checked((int)((offset + written - 1) / 16) + 2);
+            CommitViewChange(
+                startLine,
+                endLine - startLine + 1,
+                endLine - startLine + 1);
+            RefreshTabContentPreview();
+            return written;
+        }
+
         public async Task<bool> WaitForDocumentVersionAsync(long version, int timeoutMs = 700)
         {
             EditorDocument buffer = _document;

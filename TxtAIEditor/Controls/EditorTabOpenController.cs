@@ -1417,7 +1417,7 @@ namespace TxtAIEditor.Controls
                 try
                 {
                     var currentSession = getSession();
-                    if (currentSession.Model is not HexDumpTextModel hexModel ||
+                    if (currentSession.Model is not HexDumpTextModel ||
                         string.IsNullOrEmpty(hex) ||
                         hex.Length % 2 != 0)
                     {
@@ -1425,7 +1425,7 @@ namespace TxtAIEditor.Controls
                     }
 
                     byte[] bytes = Convert.FromHexString(hex);
-                    int written = hexModel.ApplyByteEdit(offset, bytes);
+                    int written = currentSession.ApplyHexEdit(offset, bytes);
                     if (written <= 0)
                     {
                         return;

@@ -311,7 +311,11 @@ function flushPendingEditForSave(requestId) {
             reportCursorAndSelection();
         }
 
-        post({ type: 'editorFlushedForSave', requestId: Number(requestId || 0) });
+        post({
+            type: 'editorFlushedForSave',
+            requestId: Number(requestId || 0),
+            documentVersion: state.hostDocumentVersion
+        });
     };
 
     if (imeController.isComposing && element && element.getAttribute('contenteditable') === 'true') {
