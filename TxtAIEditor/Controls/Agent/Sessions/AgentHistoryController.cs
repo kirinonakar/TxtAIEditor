@@ -260,21 +260,7 @@ namespace TxtAIEditor.Controls
             bool afterUserRequest = false;
             bool inPlanningModeTaskDetails = false;
             bool inRetainedThinking = false;
-            var retainedThinking = new StringBuilder();
             string? pendingToolResultToolName = null;
-
-            void AppendThinkingSummary()
-            {
-                int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(retainedThinking.ToString()));
-                string thinkingLabel = getString?.Invoke("AgentActivityThinking", "생각중") ?? "생각중";
-                string tokenFormat = getString?.Invoke("AgentInlineTokenCountFormat", "{0:N0} 토큰") ?? "{0:N0} 토큰";
-                string labelFormat = getString?.Invoke("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})") ?? "{0} ({1})";
-                result.AppendLine(string.Format(
-                    labelFormat,
-                    thinkingLabel,
-                    string.Format(tokenFormat, tokenCount)));
-                retainedThinking.Clear();
-            }
 
             void FlushPendingToolResult(bool failed)
             {
@@ -310,18 +296,15 @@ namespace TxtAIEditor.Controls
                         line.StartsWith("[Retry instruction]", StringComparison.OrdinalIgnoreCase);
                     if (!reachedThinkingBoundary)
                     {
-                        retainedThinking.AppendLine(line);
                         continue;
                     }
 
-                    AppendThinkingSummary();
                     inRetainedThinking = false;
                 }
 
                 if (line.StartsWith("[assistant: thinking]", StringComparison.OrdinalIgnoreCase))
                 {
                     inRetainedThinking = true;
-                    retainedThinking.Clear();
                     continue;
                 }
 
@@ -565,11 +548,6 @@ namespace TxtAIEditor.Controls
                         result.AppendLine(line);
                     }
                 }
-            }
-
-            if (inRetainedThinking)
-            {
-                AppendThinkingSummary();
             }
 
             if (pendingToolResultToolName != null)
