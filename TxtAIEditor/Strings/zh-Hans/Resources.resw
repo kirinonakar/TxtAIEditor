@@ -3462,6 +3462,9 @@
   <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
     <value>[工具执行]: {0}</value>
   </data>
+  <data name="AgentHistoryToolFailedFormat" xml:space="preserve">
+    <value>[工具执行失败]: {0}</value>
+  </data>
   <data name="EditorFindAllProgressFormat" xml:space="preserve">
     <value>正在查找：{0} / {1}</value>
   </data>

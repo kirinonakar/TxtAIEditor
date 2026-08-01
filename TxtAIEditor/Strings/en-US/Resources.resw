@@ -3498,6 +3498,9 @@ Plan: {0}</value>
   <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
     <value>[Tool execution]: {0}</value>
   </data>
+  <data name="AgentHistoryToolFailedFormat" xml:space="preserve">
+    <value>[Tool execution failed]: {0}</value>
+  </data>
   <data name="EditorFindAllProgressFormat" xml:space="preserve">
     <value>Finding: {0} / {1}</value>
   </data>

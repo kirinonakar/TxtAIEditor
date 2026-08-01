@@ -3462,6 +3462,9 @@
   <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
     <value>[ツール実行]: {0}</value>
   </data>
+  <data name="AgentHistoryToolFailedFormat" xml:space="preserve">
+    <value>[ツール実行失敗]: {0}</value>
+  </data>
   <data name="EditorFindAllProgressFormat" xml:space="preserve">
     <value>検索中: {0} / {1}</value>
   </data>

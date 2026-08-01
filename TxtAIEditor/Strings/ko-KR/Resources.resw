@@ -3498,6 +3498,9 @@
   <data name="AgentHistoryToolCompletedFormat" xml:space="preserve">
     <value>[도구 실행]: {0}</value>
   </data>
+  <data name="AgentHistoryToolFailedFormat" xml:space="preserve">
+    <value>[도구 실행 실패]: {0}</value>
+  </data>
   <data name="EditorFindAllProgressFormat" xml:space="preserve">
     <value>검색 중: {0} / {1}</value>
   </data>

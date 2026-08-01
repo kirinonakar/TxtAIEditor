@@ -261,6 +261,7 @@ namespace TxtAIEditor.Controls
             bool inPlanningModeTaskDetails = false;
             bool inRetainedThinking = false;
             var retainedThinking = new StringBuilder();
+            string? pendingToolResultToolName = null;
 
             void AppendThinkingSummary()
             {
@@ -275,8 +276,30 @@ namespace TxtAIEditor.Controls
                 retainedThinking.Clear();
             }
 
+            void FlushPendingToolResult(bool failed)
+            {
+                string toolName = pendingToolResultToolName ?? string.Empty;
+                pendingToolResultToolName = null;
+                if (string.IsNullOrEmpty(toolName))
+                {
+                    return;
+                }
+
+                string format = failed
+                    ? getString?.Invoke("AgentHistoryToolFailedFormat", "[도구 실행 실패]: {0}") ?? "[도구 실행 실패]: {0}"
+                    : getString?.Invoke("AgentHistoryToolCompletedFormat", "[도구 실행]: {0}") ?? "[도구 실행]: {0}";
+                result.AppendLine(string.Format(format, toolName));
+            }
+
             foreach (var line in lines)
             {
+                if (pendingToolResultToolName != null && IsHistorySectionBoundaryLine(line))
+                {
+                    // The tool result section ended without a readable body; keep the
+                    // previous completed-line behavior for that case.
+                    FlushPendingToolResult(false);
+                }
+
                 if (inRetainedThinking)
                 {
                     bool reachedThinkingBoundary =
@@ -431,10 +454,7 @@ namespace TxtAIEditor.Controls
                     string toolName = line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase)
                         ? line.Replace("[Tool result:", "").Replace("]", "").Trim()
                         : line.Substring("[tool:".Length, line.Length - "[tool:".Length - " result]".Length).Trim();
-                    string completedFormat = getString?.Invoke(
-                        "AgentHistoryToolCompletedFormat",
-                        "[도구 실행]: {0}") ?? "[도구 실행]: {0}";
-                    result.AppendLine(string.Format(completedFormat, toolName));
+                    pendingToolResultToolName = toolName;
                     continue;
                 }
                 else if (line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase) ||
@@ -494,13 +514,20 @@ namespace TxtAIEditor.Controls
                 }
                 else
                 {
-                    if (inToolResult &&
-                        (line.Contains(
-                            McpToolRateLimitException.ExaFreeMcpRateLimitMarker,
-                            StringComparison.OrdinalIgnoreCase) ||
-                         line.StartsWith("Approximately ", StringComparison.OrdinalIgnoreCase)))
+                    if (inToolResult)
                     {
-                        result.AppendLine(line);
+                        if (pendingToolResultToolName != null && !string.IsNullOrWhiteSpace(line))
+                        {
+                            FlushPendingToolResult(!AgentToolHelpers.IsSuccessfulToolResult(line));
+                        }
+
+                        if (line.Contains(
+                                McpToolRateLimitException.ExaFreeMcpRateLimitMarker,
+                                StringComparison.OrdinalIgnoreCase) ||
+                            line.StartsWith("Approximately ", StringComparison.OrdinalIgnoreCase))
+                        {
+                            result.AppendLine(line);
+                        }
                     }
                     else if (inToolCall && !toolCallSyntaxReached)
                     {
@@ -545,7 +572,32 @@ namespace TxtAIEditor.Controls
                 AppendThinkingSummary();
             }
 
+            if (pendingToolResultToolName != null)
+            {
+                FlushPendingToolResult(false);
+            }
+
             return result.ToString().TrimEnd();
+        }
+
+        private static bool IsHistorySectionBoundaryLine(string line)
+        {
+            return line.StartsWith("[assistant:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Retry detail:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[End retry detail]", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Previous Tool Call]:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Previous Response]:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[assistant: tool call]", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase) ||
+                (line.StartsWith("[tool:", StringComparison.OrdinalIgnoreCase) &&
+                    (line.EndsWith(" arguments]", StringComparison.OrdinalIgnoreCase) ||
+                     line.EndsWith(" result]", StringComparison.OrdinalIgnoreCase))) ||
+                line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[assistant: final answer]", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Planning-mode task]", StringComparison.OrdinalIgnoreCase);
         }
     }
 }
