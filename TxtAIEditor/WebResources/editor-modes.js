@@ -41,11 +41,8 @@ export class TextEditorMode extends EditorMode {
         super('text');
     }
 
-    usesFullDocumentRender() {
-        // Keep text editing virtualized at every document size. Rebuilding the
-        // full viewport DOM on every Enter makes each repeat slower and delays
-        // the keyup event behind increasingly expensive render tasks.
-        return false;
+    usesFullDocumentRender({ inlineLivePreviewEnabled, lineCount, fullDocumentLineLimit }) {
+        return !inlineLivePreviewEnabled && lineCount <= fullDocumentLineLimit;
     }
 }
 
