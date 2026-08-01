@@ -1811,6 +1811,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ExitStickyNoteText" xml:space="preserve">
     <value>Exit</value>
   </data>
+  <data name="StickyNoteDragTooltip" xml:space="preserve">
+    <value>Move window</value>
+  </data>
   <data name="TerminalExited" xml:space="preserve">
     <value>Terminal Exited</value>
   </data>

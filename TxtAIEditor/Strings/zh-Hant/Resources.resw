@@ -1811,6 +1811,9 @@
   <data name="ExitStickyNoteText" xml:space="preserve">
     <value>退出</value>
   </data>
+  <data name="StickyNoteDragTooltip" xml:space="preserve">
+    <value>移動視窗</value>
+  </data>
   <data name="TerminalExited" xml:space="preserve">
     <value>終端已退出</value>
   </data>

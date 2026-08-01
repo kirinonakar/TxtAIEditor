@@ -73,6 +73,7 @@ namespace TxtAIEditor.Controls
         public TabView EditorTabViewControl => EditorTabView;
         public TabView EditorTabView2Control => EditorTabView2;
         public StickyNoteBar StickyNoteBarControl => StickyNoteBar;
+        public Border StickyNoteDragHandleControl => StickyNoteDragHandle;
         public TerminalPane TerminalPaneControl => EnsureTerminalPane();
         private TerminalPane TerminalPane => EnsureTerminalPane();
 
@@ -408,8 +409,11 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(MoveTab2RightBtn, rightTooltip);
             ToolTipService.SetToolTip(OpenTabsListBtn, openTabsTooltip);
             ToolTipService.SetToolTip(OpenTabsList2Btn, openTabsTooltip);
+            string stickyNoteDragTooltip = getString("StickyNoteDragTooltip", "창 이동");
+            ToolTipService.SetToolTip(StickyNoteDragHandle, stickyNoteDragTooltip);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(OpenTabsListBtn, openTabsTooltip);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(OpenTabsList2Btn, openTabsTooltip);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(StickyNoteDragHandle, stickyNoteDragTooltip);
             StickyNoteBar.Localize(getString);
             _terminalPane?.Localize(getString);
         }

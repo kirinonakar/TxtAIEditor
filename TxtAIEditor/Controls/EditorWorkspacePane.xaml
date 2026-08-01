@@ -35,6 +35,25 @@
                          TabCloseRequested="OnEditorTabViewTabCloseRequested"
                          SelectionChanged="OnEditorTabViewSelectionChanged"
                          GotFocus="OnTabViewGotFocus">
+                    <TabView.TabStripHeader>
+                        <Border x:Name="StickyNoteDragHandle"
+                                Width="24"
+                                Height="24"
+                                Margin="4,0,4,0"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource TitleBarBackgroundBrush}"
+                                BorderBrush="{ThemeResource ToolbarBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Visibility="Collapsed">
+                            <FontIcon Glyph="&#xE109;"
+                                      FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                      FontSize="16"
+                                      Foreground="{ThemeResource TitleBarForegroundBrush}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                        </Border>
+                    </TabView.TabStripHeader>
                     <TabView.TabItems>
                         <!-- Dynamic tabs go here -->
                     </TabView.TabItems>

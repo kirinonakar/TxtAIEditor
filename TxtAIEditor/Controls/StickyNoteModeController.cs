@@ -1,18 +1,25 @@
+using System;
+using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Windowing;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Services;
+using Windows.Graphics;
+using WinRT.Interop;
 
 namespace TxtAIEditor.Controls
 {
     public sealed class StickyNoteModeController
     {
         private readonly Window _window;
+        private readonly IntPtr _windowHandle;
         private readonly UIElement _normalTitleBar;
         private readonly RowDefinition _titleBarRow;
         private readonly StickyNoteBar _stickyNoteBar;
+        private readonly UIElement _stickyNoteDragHandle;
         private readonly TopCommandBarPane _topToolbar;
         private readonly FrameworkElement _markdownToolbar;
         private readonly FrameworkElement _statusBar;
@@ -30,12 +37,17 @@ namespace TxtAIEditor.Controls
         private bool _restorePresenterTitleBar = true;
         private bool _restorePresenterBorder = true;
         private bool _restoreExtendsContentIntoTitleBar = true;
+        private bool _isDraggingWindow;
+        private uint _dragPointerId;
+        private PointInt32 _dragStartWindowPosition;
+        private ScreenPoint _dragStartCursorPosition;
 
         public StickyNoteModeController(
             Window window,
             UIElement normalTitleBar,
             RowDefinition titleBarRow,
             StickyNoteBar stickyNoteBar,
+            UIElement stickyNoteDragHandle,
             TopCommandBarPane topToolbar,
             FrameworkElement markdownToolbar,
             FrameworkElement statusBar,
@@ -46,9 +58,11 @@ namespace TxtAIEditor.Controls
             System.Action<bool> applyPreviewVisibility)
         {
             _window = window;
+            _windowHandle = WindowNative.GetWindowHandle(window);
             _normalTitleBar = normalTitleBar;
             _titleBarRow = titleBarRow;
             _stickyNoteBar = stickyNoteBar;
+            _stickyNoteDragHandle = stickyNoteDragHandle;
             _topToolbar = topToolbar;
             _markdownToolbar = markdownToolbar;
             _statusBar = statusBar;
@@ -60,6 +74,10 @@ namespace TxtAIEditor.Controls
 
             _stickyNoteBar.ExitClick += (_, _) => Exit();
             _stickyNoteBar.TopMostClick += (_, _) => ApplyTopMostFromStickyBar();
+            _stickyNoteDragHandle.PointerPressed += OnDragHandlePointerPressed;
+            _stickyNoteDragHandle.PointerMoved += OnDragHandlePointerMoved;
+            _stickyNoteDragHandle.PointerReleased += OnDragHandlePointerReleased;
+            _stickyNoteDragHandle.PointerCaptureLost += OnDragHandlePointerCaptureLost;
         }
 
         public void ApplyTopMostFromToolbar()
@@ -104,6 +122,7 @@ namespace TxtAIEditor.Controls
             _normalTitleBar.Visibility = Visibility.Collapsed;
             _titleBarRow.Height = new GridLength(0);
             _stickyNoteBar.Visibility = Visibility.Visible;
+            _stickyNoteDragHandle.Visibility = Visibility.Visible;
             _window.SetTitleBar(null);
             _window.ExtendsContentIntoTitleBar = false;
             ApplyPresenterChromeVisible(false);
@@ -124,11 +143,13 @@ namespace TxtAIEditor.Controls
             }
 
             _isActive = false;
+            StopWindowDrag();
             bool topMost = _stickyNoteBar.TopMostIsChecked;
             _topToolbar.TopMostIsChecked = topMost;
             _stickyNoteService.ApplyTopMost(_window, topMost);
 
             _stickyNoteBar.Visibility = Visibility.Collapsed;
+            _stickyNoteDragHandle.Visibility = Visibility.Collapsed;
             _titleBarRow.Height = _normalTitleBarHeight;
             _normalTitleBar.Visibility = Visibility.Visible;
             ApplyPresenterChromeVisible(true);
@@ -157,6 +178,87 @@ namespace TxtAIEditor.Controls
             _stickyNoteBar.TopMostIsChecked = topMost;
         }
 
+        private void OnDragHandlePointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (!_isActive || _isDraggingWindow)
+            {
+                return;
+            }
+
+            var point = e.GetCurrentPoint(_stickyNoteDragHandle);
+            if (!point.Properties.IsLeftButtonPressed || !GetCursorPos(out ScreenPoint cursorPosition))
+            {
+                return;
+            }
+
+            _dragPointerId = e.Pointer.PointerId;
+            _dragStartCursorPosition = cursorPosition;
+            if (!GetWindowRect(_windowHandle, out WindowRect windowRect))
+            {
+                return;
+            }
+
+            _dragStartWindowPosition = new PointInt32(windowRect.Left, windowRect.Top);
+            _isDraggingWindow = _stickyNoteDragHandle.CapturePointer(e.Pointer);
+            e.Handled = _isDraggingWindow;
+        }
+
+        private void OnDragHandlePointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            if (!_isDraggingWindow || e.Pointer.PointerId != _dragPointerId || !GetCursorPos(out ScreenPoint cursorPosition))
+            {
+                return;
+            }
+
+            var newPosition = new PointInt32(
+                _dragStartWindowPosition.X + cursorPosition.X - _dragStartCursorPosition.X,
+                _dragStartWindowPosition.Y + cursorPosition.Y - _dragStartCursorPosition.Y);
+
+            if (!SetWindowPos(
+                    _windowHandle,
+                    IntPtr.Zero,
+                    newPosition.X,
+                    newPosition.Y,
+                    0,
+                    0,
+                    SetWindowPosNoSize | SetWindowPosNoZOrder | SetWindowPosNoActivate))
+            {
+                System.Diagnostics.Debug.WriteLine("Failed to move sticky note window.");
+            }
+
+            e.Handled = true;
+        }
+
+        private void OnDragHandlePointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            if (!_isDraggingWindow || e.Pointer.PointerId != _dragPointerId)
+            {
+                return;
+            }
+
+            StopWindowDrag(e);
+            e.Handled = true;
+        }
+
+        private void OnDragHandlePointerCaptureLost(object sender, PointerRoutedEventArgs e)
+        {
+            StopWindowDrag();
+        }
+
+        private void StopWindowDrag(PointerRoutedEventArgs? args = null)
+        {
+            if (!_isDraggingWindow)
+            {
+                return;
+            }
+
+            _isDraggingWindow = false;
+            if (args != null)
+            {
+                _stickyNoteDragHandle.ReleasePointerCapture(args.Pointer);
+            }
+        }
+
         private void ApplyPresenterChromeVisible(bool visible)
         {
             if (_window.AppWindow.Presenter is not OverlappedPresenter presenter)
@@ -173,6 +275,42 @@ namespace TxtAIEditor.Controls
             }
 
             presenter.SetBorderAndTitleBar(_restorePresenterBorder, _restorePresenterTitleBar);
+        }
+
+        private const uint SetWindowPosNoSize = 0x0001;
+        private const uint SetWindowPosNoZOrder = 0x0004;
+        private const uint SetWindowPosNoActivate = 0x0010;
+
+        [DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out ScreenPoint point);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr window, out WindowRect rect);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetWindowPos(
+            IntPtr window,
+            IntPtr insertAfter,
+            int x,
+            int y,
+            int width,
+            int height,
+            uint flags);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ScreenPoint
+        {
+            public int X;
+            public int Y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WindowRect
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
         }
     }
 }

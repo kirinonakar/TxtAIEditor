@@ -1811,6 +1811,9 @@
   <data name="ExitStickyNoteText" xml:space="preserve">
     <value>나가기</value>
   </data>
+  <data name="StickyNoteDragTooltip" xml:space="preserve">
+    <value>창 이동</value>
+  </data>
   <data name="TerminalExited" xml:space="preserve">
     <value>터미널 종료</value>
   </data>
