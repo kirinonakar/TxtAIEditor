@@ -674,7 +674,6 @@ namespace TxtAIEditor.Core.Services
         {
             return table.Descendants().Any(element =>
                 element.Name.LocalName is "drawing" or "pict" ||
-                element.Name.LocalName is "shd" or "tblBorders" or "tcBorders" or "gridSpan" or "hMerge" or "vMerge" ||
                 (element.Name.LocalName == "t" && !string.IsNullOrWhiteSpace(element.Value)));
         }
 

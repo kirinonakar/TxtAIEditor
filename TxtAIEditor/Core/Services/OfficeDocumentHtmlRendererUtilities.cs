@@ -77,7 +77,7 @@ body { padding: 28px 16px 44px; }
 }
 .doc-table td {
     min-width: 72px;
-    border: 1px solid var(--line);
+    border: 0;
     padding: 8px 10px;
     vertical-align: top;
     overflow-wrap: anywhere;
