@@ -93,12 +93,18 @@ namespace TxtAIEditor.Composition
                 _settingsService,
                 Composition.ShellPanelLayout);
 
-        public Task SaveUiLayoutSettingsAsync() =>
-            MainWindowLayoutOperations.SaveUiLayoutSettingsAsync(
+        public Task SaveUiLayoutSettingsAsync()
+        {
+            bool stickyNoteModeActive = Composition.StickyNoteMode.IsActive;
+            Composition.StickyNoteMode.CaptureCurrentWindowSizeForPersistence();
+
+            return MainWindowLayoutOperations.SaveUiLayoutSettingsAsync(
                 _appWindow,
                 _settingsService,
                 _editorWorkspace,
-                Composition.ShellPanelLayout);
+                Composition.ShellPanelLayout,
+                captureWindowPlacement: !stickyNoteModeActive);
+        }
 
         public void ApplySavedPanelWidths(EditorSettings settings) =>
             Composition.ShellPanelLayout.ApplySavedPanelWidths(

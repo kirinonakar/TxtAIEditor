@@ -14,12 +14,16 @@ namespace TxtAIEditor.Composition
             AppWindow appWindow,
             ISettingsService settingsService,
             EditorWorkspacePane editorWorkspace,
-            ShellPanelLayoutService shellPanelLayout)
+            ShellPanelLayoutService shellPanelLayout,
+            bool captureWindowPlacement = true)
         {
             try
             {
                 var settings = settingsService.CurrentSettings;
-                WindowPlacementService.CaptureRestoredWindowPlacement(appWindow, settings);
+                if (captureWindowPlacement)
+                {
+                    WindowPlacementService.CaptureRestoredWindowPlacement(appWindow, settings);
+                }
                 settings.TerminalPanelHeight = editorWorkspace.PersistedTerminalPanelHeight;
                 settings.LeftSidebarVisible = shellPanelLayout.IsLeftSidebarVisible;
                 settings.RightSidebarVisible = shellPanelLayout.IsRightSidebarVisible;

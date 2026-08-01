@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -26,6 +27,7 @@ namespace TxtAIEditor.Controls
         private readonly ShellPanelLayoutService _shellPanelLayoutService;
         private readonly ToggleButton _leftPanelToggle;
         private readonly IStickyNoteService _stickyNoteService;
+        private readonly ISettingsService _settingsService;
         private readonly System.Action<bool> _applyLeftSidebarVisibility;
         private readonly System.Action<bool> _applyPreviewVisibility;
 
@@ -37,6 +39,9 @@ namespace TxtAIEditor.Controls
         private bool _restorePresenterTitleBar = true;
         private bool _restorePresenterBorder = true;
         private bool _restoreExtendsContentIntoTitleBar = true;
+        private SizeInt32 _normalWindowSize;
+        private bool _hasNormalWindowSize;
+        private bool _wasWindowMaximized;
         private bool _isDraggingWindow;
         private uint _dragPointerId;
         private PointInt32 _dragStartWindowPosition;
@@ -54,6 +59,7 @@ namespace TxtAIEditor.Controls
             ShellPanelLayoutService shellPanelLayoutService,
             ToggleButton leftPanelToggle,
             IStickyNoteService stickyNoteService,
+            ISettingsService settingsService,
             System.Action<bool> applyLeftSidebarVisibility,
             System.Action<bool> applyPreviewVisibility)
         {
@@ -69,6 +75,7 @@ namespace TxtAIEditor.Controls
             _shellPanelLayoutService = shellPanelLayoutService;
             _leftPanelToggle = leftPanelToggle;
             _stickyNoteService = stickyNoteService;
+            _settingsService = settingsService;
             _applyLeftSidebarVisibility = applyLeftSidebarVisibility;
             _applyPreviewVisibility = applyPreviewVisibility;
 
@@ -78,6 +85,18 @@ namespace TxtAIEditor.Controls
             _stickyNoteDragHandle.PointerMoved += OnDragHandlePointerMoved;
             _stickyNoteDragHandle.PointerReleased += OnDragHandlePointerReleased;
             _stickyNoteDragHandle.PointerCaptureLost += OnDragHandlePointerCaptureLost;
+        }
+
+        public bool IsActive => _isActive;
+
+        public void CaptureCurrentWindowSizeForPersistence()
+        {
+            if (!_isActive)
+            {
+                return;
+            }
+
+            CaptureStickyNoteWindowSize();
         }
 
         public void ApplyTopMostFromToolbar()
@@ -111,6 +130,14 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            _wasWindowMaximized = (_window.AppWindow.Presenter as OverlappedPresenter)?.State == OverlappedPresenterState.Maximized;
+            if (_wasWindowMaximized && _window.AppWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.Restore();
+            }
+
+            _normalWindowSize = _window.AppWindow.Size;
+            _hasNormalWindowSize = IsUsableWindowSize(_normalWindowSize);
             _isActive = true;
             _wasLeftSidebarVisible = _shellPanelLayoutService.IsLeftSidebarVisible;
             _wasRightSidebarVisible = _shellPanelLayoutService.IsRightSidebarVisible;
@@ -133,6 +160,7 @@ namespace TxtAIEditor.Controls
 
             _shellPanelLayoutService.ApplyLeftSidebarVisibility(false);
             _shellPanelLayoutService.ApplyPreviewVisibility(false);
+            ResizeWindow(GetStickyNoteWindowSize());
         }
 
         private void Exit()
@@ -140,6 +168,13 @@ namespace TxtAIEditor.Controls
             if (!_isActive)
             {
                 return;
+            }
+
+            CaptureCurrentWindowSizeForPersistence();
+            if (_window.AppWindow.Presenter is OverlappedPresenter currentPresenter &&
+                currentPresenter.State == OverlappedPresenterState.Maximized)
+            {
+                currentPresenter.Restore();
             }
 
             _isActive = false;
@@ -163,7 +198,87 @@ namespace TxtAIEditor.Controls
             _leftPanelToggle.IsChecked = _wasLeftSidebarVisible;
             _applyLeftSidebarVisibility(_wasLeftSidebarVisible);
             _applyPreviewVisibility(_wasRightSidebarVisible);
+
+            if (_hasNormalWindowSize)
+            {
+                ResizeWindow(_normalWindowSize);
+            }
+
+            if (_wasWindowMaximized && _window.AppWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.Maximize();
+            }
+
+            _wasWindowMaximized = false;
+            PersistSettings();
         }
+
+        private SizeInt32 GetStickyNoteWindowSize()
+        {
+            var settings = _settingsService.CurrentSettings;
+            if (settings.StickyNoteWindowWidth > 0 && settings.StickyNoteWindowHeight > 0)
+            {
+                return new SizeInt32(settings.StickyNoteWindowWidth, settings.StickyNoteWindowHeight);
+            }
+
+            return _hasNormalWindowSize ? _normalWindowSize : _window.AppWindow.Size;
+        }
+
+        private void CaptureStickyNoteWindowSize()
+        {
+            var presenter = _window.AppWindow.Presenter as OverlappedPresenter;
+            bool isRestored = presenter == null || presenter.State == OverlappedPresenterState.Restored;
+            var currentSize = _window.AppWindow.Size;
+            if (isRestored && IsUsableWindowSize(currentSize))
+            {
+                var settings = _settingsService.CurrentSettings;
+                settings.StickyNoteWindowWidth = currentSize.Width;
+                settings.StickyNoteWindowHeight = currentSize.Height;
+            }
+
+            if (_hasNormalWindowSize)
+            {
+                var settings = _settingsService.CurrentSettings;
+                settings.WindowWidth = _normalWindowSize.Width;
+                settings.WindowHeight = _normalWindowSize.Height;
+            }
+        }
+
+        private void ResizeWindow(SizeInt32 size)
+        {
+            if (!IsUsableWindowSize(size))
+            {
+                return;
+            }
+
+            try
+            {
+                _window.AppWindow.Resize(size);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to resize sticky note window: {ex.Message}");
+            }
+        }
+
+        private void PersistSettings()
+        {
+            _ = PersistSettingsAsync();
+        }
+
+        private async Task PersistSettingsAsync()
+        {
+            try
+            {
+                await _settingsService.SaveSettingsAsync(_settingsService.CurrentSettings);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to save sticky note window size: {ex.Message}");
+            }
+        }
+
+        private static bool IsUsableWindowSize(SizeInt32 size) => size.Width > 0 && size.Height > 0;
 
         private void ApplyTopMostFromStickyBar()
         {

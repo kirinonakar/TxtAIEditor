@@ -49,6 +49,8 @@ namespace TxtAIEditor.Core.Models
         public int WindowY { get; set; } = -1;
         public int WindowWidth { get; set; } = DefaultWindowWidth;
         public int WindowHeight { get; set; } = DefaultWindowHeight;
+        public int StickyNoteWindowWidth { get; set; }
+        public int StickyNoteWindowHeight { get; set; }
         public double TerminalPanelHeight { get; set; } = 220;
         public string TerminalProfile { get; set; } = "PowerShell";
         public string TerminalFontFamily { get; set; } = "Consolas";

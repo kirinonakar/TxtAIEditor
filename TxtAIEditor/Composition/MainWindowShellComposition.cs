@@ -101,6 +101,7 @@ namespace TxtAIEditor.Composition
                 shellPanelLayout,
                 ui.StatusBar.LeftPanelToggleButton,
                 shellServices.StickyNoteService,
+                commonServices.SettingsService,
                 callbacks.ApplyLeftSidebarVisibility,
                 callbacks.ApplyPreviewVisibility);
 
