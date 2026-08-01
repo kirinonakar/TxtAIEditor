@@ -1,5 +1,6 @@
 import {
     compressedScrollMetrics,
+    imeController,
     lineHeightFor,
     lineAt,
     lineTop,
@@ -137,7 +138,7 @@ function compositionSelectionRange(includeNativeSelection = true) {
         return customSelection;
     }
 
-    if (!includeNativeSelection || state.isComposing) {
+    if (!includeNativeSelection || imeController.isComposing) {
         return null;
     }
 

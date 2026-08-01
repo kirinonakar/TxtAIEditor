@@ -4,6 +4,7 @@ import {
     applyEditResultFromHost,
     clearMeasuredLineHeights,
     cleanDirtyMarker,
+    imeController,
     markDirty,
     post,
     queueRender,
@@ -64,10 +65,7 @@ function syncRenderedDirtyLineClasses() {
 let pendingModelResynchronization = null;
 
 function isImeCompositionActive() {
-    return !!(
-        state.isComposing ||
-        state.rangeComposition ||
-        state.columnComposition);
+    return imeController.isCompositionActive;
 }
 
 function applyModelInitialization(msg) {
@@ -274,7 +272,7 @@ export function createHostMessageHandler({
             break;
         case 'setText':
             {
-                if (state.isComposing) {
+                if (imeController.isComposing) {
                     break;
                 }
                 const incomingVersion = Number(msg.documentVersion);
@@ -301,7 +299,7 @@ export function createHostMessageHandler({
                 queueRender(true);
                 if (msg.shouldFocus !== false) {
                     setTimeout(() => {
-                        if (!state.isComposing && !state.textareaImeBypassActive) {
+                        if (!imeController.isComposing && !imeController.textareaBypassActive) {
                             focusLine(targetLine, targetCol);
                         }
                     }, 20);
@@ -348,7 +346,7 @@ export function createHostMessageHandler({
             break;
         case 'applyLineReplacements':
             {
-                if (state.isComposing || !canApplyLinePatchBatch(msg)) break;
+                if (imeController.isComposing || !canApplyLinePatchBatch(msg)) break;
                 const replacements = Array.isArray(msg.replacements) ? msg.replacements : [];
                 for (const replacement of replacements) {
                     const lineNumber = Math.max(1, Number(replacement?.lineNumber || 1));
@@ -382,7 +380,7 @@ export function createHostMessageHandler({
                     receivedEnd >= state.renderedRangeStart &&
                     receivedStart <= state.renderedRangeEnd;
                 runPendingLineActions();
-                if (!state.isComposing && (touchesRenderedRange || isJsonCsvTableMode())) {
+                if (!imeController.isComposing && (touchesRenderedRange || isJsonCsvTableMode())) {
                     queueRender(true);
                 }
             }
@@ -404,7 +402,7 @@ export function createHostMessageHandler({
                 if (state.language !== nextLanguage) {
                     state.language = nextLanguage;
                     syncLanguageClass();
-                    state.lineEndStacks.clear();
+                    state.cache.clearDerivedContexts();
                     if (state.inlineLivePreviewEnabled && !isFullDocumentLivePreviewLanguage(state.language)) {
                         void ensureInlinePreviewDependencies?.();
                     }
@@ -436,7 +434,7 @@ export function createHostMessageHandler({
                     const element = document.getElementById(id);
                     if (element) element.disabled = locked;
                 }
-                if (!state.isComposing) {
+                if (!imeController.isComposing) {
                     queueRender(true);
                 }
             }

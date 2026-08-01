@@ -1,5 +1,12 @@
 import { contextMenu, scrollContainer, viewport, virtualSpacer } from './editor-dom.js';
-import { ImePhase } from './editor-ime-state.js';
+import { EditorDocumentCache } from './editor-document-cache.js';
+import { ImeController } from './editor-ime-state.js';
+import {
+    CsvTableMode,
+    EditorModeCoordinator,
+    HexEditorMode,
+    TextEditorMode
+} from './editor-modes.js';
 
 const MAX_RENDER_CHARS = 20000;
 const MIN_BATCH_SIZE = 100;
@@ -27,11 +34,24 @@ function configureEditorCoreRuntime(deps) {
     Object.assign(runtime, deps || {});
 }
 
+const documentCache = new EditorDocumentCache();
+const imeController = new ImeController({
+    onRangeCompositionCleared: () => document.body.classList.remove('range-composition-active')
+});
+const modeCoordinator = new EditorModeCoordinator({
+    textMode: new TextEditorMode(),
+    hexMode: new HexEditorMode({
+        renderOverscan: HEX_RENDER_OVERSCAN,
+        prefetchAhead: HEX_PREFETCH_AHEAD
+    }),
+    csvMode: new CsvTableMode()
+});
+
 const state = {
     lineCount: 1,
     lineHeight: 22,
     overscan: 80,
-    cache: new Map(),
+    cache: documentCache,
     pending: new Set(),
     lineHeights: new Map(),
     lineHeightIndex: null,
@@ -94,18 +114,6 @@ const state = {
     dragSelectionData: null,
     dragDropPosition: null,
     isDragCopy: false,
-    imePhase: ImePhase.Idle,
-    isComposing: false,
-    compositionLine: null,
-    rangeComposition: null,
-    preparedRangeCompositionLine: null,
-    columnComposition: null,
-    pendingImeVerticalNavigation: null,
-    pendingImeSelectionCollapse: null,
-    textareaImeBypassActive: false,
-    bypassStartLine: null,
-    bypassCursorLine: null,
-    bypassCursorColumn: null,
     isSplitView: false,
     suppressNextBeforeInputType: null,
     lastManualDeleteAt: 0,
@@ -113,78 +121,16 @@ const state = {
     lastDeleteKeyDown: null,
     pendingColumnTextInputs: [],
     preservedScrollTop: null,
-    repeatEdit: {
-        lastRunAt: 0,
-        timer: 0,
-        pending: null,
-        continuousTimer: 0,
-        continuousKey: null,
-        hasContinuousRun: false,
-        hasPhysicalRepeatSignal: false,
-        lastKeyDownAt: 0,
-        keyDownSilenceMs: 350,
-        continuousInitialDelayMs: 140,
-        intervalMs: 32,
-        lineBoundaryHoldMs: 65,
-        lineBoundaryUntil: 0,
-        releaseGuardMs: 250,
-        releasedKeys: new Map(),
-        suppressBeforeInputUntil: 0,
-        suppressBeforeInputTypes: new Set()
-    },
     dirtyLines: new Map(),
     csvVirtualLineCount: 0,
     longLineProtectionFormat: '... too long ({0} characters total)'
 };
 
-state.lineEndStacks = new Map();
-state.htmlLineEndContexts = new Map();
-
-const originalSet = state.cache.set;
-state.cache.set = function(key, value) {
-    originalSet.call(state.cache, key, value);
-    invalidateLineEndStacks(key);
-    invalidateHtmlLineEndContexts(key);
-    return this;
-};
-const originalDelete = state.cache.delete;
-state.cache.delete = function(key) {
-    const res = originalDelete.call(state.cache, key);
-    invalidateLineEndStacks(key);
-    invalidateHtmlLineEndContexts(key);
-    return res;
-};
-const originalClear = state.cache.clear;
-state.cache.clear = function() {
-    originalClear.call(state.cache);
-    if (state.lineEndStacks) state.lineEndStacks.clear();
-    if (state.htmlLineEndContexts) state.htmlLineEndContexts.clear();
-};
-
-function invalidateLineEndStacks(startLine) {
-    if (!state.lineEndStacks || state.lineEndStacks.size === 0) return;
-    if (startLine <= 1) {
-        state.lineEndStacks.clear();
-        return;
-    }
-    for (const key of state.lineEndStacks.keys()) {
-        if (key >= startLine) {
-            state.lineEndStacks.delete(key);
-        }
-    }
-}
-
-function invalidateHtmlLineEndContexts(startLine) {
-    if (!state.htmlLineEndContexts || state.htmlLineEndContexts.size === 0) return;
-    if (startLine <= 1) {
-        state.htmlLineEndContexts.clear();
-        return;
-    }
-    for (const key of state.htmlLineEndContexts.keys()) {
-        if (key >= startLine) {
-            state.htmlLineEndContexts.delete(key);
-        }
-    }
+function activeEditorMode() {
+    return modeCoordinator.resolve({
+        language: state.language,
+        csvTableEnabled: state.csvTableEnabled
+    });
 }
 
 function post(msg) {
@@ -588,8 +534,8 @@ function receiveLineBlock(startLine, lines) {
     let changed = false;
     for (let i = 0; i < safeLines.length; i++) {
         const lineNumber = start + i;
-        if ((state.isComposing && (!state.compositionLine || state.compositionLine === lineNumber)) ||
-            (state.isComposing && runtime.isLineInColumnComposition(lineNumber)) ||
+        if ((imeController.isComposing && (!imeController.compositionLine || imeController.compositionLine === lineNumber)) ||
+            (imeController.isComposing && runtime.isLineInColumnComposition(lineNumber)) ||
             (state.inlineLivePreviewEnabled && state.inlineLivePreviewSourceLine === lineNumber) ||
             (document.hasFocus() && state.editingLine === lineNumber &&
                 document.activeElement?.closest?.('.line-text')?.dataset.line === String(lineNumber))) {
@@ -616,9 +562,9 @@ function updateLineFromHost(lineNumber, text, isComposing = false) {
     const line = Number(lineNumber || 1);
     if (!line || line < 1) return false;
 
-    if ((state.isComposing && (!state.compositionLine || state.compositionLine === line)) ||
-        (state.textareaImeBypassActive && state.bypassStartLine === line) ||
-        (state.isComposing && runtime.isLineInColumnComposition(line)) ||
+    if ((imeController.isComposing && (!imeController.compositionLine || imeController.compositionLine === line)) ||
+        (imeController.textareaBypassActive && imeController.bypassStartLine === line) ||
+        (imeController.isComposing && runtime.isLineInColumnComposition(line)) ||
         (state.inlineLivePreviewEnabled && state.inlineLivePreviewSourceLine === line)) {
         return false;
     }
@@ -650,7 +596,7 @@ function updateLineFromHost(lineNumber, text, isComposing = false) {
         measureRenderedRows(false);
     }
 
-    if (!state.isComposing && !isComposing) {
+    if (!imeController.isComposing && !isComposing) {
         queueRender();
     } else {
         runtime.drawEditableSelectionOverlays();
@@ -660,7 +606,7 @@ function updateLineFromHost(lineNumber, text, isComposing = false) {
 }
 
 function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCount, caret = null) {
-    if (state.isComposing || state.textareaImeBypassActive) {
+    if (imeController.isComposing || imeController.textareaBypassActive) {
         return false;
     }
 
@@ -727,7 +673,7 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
         const caretLine = Math.min(state.lineCount, Math.max(1, Number(caret.line)));
         const caretColumn = Math.max(0, Number(caret.column || 1) - 1);
         setTimeout(() => {
-            if (document.hasFocus() && !state.isComposing && !state.textareaImeBypassActive) {
+            if (document.hasFocus() && !imeController.isComposing && !imeController.textareaBypassActive) {
                 runtime.focusLine(caretLine, caretColumn);
             }
         }, 20);
@@ -735,7 +681,7 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
         const caretLine = Math.min(state.lineCount, Math.max(1, Number(savedCaretLine)));
         const caretColumn = Math.max(0, Number(savedCaretColumn || 1) - 1);
         setTimeout(() => {
-            if (document.hasFocus() && !state.isComposing && !state.textareaImeBypassActive) {
+            if (document.hasFocus() && !imeController.isComposing && !imeController.textareaBypassActive) {
                 runtime.focusLine(caretLine, caretColumn);
             }
         }, 20);
@@ -1037,14 +983,14 @@ function visibleRange() {
     const firstVisible = lineAt(scrollContainer.scrollTop);
     if (usesCompressedScroll()) {
         const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight) + 1);
-        const overscan = state.language === 'hex' ? HEX_RENDER_OVERSCAN : state.overscan;
+        const overscan = activeEditorMode().renderOverscan({ defaultOverscan: state.overscan });
         const start = Math.max(1, firstVisible - overscan);
         const end = Math.min(lineCount, firstVisible + visibleRows + overscan);
         return { start, end, count: Math.max(0, end - start + 1) };
     }
 
     const lastVisible = lineAt(scrollContainer.scrollTop + viewHeight);
-    const overscan = state.language === 'hex' ? HEX_RENDER_OVERSCAN : state.overscan;
+    const overscan = activeEditorMode().renderOverscan({ defaultOverscan: state.overscan });
     const windowStep = Math.max(1, Math.floor(overscan / 2));
     const windowAnchor = Math.floor((firstVisible - 1) / windowStep) * windowStep + 1;
     const visibleLineCount = Math.max(1, lastVisible - firstVisible + 1);
@@ -1054,14 +1000,15 @@ function visibleRange() {
 }
 
 function usesFullDocumentRender() {
-    return !state.csvTableEnabled &&
-        !state.inlineLivePreviewEnabled &&
-        state.language !== 'hex' &&
-        effectiveLineCount() <= FULL_DOCUMENT_RENDER_LINE_LIMIT;
+    return activeEditorMode().usesFullDocumentRender({
+        inlineLivePreviewEnabled: state.inlineLivePreviewEnabled,
+        lineCount: effectiveLineCount(),
+        fullDocumentLineLimit: FULL_DOCUMENT_RENDER_LINE_LIMIT
+    });
 }
 
 function usesCompressedScroll() {
-    return !state.csvTableEnabled &&
+    return activeEditorMode().allowsCompressedScroll() &&
         rawTotalVirtualHeight() > BROWSER_SCROLL_HEIGHT_LIMIT;
 }
 
@@ -1095,11 +1042,10 @@ function viewportTopForLine(startLine) {
 }
 
 function effectiveLineCount() {
-    if (state.csvTableEnabled && Number(state.csvVirtualLineCount || 0) > 0) {
-        return Math.max(1, Number(state.csvVirtualLineCount || 1));
-    }
-
-    return Math.max(1, state.lineCount);
+    return activeEditorMode().effectiveLineCount({
+        sourceLineCount: state.lineCount,
+        csvVirtualLineCount: state.csvVirtualLineCount
+    });
 }
 
 function requestLines(start, count) {
@@ -1166,7 +1112,7 @@ function requestMissingLines(start, end) {
 function prefetchAround(scrollTop) {
     const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
     const firstVisible = lineAt(scrollTop);
-    const prefetchAhead = state.language === 'hex' ? HEX_PREFETCH_AHEAD : PREFETCH_AHEAD;
+    const prefetchAhead = activeEditorMode().prefetchAhead({ defaultPrefetchAhead: PREFETCH_AHEAD });
     if (usesCompressedScroll()) {
         const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight) + 1);
         const prefetchStart = Math.max(1, firstVisible - prefetchAhead);
@@ -1232,7 +1178,7 @@ function restoreScrollAnchor(anchor) {
 }
 
 function trimHexCacheToRange(startLine, endLine) {
-    if (state.language !== 'hex' || state.cache.size <= HEX_CACHE_RETAIN_LINES) return;
+    if (!activeEditorMode().shouldTrimDocumentCache() || state.cache.size <= HEX_CACHE_RETAIN_LINES) return;
 
     const keepRanges = [{
         start: Math.max(1, Number(startLine || 1) - HEX_PREFETCH_AHEAD),
@@ -1455,10 +1401,13 @@ function reportCursorAndSelection(
 }
 
 function selectionInfo() {
-    if (state.language === 'hex') {
-        return hexSelectionInfo();
-    }
+    return activeEditorMode().selectionInfo({
+        hexSelectionInfo,
+        textSelectionInfo
+    });
+}
 
+function textSelectionInfo() {
     const selection = runtime.normalizeSelection();
     if (selection && runtime.hasCustomSelection()) {
         return selectionTextFromModel(selection);
@@ -1468,10 +1417,13 @@ function selectionInfo() {
 }
 
 function selectedText() {
-    if (state.language === 'hex') {
-        return hexSelectedText();
-    }
+    return activeEditorMode().selectedText({
+        hexSelectedText,
+        textSelectedText
+    });
+}
 
+function textSelectedText() {
     const selection = runtime.normalizeSelection();
     if (selection && runtime.hasCustomSelection()) {
         return selectionTextFromModel(selection).text;
@@ -1618,7 +1570,7 @@ function activeEditableElement() {
 
 function isPlainTextKey(event) {
     if (!event || event.ctrlKey || event.metaKey || event.altKey) return false;
-    if (event.isComposing || state.isComposing || event.key === 'Process' || event.keyCode === 229) return false;
+    if (event.isComposing || imeController.isComposing || event.key === 'Process' || event.keyCode === 229) return false;
     if (containsHangulInputText(event.key)) return false;
     return typeof event.key === 'string' && event.key.length === 1;
 }
@@ -1629,7 +1581,7 @@ function containsHangulInputText(value) {
 
 function isHangulImeKeyEvent(event) {
     if (!event || event.ctrlKey || event.metaKey || event.altKey) return false;
-    return !!(event.isComposing || state.isComposing ||
+    return !!(event.isComposing || imeController.isComposing ||
         event.key === 'Process' || event.keyCode === 229 ||
         containsHangulInputText(event.key));
 }
@@ -1637,8 +1589,8 @@ function isHangulImeKeyEvent(event) {
 function syncCustomSelectionClass() {
     const hasSelection = runtime.hasCustomSelection();
     document.body.classList.toggle('custom-selection-active', hasSelection);
-    if (!hasSelection && !state.rangeComposition?.deferred) {
-        state.preparedRangeCompositionLine = null;
+    if (!hasSelection && !imeController.rangeComposition?.deferred) {
+        imeController.preparedRangeCompositionLine = null;
         document.body.classList.remove('range-composition-active');
     }
 }
@@ -1812,6 +1764,7 @@ export {
     graphemeDeleteEnd,
     graphemeDeleteStart,
     hasTextAt,
+    imeController,
     isHangulImeKeyEvent,
     isPlainTextKey,
     isStandaloneDelimiter,

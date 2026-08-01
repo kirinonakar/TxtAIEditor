@@ -5,6 +5,7 @@ import {
 import {
     activeEditableElement,
     clearCustomSelectionVisuals,
+    imeController,
     isHangulImeKeyEvent,
     isPlainTextKey,
     lineTop,
@@ -249,7 +250,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
         syncCustomSelectionClass();
         queueRender(true);
         setTimeout(() => {
-            if (!state.isComposing && !state.textareaImeBypassActive) {
+            if (!imeController.isComposing && !imeController.textareaBypassActive) {
                 focusLine(caretLine, caretColumn);
             }
         }, 0);
@@ -261,7 +262,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
         event.stopImmediatePropagation();
         hideAutocomplete(700);
 
-        if (state.isComposing) {
+        if (imeController.isComposing) {
             return;
         }
 
@@ -438,20 +439,20 @@ export function bindKeyboardEvents({ openFindPanel }) {
             const verticalImeArrowKey = event.key === 'ArrowUp' || event.key === 'ArrowDown'
                 ? event.key
                 : (event.code === 'ArrowUp' || event.code === 'ArrowDown' ? event.code : '');
-            if (!isFindOrInput && state.isComposing && verticalImeArrowKey) {
+            if (!isFindOrInput && imeController.isComposing && verticalImeArrowKey) {
                 const compositionElement = lineElementFromEvent(event) || activeEditableElement();
                 // WebView2 reports the arrow key that commits Korean IME text as
                 // an in-composition key (often keyCode 229). Moving immediately
                 // would touch the native composition selection, so remember the
                 // intent and apply it once compositionend has committed the DOM.
-                state.pendingImeVerticalNavigation = {
+                imeController.pendingVerticalNavigation = {
                     direction: verticalImeArrowKey === 'ArrowUp' ? -1 : 1,
                     extendSelection: !!event.shiftKey,
-                    lineNumber: Number(compositionElement?.dataset?.line || state.compositionLine || state.currentLine || 1),
+                    lineNumber: Number(compositionElement?.dataset?.line || imeController.compositionLine || state.currentLine || 1),
                     column: compositionElement ? getCaretOffset(compositionElement) : Math.max(0, state.currentColumn - 1)
                 };
             }
-            if (!isFindOrInput && !state.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            if (!isFindOrInput && !imeController.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey) {
                 const imeElement = lineElementFromEvent(event) || activeEditableElement();
                 const pendingSelection = compositionSelectionRange();
                 if (imeElement && pendingSelection && !pendingSelection.isColumn) {
@@ -738,7 +739,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
                 // Physical A-Z keys must never use this fallback: Korean IME can
                 // expose its first jamo key as a Latin key before compositionstart.
                 queueColumnTextInputFallback(event.key, text => {
-                    if (state.isComposing || !activeColumnSelection()) return;
+                    if (imeController.isComposing || !activeColumnSelection()) return;
                     const target = activeEditableElement();
                     if (target?.getAttribute('contenteditable') === 'true') {
                         insertPlainTextByModel(target, text);
@@ -864,7 +865,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
         const element = lineElementFromEvent(event);
         reportCursorAndSelection(element || document.activeElement);
 
-        if (event.key === 'Shift' && hasCustomSelection() && !state.isComposing) {
+        if (event.key === 'Shift' && hasCustomSelection() && !imeController.isComposing) {
             const sel = normalizeSelection();
             if (sel && !sel.isColumn) {
                 if (sel.start.line !== sel.end.line) {
@@ -878,7 +879,7 @@ export function bindKeyboardEvents({ openFindPanel }) {
             }
         }
 
-        if ((state.autocompleteOnEnter || state.autocompleteOnTab) && !state.rangeComposition &&
+        if ((state.autocompleteOnEnter || state.autocompleteOnTab) && !imeController.rangeComposition &&
             element && element.getAttribute('contenteditable') === 'true') {
             const ignoredKeys = [
                 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',

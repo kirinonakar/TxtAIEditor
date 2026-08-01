@@ -1,12 +1,4 @@
-import {
-    activateTextareaImeBypass,
-    beginImeCommit,
-    beginImeComposition,
-    cancelImeComposition,
-    completeImeCommit,
-    ImePhase,
-    updateImeComposition
-} from './editor-ime-state.js';
+import { ImePhase } from './editor-ime-state.js';
 
 export function createEditorCompositionHandlers({
     activeColumnSelection,
@@ -19,6 +11,7 @@ export function createEditorCompositionHandlers({
     drawEditableSelectionOverlays,
     focusLine,
     getCaretOffset,
+    imeController,
     lineTextFromElement,
     makeEditablePlainText,
     markDirty,
@@ -39,7 +32,7 @@ export function createEditorCompositionHandlers({
     viewport
 }) {
 function beginPendingImeSelectionCollapse(element, line, column) {
-    state.pendingImeSelectionCollapse = {
+    imeController.pendingSelectionCollapse = {
         element,
         line,
         column,
@@ -48,14 +41,14 @@ function beginPendingImeSelectionCollapse(element, line, column) {
 }
 
 function clearPendingImeSelectionCollapse() {
-    state.pendingImeSelectionCollapse = null;
+    imeController.pendingSelectionCollapse = null;
 }
 
 function isPendingImeSelectionCollapseFor(element, event = null) {
-    const pending = state.pendingImeSelectionCollapse;
+    const pending = imeController.pendingSelectionCollapse;
     if (!pending || pending.element !== element) return false;
     if (performance.now() - pending.time > 500) {
-        state.pendingImeSelectionCollapse = null;
+        imeController.pendingSelectionCollapse = null;
         return false;
     }
     return true;
@@ -195,7 +188,7 @@ function syncRenderedRowsAfterCompositionSelectionCollapse(startLine, endLine, n
             }
             const column = Math.max(0, Math.min(Number(caretColumn || 0), textElement.textContent.length));
             const textNode = textElement.firstChild;
-            if (!state.textareaImeBypassActive) {
+            if (!imeController.textareaBypassActive) {
                 const range = document.createRange();
                 if (textNode && textNode.nodeType === Node.TEXT_NODE) {
                     range.setStart(textNode, column);
@@ -329,7 +322,7 @@ function prepareMultilineCompositionHost(selection = normalizeSelection()) {
     const endColumn = Math.max(0, Math.min(end.column, endText.length));
     targetElement.dataset.rangeCompositionSuffix = endText.slice(endColumn);
 
-    state.preparedRangeCompositionLine = start.line;
+    imeController.preparedRangeCompositionLine = start.line;
     state.currentLine = start.line;
     state.currentColumn = startColumn + 1;
     state.editingLine = start.line;
@@ -357,7 +350,7 @@ function beginDeferredRangeComposition(element, selection) {
         return null;
     }
 
-    const existing = state.rangeComposition;
+    const existing = imeController.rangeComposition;
     if (existing?.deferred &&
         existing.command?.start?.line === normalized.start.line &&
         existing.command?.start?.column === normalized.start.column &&
@@ -370,7 +363,7 @@ function beginDeferredRangeComposition(element, selection) {
         ? element
         : viewport.querySelector(`.line-text[data-line="${normalized.start.line}"]`);
     const command = createRangeCompositionEditCommand(normalized);
-    state.rangeComposition = {
+    imeController.rangeComposition = {
         command,
         lineNumber: command.start.line,
         deferred: true,
@@ -382,8 +375,8 @@ function beginDeferredRangeComposition(element, selection) {
 }
 
 function commitRangeCompositionResult(pending, targetElement, insertedText, finalText) {
-    state.rangeComposition = null;
-    state.preparedRangeCompositionLine = null;
+    imeController.rangeComposition = null;
+    imeController.preparedRangeCompositionLine = null;
     document.body.classList.remove('range-composition-active');
     state.cache.set(pending.lineNumber, finalText);
     state.cacheVersion++;
@@ -412,10 +405,10 @@ function commitRangeCompositionResult(pending, targetElement, insertedText, fina
 }
 
 function finishRangeComposition(element, lineNumber, compositionText = '') {
-    const pending = state.rangeComposition;
+    const pending = imeController.rangeComposition;
     if (!pending || !pending.command) {
-        state.rangeComposition = null;
-        state.preparedRangeCompositionLine = null;
+        imeController.rangeComposition = null;
+        imeController.preparedRangeCompositionLine = null;
         document.body.classList.remove('range-composition-active');
         return false;
     }
@@ -438,14 +431,14 @@ function finishRangeComposition(element, lineNumber, compositionText = '') {
         const hostFinalText = hostElement ? lineTextFromElement(hostElement) : pending.hostBeforeText;
         insertedText = fallbackCompositionText || changedTextBetween(pending.hostBeforeText, hostFinalText);
         if (!insertedText && hostFinalText === pending.hostBeforeText) {
-            state.rangeComposition = null;
-            state.preparedRangeCompositionLine = null;
+            imeController.rangeComposition = null;
+            imeController.preparedRangeCompositionLine = null;
             document.body.classList.remove('range-composition-active');
             queueRender(true);
             return true;
         }
-        state.rangeComposition = null;
-        state.preparedRangeCompositionLine = null;
+        imeController.rangeComposition = null;
+        imeController.preparedRangeCompositionLine = null;
         document.body.classList.remove('range-composition-active');
 
         // compositionend 이벤트 안에서 DOM/Selection을 바꾸면 WebView2 한글 IME가
@@ -492,7 +485,7 @@ function replaceSelectionForCompositionStart(element, markPendingImeStart = true
     // 아무 메시지도 보내지 않는다. compositionend에서 rangeEdit 한 건만 확정한다.
     const command = createRangeCompositionEditCommand(selection);
     const targetElement = applyLocalRangeCompositionEdit(command, element);
-    state.rangeComposition = {
+    imeController.rangeComposition = {
         command,
         lineNumber: command.start.line
     };
@@ -536,7 +529,7 @@ function columnCompositionBounds(selection) {
 }
 
 function isLineInColumnComposition(lineNumber) {
-    const pending = state.columnComposition;
+    const pending = imeController.columnComposition;
     const bounds = pending ? columnCompositionBounds(pending.selection) : null;
     if (!bounds) return false;
     return lineNumber >= bounds.startLine && lineNumber <= bounds.endLine;
@@ -556,7 +549,7 @@ function buildColumnCompositionLine(baseText, startCol, endCol, insertedText) {
 }
 
 function applyColumnCompositionPreview(element, insertedText) {
-    const pending = state.columnComposition;
+    const pending = imeController.columnComposition;
     const bounds = pending ? columnCompositionBounds(pending.selection) : null;
     if (!pending || !bounds) return false;
 
@@ -584,7 +577,7 @@ function applyColumnCompositionPreview(element, insertedText) {
 }
 
 function updateColumnCompositionPreview(element) {
-    const pending = state.columnComposition;
+    const pending = imeController.columnComposition;
     if (!pending || !element || element.getAttribute('contenteditable') !== 'true') return false;
 
     const finalText = lineTextFromElement(element);
@@ -609,7 +602,7 @@ function beginColumnComposition(element) {
     const selection = activeColumnSelection();
     const bounds = selection ? columnCompositionBounds(selection) : null;
     if (!bounds || !element || element.getAttribute('contenteditable') !== 'true') {
-        state.columnComposition = null;
+        imeController.columnComposition = null;
         return false;
     }
 
@@ -623,7 +616,7 @@ function beginColumnComposition(element) {
         }
     }
 
-    state.columnComposition = {
+    imeController.columnComposition = {
         selection: cloneEditorSelection(selection),
         lineNumber,
         beforeText: baseLines.get(lineNumber) ?? lineTextFromElement(element),
@@ -635,16 +628,16 @@ function beginColumnComposition(element) {
 }
 
 function finishColumnComposition(element, lineNumber) {
-    const pending = state.columnComposition;
+    const pending = imeController.columnComposition;
     if (!pending || !pending.selection || !element || element.getAttribute('contenteditable') !== 'true') {
-        state.columnComposition = null;
+        imeController.columnComposition = null;
         return false;
     }
 
     const targetLine = Number(lineNumber || element.dataset.line || pending.lineNumber || state.currentLine || 1);
     if (targetLine !== pending.lineNumber) {
         restoreColumnCompositionBase(pending, element);
-        state.columnComposition = null;
+        imeController.columnComposition = null;
         return false;
     }
 
@@ -654,7 +647,7 @@ function finishColumnComposition(element, lineNumber) {
     const changed = insertedText.length > 0 || finalText !== pending.beforeText;
 
     restoreColumnCompositionBase(pending, element);
-    state.columnComposition = null;
+    imeController.columnComposition = null;
 
     if (changed) {
         replaceColumnSelectionWith(originalSelection, insertedText, true);
@@ -740,16 +733,16 @@ function finishColumnComposition(element, lineNumber) {
     function setBypassCursor(column) {
         const numericColumn = Number(column);
         const safeColumn = Math.max(0, Number.isFinite(numericColumn) ? numericColumn : 0);
-        state.bypassCursorLine = bypassStartLine;
-        state.bypassCursorColumn = safeColumn;
+        imeController.bypassCursorLine = bypassStartLine;
+        imeController.bypassCursorColumn = safeColumn;
         state.currentLine = bypassStartLine;
         state.currentColumn = safeColumn + 1;
         state.editingLine = bypassStartLine;
     }
 
     function clearBypassCursor() {
-        state.bypassCursorLine = null;
-        state.bypassCursorColumn = null;
+        imeController.bypassCursorLine = null;
+        imeController.bypassCursorColumn = null;
     }
 
     function syncBypassTextareaPosition(element, anchorColumn = bypassStartColumn) {
@@ -795,14 +788,14 @@ function finishColumnComposition(element, lineNumber) {
     }
 
     function onBypassCompositionStart(e) {
-        if (!beginImeComposition(state, ImePhase.TextareaBypassComposition, bypassStartLine)) return;
+        if (!imeController.beginComposition(ImePhase.TextareaBypassComposition, bypassStartLine)) return;
         state.editingLine = bypassStartLine;
         isBypassCompositionActive = true;
         collapseEditorSelectionForBypass();
     }
 
     function onBypassCompositionUpdate(e) {
-        if (!updateImeComposition(state)) return;
+        if (!imeController.updateComposition()) return;
         const val = e.data || '';
         updateEditorText(val, true);
     }
@@ -817,12 +810,12 @@ function finishColumnComposition(element, lineNumber) {
     }
 
     function onBypassCompositionEnd(e) {
-        beginImeCommit(state);
+        imeController.beginCommit();
         isBypassCompositionActive = false;
         const val = e.data !== undefined ? (textareaBypassNode.value || e.data) : textareaBypassNode.value;
         updateEditorText(val, false);
         endBypassUndoTransaction();
-        completeImeCommit(state, true);
+        imeController.completeCommit(true);
     }
 
     function onBypassKeyDown(e) {
@@ -831,9 +824,9 @@ function finishColumnComposition(element, lineNumber) {
             
             if (bypassSelection) {
                 bypassSelection = null;
-                cancelImeComposition(state);
-                completeImeCommit(state);
-                state.bypassStartLine = null;
+                imeController.cancelComposition();
+                imeController.completeCommit();
+                imeController.bypassStartLine = null;
                 clearBypassCursor();
                 const activeLine = viewport.querySelector(`.line-text[data-line="${state.currentLine}"]`);
                 if (activeLine) {
@@ -843,9 +836,9 @@ function finishColumnComposition(element, lineNumber) {
                 updateEditorText(val, false);
                 endBypassUndoTransaction();
                 const newCaretCol = bypassStartColumn + val.length;
-                cancelImeComposition(state);
-                completeImeCommit(state);
-                state.bypassStartLine = null;
+                imeController.cancelComposition();
+                imeController.completeCommit();
+                imeController.bypassStartLine = null;
                 clearBypassCursor();
                 focusLine(bypassStartLine, newCaretCol);
             }
@@ -872,7 +865,7 @@ function finishColumnComposition(element, lineNumber) {
     }
  
     function onBypassBlur(e) {
-        if (state.textareaImeBypassActive) {
+        if (imeController.textareaBypassActive) {
             const val = textareaBypassNode.value;
             if (bypassSelection) {
                 bypassSelection = null;
@@ -880,20 +873,20 @@ function finishColumnComposition(element, lineNumber) {
                 updateEditorText(val, false);
                 endBypassUndoTransaction();
             }
-            cancelImeComposition(state);
-            completeImeCommit(state);
-            state.bypassStartLine = null;
+            imeController.cancelComposition();
+            imeController.completeCommit();
+            imeController.bypassStartLine = null;
             clearBypassCursor();
             drawEditableSelectionOverlays();
         }
     }
 
     function cancelImeBypassTextarea() {
-        if (isBypassCompositionActive || state.isComposing) {
+        if (isBypassCompositionActive || imeController.isComposing) {
             return false;
         }
 
-        const wasActive = !!(state.textareaImeBypassActive || bypassSelection || document.activeElement === textareaBypassNode);
+        const wasActive = !!(imeController.textareaBypassActive || bypassSelection || document.activeElement === textareaBypassNode);
         if (textareaBypassNode) {
             textareaBypassNode.value = '';
         }
@@ -902,9 +895,9 @@ function finishColumnComposition(element, lineNumber) {
         bypassEditCommand = null;
         bypassPrefix = '';
         bypassSuffix = '';
-        cancelImeComposition(state);
-        completeImeCommit(state);
-        state.bypassStartLine = null;
+        imeController.cancelComposition();
+        imeController.completeCommit();
+        imeController.bypassStartLine = null;
         clearBypassCursor();
         endBypassUndoTransaction();
         return wasActive;
@@ -959,8 +952,8 @@ function finishColumnComposition(element, lineNumber) {
                 bypassSuffix = suffix;
                 
                 textarea.value = '';
-                if (!activateTextareaImeBypass(state, bypassStartLine)) return false;
-                state.bypassStartLine = bypassStartLine;
+                if (!imeController.activateTextareaBypass(bypassStartLine)) return false;
+                imeController.bypassStartLine = bypassStartLine;
                 setBypassCursor(bypassStartColumn);
                 
                 const row = viewport.querySelector(`.line-row[data-line="${bypassStartLine}"]`);

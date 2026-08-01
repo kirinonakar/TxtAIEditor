@@ -1,17 +1,12 @@
 import { viewport } from './editor-dom.js';
-import {
-    beginImeCommit,
-    beginImeComposition,
-    completeImeCommit,
-    ImePhase,
-    updateImeComposition
-} from './editor-ime-state.js';
+import { ImePhase } from './editor-ime-state.js';
 import {
     activeEditableElement,
     cancelPendingColumnTextInputs,
     consumePendingColumnTextInput,
     graphemeDeleteEnd,
     graphemeDeleteStart,
+    imeController,
     MAX_RENDER_CHARS,
     queueRender,
     state,
@@ -59,7 +54,7 @@ export function bindTextInputEvents({ renderer }) {
 
     function restoreInputLineHighlighting(element, inputSnapshot) {
         if (!element?.isConnected || !inputSnapshot ||
-            state.isComposing || state.rangeComposition || state.columnComposition) {
+            imeController.isComposing || imeController.rangeComposition || imeController.columnComposition) {
             return;
         }
 
@@ -94,7 +89,7 @@ export function bindTextInputEvents({ renderer }) {
         }
         const element = lineElementFromEvent(event);
         if (element) {
-            const pendingColumnText = !state.isComposing
+            const pendingColumnText = !imeController.isComposing
                 ? consumePendingColumnTextInput(event.data)
                 : null;
             const columnSelection = pendingColumnText ? activeColumnSelection() : null;
@@ -107,23 +102,23 @@ export function bindTextInputEvents({ renderer }) {
                 postCompositionNavigationInputGuard = null;
                 return;
             }
-            if (!state.isComposing && state.rangeComposition) {
+            if (!imeController.isComposing && imeController.rangeComposition) {
                 clearPendingImeSelectionCollapse();
                 const lineNumber = Number(element.dataset.line || state.currentLine || 1);
                 if (finishRangeComposition(element, lineNumber, event.data || '')) {
-                    completeImeCommit(state);
+                    imeController.completeCommit();
                     return;
                 }
             }
-            if (!state.isComposing && isPendingImeSelectionCollapseFor(element, event)) {
+            if (!imeController.isComposing && isPendingImeSelectionCollapseFor(element, event)) {
                 return;
             }
-            if (!state.columnComposition && !state.rangeComposition?.deferred) {
+            if (!imeController.columnComposition && !imeController.rangeComposition?.deferred) {
                 state.selection = null;
                 syncCustomSelectionClass();
             }
             const inputSnapshot = commitLine(element);
-            if (!state.isComposing && !state.rangeComposition) {
+            if (!imeController.isComposing && !imeController.rangeComposition) {
                 restoreInputLineHighlighting(element, inputSnapshot);
                 triggerAutocomplete(element, inputSnapshot);
             }
@@ -169,7 +164,7 @@ export function bindTextInputEvents({ renderer }) {
         cancelPendingColumnTextInputs();
         cancelAutocompleteCaretRestore();
         postCompositionNavigationInputGuard = null;
-        state.pendingImeVerticalNavigation = null;
+        imeController.pendingVerticalNavigation = null;
         let element = lineElementFromEvent(event) || activeEditableElement();
         const pendingCompositionSelection = compositionSelectionRange();
         let collapsedSelectionForComposition = false;
@@ -190,37 +185,37 @@ export function bindTextInputEvents({ renderer }) {
         }
 
         const compositionLine = element ? Number(element.dataset.line || state.currentLine || 1) : state.currentLine;
-        let phase = state.rangeComposition ? ImePhase.RangeComposition : ImePhase.NativeComposition;
+        let phase = imeController.rangeComposition ? ImePhase.RangeComposition : ImePhase.NativeComposition;
 
         if (element && element.getAttribute('contenteditable') === 'true') {
             state.editingLine = compositionLine;
 
             if (collapsedSelectionForComposition) {
-                state.columnComposition = null;
+                imeController.columnComposition = null;
             } else if (beginColumnComposition(element)) {
                 phase = ImePhase.ColumnComposition;
             }
         } else {
-            state.columnComposition = null;
+            imeController.columnComposition = null;
         }
 
-        if (!beginImeComposition(state, phase, compositionLine)) {
+        if (!imeController.beginComposition(phase, compositionLine)) {
             return;
         }
     });
 
     viewport.addEventListener('compositionupdate', event => {
-        updateImeComposition(state);
+        imeController.updateComposition();
     });
 
     viewport.addEventListener('compositionend', event => {
         const element = lineElementFromEvent(event) || activeEditableElement();
-        const lineNumber = element ? Number(element.dataset.line || state.compositionLine || state.currentLine) : state.compositionLine;
-        const pendingVerticalNavigation = state.pendingImeVerticalNavigation;
+        const lineNumber = element ? Number(element.dataset.line || imeController.compositionLine || state.currentLine) : imeController.compositionLine;
+        const pendingVerticalNavigation = imeController.pendingVerticalNavigation;
 
-        beginImeCommit(state);
+        imeController.beginCommit();
         clearPendingImeSelectionCollapse();
-        state.pendingImeVerticalNavigation = null;
+        imeController.pendingVerticalNavigation = null;
 
         const moveAfterComposition = current => {
             if (!pendingVerticalNavigation || !current ||
@@ -242,7 +237,7 @@ export function bindTextInputEvents({ renderer }) {
         };
 
         if (finishRangeComposition(element, lineNumber, event.data || '')) {
-            completeImeCommit(state);
+            imeController.completeCommit();
             if (pendingVerticalNavigation) {
                 setTimeout(() => {
                     const current = activeEditableElement();
@@ -253,7 +248,7 @@ export function bindTextInputEvents({ renderer }) {
         }
 
         if (finishColumnComposition(element, lineNumber)) {
-            completeImeCommit(state);
+            imeController.completeCommit();
             if (pendingVerticalNavigation) {
                 setTimeout(() => {
                     const current = activeEditableElement();
@@ -282,7 +277,7 @@ export function bindTextInputEvents({ renderer }) {
                 }
             }
         }
-        completeImeCommit(state);
+        imeController.completeCommit();
     });
 
     viewport.addEventListener('beforeinput', event => {
@@ -290,14 +285,14 @@ export function bindTextInputEvents({ renderer }) {
         if (state.csvTableEnabled) return;
         let element = lineElementFromEvent(event);
 
-        if (event.isComposing || state.isComposing ||
+        if (event.isComposing || imeController.isComposing ||
             event.inputType === 'insertCompositionText' ||
             event.inputType === 'deleteCompositionText') {
             cancelPendingColumnTextInputs();
-            if (state.rangeComposition?.deferred) {
+            if (imeController.rangeComposition?.deferred) {
                 return;
             }
-            const pendingCompositionSelection = compositionSelectionRange(!state.isComposing);
+            const pendingCompositionSelection = compositionSelectionRange(!imeController.isComposing);
 
             if (pendingCompositionSelection && !pendingCompositionSelection.isColumn) {
                 const isMultilineSelection = pendingCompositionSelection.start.line !==
@@ -310,8 +305,8 @@ export function bindTextInputEvents({ renderer }) {
                 if (replacedElement) {
                     element = replacedElement;
                     state.editingLine = Number(replacedElement.dataset.line || state.currentLine || 1);
-                    if (state.rangeComposition && !state.isComposing) {
-                        beginImeComposition(state, ImePhase.RangeComposition, state.editingLine);
+                    if (imeController.rangeComposition && !imeController.isComposing) {
+                        imeController.beginComposition(ImePhase.RangeComposition, state.editingLine);
                     }
                 }
             }

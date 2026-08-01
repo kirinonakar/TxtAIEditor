@@ -1,16 +1,37 @@
-export function createModelRepeatInputHandlers({
+export function createKeyboardRepeatController({
     activeEditableElement,
     cancelPendingRepeatFollowUps,
     deleteBackwardAtCaret,
     deleteForwardAtCaret,
     focusLine,
+    getCursor,
+    getLineCount,
     hasCustomSelection,
     insertPlainTextByModel,
+    isImeComposing,
     isPlainTextKey,
+    isReadOnly,
     makeEditablePlainText,
+    setCursor,
     splitCurrentLine,
-    state
 }) {
+    const repeatState = {
+        lastRunAt: 0,
+        continuousTimer: 0,
+        continuousKey: null,
+        hasContinuousRun: false,
+        hasPhysicalRepeatSignal: false,
+        lastKeyDownAt: 0,
+        keyDownSilenceMs: 350,
+        intervalMs: 32,
+        lineBoundaryHoldMs: 65,
+        lineBoundaryUntil: 0,
+        releaseGuardMs: 250,
+        releasedKeys: new Map(),
+        suppressBeforeInputUntil: 0,
+        suppressBeforeInputTypes: new Set()
+    };
+
     function isModelRepeatKey(event) {
         if (!event) return false;
         if (event.key === ' ' || event.code === 'Space' || event.key === 'Spacebar') {
@@ -48,8 +69,8 @@ export function createModelRepeatInputHandlers({
     }
 
     function markNativeBeforeInputHandled(inputTypes, durationMs = 120) {
-        state.repeatEdit.suppressBeforeInputUntil = performance.now() + durationMs;
-        state.repeatEdit.suppressBeforeInputTypes = new Set(inputTypes);
+        repeatState.suppressBeforeInputUntil = performance.now() + durationMs;
+        repeatState.suppressBeforeInputTypes = new Set(inputTypes);
     }
 
     function shouldSuppressNativeBeforeInput(event) {
@@ -57,13 +78,13 @@ export function createModelRepeatInputHandlers({
         const now = performance.now();
         const inputType = event.inputType || '';
 
-        if (state.repeatEdit.continuousKey && beforeInputMatchesRepeatKey(event, state.repeatEdit.continuousKey)) {
+        if (repeatState.continuousKey && beforeInputMatchesRepeatKey(event, repeatState.continuousKey)) {
             return true;
         }
 
-        for (const [key, until] of state.repeatEdit.releasedKeys.entries()) {
+        for (const [key, until] of repeatState.releasedKeys.entries()) {
             if (now > until) {
-                state.repeatEdit.releasedKeys.delete(key);
+                repeatState.releasedKeys.delete(key);
                 continue;
             }
             if (beforeInputMatchesRepeatKey(event, key)) {
@@ -71,8 +92,8 @@ export function createModelRepeatInputHandlers({
             }
         }
 
-        if (now > state.repeatEdit.suppressBeforeInputUntil) return false;
-        const types = state.repeatEdit.suppressBeforeInputTypes;
+        if (now > repeatState.suppressBeforeInputUntil) return false;
+        const types = repeatState.suppressBeforeInputTypes;
         if (types.has(inputType)) return true;
         if (types.has('insertSpace') && inputType.startsWith('insert') && event.data === ' ') return true;
         if (types.has('insertLineBreak') && beforeInputMatchesRepeatKey(event, 'Enter')) return true;
@@ -104,47 +125,44 @@ export function createModelRepeatInputHandlers({
 
     function rememberReleasedRepeatKey(key) {
         if (!key) return;
-        const until = performance.now() + state.repeatEdit.releaseGuardMs;
-        state.repeatEdit.releasedKeys.set(key, until);
+        const until = performance.now() + repeatState.releaseGuardMs;
+        repeatState.releasedKeys.set(key, until);
     }
 
     function isReleaseGuardedRepeatKey(key) {
         if (!key) return false;
-        const until = state.repeatEdit.releasedKeys.get(key);
+        const until = repeatState.releasedKeys.get(key);
         if (!until) return false;
         if (performance.now() > until) {
-            state.repeatEdit.releasedKeys.delete(key);
+            repeatState.releasedKeys.delete(key);
             return false;
         }
         return true;
     }
 
     function markLineBoundaryTransition(targetLine, targetColumn) {
-        state.currentLine = Math.min(Math.max(1, Number(targetLine || 1)), state.lineCount);
-        state.currentColumn = Math.max(1, Number(targetColumn || 0) + 1);
-        state.repeatEdit.lineBoundaryUntil = Math.max(
-            state.repeatEdit.lineBoundaryUntil,
-            performance.now() + state.repeatEdit.lineBoundaryHoldMs
+        setCursor({
+            line: Math.min(Math.max(1, Number(targetLine || 1)), getLineCount()),
+            column: Math.max(1, Number(targetColumn || 0) + 1)
+        });
+        repeatState.lineBoundaryUntil = Math.max(
+            repeatState.lineBoundaryUntil,
+            performance.now() + repeatState.lineBoundaryHoldMs
         );
     }
 
     function clearPendingRepeatEdit(releasedKey = null, addReleaseGuard = true) {
-        const activeKey = state.repeatEdit.continuousKey;
+        const activeKey = repeatState.continuousKey;
         const keyToGuard = releasedKey || activeKey;
-        const hadContinuousRun = state.repeatEdit.hasContinuousRun;
-        if (state.repeatEdit.timer) {
-            clearTimeout(state.repeatEdit.timer);
-            state.repeatEdit.timer = 0;
+        const hadContinuousRun = repeatState.hasContinuousRun;
+        if (repeatState.continuousTimer) {
+            clearTimeout(repeatState.continuousTimer);
+            repeatState.continuousTimer = 0;
         }
-        if (state.repeatEdit.continuousTimer) {
-            clearTimeout(state.repeatEdit.continuousTimer);
-            state.repeatEdit.continuousTimer = 0;
-        }
-        state.repeatEdit.pending = null;
-        state.repeatEdit.continuousKey = null;
-        state.repeatEdit.hasContinuousRun = false;
-        state.repeatEdit.hasPhysicalRepeatSignal = false;
-        state.repeatEdit.lastKeyDownAt = 0;
+        repeatState.continuousKey = null;
+        repeatState.hasContinuousRun = false;
+        repeatState.hasPhysicalRepeatSignal = false;
+        repeatState.lastKeyDownAt = 0;
         if (addReleaseGuard) {
             rememberReleasedRepeatKey(keyToGuard);
             if (hadContinuousRun) {
@@ -161,25 +179,25 @@ export function createModelRepeatInputHandlers({
 
     function repeatEditDelayFromNow() {
         const now = performance.now();
-        const boundaryWait = Math.max(0, state.repeatEdit.lineBoundaryUntil - now);
-        const intervalWait = Math.max(0, state.repeatEdit.intervalMs - (now - state.repeatEdit.lastRunAt));
+        const boundaryWait = Math.max(0, repeatState.lineBoundaryUntil - now);
+        const intervalWait = Math.max(0, repeatState.intervalMs - (now - repeatState.lastRunAt));
         return Math.max(boundaryWait, intervalWait);
     }
 
     function scheduleContinuousModelRepeatEdit(key, delayMs) {
-        if (state.repeatEdit.continuousTimer) {
-            clearTimeout(state.repeatEdit.continuousTimer);
-            state.repeatEdit.continuousTimer = 0;
+        if (repeatState.continuousTimer) {
+            clearTimeout(repeatState.continuousTimer);
+            repeatState.continuousTimer = 0;
         }
 
-        state.repeatEdit.continuousTimer = setTimeout(() => {
-            state.repeatEdit.continuousTimer = 0;
-            if (state.repeatEdit.continuousKey !== key || state.readOnly || state.isComposing) {
+        repeatState.continuousTimer = setTimeout(() => {
+            repeatState.continuousTimer = 0;
+            if (repeatState.continuousKey !== key || isReadOnly() || isImeComposing()) {
                 return;
             }
 
-            if (state.repeatEdit.hasPhysicalRepeatSignal &&
-                performance.now() - state.repeatEdit.lastKeyDownAt > state.repeatEdit.keyDownSilenceMs) {
+            if (repeatState.hasPhysicalRepeatSignal &&
+                performance.now() - repeatState.lastKeyDownAt > repeatState.keyDownSilenceMs) {
                 clearPendingRepeatEdit(key);
                 return;
             }
@@ -190,28 +208,28 @@ export function createModelRepeatInputHandlers({
                 return;
             }
 
-            state.repeatEdit.lastRunAt = performance.now();
-            state.repeatEdit.hasContinuousRun = true;
+            repeatState.lastRunAt = performance.now();
+            repeatState.hasContinuousRun = true;
             runModelRepeatEdit(key);
-            scheduleContinuousModelRepeatEdit(key, state.repeatEdit.intervalMs);
+            scheduleContinuousModelRepeatEdit(key, repeatState.intervalMs);
         }, Math.max(0, Number(delayMs || 0)));
     }
 
     function scheduleModelRepeatEdit(key, isRepeat) {
-        if (state.readOnly || state.isComposing) return;
+        if (isReadOnly() || isImeComposing()) return;
         if (isRepeat && isReleaseGuardedRepeatKey(key)) return;
         if (!isRepeat) {
-            state.repeatEdit.releasedKeys.delete(key);
+            repeatState.releasedKeys.delete(key);
         }
 
         // Backspace/Delete/Enter are handled from one cancellable timer instead of
         // browser key-repeat events. This prevents queued keydown events from
         // continuing to delete or split lines after the physical key is released.
-        if (state.repeatEdit.continuousKey === key) {
-            state.repeatEdit.lastKeyDownAt = performance.now();
+        if (repeatState.continuousKey === key) {
+            repeatState.lastKeyDownAt = performance.now();
             if (isRepeat) {
-                state.repeatEdit.hasPhysicalRepeatSignal = true;
-                if (!state.repeatEdit.continuousTimer) {
+                repeatState.hasPhysicalRepeatSignal = true;
+                if (!repeatState.continuousTimer) {
                     scheduleContinuousModelRepeatEdit(key, repeatEditDelayFromNow());
                 }
             }
@@ -219,12 +237,11 @@ export function createModelRepeatInputHandlers({
         }
 
         clearPendingRepeatEdit(null, false);
-        state.repeatEdit.continuousKey = key;
-        state.repeatEdit.pending = null;
-        state.repeatEdit.hasContinuousRun = false;
-        state.repeatEdit.hasPhysicalRepeatSignal = !!isRepeat;
-        state.repeatEdit.lastKeyDownAt = performance.now();
-        state.repeatEdit.lastRunAt = performance.now();
+        repeatState.continuousKey = key;
+        repeatState.hasContinuousRun = false;
+        repeatState.hasPhysicalRepeatSignal = !!isRepeat;
+        repeatState.lastKeyDownAt = performance.now();
+        repeatState.lastRunAt = performance.now();
         runModelRepeatEdit(key);
         if (isRepeat) {
             scheduleContinuousModelRepeatEdit(key, repeatEditDelayFromNow());
@@ -232,16 +249,17 @@ export function createModelRepeatInputHandlers({
     }
 
     function runModelRepeatEdit(key) {
-        if (state.readOnly || state.isComposing) return;
+        if (isReadOnly() || isImeComposing()) return;
+        const cursor = getCursor();
         let element = activeEditableElement();
         if (!element || element.getAttribute('contenteditable') !== 'true') {
-            focusLine(state.currentLine, Math.max(0, state.currentColumn - 1));
+            focusLine(cursor.line, Math.max(0, cursor.column - 1));
             return;
         }
 
         if (key === 'Enter') {
             const elementLineNumber = Number(element.dataset.line || 0);
-            splitCurrentLine(element, { preferStateCaret: elementLineNumber !== state.currentLine });
+            splitCurrentLine(element, { preferStateCaret: elementLineNumber !== cursor.line });
             return;
         }
 

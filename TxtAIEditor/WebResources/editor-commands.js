@@ -8,6 +8,7 @@ import {
     graphemeDeleteEnd,
     graphemeDeleteStart,
     hasTextAt,
+    imeController,
     isPlainTextKey,
     isStandaloneDelimiter,
     invalidateMeasuredLineHeightsAround,
@@ -67,13 +68,8 @@ import {
 import { createCaretNavigationCommands } from './editor-caret-navigation-commands.js';
 import { createClipboardCommandHandlers } from './editor-clipboard-commands.js';
 import { createEditorCompositionHandlers } from './editor-composition.js';
-import {
-    beginImeCommit,
-    completeImeCommit,
-    resetImeState
-} from './editor-ime-state.js';
 import { createHostStreamInsertCommands } from './editor-host-stream-insert.js';
-import { createModelRepeatInputHandlers } from './editor-repeat-input.js';
+import { createKeyboardRepeatController } from './editor-repeat-input.js';
 import {
     copyCsvSelectionToClipboard,
     cutCsvSelectionToClipboard
@@ -138,8 +134,8 @@ function endEditTransaction() {
 
 function commitLine(element) {
     const lineNumber = Number(element.dataset.line || 1);
-    const isComposing = state.isComposing &&
-        (!state.compositionLine || state.compositionLine === lineNumber);
+    const isComposing = imeController.isComposing &&
+        (!imeController.compositionLine || imeController.compositionLine === lineNumber);
 
     const previousText = state.cache.get(lineNumber) ?? '';
     const text = lineTextFromElement(element);
@@ -148,10 +144,10 @@ function commitLine(element) {
     const isInlineLivePreviewActiveLine = state.inlineLivePreviewEnabled &&
         state.inlineLivePreviewSourceLine === lineNumber;
 
-    if (isComposing && state.rangeComposition) {
+    if (isComposing && imeController.rangeComposition) {
         // 다중 줄 선택 IME 조합 중에는 모델/DOM 재렌더를 건드리지 않는다.
         // 최종 조합 문자열은 compositionend에서 rangeEdit 한 건으로 반영한다.
-    } else if (isComposing && state.columnComposition) {
+    } else if (isComposing && imeController.columnComposition) {
         updateColumnCompositionPreview(element);
     } else if (isComposing) {
         // 네이티브 IME가 소유한 DOM을 로컬 미리보기로만 유지한다.
@@ -170,7 +166,7 @@ function commitLine(element) {
 
     if (isComposing) {
         reportCursorAndSelection(element, caretOffset);
-        if (state.wordWrap && !state.rangeComposition) {
+        if (state.wordWrap && !imeController.rangeComposition) {
             measureRenderedRows(false);
         }
         return inputSnapshot;
@@ -204,11 +200,11 @@ function commitLineForSave(element) {
         return false;
     }
 
-    const lineNumber = Number(element.dataset.line || state.compositionLine || state.currentLine || 1);
+    const lineNumber = Number(element.dataset.line || imeController.compositionLine || state.currentLine || 1);
 
-    if (state.rangeComposition && finishRangeComposition(element, lineNumber)) {
-        beginImeCommit(state);
-        completeImeCommit(state);
+    if (imeController.rangeComposition && finishRangeComposition(element, lineNumber)) {
+        imeController.beginCommit();
+        imeController.completeCommit();
         reportCursorAndSelection(element);
         if (state.wordWrap) {
             measureRenderedRows(false);
@@ -216,9 +212,9 @@ function commitLineForSave(element) {
         return true;
     }
 
-    if (state.columnComposition && finishColumnComposition(element, lineNumber)) {
-        beginImeCommit(state);
-        completeImeCommit(state);
+    if (imeController.columnComposition && finishColumnComposition(element, lineNumber)) {
+        imeController.beginCommit();
+        imeController.completeCommit();
         reportCursorAndSelection(element);
         if (state.wordWrap) {
             measureRenderedRows(false);
@@ -228,7 +224,7 @@ function commitLineForSave(element) {
 
     const text = lineTextFromElement(element);
     const previousText = state.cache.get(lineNumber) ?? '';
-    resetImeState(state);
+    imeController.reset();
     state.currentLine = lineNumber;
     state.currentColumn = Math.min(getCaretOffset(element) + 1, text.length + 1);
 
@@ -257,13 +253,13 @@ function flushPendingEditForSave(requestId) {
     const focusedLine = focusedElement?.getAttribute('contenteditable') === 'true'
         ? Number(focusedElement.dataset.line || 0)
         : 0;
-    const requestedLine = Number(state.compositionLine || focusedLine || state.currentLine || state.editingLine || 1);
+    const requestedLine = Number(imeController.compositionLine || focusedLine || state.currentLine || state.editingLine || 1);
     let element = (focusedElement && focusedElement.getAttribute('contenteditable') === 'true')
         ? focusedElement
         : viewport.querySelector(`.line-text[data-line="${requestedLine}"]`) || activeEditableElement();
     const wasFocused = !!(element && document.activeElement === element);
     const domSelection = window.getSelection();
-    const hasDomCaret = !!((!hasCustomSelection() || state.isComposing) && element && domSelection?.rangeCount &&
+    const hasDomCaret = !!((!hasCustomSelection() || imeController.isComposing) && element && domSelection?.rangeCount &&
         element.contains(domSelection.getRangeAt(0).startContainer));
     const restoreLine = Math.max(1, Number(focusedLine || state.currentLine || requestedLine));
     const restoreColumn = hasDomCaret
@@ -280,7 +276,7 @@ function flushPendingEditForSave(requestId) {
             compositionFallbackTimer = 0;
         }
 
-        const lineNumber = Number(state.compositionLine || requestedLine || state.currentLine || 1);
+        const lineNumber = Number(imeController.compositionLine || requestedLine || state.currentLine || 1);
         element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`) ||
             element ||
             activeEditableElement();
@@ -288,7 +284,7 @@ function flushPendingEditForSave(requestId) {
         if (element && element.getAttribute('contenteditable') === 'true') {
             commitLineForSave(element);
         } else {
-            resetImeState(state);
+            imeController.reset();
         }
 
         const safeRestoreLine = Math.min(Math.max(1, restoreLine), state.lineCount);
@@ -316,14 +312,14 @@ function flushPendingEditForSave(requestId) {
         post({ type: 'editorFlushedForSave', requestId: Number(requestId || 0) });
     };
 
-    if (state.isComposing && element && element.getAttribute('contenteditable') === 'true') {
+    if (imeController.isComposing && element && element.getAttribute('contenteditable') === 'true') {
         const finishAfterCompositionEnd = () => queueMicrotask(finish);
         element.addEventListener('compositionend', finishAfterCompositionEnd, { once: true });
         try {
             element.blur();
         } catch { }
 
-        if (!state.isComposing) {
+        if (!imeController.isComposing) {
             queueMicrotask(finish);
         } else {
             // WebView가 blur에 compositionend를 보내지 않는 비정상 상황에서만
@@ -730,8 +726,8 @@ function updateSingleLine(element, text, caretColumn) {
         markDirty(lineNumber, 'mod');
     }
 
-    if (state.isComposing ||
-        (state.compositionLine && state.compositionLine === lineNumber) ||
+    if (imeController.isComposing ||
+        (imeController.compositionLine && imeController.compositionLine === lineNumber) ||
         nextText.length > MAX_RENDER_CHARS) {
         element.textContent = nextText;
     } else {
@@ -1227,18 +1223,25 @@ const {
     normalizedModelRepeatKey,
     scheduleModelRepeatEdit,
     shouldSuppressNativeBeforeInput
-} = createModelRepeatInputHandlers({
+} = createKeyboardRepeatController({
     activeEditableElement,
     cancelPendingRepeatFollowUps,
     deleteBackwardAtCaret,
     deleteForwardAtCaret,
     focusLine,
+    getCursor: () => ({ line: state.currentLine, column: state.currentColumn }),
+    getLineCount: () => state.lineCount,
     hasCustomSelection,
     insertPlainTextByModel,
+    isImeComposing: () => imeController.isComposing,
     isPlainTextKey,
+    isReadOnly: () => state.readOnly,
     makeEditablePlainText,
+    setCursor: ({ line, column }) => {
+        state.currentLine = line;
+        state.currentColumn = column;
+    },
     splitCurrentLine,
-    state
 });
 
 const {
@@ -1266,6 +1269,7 @@ const {
     drawEditableSelectionOverlays,
     focusLine,
     getCaretOffset,
+    imeController,
     lineTextFromElement,
     makeEditablePlainText,
     markDirty,
@@ -1303,6 +1307,7 @@ const {
     graphemeDeleteEnd,
     graphemeDeleteStart,
     hasCustomSelection,
+    imeController,
     lineTextFromElement,
     normalizeSelection,
     offsetFromPointInElement,

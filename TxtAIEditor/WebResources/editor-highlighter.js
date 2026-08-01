@@ -1,4 +1,4 @@
-import { escapeHtml, state } from './editor-core.js';
+import { escapeHtml, imeController, state } from './editor-core.js';
 import { selectionBoundsForLine } from './editor-selection.js';
 
 const MAX_SYNTAX_CONTEXT_LOOKBACK_LINES = 200;
@@ -40,16 +40,16 @@ function computeLineEndStack(lineNumber, startStack) {
 
 function getLineStartStack(lineNumber) {
     if (lineNumber <= 1) return [];
-    const prev = state.lineEndStacks.get(lineNumber - 1);
+    const prev = state.cache.getLineEndStack(lineNumber - 1);
     if (prev) return prev;
 
     let startLine = lineNumber - 1;
     const minimumContextLine = Math.max(1, lineNumber - MAX_SYNTAX_CONTEXT_LOOKBACK_LINES);
-    while (startLine > minimumContextLine && !state.lineEndStacks.has(startLine)) {
+    while (startLine > minimumContextLine && !state.cache.hasLineEndStack(startLine)) {
         startLine--;
     }
 
-    const cachedStack = state.lineEndStacks.get(startLine);
+    const cachedStack = state.cache.getLineEndStack(startLine);
     let currentStack = cachedStack ? [...cachedStack] : [];
     const scanStart = cachedStack ? startLine + 1 : startLine;
     for (let l = scanStart; l < lineNumber; l++) {
@@ -58,7 +58,7 @@ function getLineStartStack(lineNumber) {
             continue;
         }
         currentStack = computeLineEndStack(l, currentStack);
-        state.lineEndStacks.set(l, currentStack);
+        state.cache.setLineEndStack(l, currentStack);
     }
     return currentStack;
 }
@@ -237,13 +237,8 @@ function advanceHtmlContext(context, text) {
 function getHtmlLineStartContext(lineNumber) {
     if (!lineNumber || lineNumber <= 1) return createHtmlLineContext();
 
-    if (!state.htmlLineEndContexts) {
-        state.htmlLineEndContexts = new Map();
-    }
-
-    const contexts = state.htmlLineEndContexts;
     const previousLine = lineNumber - 1;
-    const previousContext = contexts.get(previousLine);
+    const previousContext = state.cache.getHtmlLineEndContext(previousLine);
     if (previousContext) return cloneHtmlLineContext(previousContext);
 
     let context = createHtmlLineContext();
@@ -252,7 +247,7 @@ function getHtmlLineStartContext(lineNumber) {
     let anchor = previousLine;
 
     while (anchor >= minimumContextLine) {
-        const anchorContext = contexts.get(anchor);
+        const anchorContext = state.cache.getHtmlLineEndContext(anchor);
         if (anchorContext) {
             context = cloneHtmlLineContext(anchorContext);
             scanStart = anchor + 1;
@@ -274,7 +269,7 @@ function getHtmlLineStartContext(lineNumber) {
         }
 
         context = advanceHtmlContext(context, state.cache.get(line) || '');
-        contexts.set(line, cloneHtmlLineContext(context));
+        state.cache.setHtmlLineEndContext(line, cloneHtmlLineContext(context));
     }
 
     return cloneHtmlLineContext(context);
@@ -1035,7 +1030,7 @@ function shouldSkipLineSyntaxHighlighting(text, language = state.language) {
 }
 
 function renderLineContent(lineNumber, text, forcePlainText = false, suppressSelectionFragments = false) {
-    if (state.isComposing && state.compositionLine === lineNumber) {
+    if (imeController.isComposing && imeController.compositionLine === lineNumber) {
         return escapeHtml(text);
     }
 

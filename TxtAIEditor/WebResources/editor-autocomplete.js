@@ -2,6 +2,7 @@ import { HangulAutocomplete } from './hangul-autocomplete.js';
 import {
     cleanDirtyMarker,
     escapeHtml,
+    imeController,
     markDirty,
     post,
     queueRender,
@@ -533,7 +534,7 @@ function restoreAutocompleteCaretAfterCommit(lineNumber, columnZeroBased, expect
 
     const restore = () => {
         if (token !== autocompleteCaretRestoreToken) return;
-        if (state.isComposing || state.compositionLine) {
+        if (imeController.isComposing || imeController.compositionLine) {
             cancelAutocompleteCaretRestore();
             return;
         }

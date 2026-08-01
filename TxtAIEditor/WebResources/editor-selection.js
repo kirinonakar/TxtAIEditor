@@ -1,4 +1,4 @@
-import { state } from './editor-core.js';
+import { imeController, state } from './editor-core.js';
 import { viewport } from './editor-dom.js';
 
 function lineTextFromElement(element) {
@@ -355,13 +355,13 @@ function drawEditableColumnCursorOverlay(element, column) {
 }
 
 function drawImeBypassCaretOverlay() {
-    if (!state.textareaImeBypassActive || !state.bypassCursorLine || hasCustomSelection()) return;
+    if (!imeController.textareaBypassActive || !imeController.bypassCursorLine || hasCustomSelection()) return;
 
-    const line = Number(state.bypassCursorLine || 0);
+    const line = Number(imeController.bypassCursorLine || 0);
     const element = viewport.querySelector(`.line-text[data-line="${line}"]`);
     if (!element) return;
 
-    drawCaretOverlay(element, state.bypassCursorColumn ?? 0, 1, 'ime-bypass-caret-overlay');
+    drawCaretOverlay(element, imeController.bypassCursorColumn ?? 0, 1, 'ime-bypass-caret-overlay');
 }
 
 function drawCaretOverlay(element, column, width, extraClass) {

@@ -15,87 +15,186 @@ const compositionPhases = new Set([
     ImePhase.TextareaBypassComposition
 ]);
 
-function currentPhase(state) {
-    return state.imePhase || ImePhase.Idle;
-}
+export class ImeController {
+    #phase = ImePhase.Idle;
+    #isComposing = false;
+    #compositionLine = null;
+    #rangeComposition = null;
+    #preparedRangeCompositionLine = null;
+    #columnComposition = null;
+    #pendingVerticalNavigation = null;
+    #pendingSelectionCollapse = null;
+    #textareaBypassActive = false;
+    #bypassStartLine = null;
+    #bypassCursorLine = null;
+    #bypassCursorColumn = null;
+    #onRangeCompositionCleared;
 
-export function beginImeComposition(state, phase, lineNumber) {
-    if (!compositionPhases.has(phase)) return false;
-
-    const current = currentPhase(state);
-    const canStart = current === ImePhase.Idle ||
-        current === phase ||
-        (current === ImePhase.TextareaBypassComposition && phase === ImePhase.TextareaBypassComposition);
-    if (!canStart) return false;
-
-    state.imePhase = phase;
-    state.isComposing = true;
-    state.compositionLine = Math.max(1, Number(lineNumber || state.currentLine || 1));
-    if (phase === ImePhase.TextareaBypassComposition) {
-        state.textareaImeBypassActive = true;
-    }
-    return true;
-}
-
-export function updateImeComposition(state) {
-    return compositionPhases.has(currentPhase(state)) && state.isComposing;
-}
-
-export function beginImeCommit(state) {
-    if (!compositionPhases.has(currentPhase(state))) return false;
-    state.imePhase = ImePhase.Committing;
-    state.isComposing = false;
-    return true;
-}
-
-export function completeImeCommit(state, keepTextareaBypass = false) {
-    state.isComposing = false;
-    state.compositionLine = null;
-    state.rangeComposition = null;
-    state.preparedRangeCompositionLine = null;
-    globalThis.document?.body?.classList.remove('range-composition-active');
-    state.columnComposition = null;
-    if (keepTextareaBypass && state.textareaImeBypassActive) {
-        state.imePhase = ImePhase.TextareaBypassComposition;
-        return;
+    constructor({ onRangeCompositionCleared = () => { } } = {}) {
+        this.#onRangeCompositionCleared = onRangeCompositionCleared;
     }
 
-    state.imePhase = ImePhase.Idle;
-    state.textareaImeBypassActive = false;
-}
-
-export function activateTextareaImeBypass(state, lineNumber) {
-    const current = currentPhase(state);
-    if (current !== ImePhase.Idle && current !== ImePhase.TextareaBypassComposition) {
-        return false;
+    get phase() {
+        return this.#phase;
     }
 
-    state.imePhase = ImePhase.TextareaBypassComposition;
-    state.textareaImeBypassActive = true;
-    state.compositionLine = null;
-    state.isComposing = false;
-    if (lineNumber) {
-        state.bypassStartLine = Math.max(1, Number(lineNumber));
+    get isComposing() {
+        return this.#isComposing;
     }
-    return true;
-}
 
-export function cancelImeComposition(state) {
-    const current = currentPhase(state);
-    if (current === ImePhase.Idle) return false;
-    state.imePhase = ImePhase.Cancelled;
-    state.isComposing = false;
-    state.compositionLine = null;
-    return true;
-}
+    get compositionLine() {
+        return this.#compositionLine;
+    }
 
-export function resetImeState(state) {
-    state.imePhase = ImePhase.Idle;
-    state.isComposing = false;
-    state.compositionLine = null;
-    state.rangeComposition = null;
-    state.preparedRangeCompositionLine = null;
-    globalThis.document?.body?.classList.remove('range-composition-active');
-    state.columnComposition = null;
-    state.textareaImeBypassActive = false;
+    get rangeComposition() {
+        return this.#rangeComposition;
+    }
+
+    set rangeComposition(value) {
+        this.#rangeComposition = value;
+    }
+
+    get preparedRangeCompositionLine() {
+        return this.#preparedRangeCompositionLine;
+    }
+
+    set preparedRangeCompositionLine(value) {
+        this.#preparedRangeCompositionLine = value;
+    }
+
+    get columnComposition() {
+        return this.#columnComposition;
+    }
+
+    set columnComposition(value) {
+        this.#columnComposition = value;
+    }
+
+    get pendingVerticalNavigation() {
+        return this.#pendingVerticalNavigation;
+    }
+
+    set pendingVerticalNavigation(value) {
+        this.#pendingVerticalNavigation = value;
+    }
+
+    get pendingSelectionCollapse() {
+        return this.#pendingSelectionCollapse;
+    }
+
+    set pendingSelectionCollapse(value) {
+        this.#pendingSelectionCollapse = value;
+    }
+
+    get textareaBypassActive() {
+        return this.#textareaBypassActive;
+    }
+
+    get bypassStartLine() {
+        return this.#bypassStartLine;
+    }
+
+    set bypassStartLine(value) {
+        this.#bypassStartLine = value;
+    }
+
+    get bypassCursorLine() {
+        return this.#bypassCursorLine;
+    }
+
+    set bypassCursorLine(value) {
+        this.#bypassCursorLine = value;
+    }
+
+    get bypassCursorColumn() {
+        return this.#bypassCursorColumn;
+    }
+
+    set bypassCursorColumn(value) {
+        this.#bypassCursorColumn = value;
+    }
+
+    get isCompositionActive() {
+        return !!(this.#isComposing || this.#rangeComposition || this.#columnComposition);
+    }
+
+    beginComposition(phase, lineNumber) {
+        if (!compositionPhases.has(phase)) return false;
+
+        const canStart = this.#phase === ImePhase.Idle ||
+            this.#phase === phase ||
+            (this.#phase === ImePhase.TextareaBypassComposition &&
+                phase === ImePhase.TextareaBypassComposition);
+        if (!canStart) return false;
+
+        this.#phase = phase;
+        this.#isComposing = true;
+        this.#compositionLine = Math.max(1, Number(lineNumber || 1));
+        if (phase === ImePhase.TextareaBypassComposition) {
+            this.#textareaBypassActive = true;
+        }
+        return true;
+    }
+
+    updateComposition() {
+        return compositionPhases.has(this.#phase) && this.#isComposing;
+    }
+
+    beginCommit() {
+        if (!compositionPhases.has(this.#phase)) return false;
+        this.#phase = ImePhase.Committing;
+        this.#isComposing = false;
+        return true;
+    }
+
+    completeCommit(keepTextareaBypass = false) {
+        this.#isComposing = false;
+        this.#compositionLine = null;
+        this.#rangeComposition = null;
+        this.#preparedRangeCompositionLine = null;
+        this.#onRangeCompositionCleared();
+        this.#columnComposition = null;
+        if (keepTextareaBypass && this.#textareaBypassActive) {
+            this.#phase = ImePhase.TextareaBypassComposition;
+            return;
+        }
+
+        this.#phase = ImePhase.Idle;
+        this.#textareaBypassActive = false;
+    }
+
+    activateTextareaBypass(lineNumber) {
+        if (this.#phase !== ImePhase.Idle &&
+            this.#phase !== ImePhase.TextareaBypassComposition) {
+            return false;
+        }
+
+        this.#phase = ImePhase.TextareaBypassComposition;
+        this.#textareaBypassActive = true;
+        this.#compositionLine = null;
+        this.#isComposing = false;
+        if (lineNumber) {
+            this.#bypassStartLine = Math.max(1, Number(lineNumber));
+        }
+        return true;
+    }
+
+    cancelComposition() {
+        if (this.#phase === ImePhase.Idle) return false;
+        this.#phase = ImePhase.Cancelled;
+        this.#isComposing = false;
+        this.#compositionLine = null;
+        return true;
+    }
+
+    reset() {
+        this.#phase = ImePhase.Idle;
+        this.#isComposing = false;
+        this.#compositionLine = null;
+        this.#rangeComposition = null;
+        this.#preparedRangeCompositionLine = null;
+        this.#onRangeCompositionCleared();
+        this.#columnComposition = null;
+        this.#textareaBypassActive = false;
+    }
 }

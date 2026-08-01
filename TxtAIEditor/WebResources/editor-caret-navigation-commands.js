@@ -1,8 +1,3 @@
-import {
-    beginImeCommit,
-    completeImeCommit
-} from './editor-ime-state.js';
-
 export function createCaretNavigationCommands({
     caretRectForOffset,
     changedTextBetween,
@@ -17,6 +12,7 @@ export function createCaretNavigationCommands({
     graphemeDeleteEnd,
     graphemeDeleteStart,
     hasCustomSelection,
+    imeController,
     lineTextFromElement,
     normalizeSelection,
     offsetFromPointInElement,
@@ -47,8 +43,8 @@ export function createCaretNavigationCommands({
     function finishPendingImeBeforeCaretNavigation(element) {
         if (!element || element.getAttribute?.('contenteditable') !== 'true') return false;
 
-        if (state.rangeComposition) {
-            const pending = state.rangeComposition;
+        if (imeController.rangeComposition) {
+            const pending = imeController.rangeComposition;
             const lineNumber = Number(pending.lineNumber || element.dataset.line || state.currentLine || 1);
             const targetElement = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`) || element;
             const finalText = targetElement?.getAttribute?.('contenteditable') === 'true'
@@ -57,26 +53,26 @@ export function createCaretNavigationCommands({
             const insertedText = changedTextBetween(pending.command.collapsedText, finalText);
 
             if (finishRangeComposition(targetElement, lineNumber, insertedText)) {
-                beginImeCommit(state);
-                completeImeCommit(state);
+                imeController.beginCommit();
+                imeController.completeCommit();
                 clearPendingImeSelectionCollapse();
                 reportCursorAndSelection(targetElement);
                 return true;
             }
         }
 
-        if (state.columnComposition) {
-            const lineNumber = Number(element.dataset.line || state.compositionLine || state.currentLine || 1);
+        if (imeController.columnComposition) {
+            const lineNumber = Number(element.dataset.line || imeController.compositionLine || state.currentLine || 1);
             if (finishColumnComposition(element, lineNumber)) {
-                beginImeCommit(state);
-                completeImeCommit(state);
+                imeController.beginCommit();
+                imeController.completeCommit();
                 clearPendingImeSelectionCollapse();
                 reportCursorAndSelection(element);
                 return true;
             }
         }
 
-        if (state.isComposing) {
+        if (imeController.isComposing) {
             commitLineForSave(element);
             clearPendingImeSelectionCollapse();
             return true;

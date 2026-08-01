@@ -2,6 +2,7 @@ import { csvFormulaInput, scrollContainer, viewport } from './editor-dom.js';
 import {
     MAX_RENDER_CHARS,
     escapeHtml,
+    imeController,
     lineAt,
     measureRenderedRows,
     preserveScrollTop,
@@ -176,7 +177,7 @@ function createEditorRenderer({
         // WebView2 treats that disconnect as an IME commit boundary and Korean
         // syllables can be committed as separate jamo. Defer every DOM render
         // until compositionend instead of trying to detach/preserve the row.
-        if ((state.isComposing && state.compositionLine) || state.rangeComposition) {
+        if ((imeController.isComposing && imeController.compositionLine) || imeController.rangeComposition) {
             return;
         }
 
@@ -255,12 +256,12 @@ function createEditorRenderer({
         if (rangeKey === state.lastRangeKey) return;
         state.lastRangeKey = rangeKey;
 
-        if (state.columnComposition) {
+        if (imeController.columnComposition) {
             return;
         }
 
-        const composingRow = state.isComposing && state.compositionLine
-            ? viewport.querySelector(`.line-row[data-line="${state.compositionLine}"]`)
+        const composingRow = imeController.isComposing && imeController.compositionLine
+            ? viewport.querySelector(`.line-row[data-line="${imeController.compositionLine}"]`)
             : null;
 
         const offsetY = viewportTopForLine(renderStart);
@@ -292,7 +293,7 @@ function createEditorRenderer({
         let livePreviewContextAnchorRow = '';
         const livePreviewSkipRef = { val: 0 };
         for (let line = renderStart; line <= renderEnd; line++) {
-            if (composingRow && line === state.compositionLine) {
+            if (composingRow && line === imeController.compositionLine) {
                 rows.push(`<div class="line-row-placeholder" data-line="${line}"></div>`);
                 continue;
             }
@@ -333,13 +334,13 @@ function createEditorRenderer({
                 shouldShowSelectionSource ||
                 isLong ||
                 !state.inlineLivePreviewEnabled ||
-                state.isComposing ||
+                imeController.isComposing ||
                 !hasLine;
             const isInlineLivePreviewSourceLine = state.inlineLivePreviewEnabled &&
                 hasLine &&
                 shouldShowSource &&
                 !isLong &&
-                !state.isComposing;
+                !imeController.isComposing;
             // Long JSON rows skip token spans independently of search and selection overlays.
             let lineContent = renderLineContent(
                 line,
@@ -385,7 +386,7 @@ function createEditorRenderer({
                 sourceLine: sourceLine
             };
 
-            if (state.inlineLivePreviewEnabled && hasLine && shouldShowSource && !isLong && !state.isComposing) {
+            if (state.inlineLivePreviewEnabled && hasLine && shouldShowSource && !isLong && !imeController.isComposing) {
                 if (!isEditablePreviewBlockLine && line !== sourceLine) {
                     renderedLivePreviewLine = renderPreviewLineAt(
                         line,
@@ -425,7 +426,7 @@ function createEditorRenderer({
                 ? null
                 : state.dirtyLines.get(line);
             const dirtyClass = dirtyType ? ` dirty-${dirtyType}` : '';
-            const editingClass = line === activeLine || line === state.editingLine || line === state.compositionLine
+            const editingClass = line === activeLine || line === state.editingLine || line === imeController.compositionLine
                 ? ' editing-row'
                 : '';
             const hoveredClass = line === hoveredLineNumber ? ' hovered-row' : '';
@@ -467,7 +468,7 @@ function createEditorRenderer({
         syncHorizontalOverflow();
 
         if (composingRow) {
-            const placeholder = viewport.querySelector(`.line-row-placeholder[data-line="${state.compositionLine}"]`);
+            const placeholder = viewport.querySelector(`.line-row-placeholder[data-line="${imeController.compositionLine}"]`);
             if (placeholder) {
                 placeholder.replaceWith(composingRow);
             }
