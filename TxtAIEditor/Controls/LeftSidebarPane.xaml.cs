@@ -148,6 +148,7 @@ namespace TxtAIEditor.Controls
         public Button ExplorerHomeBtn => ExplorerView.HomeButton;
         public ToggleButton ExplorerTreeModeBtn => ExplorerView.TreeModeButton;
         public TreeView ExplorerTree => ExplorerView.Tree;
+        public BreadcrumbBar ExplorerBreadcrumb => ExplorerView.Breadcrumb;
 
         public ListView FileList => ExplorerView.FileList;
         public ListView FavoritesList => FavoritesView.Items;

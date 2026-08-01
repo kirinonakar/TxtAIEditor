@@ -219,8 +219,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 _viewModel.ExplorerItems.ReplaceAll(items);
-                _leftSidebar.ExplorerStatus.Text =
-                    $"{folderPath}\n{FormatExplorerItemCount(items.Count)}";
+                _leftSidebar.ExplorerStatus.Text = FormatExplorerItemCount(items.Count);
 
                 if (updateGitStatus)
                 {
@@ -298,13 +297,8 @@ namespace TxtAIEditor.Controls
                     _viewModel.ExplorerItems.Add(item);
                 }
 
-                string directoryLabel = string.IsNullOrEmpty(CurrentArchiveDirectory) ? "/" : CurrentArchiveDirectory;
-                string format = _localizationService.GetString("ExplorerArchiveStatusFormat", "{0}!/{1}\n{2}");
-                _leftSidebar.ExplorerStatus.Text = string.Format(
-                    format,
-                    GetArchiveDisplayPath(archivePath),
-                    directoryLabel,
-                    FormatExplorerItemCount(_viewModel.ExplorerItems.Count));
+                _leftSidebar.ExplorerStatus.Text = FormatExplorerItemCount(_viewModel.ExplorerItems.Count);
+                UpdateExplorerBreadcrumb();
             }
             catch (Exception ex)
             {
@@ -547,9 +541,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 SetCurrentFolderPath(_remoteWorkspaceService.ActiveDirectoryVirtualPath);
-                _leftSidebar.ExplorerStatus.Text =
-                    $"{connection.Profile.Name} · {connection.Profile.ProtocolLabel} · {_remoteWorkspaceService.ActiveDirectoryPath}\n" +
-                    FormatExplorerItemCount(_viewModel.ExplorerItems.Count);
+                _leftSidebar.ExplorerStatus.Text = FormatExplorerItemCount(_viewModel.ExplorerItems.Count);
             }
             catch (OperationCanceledException)
             {
@@ -579,8 +571,7 @@ namespace TxtAIEditor.Controls
                 _viewModel.ExplorerItems.Add(item);
             }
 
-            _leftSidebar.ExplorerStatus.Text =
-                $"{_remoteWorkspaceService.ActiveDirectoryPath}\n{FormatExplorerFilterResult(matched.Count)}";
+            _leftSidebar.ExplorerStatus.Text = FormatExplorerFilterResult(matched.Count);
         }
 
         public void RefreshCurrentFolder()
@@ -670,6 +661,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExplorerTreeItemInvoked += OnExplorerTreeItemInvoked;
             _leftSidebar.FileListViewItemClick += OnFileListViewItemClick;
             _leftSidebar.ExplorerFilterTextChanged += OnExplorerFilterTextChanged;
+            _leftSidebar.ExplorerBreadcrumb.ItemClicked += OnExplorerBreadcrumbItemClicked;
         }
 
         private async void OnSelectFolderClick(object sender, RoutedEventArgs e)
@@ -856,7 +848,7 @@ namespace TxtAIEditor.Controls
             PopulateTreeNode(rootNode);
             rootNode.IsExpanded = true;
 
-            _leftSidebar.ExplorerStatus.Text = $"{folderPath}\n{FormatExplorerItemCount(rootNode.Children.Count)}";
+            _leftSidebar.ExplorerStatus.Text = FormatExplorerItemCount(rootNode.Children.Count);
             _ = UpdateGitStatusesAsync();
         }
 
@@ -907,9 +899,7 @@ namespace TxtAIEditor.Controls
             await PopulateRemoteTreeNodeAsync(rootNode, rootItem);
             rootNode.IsExpanded = true;
             SetCurrentFolderPath(_remoteWorkspaceService.ActiveDirectoryVirtualPath);
-            _leftSidebar.ExplorerStatus.Text =
-                $"{connection.Profile.Name} · {connection.Profile.ProtocolLabel} · {rootPath}\n" +
-                FormatExplorerItemCount(rootNode.Children.Count);
+            _leftSidebar.ExplorerStatus.Text = FormatExplorerItemCount(rootNode.Children.Count);
         }
 
         private void PopulateTreeNode(
@@ -1310,6 +1300,186 @@ namespace TxtAIEditor.Controls
 
             CurrentFolderPath = folderPath;
             _currentFolderChanged(folderPath);
+            UpdateExplorerBreadcrumb();
+        }
+
+        private void UpdateExplorerBreadcrumb()
+        {
+            var segments = new List<ExplorerBreadcrumbSegment>();
+            try
+            {
+                if (IsViewingArchive && !string.IsNullOrWhiteSpace(CurrentArchivePath))
+                {
+                    BuildArchiveBreadcrumb(segments);
+                }
+                else if (IsViewingRemote && _remoteWorkspaceService.IsActive)
+                {
+                    BuildRemoteBreadcrumb(segments, CurrentFolderPath);
+                }
+                else if (!string.IsNullOrWhiteSpace(CurrentFolderPath))
+                {
+                    BuildLocalBreadcrumb(segments, CurrentFolderPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed building explorer breadcrumb: {ex.Message}");
+            }
+
+            bool hasSegments = segments.Count > 0;
+            _leftSidebar.ExplorerBreadcrumb.ItemsSource = hasSegments ? segments : null;
+            _leftSidebar.ExplorerBreadcrumb.Visibility = hasSegments ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void BuildLocalBreadcrumb(List<ExplorerBreadcrumbSegment> segments, string folderPath)
+        {
+            string root = Path.GetPathRoot(folderPath) ?? string.Empty;
+            string remainder = string.IsNullOrEmpty(root) ? folderPath : folderPath[root.Length..];
+            if (!string.IsNullOrEmpty(root))
+            {
+                string rootName = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                segments.Add(new ExplorerBreadcrumbSegment(
+                    string.IsNullOrEmpty(rootName) ? root : rootName,
+                    root));
+            }
+
+            string current = root;
+            foreach (string part in remainder.Split(
+                new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                StringSplitOptions.RemoveEmptyEntries))
+            {
+                current = string.IsNullOrEmpty(current) ? part : Path.Combine(current, part);
+                segments.Add(new ExplorerBreadcrumbSegment(part, current));
+            }
+        }
+
+        private void BuildRemoteBreadcrumb(List<ExplorerBreadcrumbSegment> segments, string virtualPath)
+        {
+            if (!RemotePath.TryParse(virtualPath, out Guid serverId, out string remotePath))
+            {
+                return;
+            }
+
+            string serverName = RemotePath.GetServerNameHint(virtualPath)
+                ?? _remoteWorkspaceService.ActiveConnection?.Profile.Name
+                ?? "Remote";
+            segments.Add(new ExplorerBreadcrumbSegment(
+                serverName,
+                RemotePath.Create(serverId, "/", isDirectory: true, serverName)));
+
+            string current = string.Empty;
+            foreach (string part in remotePath.Split('/', StringSplitOptions.RemoveEmptyEntries))
+            {
+                current = $"{current}/{part}";
+                segments.Add(new ExplorerBreadcrumbSegment(
+                    part,
+                    RemotePath.Create(serverId, current, isDirectory: true, serverName)));
+            }
+        }
+
+        private void BuildArchiveBreadcrumb(List<ExplorerBreadcrumbSegment> segments)
+        {
+            string archivePath = CurrentArchivePath;
+            string entryDirectory = CurrentArchiveDirectory;
+
+            if (!string.IsNullOrWhiteSpace(_currentArchiveRemotePath) &&
+                RemotePath.TryParse(_currentArchiveRemotePath, out Guid serverId, out string remoteArchivePath))
+            {
+                string serverName = RemotePath.GetServerNameHint(_currentArchiveRemotePath) ?? "Remote";
+                segments.Add(new ExplorerBreadcrumbSegment(
+                    serverName,
+                    RemotePath.Create(serverId, "/", isDirectory: true, serverName)));
+
+                string current = string.Empty;
+                string[] archiveParts = remoteArchivePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < archiveParts.Length; i++)
+                {
+                    current = $"{current}/{archiveParts[i]}";
+                    bool isLast = i == archiveParts.Length - 1;
+                    segments.Add(new ExplorerBreadcrumbSegment(
+                        archiveParts[i],
+                        isLast
+                            ? RemotePath.GetParent(_currentArchiveRemotePath)
+                            : RemotePath.Create(serverId, current, isDirectory: true, serverName)));
+                }
+            }
+            else
+            {
+                string root = Path.GetPathRoot(archivePath) ?? string.Empty;
+                string remainder = string.IsNullOrEmpty(root) ? archivePath : archivePath[root.Length..];
+                if (!string.IsNullOrEmpty(root))
+                {
+                    string rootName = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    segments.Add(new ExplorerBreadcrumbSegment(
+                        string.IsNullOrEmpty(rootName) ? root : rootName,
+                        root));
+                }
+
+                string current = root;
+                string[] archiveParts = remainder.Split(
+                    new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                    StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < archiveParts.Length; i++)
+                {
+                    current = string.IsNullOrEmpty(current) ? archiveParts[i] : Path.Combine(current, archiveParts[i]);
+                    bool isLast = i == archiveParts.Length - 1;
+                    segments.Add(new ExplorerBreadcrumbSegment(
+                        archiveParts[i],
+                        isLast ? (Path.GetDirectoryName(archivePath) ?? root) : current));
+                }
+            }
+
+            segments.Add(new ExplorerBreadcrumbSegment(
+                "!",
+                archivePath,
+                isArchive: true,
+                archivePath: archivePath));
+
+            if (!string.IsNullOrWhiteSpace(entryDirectory))
+            {
+                string currentEntry = string.Empty;
+                foreach (string part in entryDirectory.Split('/', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    currentEntry = string.IsNullOrEmpty(currentEntry) ? part : $"{currentEntry}/{part}";
+                    segments.Add(new ExplorerBreadcrumbSegment(
+                        part,
+                        currentEntry,
+                        isArchive: true,
+                        archivePath: archivePath));
+                }
+            }
+        }
+
+        private void OnExplorerBreadcrumbItemClicked(
+            Microsoft.UI.Xaml.Controls.BreadcrumbBar sender,
+            Microsoft.UI.Xaml.Controls.BreadcrumbBarItemClickedEventArgs args)
+        {
+            if (args.Item is not ExplorerBreadcrumbSegment segment)
+            {
+                return;
+            }
+
+            if (segment.IsArchive)
+            {
+                if (!string.IsNullOrWhiteSpace(segment.ArchivePath) && File.Exists(segment.ArchivePath))
+                {
+                    LoadArchiveDirectoryRoot(segment.ArchivePath, segment.EntryDirectory);
+                }
+
+                return;
+            }
+
+            if (RemotePath.IsRemote(segment.Path))
+            {
+                _ = NavigateRemoteVirtualPathAsync(segment.Path, revealInLeftPanel: false);
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(segment.Path) && Directory.Exists(segment.Path))
+            {
+                UpdateRepoPath(segment.Path);
+                LoadDirectoryRoot(segment.Path);
+            }
         }
 
         private void PushHistory(ExplorerHistoryEntry entry)
@@ -1665,7 +1835,7 @@ namespace TxtAIEditor.Controls
                         _viewModel.ExplorerItems.Add(item);
                     }
 
-                    _leftSidebar.ExplorerStatus.Text = $"{CurrentFolderPath}\n{FormatExplorerFilterResult(_viewModel.ExplorerItems.Count)}";
+                    _leftSidebar.ExplorerStatus.Text = FormatExplorerFilterResult(_viewModel.ExplorerItems.Count);
                 });
 
                 await UpdateGitStatusesAsync();
@@ -1704,13 +1874,7 @@ namespace TxtAIEditor.Controls
                         _viewModel.ExplorerItems.Add(item);
                     }
 
-                    string directoryLabel = string.IsNullOrEmpty(CurrentArchiveDirectory) ? "/" : CurrentArchiveDirectory;
-                    string format = _localizationService.GetString("ExplorerArchiveStatusFormat", "{0}!/{1}\n{2}");
-                    _leftSidebar.ExplorerStatus.Text = string.Format(
-                        format,
-                        GetArchiveDisplayPath(CurrentArchivePath),
-                        directoryLabel,
-                        FormatExplorerFilterResult(_viewModel.ExplorerItems.Count));
+                    _leftSidebar.ExplorerStatus.Text = FormatExplorerFilterResult(_viewModel.ExplorerItems.Count);
                 });
             }
         }

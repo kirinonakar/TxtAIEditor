@@ -72,6 +72,16 @@
                                         </Button>
                                     </Grid>
 
+                                    <BreadcrumbBar x:Name="ExplorerBreadcrumbBar"
+                                                   Visibility="Collapsed"
+                                                   HorizontalAlignment="Stretch"
+                                                   ItemClicked="OnExplorerBreadcrumbItemClicked">
+                                        <BreadcrumbBar.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                            </DataTemplate>
+                                        </BreadcrumbBar.ItemTemplate>
+                                    </BreadcrumbBar>
                                     <Grid ColumnSpacing="6">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
