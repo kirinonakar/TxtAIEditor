@@ -30,6 +30,7 @@ namespace TxtAIEditor.Controls
         private readonly ISettingsService _settingsService;
         private readonly System.Action<bool> _applyLeftSidebarVisibility;
         private readonly System.Action<bool> _applyPreviewVisibility;
+        private readonly System.Action _refreshTabLayout;
 
         private bool _isActive;
         private bool _wasLeftSidebarVisible;
@@ -61,7 +62,8 @@ namespace TxtAIEditor.Controls
             IStickyNoteService stickyNoteService,
             ISettingsService settingsService,
             System.Action<bool> applyLeftSidebarVisibility,
-            System.Action<bool> applyPreviewVisibility)
+            System.Action<bool> applyPreviewVisibility,
+            System.Action refreshTabLayout)
         {
             _window = window;
             _windowHandle = WindowNative.GetWindowHandle(window);
@@ -78,6 +80,7 @@ namespace TxtAIEditor.Controls
             _settingsService = settingsService;
             _applyLeftSidebarVisibility = applyLeftSidebarVisibility;
             _applyPreviewVisibility = applyPreviewVisibility;
+            _refreshTabLayout = refreshTabLayout;
 
             _stickyNoteBar.ExitClick += (_, _) => Exit();
             _stickyNoteBar.TopMostClick += (_, _) => ApplyTopMostFromStickyBar();
@@ -161,6 +164,7 @@ namespace TxtAIEditor.Controls
             _shellPanelLayoutService.ApplyLeftSidebarVisibility(false);
             _shellPanelLayoutService.ApplyPreviewVisibility(false);
             ResizeWindow(GetStickyNoteWindowSize());
+            _refreshTabLayout();
         }
 
         private void Exit()
@@ -210,6 +214,7 @@ namespace TxtAIEditor.Controls
             }
 
             _wasWindowMaximized = false;
+            _refreshTabLayout();
             PersistSettings();
         }
 

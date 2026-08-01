@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -112,6 +113,32 @@ namespace TxtAIEditor.Controls
             TryDisableTabItemTransitions(EditorTabView2);
         }
 
+        public void RefreshTabLayout()
+        {
+            QueueTabActionSpacerUpdate();
+
+            if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, RefreshTabLayoutAfterLayout))
+            {
+                _tabActionSpacerUpdateQueued = false;
+                UpdateTabActionSpacers();
+            }
+        }
+
+        private void RefreshTabLayoutAfterLayout()
+        {
+            _tabActionSpacerUpdateQueued = false;
+            UpdateTabActionSpacers();
+
+            if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+            {
+                _tabActionSpacerUpdateQueued = false;
+                UpdateTabActionSpacers();
+            }))
+            {
+                UpdateTabActionSpacers();
+            }
+        }
+
         private void UpdateTabActionSpacers()
         {
             double primaryWidth = Math.Max(72, GetVisibleTabActionsWidth(PrimaryTabActions) + 12);
@@ -123,16 +150,47 @@ namespace TxtAIEditor.Controls
             var primaryListView = FindTabViewListView(EditorTabView);
             if (primaryListView != null && EditorTabView.ActualWidth > 0)
             {
-                double availableWidth = EditorTabView.ActualWidth - primaryWidth - 44;
-                primaryListView.MaxWidth = Math.Max(0, availableWidth);
+                UpdateTabListLayout(EditorTabView, PrimaryTabActions, primaryListView, primaryWidth);
             }
 
             var secondaryListView = FindTabViewListView(EditorTabView2);
             if (secondaryListView != null && EditorTabView2.ActualWidth > 0)
             {
-                double availableWidth = EditorTabView2.ActualWidth - secondaryWidth - 44;
-                secondaryListView.MaxWidth = Math.Max(0, availableWidth);
+                UpdateTabListLayout(EditorTabView2, SecondaryTabActions, secondaryListView, secondaryWidth);
             }
+        }
+
+        private static void UpdateTabListLayout(
+            TabView tabView,
+            StackPanel actionsPanel,
+            ListViewBase listView,
+            double reservedActionWidth)
+        {
+            double availableWidth = Math.Max(0, tabView.ActualWidth - reservedActionWidth - 44);
+
+            try
+            {
+                Point listOrigin = listView.TransformToVisual(tabView).TransformPoint(new Point(0, 0));
+                Point actionsOrigin = actionsPanel.TransformToVisual(tabView).TransformPoint(new Point(0, 0));
+                if (actionsOrigin.X > listOrigin.X)
+                {
+                    availableWidth = Math.Max(0, actionsOrigin.X - listOrigin.X - 4);
+                }
+            }
+            catch
+            {
+                // Use the conservative fallback when the template is not laid out yet.
+            }
+
+            // TabView's template places the list in an Auto column. Explicitly sizing and
+            // left-aligning it prevents a mode transition from leaving the first tab centered
+            // in stale space or allowing the overlaid action buttons to cover the last tab.
+            listView.HorizontalAlignment = HorizontalAlignment.Left;
+            listView.HorizontalContentAlignment = HorizontalAlignment.Left;
+            listView.Width = availableWidth;
+            listView.MaxWidth = availableWidth;
+            listView.InvalidateMeasure();
+            listView.InvalidateArrange();
         }
 
         private static double GetVisibleTabActionsWidth(StackPanel actionsPanel)

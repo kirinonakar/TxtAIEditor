@@ -103,7 +103,8 @@ namespace TxtAIEditor.Composition
                 shellServices.StickyNoteService,
                 commonServices.SettingsService,
                 callbacks.ApplyLeftSidebarVisibility,
-                callbacks.ApplyPreviewVisibility);
+                callbacks.ApplyPreviewVisibility,
+                ui.EditorWorkspace.RefreshTabLayout);
 
             var statusBar = new StatusBarController(
                 ui.StatusBar,
