@@ -84,6 +84,7 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock x:Name="ExplorerStatusText" Text="폴더를 선택하세요." FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center"/>
                                         <Button x:Name="ExplorerHomeButton" Grid.Column="1" Click="OnExplorerHomeClick" ToolTipService.ToolTip="홈 폴더로 이동" AutomationProperties.Name="홈 폴더로 이동" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
