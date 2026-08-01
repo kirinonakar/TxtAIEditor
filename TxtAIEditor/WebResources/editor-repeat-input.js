@@ -1,3 +1,5 @@
+const MAX_MODEL_REPEAT_EDITS_PER_PRESS = 100;
+
 export function createKeyboardRepeatController({
     activeEditableElement,
     cancelPendingRepeatFollowUps,
@@ -19,6 +21,8 @@ export function createKeyboardRepeatController({
         lastRunAt: 0,
         continuousTimer: 0,
         continuousKey: null,
+        editCount: 0,
+        generation: 0,
         hasContinuousRun: false,
         hasPhysicalRepeatSignal: false,
         lastKeyDownAt: 0,
@@ -28,6 +32,7 @@ export function createKeyboardRepeatController({
         lineBoundaryUntil: 0,
         releaseGuardMs: 250,
         releasedKeys: new Map(),
+        stoppedUntilReleaseKeys: new Set(),
         suppressBeforeInputUntil: 0,
         suppressBeforeInputTypes: new Set()
     };
@@ -80,6 +85,12 @@ export function createKeyboardRepeatController({
 
         if (repeatState.continuousKey && beforeInputMatchesRepeatKey(event, repeatState.continuousKey)) {
             return true;
+        }
+
+        for (const key of repeatState.stoppedUntilReleaseKeys) {
+            if (beforeInputMatchesRepeatKey(event, key)) {
+                return true;
+            }
         }
 
         for (const [key, until] of repeatState.releasedKeys.entries()) {
@@ -152,6 +163,7 @@ export function createKeyboardRepeatController({
     }
 
     function clearPendingRepeatEdit(releasedKey = null, addReleaseGuard = true) {
+        repeatState.generation++;
         const activeKey = repeatState.continuousKey;
         const keyToGuard = releasedKey || activeKey;
         const hadContinuousRun = repeatState.hasContinuousRun;
@@ -160,6 +172,7 @@ export function createKeyboardRepeatController({
             repeatState.continuousTimer = 0;
         }
         repeatState.continuousKey = null;
+        repeatState.editCount = 0;
         repeatState.hasContinuousRun = false;
         repeatState.hasPhysicalRepeatSignal = false;
         repeatState.lastKeyDownAt = 0;
@@ -177,6 +190,33 @@ export function createKeyboardRepeatController({
         }
     }
 
+    function stopAtRepeatLimit(key) {
+        if (!key) return;
+        repeatState.generation++;
+        if (repeatState.continuousTimer) {
+            clearTimeout(repeatState.continuousTimer);
+            repeatState.continuousTimer = 0;
+        }
+        repeatState.stoppedUntilReleaseKeys.add(key);
+        repeatState.continuousKey = null;
+        repeatState.editCount = 0;
+        repeatState.hasContinuousRun = false;
+        repeatState.hasPhysicalRepeatSignal = false;
+        repeatState.lastKeyDownAt = 0;
+        cancelPendingRepeatFollowUps(key);
+    }
+
+    function releaseModelRepeatKey(key) {
+        if (!key) return;
+        repeatState.stoppedUntilReleaseKeys.delete(key);
+        clearPendingRepeatEdit(key);
+    }
+
+    function resetModelRepeatState() {
+        repeatState.stoppedUntilReleaseKeys.clear();
+        clearPendingRepeatEdit();
+    }
+
     function repeatEditDelayFromNow() {
         const now = performance.now();
         const boundaryWait = Math.max(0, repeatState.lineBoundaryUntil - now);
@@ -184,15 +224,22 @@ export function createKeyboardRepeatController({
         return Math.max(boundaryWait, intervalWait);
     }
 
-    function scheduleContinuousModelRepeatEdit(key, delayMs) {
+    function scheduleContinuousModelRepeatEdit(key, delayMs, generation = repeatState.generation) {
+        if (generation !== repeatState.generation) return;
         if (repeatState.continuousTimer) {
             clearTimeout(repeatState.continuousTimer);
             repeatState.continuousTimer = 0;
         }
 
-        repeatState.continuousTimer = setTimeout(() => {
-            repeatState.continuousTimer = 0;
-            if (repeatState.continuousKey !== key || isReadOnly() || isImeComposing()) {
+        const timerId = setTimeout(() => {
+            // A callback from a previous press can already be queued when the
+            // same key starts a new repeat session. It must not clear or extend
+            // the new session's timer.
+            if (repeatState.continuousTimer === timerId) {
+                repeatState.continuousTimer = 0;
+            }
+            if (generation !== repeatState.generation ||
+                repeatState.continuousKey !== key || isReadOnly() || isImeComposing()) {
                 return;
             }
 
@@ -204,19 +251,21 @@ export function createKeyboardRepeatController({
 
             const wait = repeatEditDelayFromNow();
             if (wait > 0) {
-                scheduleContinuousModelRepeatEdit(key, wait);
+                scheduleContinuousModelRepeatEdit(key, wait, generation);
                 return;
             }
 
             repeatState.lastRunAt = performance.now();
             repeatState.hasContinuousRun = true;
-            runModelRepeatEdit(key);
-            scheduleContinuousModelRepeatEdit(key, repeatState.intervalMs);
+            if (!runCountedModelRepeatEdit(key)) return;
+            scheduleContinuousModelRepeatEdit(key, repeatState.intervalMs, generation);
         }, Math.max(0, Number(delayMs || 0)));
+        repeatState.continuousTimer = timerId;
     }
 
     function scheduleModelRepeatEdit(key, isRepeat) {
         if (isReadOnly() || isImeComposing()) return;
+        if (repeatState.stoppedUntilReleaseKeys.has(key)) return;
         if (isRepeat && isReleaseGuardedRepeatKey(key)) return;
         if (!isRepeat) {
             repeatState.releasedKeys.delete(key);
@@ -236,16 +285,37 @@ export function createKeyboardRepeatController({
             return;
         }
 
+        // A delayed OS repeat event from an earlier press must never create a
+        // new session. Only a fresh physical keydown (repeat === false) can arm
+        // model repetition again.
+        if (isRepeat) return;
+
         clearPendingRepeatEdit(null, false);
         repeatState.continuousKey = key;
+        repeatState.editCount = 0;
         repeatState.hasContinuousRun = false;
         repeatState.hasPhysicalRepeatSignal = !!isRepeat;
         repeatState.lastKeyDownAt = performance.now();
         repeatState.lastRunAt = performance.now();
-        runModelRepeatEdit(key);
+        if (!runCountedModelRepeatEdit(key)) return;
         if (isRepeat) {
             scheduleContinuousModelRepeatEdit(key, repeatEditDelayFromNow());
         }
+    }
+
+    function runCountedModelRepeatEdit(key) {
+        if (repeatState.editCount >= MAX_MODEL_REPEAT_EDITS_PER_PRESS) {
+            stopAtRepeatLimit(key);
+            return false;
+        }
+
+        runModelRepeatEdit(key);
+        repeatState.editCount++;
+        if (repeatState.editCount >= MAX_MODEL_REPEAT_EDITS_PER_PRESS) {
+            stopAtRepeatLimit(key);
+            return false;
+        }
+        return true;
     }
 
     function runModelRepeatEdit(key) {
@@ -282,12 +352,13 @@ export function createKeyboardRepeatController({
     }
 
     return {
-        clearPendingRepeatEdit,
         isModelRepeatKey,
         isSpaceInputEvent,
         markLineBoundaryTransition,
         markNativeBeforeInputHandled,
         normalizedModelRepeatKey,
+        releaseModelRepeatKey,
+        resetModelRepeatState,
         scheduleModelRepeatEdit,
         shouldSuppressNativeBeforeInput
     };

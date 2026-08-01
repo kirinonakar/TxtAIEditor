@@ -27,7 +27,6 @@ import {
 import {
     cancelImeBypassTextarea,
     changeLineIndent,
-    clearPendingRepeatEdit,
     commitLine,
     compositionSelectionRange,
     focusLine,
@@ -43,6 +42,8 @@ import {
     normalizedModelRepeatKey,
     pasteFromClipboard,
     prepareMultilineCompositionHost,
+    releaseModelRepeatKey,
+    resetModelRepeatState,
     scheduleModelRepeatEdit,
     selectAll,
     submitHexEdit,
@@ -861,7 +862,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
         }
 
         if (isModelRepeatKey(event)) {
-            clearPendingRepeatEdit(normalizedModelRepeatKey(event));
+            releaseModelRepeatKey(normalizedModelRepeatKey(event));
         }
 
         const element = lineElementFromEvent(event);
@@ -898,7 +899,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
 
     document.addEventListener('keyup', event => {
         if (isModelRepeatKey(event)) {
-            clearPendingRepeatEdit(normalizedModelRepeatKey(event));
+            releaseModelRepeatKey(normalizedModelRepeatKey(event));
         }
 
         if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
@@ -917,12 +918,12 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
 
     window.addEventListener('blur', () => {
         stopKeyboardVerticalRepeat();
-        clearPendingRepeatEdit();
+        resetModelRepeatState();
     });
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             stopKeyboardVerticalRepeat();
-            clearPendingRepeatEdit();
+            resetModelRepeatState();
         }
     });
 }

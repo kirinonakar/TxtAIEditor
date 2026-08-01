@@ -1222,12 +1222,13 @@ const {
 });
 
 const {
-    clearPendingRepeatEdit,
     isModelRepeatKey,
     isSpaceInputEvent,
     markLineBoundaryTransition,
     markNativeBeforeInputHandled,
     normalizedModelRepeatKey,
+    releaseModelRepeatKey,
+    resetModelRepeatState,
     scheduleModelRepeatEdit,
     shouldSuppressNativeBeforeInput
 } = createKeyboardRepeatController({
@@ -1413,7 +1414,6 @@ export {
     cancelImeBypassTextarea,
     focusImeBypassTextarea,
     clearPendingImeSelectionCollapse,
-    clearPendingRepeatEdit,
     commitLine,
     compositionSelectionRange,
     copySelectionToClipboard,
@@ -1447,11 +1447,13 @@ export {
     normalizedModelRepeatKey,
     pasteFromClipboard,
     prepareMultilineCompositionHost,
+    releaseModelRepeatKey,
     submitHexEdit,
     positionFromPointer,
     replaceSelectionForCompositionStart,
     replaceSelectionWith,
     runPendingLineActions,
+    resetModelRepeatState,
     scheduleModelRepeatEdit,
     selectAll,
     selectWordAtPointer,
