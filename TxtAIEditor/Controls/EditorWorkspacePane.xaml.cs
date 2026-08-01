@@ -51,10 +51,11 @@ namespace TxtAIEditor.Controls
             EditorTabView2.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
             PrimaryTabActions.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
             SecondaryTabActions.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
-            StickyNoteBar.RegisterPropertyChangedCallback(VisibilityProperty, (_, __) => QueueTabActionSpacerUpdate());
+            StickyNoteBar.RegisterPropertyChangedCallback(VisibilityProperty, (_, __) => ApplyStickyNoteTabActions());
             ActiveTabView = EditorTabView;
             Loaded += (_, __) => {
                 DisableTabItemTransitions();
+                ApplyStickyNoteTabActions();
                 QueueTabActionSpacerUpdate();
             };
         }
@@ -169,7 +170,8 @@ namespace TxtAIEditor.Controls
             ListViewBase listView,
             double reservedActionWidth)
         {
-            double availableWidth = Math.Max(0, tabView.ActualWidth - reservedActionWidth - TabViewAddButtonReservedWidth);
+            double addButtonReservedWidth = tabView.IsAddTabButtonVisible ? TabViewAddButtonReservedWidth : 0;
+            double availableWidth = Math.Max(0, tabView.ActualWidth - reservedActionWidth - addButtonReservedWidth);
 
             try
             {
@@ -179,7 +181,7 @@ namespace TxtAIEditor.Controls
                 {
                     // The add button is in the column immediately after the list.
                     // Reserve its column plus a small gap before the overlaid actions.
-                    availableWidth = Math.Max(0, actionsOrigin.X - listOrigin.X - TabViewAddButtonReservedWidth);
+                    availableWidth = Math.Max(0, actionsOrigin.X - listOrigin.X - addButtonReservedWidth);
                 }
             }
             catch
@@ -272,6 +274,18 @@ namespace TxtAIEditor.Controls
             {
                 _tabActionSpacerUpdateQueued = false;
             }
+        }
+
+        private void ApplyStickyNoteTabActions()
+        {
+            bool isStickyNoteMode = StickyNoteBar.Visibility == Visibility.Visible;
+
+            EditorTabView.IsAddTabButtonVisible = !isStickyNoteMode;
+            EditorTabView2.IsAddTabButtonVisible = !isStickyNoteMode;
+            StickyAddTabBtn.Visibility = isStickyNoteMode ? Visibility.Visible : Visibility.Collapsed;
+            StickyAddTab2Btn.Visibility = isStickyNoteMode ? Visibility.Visible : Visibility.Collapsed;
+
+            QueueTabActionSpacerUpdate();
         }
 
         private static ListViewBase? FindTabViewListView(TabView tabView)
@@ -463,9 +477,12 @@ namespace TxtAIEditor.Controls
             _pendingTerminalLocalization = getString;
             string leftTooltip = getString("MoveTabLeftTooltip", "왼쪽 탭으로 이동 (Ctrl/Shift 누르고 클릭하면 탭 위치 이동)");
             string rightTooltip = getString("MoveTabRightTooltip", "오른쪽 탭으로 이동 (Ctrl/Shift 누르고 클릭하면 탭 위치 이동)");
+            string newTabTooltip = getString("ShortcutDescNewTab", "새 탭");
             string openTabsTooltip = getString("OpenTabsListTooltip", "열린 탭 목록");
             _noOpenTabsText = getString("NoOpenTabs", "열린 탭이 없습니다");
 
+            ToolTipService.SetToolTip(StickyAddTabBtn, newTabTooltip);
+            ToolTipService.SetToolTip(StickyAddTab2Btn, newTabTooltip);
             ToolTipService.SetToolTip(MoveTabLeftBtn, leftTooltip);
             ToolTipService.SetToolTip(MoveTabRightBtn, rightTooltip);
             ToolTipService.SetToolTip(MoveTab2LeftBtn, leftTooltip);
@@ -473,6 +490,8 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(OpenTabsListBtn, openTabsTooltip);
             ToolTipService.SetToolTip(OpenTabsList2Btn, openTabsTooltip);
             string stickyNoteDragTooltip = getString("StickyNoteDragTooltip", "창 이동");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(StickyAddTabBtn, newTabTooltip);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(StickyAddTab2Btn, newTabTooltip);
             ToolTipService.SetToolTip(StickyNoteDragHandle, stickyNoteDragTooltip);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(OpenTabsListBtn, openTabsTooltip);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(OpenTabsList2Btn, openTabsTooltip);
@@ -850,6 +869,12 @@ namespace TxtAIEditor.Controls
 
         private void OnEditorTabViewAddTabClick(TabView sender, object args) => PrimaryAddTabButtonClick?.Invoke(sender, args);
 
+        private void OnStickyAddTabClick(object sender, RoutedEventArgs e)
+        {
+            ActiveTabView = EditorTabView;
+            PrimaryAddTabButtonClick?.Invoke(EditorTabView, e);
+        }
+
         private void OnEditorTabViewTabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args) =>
             PrimaryTabCloseRequested?.Invoke(sender, args);
 
@@ -864,6 +889,9 @@ namespace TxtAIEditor.Controls
             ActiveTabView = sender;
             SecondaryAddTabButtonClick?.Invoke(sender, args);
         }
+
+        private void OnStickyAddTab2Click(object sender, RoutedEventArgs e) =>
+            OnEditorTabView2AddTabClick(EditorTabView2, e);
 
         private void OnEditorTabView2TabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args)
         {
