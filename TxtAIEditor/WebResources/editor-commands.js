@@ -24,6 +24,7 @@ import {
     reportCursorAndSelection,
     requestLines,
     restoreScrollAnchor,
+    selectionController,
     selectedLineRange,
     selectedText,
     setupVirtualHeight,
@@ -31,6 +32,7 @@ import {
     state,
     syncCustomSelectionClass,
     visualScrollDeltaToScrollTopDelta,
+    viewportController,
     writeClipboardText
 } from './editor-core.js';
 import { scrollContainer, viewport } from './editor-dom.js';
@@ -444,8 +446,8 @@ function splitCurrentLine(element, options = {}) {
                 const caretLine = Math.min(Math.max(1, Number(state.currentLine || sel.end.line)), state.lineCount);
                 const caretText = state.cache.get(caretLine) || '';
                 const caretColumn = Math.max(0, Math.min(Number(state.currentColumn || 1) - 1, caretText.length));
-                state.selection = null;
-                state.selectionAnchor = { line: caretLine, column: caretColumn };
+                selectionController.selection = null;
+                selectionController.anchor = { line: caretLine, column: caretColumn };
                 state.currentLine = caretLine;
                 state.currentColumn = caretColumn + 1;
                 syncCustomSelectionClass();
@@ -516,7 +518,7 @@ function splitCurrentLine(element, options = {}) {
     if (state.showDirtyLines) {
         state.dirtyLines.set(nextLineNumber, 'add');
     }
-    state.selection = null;
+    selectionController.selection = null;
     clearCustomSelectionVisuals();
     syncCustomSelectionClass();
     setupVirtualHeight();
@@ -524,7 +526,7 @@ function splitCurrentLine(element, options = {}) {
     post({ type: 'splitLine', lineNumber, before, after: indentedAfter });
     post({ type: 'contentChanged' });
     markLineBoundaryTransition(nextLineNumber, nextCaretColumn);
-    state.selectionAnchor = { line: nextLineNumber, column: nextCaretColumn };
+    selectionController.anchor = { line: nextLineNumber, column: nextCaretColumn };
     state.currentLine = nextLineNumber;
     state.currentColumn = nextCaretColumn + 1;
     state.editingLine = nextLineNumber;
@@ -614,8 +616,8 @@ function insertTextAtCaret(text, options = {}) {
             state.lineCount += insertedCount;
             state.currentLine = lastLineNumber;
             state.currentColumn = (parts[parts.length - 1]?.length || 0) + 1;
-            state.selection = null;
-            state.selectionAnchor = {
+            selectionController.selection = null;
+            selectionController.anchor = {
                 line: lastLineNumber,
                 column: state.currentColumn - 1
             };
@@ -677,8 +679,8 @@ function insertTextAtCaret(text, options = {}) {
         state.lineCount += insertedCount;
         state.currentLine = lastLineNumber;
         state.currentColumn = (parts[parts.length - 1]?.length || 0) + 1;
-        state.selection = null;
-        state.selectionAnchor = {
+        selectionController.selection = null;
+        selectionController.anchor = {
             line: lastLineNumber,
             column: state.currentColumn - 1
         };
@@ -715,10 +717,10 @@ function updateSingleLine(element, text, caretColumn) {
     state.cache.set(lineNumber, nextText);
     state.cacheVersion++;
     invalidateMeasuredLineHeightsAround(lineNumber);
-    state.selection = null;
+    selectionController.selection = null;
     syncCustomSelectionClass();
     clearCustomSelectionVisuals();
-    state.selectionAnchor = { line: lineNumber, column: nextColumn };
+    selectionController.anchor = { line: lineNumber, column: nextColumn };
     state.currentLine = lineNumber;
     state.currentColumn = nextColumn + 1;
 
@@ -766,7 +768,7 @@ function applyMergeLineForward(lineNumber, text, nextText) {
     restoreScrollTop(savedScrollTop);
     post({ type: 'mergeLineWithPrevious', lineNumber: lineNumber + 1 });
     post({ type: 'contentChanged' });
-    state.selection = null;
+    selectionController.selection = null;
     syncCustomSelectionClass();
     markLineBoundaryTransition(lineNumber, text.length);
     queueRender(true);
@@ -790,7 +792,7 @@ function applyMergeLineBackward(lineNumber, previous, current) {
     setupVirtualHeight();
     post({ type: 'mergeLineWithPrevious', lineNumber });
     post({ type: 'contentChanged' });
-    state.selection = null;
+    selectionController.selection = null;
     syncCustomSelectionClass();
     markLineBoundaryTransition(lineNumber - 1, previous.length);
     queueRender(true);
@@ -965,12 +967,12 @@ function replaceColumnSelectionWith(selection, text, skipRender = false) {
     state.cacheVersion++;
 
     const nextCol = startCol + insertedLengthForCaret;
-    state.selection = {
+    selectionController.selection = {
         start: { line: startLine, column: nextCol },
         end: { line: endLine, column: nextCol },
         isColumn: true
     };
-    state.selectionAnchor = state.selection.start;
+    selectionController.anchor = selectionController.selection.start;
     state.currentLine = endLine;
     state.currentColumn = nextCol + 1;
     syncCustomSelectionClass();
@@ -1102,21 +1104,21 @@ function replaceSelectionWith(selection, text, editSelection = null) {
         };
         const selectionStart = positionFromOffset(editSelection.startOffset ?? 0);
         const selectionEnd = positionFromOffset(editSelection.endOffset ?? editSelection.startOffset ?? 0);
-        state.selectionAnchor = selectionStart;
-        state.selection = editSelection.startOffset === editSelection.endOffset
+        selectionController.anchor = selectionStart;
+        selectionController.selection = editSelection.startOffset === editSelection.endOffset
             ? null
             : { start: selectionStart, end: selectionEnd };
         state.currentLine = selectionEnd.line;
         state.currentColumn = selectionEnd.column + 1;
     } else {
-        state.selection = null;
+        selectionController.selection = null;
         syncCustomSelectionClass();
         clearCustomSelectionVisuals();
         const endLine = start.line + parts.length - 1;
         const endColumn = parts.length === 1 ? start.column + parts[0].length : parts[parts.length - 1].length;
         state.currentLine = endLine;
         state.currentColumn = endColumn + 1;
-        state.selectionAnchor = { line: endLine, column: endColumn };
+        selectionController.anchor = { line: endLine, column: endColumn };
     }
     if (!editSelection) {
         const immediateLine = state.currentLine;
@@ -1208,6 +1210,7 @@ const {
     post,
     queueRender,
     reportCursorAndSelection,
+    selectionController,
     setupVirtualHeight,
     shiftCachedLines,
     state,
@@ -1281,12 +1284,14 @@ const {
     replaceColumnSelectionWith,
     reportCursorAndSelection,
     scrollContainer,
+    selectionController,
     setCaret,
     setNativeSelectionRangeInElement,
     setupVirtualHeight,
     shiftCachedLines,
     state,
     syncCustomSelectionClass,
+    viewportController,
     viewport
 });
 
@@ -1314,6 +1319,7 @@ const {
     queueRender,
     reportCursorAndSelection,
     scrollContainer,
+    selectionController,
     setCaret,
     state,
     syncCustomSelectionClass,
@@ -1337,6 +1343,7 @@ const { applyMarkdownCommand } = createMarkdownCommandHandlers({
     queueRender,
     replaceSelectionWith,
     reportCursorAndSelection,
+    selectionController,
     state,
     syncCustomSelectionClass,
     writeClipboardText
@@ -1387,6 +1394,7 @@ const {
     readClipboardText,
     replaceSelectionWith,
     reportCursorAndSelection,
+    selectionController,
     selectedText,
     state,
     syncCustomSelectionClass,

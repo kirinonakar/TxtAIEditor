@@ -8,6 +8,7 @@ import {
     preserveScrollTop,
     queueRender,
     requestMissingLines,
+    selectionController,
     state,
     setupVirtualHeight,
     syncCustomSelectionClass,
@@ -15,6 +16,7 @@ import {
     totalVirtualHeight,
     usesFullDocumentRender,
     visibleRange,
+    viewportController,
     viewportTopForLine
 } from './editor-core.js';
 import {
@@ -253,8 +255,7 @@ function createEditorRenderer({
             requestMissingLines(renderStart, renderEnd);
             trimHexCacheToRange(renderStart, renderEnd);
         }
-        if (rangeKey === state.lastRangeKey) return;
-        state.lastRangeKey = rangeKey;
+        if (!viewportController.acceptRangeKey(rangeKey)) return;
 
         if (imeController.columnComposition) {
             return;
@@ -280,8 +281,7 @@ function createEditorRenderer({
             }
 
             viewport.innerHTML = renderCsvTableRows(renderStart, renderEnd, hoveredLineNumber).join('');
-            state.renderedRangeStart = renderStart;
-            state.renderedRangeEnd = renderEnd;
+            viewportController.setRenderedRange(renderStart, renderEnd);
             refreshHoveredLineFromLastPointer();
             restoreCsvFocusAfterRender();
             syncHorizontalOverflow();
@@ -325,7 +325,7 @@ function createEditorRenderer({
                 hasLine &&
                 !isLong &&
                 !!selectionBounds &&
-                (state.isSelecting || hasCustomSelection());
+                (selectionController.isSelecting || hasCustomSelection());
             const isEditablePreviewBlockLine = !!editablePreviewBlock &&
                 line >= editablePreviewBlock.startLine &&
                 line <= editablePreviewBlock.endLine;
@@ -463,8 +463,7 @@ function createEditorRenderer({
             ? 'none'
             : `translateY(${viewportTopForLine(viewportLayoutStart)}px)`;
         viewport.innerHTML = rows.join('');
-        state.renderedRangeStart = renderStart;
-        state.renderedRangeEnd = renderEnd;
+        viewportController.setRenderedRange(renderStart, renderEnd);
         syncHorizontalOverflow();
 
         if (composingRow) {
@@ -670,7 +669,7 @@ function createEditorRenderer({
             if (pendingInlineLivePreviewFocus?.token !== token) return;
             pendingInlineLivePreviewFocus = null;
             if (!document.activeElement?.closest?.(`.line-text[data-line="${safeLine}"]`)) {
-                state.lastRangeKey = '';
+                viewportController.invalidateRenderRange();
                 queueRender(true);
             }
         }, 1600);
@@ -725,7 +724,7 @@ function createEditorRenderer({
                     livePreviewFailedImages.add(imageKey);
                     img.replaceWith(document.createTextNode(img.getAttribute('alt') || ''));
                 }
-                state.lastRangeKey = '';
+                viewportController.invalidateRenderRange();
                 measureRenderedRows(true, true);
             };
             if (img.complete) {

@@ -23,12 +23,14 @@ export function createEditorCompositionHandlers({
     replaceColumnSelectionWith,
     reportCursorAndSelection,
     scrollContainer,
+    selectionController,
     setCaret,
     setNativeSelectionRangeInElement,
     setupVirtualHeight,
     shiftCachedLines,
     state,
     syncCustomSelectionClass,
+    viewportController,
     viewport
 }) {
 function beginPendingImeSelectionCollapse(element, line, column) {
@@ -76,8 +78,8 @@ function applyLocalRangeCompositionEdit(command, preferredElement = null) {
     if (!command || command.type !== 'replaceRange') return null;
 
     const { start, end, collapsedText, caretColumn, removedLineCount } = command;
-    state.selection = null;
-    state.selectionAnchor = { line: start.line, column: caretColumn };
+    selectionController.selection = null;
+    selectionController.anchor = { line: start.line, column: caretColumn };
     state.currentLine = start.line;
     state.currentColumn = caretColumn + 1;
     state.editingLine = start.line;
@@ -120,7 +122,7 @@ function applyLocalRangeCompositionEdit(command, preferredElement = null) {
         targetElement
     );
 
-    state.lastRangeKey = '';
+    viewportController.invalidateRenderRange();
     if (state.wordWrap) {
         measureRenderedRows(false);
     }
@@ -265,8 +267,8 @@ function prepareSingleLineSelectionForNativeComposition(selection) {
     // 한 줄 선택 영역은 직접 지우지 말고 브라우저/IME의 네이티브 replace-composition에 맡긴다.
     // compositionstart 도중 textContent를 바꾸고 캐럿을 다시 잡으면 WebView2/Chrome 한글 IME가
     // 첫 음절을 `ㅍㅗ`처럼 호환 자모 두 글자로 확정하는 경우가 있다.
-    state.selection = null;
-    state.selectionAnchor = { line: start.line, column: start.column };
+    selectionController.selection = null;
+    selectionController.anchor = { line: start.line, column: start.column };
     state.currentLine = start.line;
     state.currentColumn = start.column + 1;
     state.editingLine = start.line;
@@ -380,18 +382,18 @@ function commitRangeCompositionResult(pending, targetElement, insertedText, fina
     document.body.classList.remove('range-composition-active');
     state.cache.set(pending.lineNumber, finalText);
     state.cacheVersion++;
-    state.selection = null;
-    state.selectionAnchor = {
+    selectionController.selection = null;
+    selectionController.anchor = {
         line: pending.lineNumber,
         column: pending.command.caretColumn + insertedText.length
     };
     state.currentLine = pending.lineNumber;
-    state.currentColumn = state.selectionAnchor.column + 1;
+    state.currentColumn = selectionController.anchor.column + 1;
     if (targetElement?.getAttribute?.('contenteditable') === 'true') {
         setNativeSelectionRangeInElement(
             targetElement,
-            state.selectionAnchor.column,
-            state.selectionAnchor.column);
+            selectionController.anchor.column,
+            selectionController.anchor.column);
     }
     if (!cleanDirtyMarker(pending.lineNumber)) {
         markDirty(pending.lineNumber, 'mod');
@@ -653,8 +655,8 @@ function finishColumnComposition(element, lineNumber) {
         replaceColumnSelectionWith(originalSelection, insertedText, true);
         queueRender(true);
     } else {
-        state.selection = originalSelection;
-        state.selectionAnchor = originalSelection.start;
+        selectionController.selection = originalSelection;
+        selectionController.anchor = originalSelection.start;
         syncCustomSelectionClass();
         queueRender(true);
         setTimeout(() => focusLine(state.currentLine, Math.max(0, state.currentColumn - 1)), 0);
@@ -937,7 +939,7 @@ function finishColumnComposition(element, lineNumber) {
 
     function focusImeBypassTextarea() {
         const selection = normalizeSelection();
-        if (selection && selection.start.line !== selection.end.line && !selection.isColumn && !state.isSelecting) {
+        if (selection && selection.start.line !== selection.end.line && !selection.isColumn && !selectionController.isSelecting) {
             const textarea = getOrCreateBypassTextarea();
             const shouldRefreshBypass = state.isSplitView || document.activeElement !== textarea;
             if (shouldRefreshBypass) {

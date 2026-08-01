@@ -13,6 +13,7 @@ export function createClipboardCommandHandlers({
     readClipboardText,
     replaceSelectionWith,
     reportCursorAndSelection,
+    selectionController,
     selectedText,
     state,
     syncCustomSelectionClass,
@@ -100,8 +101,8 @@ export function createClipboardCommandHandlers({
         const lastLine = state.lineCount;
         const lastText = state.cache.get(lastLine) || '';
         const endColumn = lastText.length;
-        state.selectionAnchor = { line: 1, column: 0 };
-        state.selection = { start: { line: 1, column: 0 }, end: { line: lastLine, column: endColumn } };
+        selectionController.anchor = { line: 1, column: 0 };
+        selectionController.selection = { start: { line: 1, column: 0 }, end: { line: lastLine, column: endColumn } };
         syncCustomSelectionClass();
         state.currentLine = lastLine;
         state.currentColumn = endColumn + 1;

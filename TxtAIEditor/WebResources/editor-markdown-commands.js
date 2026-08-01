@@ -16,6 +16,7 @@ export function createMarkdownCommandHandlers(deps) {
         queueRender,
         replaceSelectionWith,
         reportCursorAndSelection,
+        selectionController,
         state,
         syncCustomSelectionClass,
         writeClipboardText
@@ -75,8 +76,8 @@ function replaceMarkdownRange(range, replacement, startOffset = 0, endOffset = s
 }
 
 function setSelectionAfterLineEdits(start, end) {
-    state.selectionAnchor = start;
-    state.selection = comparePositions(start, end) === 0 ? null : { start, end };
+    selectionController.anchor = start;
+    selectionController.selection = comparePositions(start, end) === 0 ? null : { start, end };
     state.currentLine = end.line;
     state.currentColumn = end.column + 1;
     post({ type: 'contentChanged' });

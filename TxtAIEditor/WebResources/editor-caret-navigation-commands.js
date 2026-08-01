@@ -19,6 +19,7 @@ export function createCaretNavigationCommands({
     queueRender,
     reportCursorAndSelection,
     scrollContainer,
+    selectionController,
     setCaret,
     state,
     syncCustomSelectionClass,
@@ -131,19 +132,19 @@ export function createCaretNavigationCommands({
     }
 
     function selectionFocusPosition(fallbackPosition) {
-        if (!state.selection || !state.selectionAnchor) return fallbackPosition;
+        if (!selectionController.selection || !selectionController.anchor) return fallbackPosition;
 
-        if (samePosition(state.selection.start, state.selectionAnchor) &&
-            !samePosition(state.selection.end, state.selectionAnchor)) {
-            return state.selection.end;
+        if (samePosition(selectionController.selection.start, selectionController.anchor) &&
+            !samePosition(selectionController.selection.end, selectionController.anchor)) {
+            return selectionController.selection.end;
         }
 
-        if (samePosition(state.selection.end, state.selectionAnchor) &&
-            !samePosition(state.selection.start, state.selectionAnchor)) {
-            return state.selection.start;
+        if (samePosition(selectionController.selection.end, selectionController.anchor) &&
+            !samePosition(selectionController.selection.start, selectionController.anchor)) {
+            return selectionController.selection.start;
         }
 
-        return state.selection.end || fallbackPosition;
+        return selectionController.selection.end || fallbackPosition;
     }
 
     function editableElementForLine(lineNumber, fallbackElement) {
@@ -241,7 +242,7 @@ export function createCaretNavigationCommands({
         }
 
         const anchor = extendSelection
-            ? (state.selectionAnchor || { line: lineNumber, column: caret })
+            ? (selectionController.anchor || { line: lineNumber, column: caret })
             : null;
 
         let target = null;
@@ -295,8 +296,8 @@ export function createCaretNavigationCommands({
             }
 
             if (extendSelection) {
-                state.selectionAnchor = anchor;
-                state.selection = (anchor.line === target.line && anchor.column === target.column)
+                selectionController.anchor = anchor;
+                selectionController.selection = (anchor.line === target.line && anchor.column === target.column)
                     ? null
                     : { start: anchor, end: target };
                 state.currentLine = target.line;
@@ -311,8 +312,8 @@ export function createCaretNavigationCommands({
                     setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
                 }
             } else {
-                state.selection = null;
-                state.selectionAnchor = { line: target.line, column: target.column };
+                selectionController.selection = null;
+                selectionController.anchor = { line: target.line, column: target.column };
                 state.currentLine = target.line;
                 state.currentColumn = target.column + 1;
                 syncCustomSelectionClass();
@@ -375,9 +376,9 @@ export function createCaretNavigationCommands({
         }
 
         if (extendSelection) {
-            const anchor = state.selectionAnchor || { line: lineNumber, column: caret };
-            state.selectionAnchor = anchor;
-            state.selection = (anchor.line === target.line && anchor.column === target.column)
+            const anchor = selectionController.anchor || { line: lineNumber, column: caret };
+            selectionController.anchor = anchor;
+            selectionController.selection = (anchor.line === target.line && anchor.column === target.column)
                 ? null
                 : { start: anchor, end: target };
             state.currentLine = target.line;
@@ -392,8 +393,8 @@ export function createCaretNavigationCommands({
                 setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
             }
         } else {
-            state.selection = null;
-            state.selectionAnchor = { line: target.line, column: target.column };
+            selectionController.selection = null;
+            selectionController.anchor = { line: target.line, column: target.column };
             syncCustomSelectionClass();
             if (collapsedCustomSelection) {
                 clearCustomSelectionVisuals();

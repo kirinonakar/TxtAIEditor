@@ -6,10 +6,12 @@ import {
     post,
     queueRender,
     requestLines,
+    searchController,
     setupVirtualHeight,
     state,
     usesCompressedScroll,
-    visualScrollDeltaToScrollTopDelta
+    visualScrollDeltaToScrollTopDelta,
+    viewportController
 } from './editor-core.js';
 const {
     findEditablePreviewBlockContaining,
@@ -97,7 +99,7 @@ function ensureInlinePreviewDependencies() {
         loadPreviewScript('mermaid', 'mermaid/mermaid.min.js', 'mermaid')
     ]).then(() => {
         initializeMermaid(new URLSearchParams(window.location.search).get('theme') || 'Dark');
-        state.lastRangeKey = '';
+        viewportController.invalidateRenderRange();
         queueRender(true);
     }).catch(error => {
         previewDependencyPromise = null;
@@ -191,7 +193,7 @@ function postEditorScroll(scrollTop = scrollContainer.scrollTop) {
 }
 
 function alignActiveSearchMatchHorizontally(row) {
-    if (state.wordWrap || !state.activeSearch) return false;
+    if (state.wordWrap || !searchController.activeMatch) return false;
 
     const activeMatch = row.querySelector('mark.active-match');
     if (!activeMatch) return false;
@@ -270,7 +272,7 @@ function revealLine(lineNumber, indexOfMatch = 0, matchLength = 0, query = '', p
     const safeLine = Math.min(Math.max(1, Number(lineNumber || 1)), state.lineCount);
     state.currentLine = safeLine;
     state.currentColumn = Math.max(1, Number(indexOfMatch || 0) + 1);
-    state.activeSearch = query
+    searchController.activeMatch = query
         ? { lineNumber: safeLine, indexOfMatch, matchLength, query }
         : null;
 

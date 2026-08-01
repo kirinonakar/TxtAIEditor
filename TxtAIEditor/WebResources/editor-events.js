@@ -12,10 +12,12 @@ import {
     prefetchAround,
     queueRender,
     reportCursorAndSelection,
+    selectionController,
     setupVirtualHeight,
     state,
     usesCompressedScroll,
-    visualScrollDeltaToScrollTopDelta
+    visualScrollDeltaToScrollTopDelta,
+    viewportController
 } from './editor-core.js';
 import {
     autocompleteState,
@@ -38,7 +40,10 @@ export function bindEditorEvents({
 }) {
     bindTextInputEvents({ renderer });
     const pointerEvents = bindPointerSelectionEvents({ getPreciseLivePreviewPosition, renderer });
-    bindKeyboardEvents({ openFindPanel });
+    bindKeyboardEvents({
+        openFindPanel,
+        cancelDragInteraction: pointerEvents.cancelDragInteraction
+    });
     const clipboardEvents = bindClipboardEvents();
     bindContextMenu();
     bindCsvTable();
@@ -75,7 +80,7 @@ export function bindEditorEvents({
 
     let nativeSelectionReportTimer = 0;
     document.addEventListener('selectionchange', () => {
-        if (state.isSelecting || hasCustomSelection()) return;
+        if (selectionController.isSelecting || hasCustomSelection()) return;
         clearTimeout(nativeSelectionReportTimer);
         nativeSelectionReportTimer = setTimeout(() => {
             reportCursorAndSelection(document.activeElement);
@@ -113,8 +118,8 @@ export function bindEditorEvents({
         }
 
         hideContextMenu();
-        if (state.preservedScrollTop !== null &&
-            Math.abs(scrollContainer.scrollTop - state.preservedScrollTop) > 1) {
+        if (viewportController.hasPreservedScrollTop &&
+            Math.abs(scrollContainer.scrollTop - viewportController.preservedScrollTop) > 1) {
             clearPreservedScrollTop();
         }
         if (scrollWorkFrame) return;

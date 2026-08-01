@@ -9,6 +9,7 @@ import {
     imeController,
     MAX_RENDER_CHARS,
     queueRender,
+    selectionController,
     state,
     syncCustomSelectionClass
 } from './editor-core.js';
@@ -114,7 +115,7 @@ export function bindTextInputEvents({ renderer }) {
                 return;
             }
             if (!imeController.columnComposition && !imeController.rangeComposition?.deferred) {
-                state.selection = null;
+                selectionController.clear();
                 syncCustomSelectionClass();
             }
             const inputSnapshot = commitLine(element);
@@ -259,7 +260,7 @@ export function bindTextInputEvents({ renderer }) {
         }
 
         if (element && element.getAttribute('contenteditable') === 'true') {
-            state.selection = null;
+            selectionController.clear();
             syncCustomSelectionClass();
             state.editingLine = lineNumber;
             const current = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`) || element;

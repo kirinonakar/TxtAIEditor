@@ -1,6 +1,10 @@
 import { contextMenu, scrollContainer, viewport, virtualSpacer } from './editor-dom.js';
 import { EditorDocumentCache } from './editor-document-cache.js';
+import { DragDropController } from './editor-drag-drop-state.js';
 import { ImeController } from './editor-ime-state.js';
+import { SearchController } from './editor-search-state.js';
+import { SelectionController } from './editor-selection-state.js';
+import { ViewportController } from './editor-viewport-state.js';
 import {
     CsvTableMode,
     EditorModeCoordinator,
@@ -35,9 +39,13 @@ function configureEditorCoreRuntime(deps) {
 }
 
 const documentCache = new EditorDocumentCache();
+const dragDropController = new DragDropController();
 const imeController = new ImeController({
     onRangeCompositionCleared: () => document.body.classList.remove('range-composition-active')
 });
+const selectionController = new SelectionController();
+const searchController = new SearchController();
+const viewportController = new ViewportController();
 const modeCoordinator = new EditorModeCoordinator({
     textMode: new TextEditorMode(),
     hexMode: new HexEditorMode({
@@ -65,37 +73,21 @@ const state = {
     syntaxHighlighting: true,
     language: 'plaintext',
     tabSize: 4,
-    searchQuery: '',
-    searchMatches: [],
-    searchIndex: -1,
-    activeSearch: null,
-    findMatchCase: false,
-    findRegex: false,
-    selection: null,
-    selectionAnchor: null,
     hexSelection: null,
     hexSelectionAnchorOffset: null,
     hexSelectionPane: 'hex',
     hexCursorOffset: 0,
     hexPendingHighNibble: null,
-    isSelecting: false,
-    isLineSelecting: false,
     initialized: false,
-    lastRangeKey: '',
-    renderedRangeStart: 0,
-    renderedRangeEnd: 0,
     cacheVersion: 0,
     documentVersion: 0,
     hostDocumentId: '',
     hostDocumentVersion: 0,
     viewId: '',
     messageSequence: 0,
-    searchDocumentVersion: -1,
-    pendingSearchNavigation: null,
     pendingLinePatchBatch: null,
     textOperationLocked: false,
     textOperationPreviousReadOnly: false,
-    renderQueued: false,
     clipboardRequests: new Map(),
     pendingLineActions: [],
     autocompleteOnEnter: true,
@@ -108,19 +100,12 @@ const state = {
     livePreviewLocalResourceVersion: '0',
     inlineLivePreviewSourceLine: null,
     inlineLivePreviewEditableBlock: null,
-    dragStartPosition: null,
-    isDragPotential: false,
-    isDragMoving: false,
-    dragSelectionData: null,
-    dragDropPosition: null,
-    isDragCopy: false,
     isSplitView: false,
     suppressNextBeforeInputType: null,
     lastManualDeleteAt: 0,
     editingLine: null,
     lastDeleteKeyDown: null,
     pendingColumnTextInputs: [],
-    preservedScrollTop: null,
     dirtyLines: new Map(),
     csvVirtualLineCount: 0,
     longLineProtectionFormat: '... too long ({0} characters total)'
@@ -140,7 +125,7 @@ function post(msg) {
     const isOptimisticallyAppliedMutation = isMutation && msg?.type !== 'replaceAll';
     if (msg?.type === 'contentChanged') {
         state.documentVersion++;
-        state.searchDocumentVersion = -1;
+        searchController.invalidateDocument();
     }
 
     const sequence = state.hostDocumentId ? ++state.messageSequence : 0;
@@ -511,18 +496,14 @@ function setupModel(lineCount) {
     state.csvVirtualLineCount = 0;
     state.cache.clear();
     state.pending.clear();
-    state.preservedScrollTop = null;
+    viewportController.resetDocument();
     clearMeasuredLineHeights();
     state.cacheVersion++;
     state.documentVersion++;
-    state.searchDocumentVersion = -1;
-    state.pendingSearchNavigation = null;
+    searchController.invalidateDocument({ clearPendingNavigation: true });
     state.hexSelection = null;
     state.hexSelectionAnchorOffset = null;
     state.hexCursorOffset = 0;
-    state.lastRangeKey = '';
-    state.renderedRangeStart = 0;
-    state.renderedRangeEnd = 0;
     state.dirtyLines.clear();
     setupVirtualHeight();
     queueRender(true);
@@ -580,7 +561,7 @@ function updateLineFromHost(lineNumber, text, isComposing = false) {
     state.cache.set(line, nextText);
     state.cacheVersion++;
     state.documentVersion++;
-    state.searchDocumentVersion = -1;
+    searchController.invalidateDocument();
     invalidateMeasuredLineHeightsAround(line);
 
     if (!cleanDirtyMarker(line)) {
@@ -621,7 +602,7 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
     const savedCaretLine = state.currentLine;
     const savedCaretColumn = state.currentColumn;
 
-    state.selection = null;
+    selectionController.clear();
     state.hexSelection = null;
     state.hexSelectionAnchorOffset = null;
     state.hexCursorOffset = 0;
@@ -658,7 +639,7 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
 
     state.cacheVersion++;
     state.documentVersion++;
-    state.searchDocumentVersion = -1;
+    searchController.invalidateDocument();
     state.livePreviewLocalResourceVersion = String(Date.now());
     setupVirtualHeight();
 
@@ -707,14 +688,8 @@ function setupVirtualHeight() {
 
     viewport.style.removeProperty('--full-document-trailing-height');
     const maximumScrollTop = maximumVirtualScrollTop();
-    if (state.preservedScrollTop !== null) {
-        state.preservedScrollTop = Math.min(
-            maximumScrollTop,
-            Math.max(0, Number(state.preservedScrollTop || 0)));
-    }
-    const preservedHeight = state.preservedScrollTop !== null
-        ? Math.max(0, Number(state.preservedScrollTop || 0)) + scrollContainer.clientHeight
-        : 0;
+    viewportController.clampPreservedScrollTop(maximumScrollTop);
+    const preservedHeight = viewportController.preservedContentHeight(scrollContainer.clientHeight);
     virtualSpacer.style.height = `${Math.max(totalVirtualHeight(), preservedHeight)}px`;
     const maxScroll = Math.min(
         maximumScrollTop,
@@ -732,14 +707,12 @@ function syncFullDocumentTrailingSpace() {
 }
 
 function preserveScrollTop(scrollTop) {
-    const nextScrollTop = Math.max(0, Number(scrollTop || 0));
-    state.preservedScrollTop = Math.max(Number(state.preservedScrollTop ?? 0), nextScrollTop);
+    viewportController.preserveScrollTop(scrollTop);
     setupVirtualHeight();
 }
 
 function clearPreservedScrollTop() {
-    if (state.preservedScrollTop === null) return;
-    state.preservedScrollTop = null;
+    if (!viewportController.clearPreservedScrollTop()) return;
     setupVirtualHeight();
 }
 
@@ -1204,13 +1177,9 @@ function trimHexCacheToRange(startLine, endLine) {
 }
 
 function queueRender(force = false) {
-    if (force) {
-        state.lastRangeKey = '';
-    }
-    if (state.renderQueued) return;
-    state.renderQueued = true;
+    if (!viewportController.beginQueuedRender({ force })) return;
     requestAnimationFrame(() => {
-        state.renderQueued = false;
+        viewportController.completeQueuedRender();
         runtime.render();
     });
 }
@@ -1304,7 +1273,7 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
             }
         }
         if (renderOnChange) {
-            state.lastRangeKey = '';
+            viewportController.invalidateRenderRange();
             requestAnimationFrame(() => runtime.render());
         }
     }
@@ -1322,7 +1291,7 @@ function invalidateMeasuredLineHeightsAround(lineNumber, radius = 0) {
     }
 
     if (changed) {
-        state.lastRangeKey = '';
+        viewportController.invalidateRenderRange();
         setupVirtualHeight();
     }
 }
@@ -1375,9 +1344,9 @@ function reportCursorAndSelection(
     const editable = element && element.closest ? element.closest('.line-text') : null;
     if (editable && document.body.contains(editable)) {
         state.currentLine = Number(editable.dataset.line || state.currentLine);
-        if (state.selection && state.selection.end) {
-            state.currentLine = state.selection.end.line;
-            state.currentColumn = state.selection.end.column + 1;
+        if (selectionController.selection?.end) {
+            state.currentLine = selectionController.selection.end.line;
+            state.currentColumn = selectionController.selection.end.column + 1;
         } else if (editable.getAttribute('contenteditable') === 'true') {
             const caretOffset = Number(knownCaretOffset);
             state.currentColumn = (knownCaretOffset !== null && Number.isFinite(caretOffset)
@@ -1760,6 +1729,7 @@ export {
     compressedScrollMetrics,
     configureEditorCoreRuntime,
     containsHangulInputText,
+    dragDropController,
     escapeHtml,
     graphemeDeleteEnd,
     graphemeDeleteStart,
@@ -1788,6 +1758,8 @@ export {
     requestLines,
     requestMissingLines,
     restoreScrollAnchor,
+    searchController,
+    selectionController,
     selectedLineRange,
     selectionInfo,
     selectedText,
@@ -1804,6 +1776,7 @@ export {
     usesMeasuredLineHeights,
     visualScrollDeltaToScrollTopDelta,
     visibleRange,
+    viewportController,
     viewportTopForLine,
     writeClipboardText
 };

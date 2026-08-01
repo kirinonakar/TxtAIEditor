@@ -9,12 +9,15 @@ import {
     post,
     queueRender,
     receiveLineBlock,
+    searchController,
+    selectionController,
     selectionInfo,
     setupModel,
     setupVirtualHeight,
     state,
     syncCustomSelectionClass,
-    updateLineFromHost
+    updateLineFromHost,
+    viewportController
 } from './editor-core.js';
 import {
     applyMarkdownCommand,
@@ -124,39 +127,6 @@ document.addEventListener('compositionend', () => {
         }
     });
 });
-
-function findSearchMatchIndexFromPosition(matches, line, column, reverse) {
-    if (!Array.isArray(matches) || matches.length === 0) {
-        return -1;
-    }
-
-    const safeLine = Math.max(1, Number(line || 1));
-    const safeColumn = Math.max(1, Number(column || 1));
-
-    if (reverse) {
-        for (let i = matches.length - 1; i >= 0; i--) {
-            const match = matches[i];
-            const matchLine = Number(match.lineNumber || 1);
-            const matchColumn = Number(match.indexOfMatch || 0) + 1;
-            if (matchLine < safeLine || (matchLine === safeLine && matchColumn < safeColumn)) {
-                return i;
-            }
-        }
-
-        return matches.length - 1;
-    }
-
-    for (let i = 0; i < matches.length; i++) {
-        const match = matches[i];
-        const matchLine = Number(match.lineNumber || 1);
-        const matchColumn = Number(match.indexOfMatch || 0) + 1;
-        if (matchLine > safeLine || (matchLine === safeLine && matchColumn >= safeColumn)) {
-            return i;
-        }
-    }
-
-    return 0;
-}
 
 function canApplyVersionedDocumentChange(msg) {
     if (!msg.documentId || msg.documentVersion === undefined || msg.documentVersion === null) {
@@ -285,7 +255,7 @@ export function createHostMessageHandler({
                 }
                 const text = msg.text || '';
                 const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-                state.selection = null;
+                selectionController.clear();
                 try {
                     window.getSelection()?.removeAllRanges();
                 } catch (e) { }
@@ -361,7 +331,7 @@ export function createHostMessageHandler({
                 if (msg.isFinal === true) {
                     state.cacheVersion++;
                     state.documentVersion++;
-                    state.searchDocumentVersion = -1;
+                    searchController.invalidateDocument();
                     clearMeasuredLineHeights();
                     markVersionedDocumentChangeApplied(msg);
                     state.pendingLinePatchBatch = null;
@@ -376,9 +346,7 @@ export function createHostMessageHandler({
                 const receivedCount = receiveLineBlock(receivedStart, msg.lines || []);
                 const receivedEnd = receivedStart + receivedCount - 1;
                 const touchesRenderedRange = receivedCount > 0 &&
-                    state.renderedRangeStart > 0 &&
-                    receivedEnd >= state.renderedRangeStart &&
-                    receivedStart <= state.renderedRangeEnd;
+                    viewportController.overlapsRenderedRange(receivedStart, receivedEnd);
                 runPendingLineActions();
                 if (!imeController.isComposing && (touchesRenderedRange || isJsonCsvTableMode())) {
                     queueRender(true);
@@ -502,58 +470,43 @@ export function createHostMessageHandler({
             {
                 const resultQuery = msg.query || '';
                 if (findInput.value !== resultQuery) {
-                    if (state.pendingSearchNavigation?.query === resultQuery) {
-                        state.pendingSearchNavigation = null;
+                    if (searchController.pendingNavigation?.query === resultQuery) {
+                        searchController.clearPendingNavigation();
                     }
                     break;
                 }
 
-                state.searchQuery = resultQuery;
-                state.searchMatches = msg.matches || [];
-                
-                const byLine = new Map();
-                for (const match of state.searchMatches) {
-                    let list = byLine.get(match.lineNumber);
-                    if (!list) {
-                        list = [];
-                        byLine.set(match.lineNumber, list);
-                    }
-                    list.push(match);
-                }
-                state.searchMatchesByLine = byLine;
+                searchController.applyResults({
+                    query: resultQuery,
+                    matches: msg.matches,
+                    documentVersion: state.documentVersion
+                });
 
-                state.searchDocumentVersion = state.documentVersion;
-
-                const pendingNavigation = state.pendingSearchNavigation;
-                const usePendingNavigation = pendingNavigation && pendingNavigation.query === state.searchQuery;
+                const pendingNavigation = searchController.pendingNavigation;
+                const usePendingNavigation = pendingNavigation && pendingNavigation.query === searchController.query;
                 if (pendingNavigation && !usePendingNavigation) {
-                    state.pendingSearchNavigation = null;
+                    searchController.clearPendingNavigation();
                 }
 
-                state.searchIndex = usePendingNavigation
-                    ? findSearchMatchIndexFromPosition(
-                        state.searchMatches,
+                const activeMatch = usePendingNavigation
+                    ? searchController.selectFromPosition(
                         pendingNavigation.line,
                         pendingNavigation.column,
                         pendingNavigation.reverse)
-                    : findSearchMatchIndexFromPosition(
-                        state.searchMatches,
+                    : searchController.selectFromPosition(
                         state.currentLine,
                         state.currentColumn,
                         false);
-                state.activeSearch = null;
-                if (state.searchIndex >= 0) {
-                    const match = state.searchMatches[state.searchIndex];
-                    state.activeSearch = {
-                        lineNumber: match.lineNumber,
-                        indexOfMatch: match.indexOfMatch,
-                        matchLength: match.matchLength,
-                        query: state.searchQuery
-                    };
-                    revealLine(match.lineNumber, match.indexOfMatch, match.matchLength, state.searchQuery, true);
+                if (activeMatch) {
+                    revealLine(
+                        activeMatch.lineNumber,
+                        activeMatch.indexOfMatch,
+                        activeMatch.matchLength,
+                        searchController.query,
+                        true);
                 }
                 if (usePendingNavigation) {
-                    state.pendingSearchNavigation = null;
+                    searchController.clearPendingNavigation();
                 }
                 queueRender(true);
                 break;

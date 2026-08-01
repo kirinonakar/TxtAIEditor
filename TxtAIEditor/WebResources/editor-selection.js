@@ -1,4 +1,4 @@
-import { imeController, state } from './editor-core.js';
+import { imeController, selectionController, state } from './editor-core.js';
 import { viewport } from './editor-dom.js';
 
 function lineTextFromElement(element) {
@@ -10,26 +10,16 @@ function lineTextFromElement(element) {
     return text.includes('\u00a0') ? text.replace(/\u00a0/g, ' ') : text;
 }
 
-function normalizeSelection(selection = state.selection) {
-    if (!selection) return null;
-    const a = selection.start;
-    const b = selection.end;
-    if (a.line < b.line || (a.line === b.line && a.column <= b.column)) {
-        return { start: a, end: b, isColumn: !!selection.isColumn };
-    }
-    return { start: b, end: a, isColumn: !!selection.isColumn };
+function normalizeSelection(selection = selectionController.selection) {
+    return selectionController.normalize(selection);
 }
 
 function hasCustomSelection() {
-    const normalized = normalizeSelection();
-    return !!normalized &&
-        (normalized.start.line !== normalized.end.line ||
-            normalized.start.column !== normalized.end.column);
+    return selectionController.hasSelection();
 }
 
 function activeColumnSelection() {
-    const selection = normalizeSelection();
-    return selection && selection.isColumn && hasCustomSelection() ? selection : null;
+    return selectionController.activeColumnSelection();
 }
 
 function cloneEditorSelection(selection) {

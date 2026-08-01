@@ -1,4 +1,4 @@
-import { escapeHtml, imeController, state } from './editor-core.js';
+import { escapeHtml, imeController, searchController, state } from './editor-core.js';
 import { selectionBoundsForLine } from './editor-selection.js';
 
 const MAX_SYNTAX_CONTEXT_LOOKBACK_LINES = 200;
@@ -1047,12 +1047,12 @@ function renderLineContent(lineNumber, text, forcePlainText = false, suppressSel
         }
     }
 
-    if (state.searchQuery && state.searchMatches.length > 0) {
-        const active = state.activeSearch;
+    if (searchController.query && searchController.matches.length > 0) {
+        const active = searchController.activeMatch;
         const activeMatchOnLine = active && active.lineNumber === lineNumber
             ? active
             : null;
-        const matchesOnLine = state.searchMatchesByLine?.get(lineNumber) || [];
+        const matchesOnLine = searchController.matchesByLine.get(lineNumber) || [];
         return renderSearchMatchesForLine(
             lineNumber,
             text,

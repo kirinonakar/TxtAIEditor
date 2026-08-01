@@ -5,6 +5,7 @@ import {
 import {
     activeEditableElement,
     clearCustomSelectionVisuals,
+    dragDropController,
     imeController,
     isHangulImeKeyEvent,
     isPlainTextKey,
@@ -14,6 +15,7 @@ import {
     queueRender,
     reportCursorAndSelection,
     requestLines,
+    selectionController,
     state,
     syncCustomSelectionClass
 } from './editor-core.js';
@@ -56,22 +58,22 @@ import {
 } from './editor-autocomplete.js';
 import { cancelPostEditFocusFollowUps } from './editor-edit-focus.js';
 
-export function bindKeyboardEvents({ openFindPanel }) {
+export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
     function samePosition(a, b) {
         return !!a && !!b && a.line === b.line && a.column === b.column;
     }
 
     function selectionFocusPosition(fallbackPosition) {
-        if (!state.selection || !state.selectionAnchor) return fallbackPosition;
+        if (!selectionController.selection || !selectionController.anchor) return fallbackPosition;
 
-        if (samePosition(state.selection.start, state.selectionAnchor) &&
-            !samePosition(state.selection.end, state.selectionAnchor)) {
-            return state.selection.end;
+        if (samePosition(selectionController.selection.start, selectionController.anchor) &&
+            !samePosition(selectionController.selection.end, selectionController.anchor)) {
+            return selectionController.selection.end;
         }
 
-        if (samePosition(state.selection.end, state.selectionAnchor) &&
-            !samePosition(state.selection.start, state.selectionAnchor)) {
-            return state.selection.start;
+        if (samePosition(selectionController.selection.end, selectionController.anchor) &&
+            !samePosition(selectionController.selection.start, selectionController.anchor)) {
+            return selectionController.selection.start;
         }
 
         return fallbackPosition;
@@ -92,10 +94,10 @@ export function bindKeyboardEvents({ openFindPanel }) {
             : (state.cache.get(targetLine) || '');
         const targetColumn = moveToEnd ? targetText.length : 0;
         const target = { line: targetLine, column: targetColumn };
-        const anchor = state.selectionAnchor || focus;
+        const anchor = selectionController.anchor || focus;
 
-        state.selectionAnchor = anchor;
-        state.selection = samePosition(anchor, target)
+        selectionController.anchor = anchor;
+        selectionController.selection = samePosition(anchor, target)
             ? null
             : { start: anchor, end: target };
         state.currentLine = targetLine;
@@ -115,9 +117,9 @@ export function bindKeyboardEvents({ openFindPanel }) {
         const caret = element ? getCaretOffset(element) : (state.currentColumn - 1);
 
         if (extendSelection) {
-            const anchor = state.selectionAnchor || { line: lineNumber, column: caret };
-            state.selectionAnchor = anchor;
-            state.selection = (anchor.line === targetLine && anchor.column === targetColumn)
+            const anchor = selectionController.anchor || { line: lineNumber, column: caret };
+            selectionController.anchor = anchor;
+            selectionController.selection = (anchor.line === targetLine && anchor.column === targetColumn)
                 ? null
                 : { start: anchor, end: { line: targetLine, column: targetColumn } };
             state.currentLine = targetLine;
@@ -127,8 +129,8 @@ export function bindKeyboardEvents({ openFindPanel }) {
             setTimeout(() => focusLine(targetLine, targetColumn), 0);
             reportCursorAndSelection();
         } else {
-            state.selection = null;
-            state.selectionAnchor = { line: targetLine, column: targetColumn };
+            selectionController.selection = null;
+            selectionController.anchor = { line: targetLine, column: targetColumn };
             state.currentLine = targetLine;
             state.currentColumn = targetColumn + 1;
             syncCustomSelectionClass();
@@ -149,9 +151,9 @@ export function bindKeyboardEvents({ openFindPanel }) {
             const caret = element ? getCaretOffset(element) : (state.currentColumn - 1);
 
             if (extendSelection) {
-                const anchor = state.selectionAnchor || { line: lineNumber, column: caret };
-                state.selectionAnchor = anchor;
-                state.selection = (anchor.line === targetLine && anchor.column === targetColumn)
+                const anchor = selectionController.anchor || { line: lineNumber, column: caret };
+                selectionController.anchor = anchor;
+                selectionController.selection = (anchor.line === targetLine && anchor.column === targetColumn)
                     ? null
                     : { start: anchor, end: { line: targetLine, column: targetColumn } };
                 state.currentLine = targetLine;
@@ -161,8 +163,8 @@ export function bindKeyboardEvents({ openFindPanel }) {
                 setTimeout(() => focusLine(targetLine, targetColumn), 0);
                 reportCursorAndSelection();
             } else {
-                state.selection = null;
-                state.selectionAnchor = { line: targetLine, column: targetColumn };
+                selectionController.selection = null;
+                selectionController.anchor = { line: targetLine, column: targetColumn };
                 state.currentLine = targetLine;
                 state.currentColumn = targetColumn + 1;
                 syncCustomSelectionClass();
@@ -236,8 +238,8 @@ export function bindKeyboardEvents({ openFindPanel }) {
             0,
             Math.min(Number(state.currentColumn || fallbackColumn + 1) - 1, lineText.length));
 
-        state.selection = null;
-        state.selectionAnchor = { line: caretLine, column: caretColumn };
+        selectionController.selection = null;
+        selectionController.anchor = { line: caretLine, column: caretColumn };
         state.hexSelection = null;
         state.hexSelectionAnchorOffset = null;
         state.hexCursorOffset = 0;
@@ -371,10 +373,10 @@ export function bindKeyboardEvents({ openFindPanel }) {
             return;
         }
 
-        if (event.key === 'Escape' && (state.isDragPotential || state.isDragMoving)) {
+        if (event.key === 'Escape' && dragDropController.isActive) {
             event.preventDefault();
-            state.isSelecting = false;
-            cleanupDragState();
+            selectionController.isSelecting = false;
+            cancelDragInteraction();
             queueRender(true);
             return;
         }
@@ -664,9 +666,9 @@ export function bindKeyboardEvents({ openFindPanel }) {
             const currentCol = getCaretOffset(element);
             const targetLineNum = Math.max(1, currentLineNum - pageLines);
             if (event.shiftKey) {
-                const anchor = state.selectionAnchor || { line: currentLineNum, column: currentCol };
-                state.selectionAnchor = anchor;
-                state.selection = (anchor.line === targetLineNum && anchor.column === currentCol)
+                const anchor = selectionController.anchor || { line: currentLineNum, column: currentCol };
+                selectionController.anchor = anchor;
+                selectionController.selection = (anchor.line === targetLineNum && anchor.column === currentCol)
                     ? null
                     : { start: anchor, end: { line: targetLineNum, column: currentCol } };
                 state.currentLine = targetLineNum;
@@ -674,8 +676,8 @@ export function bindKeyboardEvents({ openFindPanel }) {
                 syncCustomSelectionClass();
                 queueRender(true);
             } else {
-                state.selection = null;
-                state.selectionAnchor = { line: targetLineNum, column: currentCol };
+                selectionController.selection = null;
+                selectionController.anchor = { line: targetLineNum, column: currentCol };
                 state.currentLine = targetLineNum;
                 state.currentColumn = currentCol + 1;
                 syncCustomSelectionClass();
@@ -692,9 +694,9 @@ export function bindKeyboardEvents({ openFindPanel }) {
             const currentCol = getCaretOffset(element);
             const targetLineNum = Math.min(state.lineCount, currentLineNum + pageLines);
             if (event.shiftKey) {
-                const anchor = state.selectionAnchor || { line: currentLineNum, column: currentCol };
-                state.selectionAnchor = anchor;
-                state.selection = (anchor.line === targetLineNum && anchor.column === currentCol)
+                const anchor = selectionController.anchor || { line: currentLineNum, column: currentCol };
+                selectionController.anchor = anchor;
+                selectionController.selection = (anchor.line === targetLineNum && anchor.column === currentCol)
                     ? null
                     : { start: anchor, end: { line: targetLineNum, column: currentCol } };
                 state.currentLine = targetLineNum;
@@ -702,8 +704,8 @@ export function bindKeyboardEvents({ openFindPanel }) {
                 syncCustomSelectionClass();
                 queueRender(true);
             } else {
-                state.selection = null;
-                state.selectionAnchor = { line: targetLineNum, column: currentCol };
+                selectionController.selection = null;
+                selectionController.anchor = { line: targetLineNum, column: currentCol };
                 state.currentLine = targetLineNum;
                 state.currentColumn = currentCol + 1;
                 syncCustomSelectionClass();

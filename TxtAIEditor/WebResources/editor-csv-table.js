@@ -6,10 +6,13 @@ import {
     post,
     queueRender,
     requestMissingLines,
+    searchController,
+    selectionController,
     setupVirtualHeight,
     shiftCachedLines,
     state,
     syncCustomSelectionClass,
+    viewportController,
     writeClipboardText
 } from './editor-core.js';
 import {
@@ -613,7 +616,7 @@ function replaceJsonDocumentText(nextText) {
     state.cacheVersion++;
     state.csvTableVersion++;
     state.csvJsonTableModel = null;
-    state.searchDocumentVersion = -1;
+    searchController.invalidateDocument();
     state.livePreviewLocalResourceVersion = String(Date.now());
     state.dirtyLines.clear();
     if (state.showDirtyLines) {
@@ -812,7 +815,7 @@ function setSelectedCell(lineNumber, columnIndex, focusFormula = false) {
     state.csvSelectedColumn = Math.max(0, Number(columnIndex || 0));
     state.currentLine = state.csvSelectedLine;
     state.currentColumn = state.csvSelectedColumn + 1;
-    state.selection = null;
+    selectionController.clear();
     state.csvEditMode = 'select';
     state.csvSelection = {
         mode: 'cells',
@@ -1275,7 +1278,7 @@ function moveCsvFocus(lineNumber, columnIndex) {
     state.csvSelectedColumn = column;
     state.currentLine = state.csvSelectedLine;
     state.currentColumn = state.csvSelectedColumn + 1;
-    state.selection = null;
+    selectionController.clear();
     state.csvEditMode = 'select';
     state.csvSelection = {
         mode: 'cells',
@@ -1444,7 +1447,7 @@ function setCsvTableMode(enabled, options = {}) {
     document.body.classList.toggle('csv-table-mode', state.csvTableEnabled);
     csvToolbar.hidden = !state.csvTableEnabled;
     csvColumnHeader.hidden = !state.csvTableEnabled;
-    state.lastRangeKey = '';
+    viewportController.invalidateRenderRange();
 
     // Reset scroll position to the top-left corner on toggle.
     if (scrollContainer) {

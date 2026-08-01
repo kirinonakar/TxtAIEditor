@@ -13,6 +13,7 @@ export function createHostStreamInsertCommands({
     post,
     queueRender,
     reportCursorAndSelection,
+    selectionController,
     setupVirtualHeight,
     shiftCachedLines,
     state,
@@ -21,8 +22,7 @@ export function createHostStreamInsertCommands({
     let hostStreamInsert = null;
 
     function clearHostStreamSelection() {
-        state.selection = null;
-        state.selectionAnchor = null;
+        selectionController.clear({ clearAnchor: true });
         clearCustomSelectionVisuals();
         try {
             window.getSelection()?.removeAllRanges();

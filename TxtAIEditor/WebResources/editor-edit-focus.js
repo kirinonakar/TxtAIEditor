@@ -1,7 +1,9 @@
 import {
     reportCursorAndSelection,
+    selectionController,
     state,
-    totalVirtualHeight
+    totalVirtualHeight,
+    viewportController
 } from './editor-core.js';
 import { scrollContainer, viewport } from './editor-dom.js';
 import {
@@ -33,7 +35,7 @@ export function queuePostEditCaretRestore(lineNumber, columnZeroBased, scrollMar
 
         state.currentLine = targetLine;
         state.currentColumn = targetColumn + 1;
-        state.selectionAnchor = { line: targetLine, column: targetColumn };
+        selectionController.anchor = { line: targetLine, column: targetColumn };
 
         const element = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
         if (element && element.getAttribute('contenteditable') === 'true') {
@@ -63,9 +65,7 @@ export function queuePostEditCaretRestore(lineNumber, columnZeroBased, scrollMar
 }
 
 export function clampScrollTop(scrollTop) {
-    const preservedHeight = state.preservedScrollTop !== null
-        ? Math.max(0, Number(state.preservedScrollTop || 0)) + scrollContainer.clientHeight
-        : 0;
+    const preservedHeight = viewportController.preservedContentHeight(scrollContainer.clientHeight);
     const maxScrollTop = Math.max(0, Math.max(totalVirtualHeight(), preservedHeight) - scrollContainer.clientHeight);
     return Math.min(maxScrollTop, Math.max(0, Number(scrollTop || 0)));
 }

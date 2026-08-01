@@ -6,6 +6,7 @@ import {
     markDirty,
     post,
     queueRender,
+    selectionController,
     setupVirtualHeight,
     shiftCachedLines,
     syncCustomSelectionClass,
@@ -509,8 +510,8 @@ function replaceWordWithAutocompleteText(element, wordStart, replaceEnd, insertT
     }
 
     state.lineCount += insertedCount;
-    state.selection = null;
-    state.selectionAnchor = {
+    selectionController.selection = null;
+    selectionController.anchor = {
         line: lastLineNumber,
         column: parts[parts.length - 1]?.length || 0
     };
@@ -551,8 +552,8 @@ function restoreAutocompleteCaretAfterCommit(lineNumber, columnZeroBased, expect
             return;
         }
 
-        state.selection = null;
-        state.selectionAnchor = { line: targetLine, column: targetColumn };
+        selectionController.selection = null;
+        selectionController.anchor = { line: targetLine, column: targetColumn };
         state.currentLine = targetLine;
         state.currentColumn = targetColumn + 1;
         syncCustomSelectionClass();

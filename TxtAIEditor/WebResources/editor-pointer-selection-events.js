@@ -6,10 +6,12 @@ import {
 } from './editor-dom.js';
 import {
     clearCustomSelectionVisuals,
+    dragDropController,
     post,
     preserveScrollTop,
     queueRender,
     reportCursorAndSelection,
+    selectionController,
     selectedText,
     state,
     syncCustomSelectionClass
@@ -268,9 +270,8 @@ export function bindPointerSelectionEvents({
 
     function updateOpenableHoverUnderline(event) {
         if (state.csvTableEnabled ||
-            state.isSelecting ||
-            state.isDragPotential ||
-            state.isDragMoving ||
+            selectionController.isSelecting ||
+            dragDropController.isActive ||
             hasCustomSelection() ||
             isHexView()) {
             cancelOpenableHoverValidation();
@@ -423,17 +424,13 @@ export function bindPointerSelectionEvents({
             ? state.hexSelectionAnchorOffset
             : position.offset;
         state.hexSelectionAnchorOffset = anchorOffset;
-        state.selection = null;
+        selectionController.selection = null;
         setHexCursor(position);
         setHexSelectionFromOffsets(anchorOffset, position.offset);
         syncCustomSelectionClass();
-        state.isSelecting = true;
-        state.isLineSelecting = false;
-        state.isDragPotential = false;
-        state.isDragMoving = false;
-        state.dragSelectionData = null;
-        state.dragDropPosition = null;
-        state.dragStartPosition = null;
+        selectionController.isSelecting = true;
+        selectionController.isLineSelecting = false;
+        dragDropController.reset();
         document.body.classList.add('selecting');
 
         queueRender(true);
@@ -457,11 +454,7 @@ export function bindPointerSelectionEvents({
     function endHexSelection(event) {
         stopSelectionAutoScroll();
         releaseSelectionPointer(event);
-        state.isSelecting = false;
-        state.isLineSelecting = false;
-        state.isDragPotential = false;
-        state.isDragMoving = false;
-        state.dragStartPosition = null;
+        selectionController.endPointerSelection();
         cleanupDragState();
         clearNativeSelection();
         document.body.classList.remove('selecting');
@@ -497,14 +490,12 @@ export function bindPointerSelectionEvents({
     }
 
     function cancelActiveSelectionInteraction({ render = true } = {}) {
-        const wasActive = state.isSelecting || state.isLineSelecting || state.isDragPotential || state.isDragMoving;
+        const wasActive = selectionController.isSelecting || selectionController.isLineSelecting || dragDropController.isActive;
         if (!wasActive) return;
 
         stopSelectionAutoScroll();
         releaseSelectionPointer();
-        state.isSelecting = false;
-        state.isLineSelecting = false;
-        state.dragStartPosition = null;
+        selectionController.endPointerSelection();
         cleanupDragState();
         document.body.classList.remove('selecting');
         syncCustomSelectionClass();
@@ -590,18 +581,14 @@ export function bindPointerSelectionEvents({
         if (!livePreviewPointer || livePreviewPointer.selecting) return;
 
         livePreviewPointer.selecting = true;
-        const anchor = livePreviewPointer.extendSelection && state.selectionAnchor
-            ? state.selectionAnchor
+        const anchor = livePreviewPointer.extendSelection && selectionController.anchor
+            ? selectionController.anchor
             : { line: livePreviewPointer.start.line, column: livePreviewPointer.start.column };
-        state.selectionAnchor = anchor;
-        state.selection = null;
-        state.isSelecting = true;
-        state.isLineSelecting = false;
-        state.isDragPotential = false;
-        state.isDragMoving = false;
-        state.dragSelectionData = null;
-        state.dragDropPosition = null;
-        state.dragStartPosition = null;
+        selectionController.anchor = anchor;
+        selectionController.selection = null;
+        selectionController.isSelecting = true;
+        selectionController.isLineSelecting = false;
+        dragDropController.reset();
         document.body.classList.add('selecting');
         syncCustomSelectionClass();
         clearNativeSelection();
@@ -689,13 +676,12 @@ export function bindPointerSelectionEvents({
             }
 
             const hadSelection = hasCustomSelection();
-            state.isSelecting = false;
-            state.isLineSelecting = false;
-            state.dragStartPosition = null;
+            selectionController.endPointerSelection();
+            dragDropController.clearPointerStart();
             document.body.classList.remove('selecting');
             syncCustomSelectionClass();
             if (!hasCustomSelection()) {
-                state.selection = null;
+                selectionController.selection = null;
                 syncCustomSelectionClass();
             }
             if (!pending.sourceBlockSelection && (hadSelection || hasCustomSelection())) {
@@ -711,13 +697,12 @@ export function bindPointerSelectionEvents({
 
         const clickPosition = endPosition || pending.start;
         const clickColumn = Math.max(0, clickPosition.column);
-        state.selection = null;
-        state.selectionAnchor = { line: clickPosition.line, column: clickColumn };
+        selectionController.selection = null;
+        selectionController.anchor = { line: clickPosition.line, column: clickColumn };
         state.currentLine = clickPosition.line;
         state.currentColumn = clickColumn + 1;
-        state.isSelecting = false;
-        state.isLineSelecting = false;
-        state.dragStartPosition = null;
+        selectionController.endPointerSelection();
+        dragDropController.clearPointerStart();
         syncCustomSelectionClass();
         preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft);
 
@@ -747,9 +732,8 @@ export function bindPointerSelectionEvents({
         }
         stopSelectionAutoScroll();
         releaseSelectionPointer();
-        state.isSelecting = false;
-        state.isLineSelecting = false;
-        state.dragStartPosition = null;
+        selectionController.endPointerSelection();
+        dragDropController.clearPointerStart();
         document.body.classList.remove('selecting');
         syncCustomSelectionClass();
         preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft);
@@ -841,11 +825,11 @@ export function bindPointerSelectionEvents({
                 event.preventDefault();
                 captureSelectionPointer(event);
 
-                state.selectionAnchor = { line: line, column: 0 };
-                state.selection = { start: { line: line, column: 0 }, end: { line: line, column: lineLength || 1 } };
+                selectionController.anchor = { line: line, column: 0 };
+                selectionController.selection = { start: { line: line, column: 0 }, end: { line: line, column: lineLength || 1 } };
                 syncCustomSelectionClass();
-                state.isSelecting = true;
-                state.isLineSelecting = true;
+                selectionController.isSelecting = true;
+                selectionController.isLineSelecting = true;
                 document.body.classList.add('selecting');
                 state.currentLine = line;
                 state.currentColumn = lineLength + 1;
@@ -899,13 +883,13 @@ export function bindPointerSelectionEvents({
 
             const hadSelection = hasCustomSelection();
             const positionText = state.cache.get(position.line) ?? lineTextFromElement(position.element);
-            state.dragStartPosition = {
+            dragDropController.beginPointer({
                 line: position.line,
                 column: position.column,
                 isEmptyLine: positionText.length === 0,
                 clientX: event.clientX,
                 clientY: event.clientY
-            };
+            });
             const isColumnSelect = event.altKey;
             const clickInsideSelection = hadSelection && !event.shiftKey && !isColumnSelect && isPositionInsideSelection(position);
             const collapseSelectionWithoutExtending = hadSelection && !event.shiftKey && !clickInsideSelection;
@@ -914,31 +898,25 @@ export function bindPointerSelectionEvents({
 
             if (clickInsideSelection) {
                 const sel = normalizeSelection();
-                state.dragSelectionData = {
+                dragDropController.armSelection({
                     start: { line: sel.start.line, column: sel.start.column },
                     end: { line: sel.end.line, column: sel.end.column },
                     isColumn: !!sel.isColumn,
                     text: ''
-                };
-                state.isDragPotential = true;
-                state.isDragMoving = false;
-                state.dragDropPosition = null;
+                });
             } else {
-                state.isDragPotential = false;
-                state.isDragMoving = false;
-                state.dragSelectionData = null;
-                state.dragDropPosition = null;
-                const anchor = event.shiftKey && state.selectionAnchor
-                    ? state.selectionAnchor
+                dragDropController.disarmSelection();
+                const anchor = event.shiftKey && selectionController.anchor
+                    ? selectionController.anchor
                     : { line: position.line, column: position.column };
-                state.selectionAnchor = anchor;
-                state.selection = event.shiftKey
+                selectionController.anchor = anchor;
+                selectionController.selection = event.shiftKey
                     ? { start: anchor, end: { line: position.line, column: position.column }, isColumn: isColumnSelect }
                     : null;
             }
             syncCustomSelectionClass();
-            state.isSelecting = true;
-            state.isLineSelecting = false;
+            selectionController.isSelecting = true;
+            selectionController.isLineSelecting = false;
             document.body.classList.add('selecting');
             if (!clickInsideSelection) {
                 state.currentLine = position.line;
@@ -987,22 +965,22 @@ export function bindPointerSelectionEvents({
             return;
         }
 
-        if (isHexView() && state.isSelecting) {
+        if (isHexView() && selectionController.isSelecting) {
             endHexSelection(event);
             return;
         }
 
         stopSelectionAutoScroll();
 
-        if (state.isDragMoving && state.dragSelectionData) {
-            const dragData = state.dragSelectionData;
-            const dropPos = state.dragDropPosition;
-            const isCopy = state.isDragCopy;
-            state.isSelecting = false;
-            state.isLineSelecting = false;
+        const movement = dragDropController.movementSnapshot();
+        if (movement) {
+            const dragData = movement.selectionData;
+            const dropPos = movement.dropPosition;
+            const isCopy = movement.isCopy;
+            selectionController.endPointerSelection();
             document.body.classList.remove('selecting');
             releaseSelectionPointer(event);
-            state.dragStartPosition = null;
+            dragDropController.clearPointerStart();
 
             if (dropPos && hasCustomSelection() && dragData.text) {
                 const sel = normalizeSelection();
@@ -1025,17 +1003,15 @@ export function bindPointerSelectionEvents({
             return;
         }
 
-        if (state.isDragPotential) {
-            state.isDragPotential = false;
-            state.dragSelectionData = null;
-            state.dragDropPosition = null;
+        if (dragDropController.isPotential) {
+            dragDropController.disarmSelection();
             const clickPos = event ? positionFromPointer(event) : null;
             if (clickPos) {
                 const clickColumn = Math.max(0, clickPos.column);
                 const clickScrollTop = scrollContainer.scrollTop;
                 const clickScrollLeft = scrollContainer.scrollLeft;
-                state.selection = null;
-                state.selectionAnchor = { line: clickPos.line, column: clickColumn };
+                selectionController.selection = null;
+                selectionController.anchor = { line: clickPos.line, column: clickColumn };
                 state.currentLine = clickPos.line;
                 state.currentColumn = clickColumn + 1;
                 keepEditablePreviewBlockFromElement(clickPos.element);
@@ -1048,24 +1024,23 @@ export function bindPointerSelectionEvents({
                 }, 0);
                 reportCursorAndSelection(clickPos.element || document.activeElement);
             } else if (hasCustomSelection()) {
-                state.selection = null;
+                selectionController.selection = null;
                 syncCustomSelectionClass();
                 queueRender(true);
             }
-            state.isSelecting = true;
+            selectionController.isSelecting = true;
         }
 
-        if (!state.isSelecting) return;
-        state.isSelecting = false;
-        state.isLineSelecting = false;
+        if (!selectionController.isSelecting) return;
+        selectionController.endPointerSelection();
         document.body.classList.remove('selecting');
         syncCustomSelectionClass();
         releaseSelectionPointer(event);
-        state.dragStartPosition = null;
+        dragDropController.clearPointerStart();
         const hadSelection = hasCustomSelection();
         const selection = normalizeSelection();
         if (selection && !hasCustomSelection()) {
-            state.selection = null;
+            selectionController.selection = null;
             syncCustomSelectionClass();
         } else if (selection) {
             if (selection.isColumn) {
@@ -1077,7 +1052,7 @@ export function bindPointerSelectionEvents({
                 const hasInputCaret = !!(inputHost && domSelection?.rangeCount &&
                     inputHost.contains(domSelection.getRangeAt(0).startContainer));
                 if (!hasInputCaret) {
-                    const anchor = state.selectionAnchor || selection.start;
+                    const anchor = selectionController.anchor || selection.start;
                     const anchorElement = viewport.querySelector(`.line-text[data-line="${anchor.line}"]`);
                     if (anchorElement?.getAttribute('contenteditable') === 'true') {
                         setCaret(anchorElement, anchor.column, 0, true, false);
@@ -1143,7 +1118,7 @@ export function bindPointerSelectionEvents({
         indicator.style.height = rowRect.height + 'px';
         container.appendChild(indicator);
 
-        if (state.isDragCopy) {
+        if (dragDropController.isCopy) {
             const plus = document.createElement('span');
             plus.className = 'drag-drop-plus';
             plus.textContent = '+';
@@ -1153,11 +1128,7 @@ export function bindPointerSelectionEvents({
 
     function cleanupDragState() {
         scrollContainer.querySelectorAll('.drag-drop-indicator').forEach(el => el.remove());
-        state.isDragPotential = false;
-        state.isDragMoving = false;
-        state.isDragCopy = false;
-        state.dragSelectionData = null;
-        state.dragDropPosition = null;
+        dragDropController.reset();
         document.body.classList.remove('dragging-selection');
     }
 
@@ -1183,8 +1154,8 @@ export function bindPointerSelectionEvents({
 
     function updateSelectionFromPosition(position, event, options = {}) {
         let newSelection;
-        if (state.isLineSelecting) {
-            const startLine = state.selectionAnchor.line;
+        if (selectionController.isLineSelecting) {
+            const startLine = selectionController.anchor.line;
             const endLine = position.line;
             if (startLine <= endLine) {
                 const endText = state.cache.get(endLine) || '';
@@ -1201,25 +1172,26 @@ export function bindPointerSelectionEvents({
             }
         } else {
             newSelection = {
-                start: state.selectionAnchor || { line: position.line, column: position.column },
+                start: selectionController.anchor || { line: position.line, column: position.column },
                 end: { line: position.line, column: position.column },
                 isColumn: !!event.altKey
             };
         }
 
-        const selectionChanged = !state.selection ||
-            state.selection.start.line !== newSelection.start.line ||
-            state.selection.start.column !== newSelection.start.column ||
-            state.selection.end.line !== newSelection.end.line ||
-            state.selection.end.column !== newSelection.end.column;
+        const selectionChanged = !selectionController.selection ||
+            selectionController.selection.start.line !== newSelection.start.line ||
+            selectionController.selection.start.column !== newSelection.start.column ||
+            selectionController.selection.end.line !== newSelection.end.line ||
+            selectionController.selection.end.column !== newSelection.end.column;
 
         const isEmpty = newSelection.start.line === newSelection.end.line &&
             newSelection.start.column === newSelection.end.column;
 
-        if (isEmpty && !state.selection) {
-            const emptyLineDragDistance = state.dragStartPosition?.isEmptyLine &&
-                state.dragStartPosition.line === position.line
-                ? Math.hypot(event.clientX - state.dragStartPosition.clientX, event.clientY - state.dragStartPosition.clientY)
+        if (isEmpty && !selectionController.selection) {
+            const pointerStart = dragDropController.pointerStart;
+            const emptyLineDragDistance = pointerStart?.isEmptyLine &&
+                pointerStart.line === position.line
+                ? Math.hypot(event.clientX - pointerStart.clientX, event.clientY - pointerStart.clientY)
                 : 0;
             if (emptyLineDragDistance > 4) {
                 newSelection = {
@@ -1237,7 +1209,7 @@ export function bindPointerSelectionEvents({
         if (finalSelectionChanged) {
             const finalSelectionIsEmpty = newSelection.start.line === newSelection.end.line &&
                 newSelection.start.column === newSelection.end.column;
-            state.selection = finalSelectionIsEmpty ? null : newSelection;
+            selectionController.selection = finalSelectionIsEmpty ? null : newSelection;
             if (!newSelection.isColumn) {
                 clearNativeSelection();
             }
@@ -1284,9 +1256,8 @@ export function bindPointerSelectionEvents({
             selectionAutoScrollPointer !== pointer ||
             livePreviewPointer ||
             isHexView() ||
-            !state.isSelecting ||
-            state.isDragMoving ||
-            state.isDragPotential) {
+            !selectionController.isSelecting ||
+            dragDropController.isActive) {
             return;
         }
 
@@ -1296,7 +1267,7 @@ export function bindPointerSelectionEvents({
     function runSelectionAutoScroll() {
         selectionAutoScrollFrame = 0;
 
-        if (!state.isSelecting || state.isDragMoving || state.isDragPotential || !selectionAutoScrollPointer) {
+        if (!selectionController.isSelecting || dragDropController.isActive || !selectionAutoScrollPointer) {
             stopSelectionAutoScroll();
             return;
         }
@@ -1359,7 +1330,7 @@ export function bindPointerSelectionEvents({
         }
 
         if (isHexView()) {
-            if (!state.isSelecting) return;
+            if (!selectionController.isSelecting) return;
             if ((event.buttons & 1) === 0) {
                 endHexSelection(event);
                 return;
@@ -1370,30 +1341,33 @@ export function bindPointerSelectionEvents({
             return;
         }
 
-        if (state.isDragPotential || state.isDragMoving) {
+        if (dragDropController.isActive) {
             if ((event.buttons & 1) === 0) {
                 endSelection(event);
                 return;
             }
             event.preventDefault();
-            const dx = event.clientX - (state.dragStartPosition?.clientX ?? event.clientX);
-            const dy = event.clientY - (state.dragStartPosition?.clientY ?? event.clientY);
+            const pointerStart = dragDropController.pointerStart;
+            const dx = event.clientX - (pointerStart?.clientX ?? event.clientX);
+            const dy = event.clientY - (pointerStart?.clientY ?? event.clientY);
             const distance = Math.hypot(dx, dy);
 
-            if (state.isDragPotential && distance > 4) {
-                state.isDragMoving = true;
-                state.isDragPotential = false;
-                state.isDragCopy = event.ctrlKey || event.metaKey;
+            if (dragDropController.isPotential && distance > 4) {
+                dragDropController.beginMove({
+                    text: selectedText(),
+                    isCopy: event.ctrlKey || event.metaKey
+                });
                 document.body.classList.remove('selecting');
                 document.body.classList.add('dragging-selection');
-                state.dragSelectionData.text = selectedText();
             }
 
-            if (state.isDragMoving) {
-                state.isDragCopy = event.ctrlKey || event.metaKey;
+            if (dragDropController.isMoving) {
                 const pos = positionFromPointer(event);
+                dragDropController.updateMove({
+                    dropPosition: pos ? { line: pos.line, column: pos.column } : undefined,
+                    isCopy: event.ctrlKey || event.metaKey
+                });
                 if (pos) {
-                    state.dragDropPosition = { line: pos.line, column: pos.column };
                     updateDragDropIndicator(pos, event);
                 }
                 return;
@@ -1401,7 +1375,7 @@ export function bindPointerSelectionEvents({
             return;
         }
 
-        if (!state.isSelecting) return;
+        if (!selectionController.isSelecting) return;
         if ((event.buttons & 1) === 0) {
             endSelection(event);
             return;
@@ -1423,7 +1397,7 @@ export function bindPointerSelectionEvents({
             return;
         }
         if (activeSelectionPointerId === event.pointerId &&
-            (state.isSelecting || state.isDragPotential || state.isDragMoving)) {
+            (selectionController.isSelecting || dragDropController.isActive)) {
             cancelActiveSelectionInteraction();
         }
         if (activeSelectionPointerId === event.pointerId) {
@@ -1435,9 +1409,8 @@ export function bindPointerSelectionEvents({
         cancelOpenableHoverValidation();
         if (!livePreviewPointer &&
             !isHexView() &&
-            state.isSelecting &&
-            !state.isDragPotential &&
-            !state.isDragMoving) {
+            selectionController.isSelecting &&
+            !dragDropController.isActive) {
             scheduleSelectionUpdateAfterWheel(event);
             return;
         }
@@ -1459,7 +1432,7 @@ export function bindPointerSelectionEvents({
             cancelLivePreviewPointer();
             return;
         }
-        if (!state.isSelecting) return;
+        if (!selectionController.isSelecting) return;
         cancelActiveSelectionInteraction();
     });
 
@@ -1542,9 +1515,9 @@ export function bindPointerSelectionEvents({
         const keepSelection = hasCustomSelection() && isPositionInsideSelection(position);
         if (position && !keepSelection) {
             const hadSelection = hasCustomSelection();
-            state.selection = null;
+            selectionController.selection = null;
             syncCustomSelectionClass();
-            state.selectionAnchor = { line: position.line, column: position.column };
+            selectionController.anchor = { line: position.line, column: position.column };
             state.currentLine = position.line;
             state.currentColumn = position.column + 1;
             if (position.element.getAttribute('contenteditable') === 'true') {
@@ -1557,6 +1530,7 @@ export function bindPointerSelectionEvents({
     });
 
     return {
+        cancelDragInteraction: cleanupDragState,
         handleOpenableHoverResult
     };
 }

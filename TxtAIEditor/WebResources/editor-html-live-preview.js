@@ -1,5 +1,5 @@
 import { htmlLivePreview, viewport } from './editor-dom.js';
-import { post, requestMissingLines, state } from './editor-core.js';
+import { post, requestMissingLines, state, viewportController } from './editor-core.js';
 import { buildHtmlPreviewFrameBridgeScript } from './html-preview-frame-bridge.js';
 
 function escapeAttribute(value) {
@@ -73,9 +73,8 @@ function createFullHtmlLivePreviewRenderer() {
         document.body.classList.remove('full-html-live-preview-enabled');
         htmlLivePreview.hidden = true;
         htmlLivePreview.removeAttribute('srcdoc');
-        state.lastRangeKey = '';
-        state.renderedRangeStart = 0;
-        state.renderedRangeEnd = 0;
+        viewportController.invalidateRenderRange();
+        viewportController.clearRenderedRange();
     }
 
     function activate() {
@@ -87,7 +86,7 @@ function createFullHtmlLivePreviewRenderer() {
         state.inlineLivePreviewSourceLine = null;
         state.inlineLivePreviewEditableBlock = null;
         state.editingLine = null;
-        state.lastRangeKey = '';
+        viewportController.invalidateRenderRange();
         viewport.innerHTML = '';
         document.body.classList.add('full-html-live-preview-enabled');
         htmlLivePreview.hidden = false;
@@ -100,8 +99,7 @@ function createFullHtmlLivePreviewRenderer() {
         }
 
         activate();
-        state.renderedRangeStart = 1;
-        state.renderedRangeEnd = state.lineCount;
+        viewportController.setRenderedRange(1, state.lineCount);
 
         const text = fullDocumentText();
         if (text === null) {

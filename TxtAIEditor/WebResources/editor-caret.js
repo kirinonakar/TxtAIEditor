@@ -7,6 +7,7 @@ import {
     orderedRange,
     queueRender,
     reportCursorAndSelection,
+    selectionController,
     state,
     usesFullDocumentRender,
     usesCompressedScroll,
@@ -279,8 +280,8 @@ function selectWordAtPointer(event) {
     const wordRange = wordRangeAtColumn(text, position.column);
     if (!wordRange) return false;
 
-    state.selectionAnchor = { line: position.line, column: wordRange.start };
-    state.selection = {
+    selectionController.anchor = { line: position.line, column: wordRange.start };
+    selectionController.selection = {
         start: { line: position.line, column: wordRange.start },
         end: { line: position.line, column: wordRange.end }
     };
@@ -370,7 +371,7 @@ function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = tr
 
     reportCursorAndSelection(element, getCaretOffset(element), includeSelectionReport);
 
-    const preserveSelectionInputContext = state.isSelecting || !!state.selection?.isColumn;
+    const preserveSelectionInputContext = selectionController.isSelecting || !!selectionController.selection?.isColumn;
     if (oldActiveLine !== null && oldActiveLine !== state.editingLine && !preserveSelectionInputContext) {
         if (!fullDocumentEditingRowPatched) {
             queueRender(true);
