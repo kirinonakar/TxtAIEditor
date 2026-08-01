@@ -649,11 +649,21 @@ function replaceJsonDocumentText(nextText) {
     }
 }
 
-function writeJsonCell(lineNumber, columnIndex, value, sourceElement = null, refreshFormula = true) {
+function writeJsonCell(lineNumber, columnIndex, value, sourceElement = null, refreshFormula = true, isComposing = false) {
     const model = currentJsonTableModel();
     const path = csvJsonCellPath(lineNumber, columnIndex);
     if (!model || !path) {
         updateCsvFormula();
+        return;
+    }
+
+    // Keep the active cell DOM under IME ownership until compositionend. A
+    // JSON table edit rewrites the whole source document, so doing that for
+    // each composition update would disconnect/reset every rendered cell.
+    if (isComposing) {
+        if (sourceElement) {
+            sourceElement.textContent = String(value ?? '');
+        }
         return;
     }
 
@@ -846,7 +856,7 @@ function setSelectedCell(lineNumber, columnIndex, focusFormula = false) {
 function writeCsvCell(lineNumber, columnIndex, value, sourceElement = null, refreshFormula = true, isComposing = false) {
     ensureCsvState();
     if (isJsonCsvTableMode()) {
-        writeJsonCell(lineNumber, columnIndex, value, sourceElement, refreshFormula);
+        writeJsonCell(lineNumber, columnIndex, value, sourceElement, refreshFormula, isComposing);
         return;
     }
 

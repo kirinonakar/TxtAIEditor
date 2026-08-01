@@ -122,7 +122,13 @@ function post(msg) {
     const baseVersion = state.hostDocumentVersion;
     const isMutation = ['edit', 'lineChanged', 'lineEdit', 'rangeEdit', 'insertLine', 'splitLine',
         'mergeLineWithPrevious', 'deleteLine', 'hexEdit', 'replaceAll'].includes(msg?.type);
-    const isOptimisticallyAppliedMutation = isMutation && msg?.type !== 'replaceAll';
+    // Composition previews are intentionally ignored by the host model until
+    // compositionend. Do not advance the optimistic host version for them;
+    // otherwise the final committed edit is sent with a future baseVersion and
+    // the host rejects it, triggering a full document resynchronization.
+    const isOptimisticallyAppliedMutation = isMutation &&
+        msg?.type !== 'replaceAll' &&
+        msg?.isComposing !== true;
     if (msg?.type === 'contentChanged') {
         state.documentVersion++;
         searchController.invalidateDocument();
