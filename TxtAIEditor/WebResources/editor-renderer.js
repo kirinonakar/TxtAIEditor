@@ -21,7 +21,8 @@ import {
 } from './editor-core.js';
 import {
     renderLineContent,
-    shouldSkipLineSyntaxHighlighting
+    shouldSkipLineSyntaxHighlighting,
+    wrapPreviewHtmlSearchMatches
 } from './editor-highlighter.js';
 import {
     drawEditableSelectionOverlays,
@@ -413,7 +414,10 @@ function createEditorRenderer({
                     renderEnd = nextEnd;
                 }
                 if (!renderedLivePreviewLine.pending && !renderedLivePreviewLine.source) {
-                    lineContent = renderedLivePreviewLine.html;
+                    lineContent = wrapPreviewHtmlSearchMatches(
+                        renderedLivePreviewLine.html,
+                        line,
+                        renderedLivePreviewLine.endLine || line);
                     liveContentEditable = 'false';
                     livePreviewClass = renderedLivePreviewLine.skipped
                         ? ' live-preview-skipped'

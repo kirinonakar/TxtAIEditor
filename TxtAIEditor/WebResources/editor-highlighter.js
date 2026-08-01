@@ -1173,8 +1173,112 @@ function renderSearchMatchesForLine(lineNumber, text, matches, activeMatch, supp
     return parts.join('');
 }
 
+// Live preview rows are rendered from markdown, so the per-line match
+// offsets stored in searchController refer to the source text, not to the
+// rendered HTML. Re-run the active query against the rendered text nodes
+// so search terms keep their shading inside live preview rows.
+function wrapPreviewHtmlSearchMatches(html, lineNumber, endLine) {
+    const query = searchController.query;
+    if (!query || !html || searchController.matches.length === 0) {
+        return html;
+    }
+
+    const active = searchController.activeMatch;
+    let activeOrdinal = -1;
+    if (active &&
+        active.lineNumber >= lineNumber &&
+        active.lineNumber <= (endLine || lineNumber)) {
+        const lineMatches = (searchController.matchesByLine.get(active.lineNumber) || [])
+            .filter(match => Number(match.lineNumber) === active.lineNumber)
+            .sort((a, b) => Number(a.indexOfMatch || 0) - Number(b.indexOfMatch || 0));
+        for (let ordinal = 0; ordinal < lineMatches.length; ordinal++) {
+            if (Number(lineMatches[ordinal].indexOfMatch || 0) === active.indexOfMatch) {
+                activeOrdinal = ordinal;
+                break;
+            }
+        }
+    }
+
+    let regex = null;
+    if (searchController.regex) {
+        try {
+            regex = new RegExp(query, searchController.matchCase ? 'g' : 'gi');
+        } catch (error) {
+            return html;
+        }
+    }
+
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+    let occurrence = -1;
+    let node;
+    const skippedContainers = 'svg, math, script, style';
+
+    while ((node = walker.nextNode())) {
+        const text = node.nodeValue || '';
+        if (!text) continue;
+        if (node.parentElement?.closest?.(skippedContainers)) continue;
+
+        const fragment = document.createDocumentFragment();
+        const appendMark = (start, length) => {
+            occurrence++;
+            const mark = document.createElement('mark');
+            mark.className = occurrence === activeOrdinal
+                ? 'search-match active-match'
+                : 'search-match';
+            mark.textContent = text.slice(start, start + length);
+            fragment.appendChild(mark);
+        };
+
+        if (regex) {
+            regex.lastIndex = 0;
+            let match;
+            let pos = 0;
+            while ((match = regex.exec(text)) !== null) {
+                if (match[0].length === 0) {
+                    regex.lastIndex++;
+                    continue;
+                }
+                if (match.index > pos) {
+                    fragment.appendChild(document.createTextNode(text.slice(pos, match.index)));
+                }
+                appendMark(match.index, match[0].length);
+                pos = match.index + match[0].length;
+            }
+            if (fragment.childNodes.length === 0) continue;
+            if (pos < text.length) {
+                fragment.appendChild(document.createTextNode(text.slice(pos)));
+            }
+            node.replaceWith(fragment);
+            continue;
+        }
+
+        const haystack = searchController.matchCase ? text : text.toLowerCase();
+        const needle = searchController.matchCase ? query : query.toLowerCase();
+        let pos = 0;
+        let index = haystack.indexOf(needle, pos);
+        if (index < 0) continue;
+        while (index >= 0) {
+            if (index > pos) {
+                fragment.appendChild(document.createTextNode(text.slice(pos, index)));
+            }
+            appendMark(index, query.length);
+            pos = index + query.length;
+            index = haystack.indexOf(needle, pos);
+        }
+        if (pos < text.length) {
+            fragment.appendChild(document.createTextNode(text.slice(pos)));
+        }
+        node.replaceWith(fragment);
+    }
+
+    return template.innerHTML;
+}
+
 export {
     highlightLine,
     renderLineContent,
-    shouldSkipLineSyntaxHighlighting
+    shouldSkipLineSyntaxHighlighting,
+    wrapPreviewHtmlSearchMatches
 };
