@@ -23,6 +23,9 @@ namespace TxtAIEditor.Controls
     public sealed partial class EditorWorkspacePane : UserControl
     {
         private const double TerminalSplitterVisibleThickness = 2;
+        // TabView places the built-in add button after the tab list. Keep that
+        // column out of the list width so it cannot be covered by the actions.
+        private const double TabViewAddButtonReservedWidth = 40;
 
         private TerminalPane? _terminalPane;
         private EditorSettings? _pendingTerminalSettings;
@@ -166,7 +169,7 @@ namespace TxtAIEditor.Controls
             ListViewBase listView,
             double reservedActionWidth)
         {
-            double availableWidth = Math.Max(0, tabView.ActualWidth - reservedActionWidth - 44);
+            double availableWidth = Math.Max(0, tabView.ActualWidth - reservedActionWidth - TabViewAddButtonReservedWidth);
 
             try
             {
@@ -174,7 +177,9 @@ namespace TxtAIEditor.Controls
                 Point actionsOrigin = actionsPanel.TransformToVisual(tabView).TransformPoint(new Point(0, 0));
                 if (actionsOrigin.X > listOrigin.X)
                 {
-                    availableWidth = Math.Max(0, actionsOrigin.X - listOrigin.X - 4);
+                    // The add button is in the column immediately after the list.
+                    // Reserve its column plus a small gap before the overlaid actions.
+                    availableWidth = Math.Max(0, actionsOrigin.X - listOrigin.X - TabViewAddButtonReservedWidth);
                 }
             }
             catch
@@ -182,12 +187,12 @@ namespace TxtAIEditor.Controls
                 // Use the conservative fallback when the template is not laid out yet.
             }
 
-            // TabView's template places the list in an Auto column. Explicitly sizing and
-            // left-aligning it prevents a mode transition from leaving the first tab centered
-            // in stale space or allowing the overlaid action buttons to cover the last tab.
+            // TabView's template places the list in an Auto column. Let the list keep its
+            // content width when tabs fit so the add button stays directly after the last tab;
+            // MaxWidth makes it fill the remaining space only when the tabs overflow.
             listView.HorizontalAlignment = HorizontalAlignment.Left;
             listView.HorizontalContentAlignment = HorizontalAlignment.Left;
-            listView.Width = availableWidth;
+            listView.Width = double.NaN;
             listView.MaxWidth = availableWidth;
             listView.InvalidateMeasure();
             listView.InvalidateArrange();
