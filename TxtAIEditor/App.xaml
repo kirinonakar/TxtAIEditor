@@ -29,6 +29,9 @@
                     <SolidColorBrush x:Key="ButtonBorderBrush" Color="#E0E0E0"/>
                     <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#D5D5D5"/>
                     <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#C5C5C5"/>
+                    <!-- Right sidebar preview toolbar icon buttons (Light Theme) -->
+                    <SolidColorBrush x:Key="PreviewToolbarButtonBackgroundPointerOver" Color="#E9EBEE"/>
+                    <SolidColorBrush x:Key="PreviewToolbarButtonBackgroundPressed" Color="#D2D6DB"/>
                     <SolidColorBrush x:Key="LlmOutputBackground" Color="#FCFCFC"/>
                     <SolidColorBrush x:Key="LlmOutputForeground" Color="#1F2937"/>
                     
@@ -89,6 +92,9 @@
                     <SolidColorBrush x:Key="ButtonBorderBrush" Color="#2E3033"/>
                     <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#3B3E45"/>
                     <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#4E525C"/>
+                    <!-- Right sidebar preview toolbar icon buttons (Dark Theme) -->
+                    <SolidColorBrush x:Key="PreviewToolbarButtonBackgroundPointerOver" Color="#2E3035"/>
+                    <SolidColorBrush x:Key="PreviewToolbarButtonBackgroundPressed" Color="#3F4248"/>
                     <SolidColorBrush x:Key="LlmOutputBackground" Color="#151618"/>
                     <SolidColorBrush x:Key="LlmOutputForeground" Color="#D4D4D4"/>
                     
