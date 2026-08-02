@@ -13,6 +13,10 @@ namespace TxtAIEditor.Controls
         {
             InitializeComponent();
             RemoteExplorer.RemoteServerSelected += OnRemoteServerSelected;
+            RootGrid.AddHandler(
+                UIElement.PointerPressedEvent,
+                new PointerEventHandler(OnExplorerPointerPressed),
+                true);
         }
 
         public Grid Root => RootGrid;
@@ -33,6 +37,7 @@ namespace TxtAIEditor.Controls
         public ListView FileList => FileListView;
 
         public event RoutedEventHandler? BackClick;
+        public event RoutedEventHandler? ForwardClick;
         public event RoutedEventHandler? UpClick;
         public event RoutedEventHandler? SelectFolderClick;
         public event RoutedEventHandler? CreateFolderClick;
@@ -138,6 +143,20 @@ namespace TxtAIEditor.Controls
         }
 
         private void OnExplorerBackClick(object sender, RoutedEventArgs e) => BackClick?.Invoke(sender, e);
+        private void OnExplorerPointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            var properties = e.GetCurrentPoint(RootGrid).Properties;
+            if (properties.IsXButton1Pressed)
+            {
+                e.Handled = true;
+                BackClick?.Invoke(this, new RoutedEventArgs());
+            }
+            else if (properties.IsXButton2Pressed)
+            {
+                e.Handled = true;
+                ForwardClick?.Invoke(this, new RoutedEventArgs());
+            }
+        }
         private void OnExplorerUpClick(object sender, RoutedEventArgs e) => UpClick?.Invoke(sender, e);
         private void OnSelectFolderClick(object sender, RoutedEventArgs e) => SelectFolderClick?.Invoke(sender, e);
         private void OnCreateFolderClick(object sender, RoutedEventArgs e) => CreateFolderClick?.Invoke(sender, e);

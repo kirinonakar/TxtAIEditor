@@ -16,6 +16,7 @@ namespace TxtAIEditor.Controls
 
         public event RoutedEventHandler? LeftActivityClick;
         public event RoutedEventHandler? ExplorerBackClick { add => ExplorerView.BackClick += value; remove => ExplorerView.BackClick -= value; }
+        public event RoutedEventHandler? ExplorerForwardClick { add => ExplorerView.ForwardClick += value; remove => ExplorerView.ForwardClick -= value; }
         public event RoutedEventHandler? ExplorerUpClick { add => ExplorerView.UpClick += value; remove => ExplorerView.UpClick -= value; }
         public event RoutedEventHandler? SelectFolderClick { add => ExplorerView.SelectFolderClick += value; remove => ExplorerView.SelectFolderClick -= value; }
         public event RoutedEventHandler? CreateFolderClick { add => ExplorerView.CreateFolderClick += value; remove => ExplorerView.CreateFolderClick -= value; }

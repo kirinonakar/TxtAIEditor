@@ -42,7 +42,9 @@ namespace TxtAIEditor.Controls
             new(StringComparer.OrdinalIgnoreCase);
         private const int MaxFolderHistory = 200;
         private readonly Stack<ExplorerHistoryEntry> _folderHistory = new();
+        private readonly Stack<ExplorerHistoryEntry> _forwardHistory = new();
         private bool _isBackNavigation;
+        private bool _isForwardNavigation;
 
         public enum ExplorerSortMode
         {
@@ -673,6 +675,7 @@ namespace TxtAIEditor.Controls
         {
             _leftSidebar.ExplorerUpClick += OnExplorerUpClick;
             _leftSidebar.ExplorerBackClick += OnExplorerBackClick;
+            _leftSidebar.ExplorerForwardClick += OnExplorerForwardClick;
             _leftSidebar.SelectFolderClick += OnSelectFolderClick;
             _leftSidebar.RefreshClick += OnExplorerRefreshClick;
             _leftSidebar.SortClick += OnExplorerSortClick;
@@ -1215,27 +1218,83 @@ namespace TxtAIEditor.Controls
             }
 
             ExplorerHistoryEntry entry = _folderHistory.Pop();
+            PushForwardHistory(CreateCurrentHistoryEntry());
             UpdateBackButtonState();
             _isBackNavigation = true;
             try
             {
-                if (entry.IsArchive)
-                {
-                    LoadArchiveDirectoryRoot(entry.Path, entry.SecondaryPath);
-                }
-                else if (RemotePath.IsRemote(entry.Path))
-                {
-                    _ = NavigateRemoteVirtualPathAsync(entry.Path, revealInLeftPanel: false);
-                }
-                else if (Directory.Exists(entry.Path))
-                {
-                    UpdateRepoPath(entry.Path);
-                    LoadDirectoryRoot(entry.Path);
-                }
+                NavigateToHistoryEntry(entry);
             }
             finally
             {
                 _isBackNavigation = false;
+            }
+        }
+
+        private void OnExplorerForwardClick(object sender, RoutedEventArgs e)
+        {
+            if (_forwardHistory.Count == 0)
+            {
+                return;
+            }
+
+            ExplorerHistoryEntry entry = _forwardHistory.Pop();
+            _isForwardNavigation = true;
+            try
+            {
+                NavigateToHistoryEntry(entry);
+            }
+            finally
+            {
+                _isForwardNavigation = false;
+            }
+
+            UpdateBackButtonState();
+        }
+
+        private void NavigateToHistoryEntry(ExplorerHistoryEntry entry)
+        {
+            if (entry.IsArchive)
+            {
+                LoadArchiveDirectoryRoot(entry.Path, entry.SecondaryPath);
+            }
+            else if (RemotePath.IsRemote(entry.Path))
+            {
+                _ = NavigateRemoteVirtualPathAsync(entry.Path, revealInLeftPanel: false);
+            }
+            else if (Directory.Exists(entry.Path))
+            {
+                UpdateRepoPath(entry.Path);
+                LoadDirectoryRoot(entry.Path);
+            }
+        }
+
+        private ExplorerHistoryEntry CreateCurrentHistoryEntry()
+        {
+            if (IsViewingArchive && !string.IsNullOrWhiteSpace(CurrentArchivePath))
+            {
+                return new ExplorerHistoryEntry(CurrentArchivePath, CurrentArchiveDirectory, isArchive: true);
+            }
+
+            return new ExplorerHistoryEntry(CurrentFolderPath);
+        }
+
+        private void PushForwardHistory(ExplorerHistoryEntry entry)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Path))
+            {
+                return;
+            }
+
+            _forwardHistory.Push(entry);
+            if (_forwardHistory.Count > MaxFolderHistory)
+            {
+                ExplorerHistoryEntry[] entries = _forwardHistory.ToArray();
+                _forwardHistory.Clear();
+                for (int i = 0; i < entries.Length - 1; i++)
+                {
+                    _forwardHistory.Push(entries[i]);
+                }
             }
         }
 
@@ -1516,6 +1575,11 @@ namespace TxtAIEditor.Controls
                 {
                     _folderHistory.Push(entries[i]);
                 }
+            }
+
+            if (!_isForwardNavigation)
+            {
+                _forwardHistory.Clear();
             }
 
             UpdateBackButtonState();
