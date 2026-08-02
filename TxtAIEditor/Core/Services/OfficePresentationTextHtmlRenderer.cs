@@ -78,7 +78,10 @@ namespace TxtAIEditor.Core.Services
             XElement table,
             IReadOnlyList<string> themeColors,
             long slideWidth,
-            double baseWidthPx)
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx,
+            XDocument? tableStyles)
         {
             var builder = new StringBuilder("<table>");
             List<XElement> rows = table.Elements()
@@ -92,12 +95,40 @@ namespace TxtAIEditor.Core.Services
             }
 
             IReadOnlyList<long> columnWidths = ReadTableColumnWidths(table);
+            int columnCount = Math.Max(
+                columnWidths.Count,
+                rows.Count == 0
+                    ? 0
+                    : rows.Max(row => row.Elements().Count(e => e.Name.LocalName == "tc")));
+            XElement? tableStyle = ReadTableStyleDefinition(table, tableStyles);
+            XElement? tableProperties = table.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "tblPr");
+            bool firstRow = ReadBooleanAttribute(tableProperties, "firstRow");
+            bool lastRow = ReadBooleanAttribute(tableProperties, "lastRow");
+            bool bandRow = ReadBooleanAttribute(tableProperties, "bandRow");
+            bool firstColumn = ReadBooleanAttribute(tableProperties, "firstCol");
+            bool lastColumn = ReadBooleanAttribute(tableProperties, "lastCol");
+            bool bandColumn = ReadBooleanAttribute(tableProperties, "bandCol");
+
             if (columnWidths.Count > 0)
             {
-                long totalWidth = Math.Max(1, columnWidths.Sum());
+                int widthCount = Math.Max(columnWidths.Count, columnCount);
+                long knownWidthTotal = columnWidths
+                    .Where(width => width > 0)
+                    .Sum();
+                int missingWidthCount = widthCount - columnWidths.Count(width => width > 0);
+                long fallbackWidth = missingWidthCount > 0
+                    ? Math.Max(1, knownWidthTotal / missingWidthCount)
+                    : 0;
+                long totalWidth = Math.Max(
+                    1,
+                    knownWidthTotal + (fallbackWidth * missingWidthCount));
                 builder.Append("<colgroup>");
-                foreach (long width in columnWidths)
+                for (int index = 0; index < widthCount; index++)
                 {
+                    long width = index < columnWidths.Count && columnWidths[index] > 0
+                        ? columnWidths[index]
+                        : fallbackWidth;
                     builder.Append("<col style=\"width:")
                         .Append(FormatInvariant(width / (double)totalWidth * 100))
                         .Append("%\">");
@@ -107,29 +138,69 @@ namespace TxtAIEditor.Core.Services
             }
 
             builder.Append("<tbody>");
-            long totalHeight = Math.Max(
-                1,
-                rows.Sum(row => Math.Max(0, ReadTableRowHeight(row))));
-            foreach (XElement row in rows)
+            List<long> rowHeights = rows
+                .Select(ReadTableRowHeight)
+                .ToList();
+            long totalHeight = rowHeights.Sum(height => Math.Max(0, height));
+            bool hasRowHeights = totalHeight > 0;
+            if (!hasRowHeights)
             {
+                totalHeight = Math.Max(1, rows.Count);
+            }
+
+            for (int rowIndex = 0; rowIndex < rows.Count; rowIndex++)
+            {
+                XElement row = rows[rowIndex];
                 long rowHeight = ReadTableRowHeight(row);
                 builder.Append("<tr");
-                if (rowHeight > 0 && totalHeight > 1)
+                if (hasRowHeights && rowHeight > 0)
                 {
                     builder.Append(" style=\"height:")
                         .Append(FormatInvariant(rowHeight / (double)totalHeight * 100))
                         .Append("%\"");
                 }
+                else if (!hasRowHeights && rows.Count > 0)
+                {
+                    builder.Append(" style=\"height:")
+                        .Append(FormatInvariant(100.0 / rows.Count))
+                        .Append("%\"");
+                }
 
                 builder.Append('>');
+                int columnIndex = 0;
                 foreach (XElement cell in row.Elements().Where(e => e.Name.LocalName == "tc"))
                 {
                     if (IsMergedTableCellContinuation(cell))
                     {
+                        columnIndex++;
                         continue;
                     }
 
-                    string style = ReadTableCellStyle(cell, themeColors);
+                    bool isFirstColumn = firstColumn && columnIndex == 0;
+                    bool isLastColumn = lastColumn &&
+                        (columnCount <= 0 || columnIndex >= columnCount - 1);
+                    int bandRowIndex = rowIndex - (firstRow ? 1 : 0);
+                    int bandColumnIndex = columnIndex - (firstColumn ? 1 : 0);
+                    string? bandRowName = bandRow && bandRowIndex >= 0
+                        ? (bandRowIndex % 2 == 0 ? "band1H" : "band2H")
+                        : null;
+                    string? bandColumnName = bandColumn && bandColumnIndex >= 0
+                        ? (bandColumnIndex % 2 == 0 ? "band1V" : "band2V")
+                        : null;
+                    string style = ReadTableCellStyle(
+                        cell,
+                        themeColors,
+                        slideWidth,
+                        slideHeight,
+                        baseWidthPx,
+                        baseHeightPx,
+                        tableStyle,
+                        firstRow && rowIndex == 0,
+                        lastRow && rowIndex == rows.Count - 1,
+                        bandRowName,
+                        isFirstColumn,
+                        isLastColumn,
+                        bandColumnName);
                     builder.Append("<td");
                     int colspan = ReadTableSpan(cell, "gridSpan", "colSpan");
                     int rowspan = ReadTableSpan(cell, "rowSpan", "vSpan");
@@ -155,6 +226,8 @@ namespace TxtAIEditor.Core.Services
                             slideWidth,
                             baseWidthPx))
                         .Append("</td>");
+
+                    columnIndex += Math.Max(1, colspan);
                 }
 
                 builder.Append("</tr>");
@@ -177,10 +250,27 @@ namespace TxtAIEditor.Core.Services
             long right = ReadInsetEmu(bodyProperties, "rIns", 91440);
             long top = ReadInsetEmu(bodyProperties, "tIns", 45720);
             long bottom = ReadInsetEmu(bodyProperties, "bIns", 45720);
-            return "padding:" + Pixels(top, slideHeight, baseHeightPx) + " " +
-                Pixels(right, slideWidth, baseWidthPx) + " " +
-                Pixels(bottom, slideHeight, baseHeightPx) + " " +
-                Pixels(left, slideWidth, baseWidthPx) + ";";
+            var style = new StringBuilder("padding:")
+                .Append(Pixels(top, slideHeight, baseHeightPx)).Append(' ')
+                .Append(Pixels(right, slideWidth, baseWidthPx)).Append(' ')
+                .Append(Pixels(bottom, slideHeight, baseHeightPx)).Append(' ')
+                .Append(Pixels(left, slideWidth, baseWidthPx)).Append(';');
+
+            string anchor = bodyProperties?.Attribute("anchor")?.Value ?? string.Empty;
+            string? verticalAlign = anchor switch
+            {
+                "ctr" or "just" or "dist" => "center",
+                "b" => "flex-end",
+                _ => null
+            };
+            if (!string.IsNullOrWhiteSpace(verticalAlign))
+            {
+                style.Append("display:flex;flex-direction:column;justify-content:")
+                    .Append(verticalAlign)
+                    .Append(';');
+            }
+
+            return style.ToString();
         }
 
         private static string BuildParagraphRunsHtml(
@@ -492,9 +582,10 @@ namespace TxtAIEditor.Core.Services
             string align = paragraphProperties.Attribute("algn")?.Value ?? string.Empty;
             string? cssAlign = align switch
             {
+                "l" => "left",
                 "ctr" => "center",
                 "r" => "right",
-                "just" or "dist" => "justify",
+                "just" or "dist" or "thaiDist" or "justLow" => "justify",
                 _ => null
             };
             if (!string.IsNullOrWhiteSpace(cssAlign))
@@ -586,38 +677,126 @@ namespace TxtAIEditor.Core.Services
 
         private static string ReadTableCellStyle(
             XElement cell,
-            IReadOnlyList<string> themeColors)
+            IReadOnlyList<string> themeColors,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx,
+            XElement? tableStyle,
+            bool isFirstRow,
+            bool isLastRow,
+            string? bandRowName,
+            bool isFirstColumn,
+            bool isLastColumn,
+            string? bandColumnName)
         {
             XElement? properties = cell.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "tcPr");
-            if (properties == null)
-            {
-                return string.Empty;
-            }
 
             var style = new StringBuilder();
-            string? fill = ReadPresentationColor(
-                properties.Elements().FirstOrDefault(e => e.Name.LocalName == "solidFill"),
+            XElement? styleRegion = ReadTableStyleRegion(
+                tableStyle,
+                isFirstRow,
+                isLastRow,
+                bandRowName,
+                isFirstColumn,
+                isLastColumn,
+                bandColumnName);
+            XElement? wholeTableRegion = tableStyle?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "wholeTbl");
+            string? fill = ReadPresentationFill(
+                ReadFillElement(styleRegion),
                 themeColors);
-            if (!string.IsNullOrWhiteSpace(fill))
+            fill ??= ReadPresentationFill(
+                ReadFillElement(wholeTableRegion),
+                themeColors);
+            bool hasNoFill = properties?.Elements()
+                .Any(e => e.Name.LocalName == "noFill") == true;
+            string? directFill = ReadPresentationFill(
+                properties?.Elements().FirstOrDefault(e =>
+                    e.Name.LocalName is "solidFill" or "gradFill" or "pattFill" or "blipFill"),
+                themeColors);
+            if (hasNoFill)
+            {
+                style.Append("background:transparent;");
+            }
+            else if (!string.IsNullOrWhiteSpace(directFill))
+            {
+                style.Append("background:").Append(directFill).Append(';');
+            }
+            else if (!string.IsNullOrWhiteSpace(fill))
             {
                 style.Append("background:").Append(fill).Append(';');
             }
 
-            string? borderColor = properties.Elements()
-                .Where(e => e.Name.LocalName.StartsWith("ln", StringComparison.Ordinal))
-                .Select(line => ReadPresentationColor(line, themeColors))
-                .FirstOrDefault(color => !string.IsNullOrWhiteSpace(color));
-            if (!string.IsNullOrWhiteSpace(borderColor))
+            string? textColor = ReadPresentationColor(
+                styleRegion?.Descendants().FirstOrDefault(e => e.Name.LocalName == "tcTxStyle"),
+                themeColors);
+            textColor ??= ReadPresentationColor(
+                wholeTableRegion?.Descendants().FirstOrDefault(e => e.Name.LocalName == "tcTxStyle"),
+                themeColors);
+            if (!string.IsNullOrWhiteSpace(textColor))
             {
-                style.Append("border-color:").Append(borderColor).Append(';');
+                style.Append("color:").Append(textColor).Append(';');
             }
 
-            string anchor = properties.Attribute("anchor")?.Value ?? string.Empty;
+            AppendTableCellBorder(
+                style,
+                "top",
+                ReadTableLine(properties, styleRegion, wholeTableRegion, "lnT"),
+                themeColors,
+                slideWidth,
+                baseWidthPx);
+            AppendTableCellBorder(
+                style,
+                "right",
+                ReadTableLine(properties, styleRegion, wholeTableRegion, "lnR"),
+                themeColors,
+                slideWidth,
+                baseWidthPx);
+            AppendTableCellBorder(
+                style,
+                "bottom",
+                ReadTableLine(properties, styleRegion, wholeTableRegion, "lnB"),
+                themeColors,
+                slideWidth,
+                baseWidthPx);
+            AppendTableCellBorder(
+                style,
+                "left",
+                ReadTableLine(properties, styleRegion, wholeTableRegion, "lnL"),
+                themeColors,
+                slideWidth,
+                baseWidthPx);
+
+            if (properties != null)
+            {
+                long left = ReadCellInset(properties, "marL", "lIns", 91440);
+                long right = ReadCellInset(properties, "marR", "rIns", 91440);
+                long top = ReadCellInset(properties, "marT", "tIns", 45720);
+                long bottom = ReadCellInset(properties, "marB", "bIns", 45720);
+                style.Append("padding:")
+                    .Append(Pixels(top, slideHeight, baseHeightPx)).Append(' ')
+                    .Append(Pixels(right, slideWidth, baseWidthPx)).Append(' ')
+                    .Append(Pixels(bottom, slideHeight, baseHeightPx)).Append(' ')
+                    .Append(Pixels(left, slideWidth, baseWidthPx)).Append(';');
+            }
+
+            string anchor = properties?.Attribute("anchor")?.Value ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(anchor))
+            {
+                anchor = cell.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "txBody")?
+                    .Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "bodyPr")?
+                    .Attribute("anchor")?.Value ?? string.Empty;
+            }
+
             string? verticalAlign = anchor switch
             {
-                "ctr" => "middle",
+                "ctr" or "just" or "dist" => "middle",
                 "b" => "bottom",
+                "t" => "top",
                 _ => null
             };
             if (!string.IsNullOrWhiteSpace(verticalAlign))
@@ -626,6 +805,197 @@ namespace TxtAIEditor.Core.Services
             }
 
             return style.ToString();
+        }
+
+        private static XElement? ReadTableStyleDefinition(
+            XElement table,
+            XDocument? tableStyles)
+        {
+            if (tableStyles == null)
+            {
+                return null;
+            }
+
+            string? styleId = table.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "tblPr")?
+                .Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "tableStyleId")?
+                .Value;
+            if (string.IsNullOrWhiteSpace(styleId))
+            {
+                return null;
+            }
+
+            string normalizedStyleId = NormalizeTableStyleId(styleId);
+            return tableStyles.Descendants()
+                .FirstOrDefault(e =>
+                    e.Name.LocalName == "tblStyle" &&
+                    string.Equals(
+                        NormalizeTableStyleId(e.Attribute("styleId")?.Value),
+                        normalizedStyleId,
+                        StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string NormalizeTableStyleId(string? value)
+        {
+            return (value ?? string.Empty)
+                .Trim()
+                .Trim('{', '}');
+        }
+
+        private static bool ReadBooleanAttribute(XElement? element, string name)
+        {
+            string value = element?.Attribute(name)?.Value ?? string.Empty;
+            return value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("on", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static XElement? ReadTableStyleRegion(
+            XElement? tableStyle,
+            bool isFirstRow,
+            bool isLastRow,
+            string? bandRowName,
+            bool isFirstColumn,
+            bool isLastColumn,
+            string? bandColumnName)
+        {
+            if (tableStyle == null)
+            {
+                return null;
+            }
+
+            string[] regionNames =
+            {
+                isFirstRow ? "firstRow" : string.Empty,
+                isLastRow ? "lastRow" : string.Empty,
+                isFirstColumn ? "firstCol" : string.Empty,
+                isLastColumn ? "lastCol" : string.Empty,
+                bandRowName ?? string.Empty,
+                bandColumnName ?? string.Empty,
+                "wholeTbl"
+            };
+            foreach (string regionName in regionNames)
+            {
+                if (string.IsNullOrWhiteSpace(regionName))
+                {
+                    continue;
+                }
+
+                XElement? region = tableStyle.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == regionName);
+                if (region != null)
+                {
+                    return region;
+                }
+            }
+
+            return null;
+        }
+
+        private static XElement? ReadFillElement(XElement? element)
+        {
+            if (element == null)
+            {
+                return null;
+            }
+
+            return element.Name.LocalName is "solidFill" or "gradFill" or "pattFill" or "blipFill" or "fillRef"
+                ? element
+                : element.Descendants().FirstOrDefault(e =>
+                    e.Name.LocalName is "solidFill" or "gradFill" or "pattFill" or "blipFill" or "fillRef");
+        }
+
+        private static XElement? ReadTableLine(
+            XElement? cellProperties,
+            XElement? styleRegion,
+            XElement? wholeTableRegion,
+            string lineName)
+        {
+            XElement? directLine = cellProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == lineName);
+            if (directLine != null)
+            {
+                return directLine;
+            }
+
+            XElement? styleBorders = styleRegion?.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "tcBdr");
+            XElement? line = styleBorders?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == lineName);
+            if (line != null)
+            {
+                return line;
+            }
+
+            XElement? wholeTableBorders = wholeTableRegion?.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "tcBdr");
+            return wholeTableBorders?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == lineName);
+        }
+
+        private static void AppendTableCellBorder(
+            StringBuilder style,
+            string side,
+            XElement? line,
+            IReadOnlyList<string> themeColors,
+            long slideWidth,
+            double baseWidthPx)
+        {
+            if (line == null)
+            {
+                return;
+            }
+
+            string property = "border-" + side;
+            if (line.Name.LocalName == "noFill" ||
+                line.Descendants().Any(e => e.Name.LocalName == "noFill"))
+            {
+                style.Append(property).Append(":none;");
+                return;
+            }
+
+            double widthPx = 1;
+            if (TryReadLong(line, "w", out long width) && width > 0)
+            {
+                widthPx = Math.Max(.5, width / (double)Math.Max(1, slideWidth) * baseWidthPx);
+            }
+
+            string? color = ReadPresentationColor(line, themeColors);
+            string borderStyle = ReadTableBorderStyle(line);
+            style.Append(property)
+                .Append(':')
+                .Append(FormatInvariant(widthPx))
+                .Append("px ")
+                .Append(borderStyle)
+                .Append(' ')
+                .Append(string.IsNullOrWhiteSpace(color) ? "currentColor" : color)
+                .Append(';');
+        }
+
+        private static string ReadTableBorderStyle(XElement line)
+        {
+            string value = line.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "prstDash")?
+                .Attribute("val")?.Value ?? string.Empty;
+            return value.ToLowerInvariant() switch
+            {
+                "dash" or "dashsys" or "lgdash" or "lgdashsys" or "sysdash" => "dashed",
+                "dot" or "dotsys" or "lgdashdot" => "dotted",
+                "dashdot" or "dashdotdot" or "lgdashdotdot" => "dashed",
+                _ => "solid"
+            };
+        }
+
+        private static long ReadCellInset(
+            XElement properties,
+            string primaryName,
+            string alternateName,
+            long fallback)
+        {
+            return TryReadLong(properties, primaryName, out long value) && value >= 0
+                ? value
+                : ReadInsetEmu(properties, alternateName, fallback);
         }
 
         private static string? NormalizePlaceholderType(string? type)

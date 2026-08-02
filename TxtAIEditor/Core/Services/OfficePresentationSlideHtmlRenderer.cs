@@ -59,7 +59,8 @@ namespace TxtAIEditor.Core.Services
             long slideWidth,
             long slideHeight,
             double baseWidthPx,
-            IReadOnlyList<string> themeColors)
+            IReadOnlyList<string> themeColors,
+            XDocument? tableStyles)
         {
             ZipArchiveEntry? slideEntry = archive.GetEntry(slidePath);
             if (slideEntry == null)
@@ -76,6 +77,15 @@ namespace TxtAIEditor.Core.Services
                     OfficePresentationPackageReader.GetRelationshipsPath(slidePath),
                     Path.GetDirectoryName(slidePath)?.Replace('\\', '/') ?? string.Empty)
                 .ConfigureAwait(false);
+            IReadOnlyList<string> slideThemeColors =
+                await OfficePresentationPackageReader.LoadThemeColorsForSlideAsync(
+                    archive,
+                    relationships)
+                    .ConfigureAwait(false);
+            if (slideThemeColors.Count > 0)
+            {
+                themeColors = slideThemeColors;
+            }
 
             double baseHeightPx =
                 baseWidthPx * slideHeight / Math.Max(1.0, slideWidth);
@@ -88,7 +98,12 @@ namespace TxtAIEditor.Core.Services
                     baseWidthPx,
                     baseHeightPx)
                 .ConfigureAwait(false);
-            string background = ReadSlideBackground(slide, themeColors) ?? "#ffffff";
+            string background = await ReadSlideBackgroundAsync(
+                    archive,
+                    slide,
+                    relationships,
+                    themeColors)
+                .ConfigureAwait(false) ?? "#ffffff";
 
             var html = new StringBuilder();
             html.Append("<section class=\"slide\" style=\"--slide-ratio:")
@@ -116,7 +131,8 @@ namespace TxtAIEditor.Core.Services
                 slideHeight,
                 baseWidthPx,
                 baseHeightPx,
-                placeholderBounds))
+                placeholderBounds,
+                tableStyles))
             {
                 html.Append(elementHtml);
             }
@@ -134,7 +150,8 @@ namespace TxtAIEditor.Core.Services
             long slideHeight,
             double baseWidthPx,
             double baseHeightPx,
-            IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds)
+            IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds,
+            XDocument? tableStyles)
         {
             XElement? shapeTree = slide.Descendants()
                 .FirstOrDefault(e => e.Name.LocalName == "spTree");
@@ -155,6 +172,7 @@ namespace TxtAIEditor.Core.Services
                     baseWidthPx,
                     baseHeightPx,
                     placeholderBounds,
+                    tableStyles,
                     null))
                 {
                     yield return elementHtml;
@@ -172,6 +190,7 @@ namespace TxtAIEditor.Core.Services
             double baseWidthPx,
             double baseHeightPx,
             IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds,
+            XDocument? tableStyles,
             PresentationGroupTransform? groupTransform)
         {
             if (element.Name.LocalName == "grpSp")
@@ -197,6 +216,7 @@ namespace TxtAIEditor.Core.Services
                         baseWidthPx,
                         baseHeightPx,
                         placeholderBounds,
+                        tableStyles,
                         nextTransform))
                     {
                         yield return childHtml;
@@ -326,7 +346,10 @@ namespace TxtAIEditor.Core.Services
                     table,
                     themeColors,
                     slideWidth,
-                    baseWidthPx);
+                    slideHeight,
+                    baseWidthPx,
+                    baseHeightPx,
+                    tableStyles);
                 if (!string.IsNullOrWhiteSpace(tableHtml))
                 {
                     yield return
@@ -407,10 +430,12 @@ namespace TxtAIEditor.Core.Services
 
             var style = new StringBuilder();
             XElement? fillElement = shapeProperties.Elements()
-                .FirstOrDefault(e => e.Name.LocalName == "solidFill");
+                .FirstOrDefault(e => e.Name.LocalName is
+                    "solidFill" or "gradFill" or "pattFill" or "blipFill" or
+                    "fillRef" or "noFill");
             bool hasShapeNoFill = shapeProperties.Elements()
                 .Any(e => e.Name.LocalName == "noFill");
-            string? fill = ReadPresentationColor(fillElement, themeColors);
+            string? fill = ReadPresentationFill(fillElement, themeColors);
             if (!string.IsNullOrWhiteSpace(fill) && !hasShapeNoFill)
             {
                 style.Append("background:").Append(fill).Append(';');
@@ -441,13 +466,126 @@ namespace TxtAIEditor.Core.Services
             return style.ToString();
         }
 
-        private static string? ReadSlideBackground(
+        private static async Task<string?> ReadSlideBackgroundAsync(
+            ZipArchive archive,
             XDocument slide,
+            IReadOnlyDictionary<string, string> slideRelationships,
             IReadOnlyList<string> themeColors)
         {
-            XElement? background = slide.Descendants()
+            string? background = await ReadPresentationBackgroundAsync(
+                archive,
+                slide,
+                slideRelationships,
+                themeColors).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(background))
+            {
+                return background;
+            }
+
+            string? layoutPath = FindRelatedPart(slideRelationships, "slideLayouts");
+            if (string.IsNullOrWhiteSpace(layoutPath))
+            {
+                return null;
+            }
+
+            IReadOnlyDictionary<string, string> layoutRelationships =
+                await OfficePresentationPackageReader.LoadRelationshipsAsync(
+                    archive,
+                    OfficePresentationPackageReader.GetRelationshipsPath(layoutPath),
+                    Path.GetDirectoryName(layoutPath)?.Replace('\\', '/') ?? string.Empty)
+                    .ConfigureAwait(false);
+
+            XDocument? layout = await OfficePresentationPackageReader
+                .TryLoadXmlEntryAsync(archive, layoutPath)
+                .ConfigureAwait(false);
+            background = layout == null
+                ? null
+                : await ReadPresentationBackgroundAsync(
+                    archive,
+                    layout,
+                    layoutRelationships,
+                    themeColors).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(background))
+            {
+                return background;
+            }
+
+            string? masterPath = FindRelatedPart(layoutRelationships, "slideMasters");
+            if (string.IsNullOrWhiteSpace(masterPath))
+            {
+                return null;
+            }
+
+            XDocument? master = await OfficePresentationPackageReader
+                .TryLoadXmlEntryAsync(archive, masterPath)
+                .ConfigureAwait(false);
+            if (master == null)
+            {
+                return null;
+            }
+
+            IReadOnlyDictionary<string, string> masterRelationships =
+                await OfficePresentationPackageReader.LoadRelationshipsAsync(
+                    archive,
+                    OfficePresentationPackageReader.GetRelationshipsPath(masterPath),
+                    Path.GetDirectoryName(masterPath)?.Replace('\\', '/') ?? string.Empty)
+                    .ConfigureAwait(false);
+            return await ReadPresentationBackgroundAsync(
+                archive,
+                master,
+                masterRelationships,
+                themeColors).ConfigureAwait(false);
+        }
+
+        private static string? FindRelatedPart(
+            IReadOnlyDictionary<string, string> relationships,
+            string partFolder)
+        {
+            return relationships.Values.FirstOrDefault(path =>
+                path.Contains("/" + partFolder + "/", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains(partFolder + "/", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static async Task<string?> ReadPresentationBackgroundAsync(
+            ZipArchive archive,
+            XDocument part,
+            IReadOnlyDictionary<string, string> relationships,
+            IReadOnlyList<string> themeColors)
+        {
+            XElement? background = part.Descendants()
                 .FirstOrDefault(e => e.Name.LocalName == "bg");
-            return ReadPresentationColor(background, themeColors);
+            XElement? fill = FindPresentationFill(background) ??
+                background?.Descendants().FirstOrDefault(e => e.Name.LocalName == "bgRef");
+            if (fill == null || fill.Name.LocalName == "noFill")
+            {
+                return null;
+            }
+
+            if (fill.Name.LocalName == "blipFill")
+            {
+                string? relationshipId = fill.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "blip")?
+                    .Attributes()
+                    .FirstOrDefault(attribute => attribute.Name.LocalName is "embed" or "link")?
+                    .Value;
+                if (!string.IsNullOrWhiteSpace(relationshipId) &&
+                    relationships.TryGetValue(relationshipId, out string? imagePath))
+                {
+                    string? imageDataUri = OfficePresentationPackageReader.TryReadImageDataUri(
+                        archive,
+                        imagePath);
+                    if (!string.IsNullOrWhiteSpace(imageDataUri))
+                    {
+                        return "url(" + imageDataUri + ") center / 100% 100% no-repeat";
+                    }
+                }
+
+                return null;
+            }
+
+            return fill.Name.LocalName == "bgRef"
+                ? ReadPresentationColor(fill, themeColors)
+                : ReadPresentationFill(fill, themeColors);
         }
 
         private static async Task<IReadOnlyList<PresentationPlaceholderBounds>>

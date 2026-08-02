@@ -72,9 +72,20 @@ namespace TxtAIEditor.Core.Services
             return (DefaultSlideWidthEmu, DefaultSlideHeightEmu);
         }
 
-        public static async Task<IReadOnlyList<string>> LoadThemeColorsAsync(ZipArchive archive)
+        public static Task<IReadOnlyList<string>> LoadThemeColorsAsync(ZipArchive archive)
         {
-            XDocument? theme = await TryLoadXmlEntryAsync(archive, "ppt/theme/theme1.xml").ConfigureAwait(false);
+            return LoadThemeColorsAsync(archive, "ppt/theme/theme1.xml");
+        }
+
+        public static async Task<IReadOnlyList<string>> LoadThemeColorsAsync(
+            ZipArchive archive,
+            string themePath)
+        {
+            XDocument? theme = await TryLoadXmlEntryAsync(
+                archive,
+                string.IsNullOrWhiteSpace(themePath)
+                    ? "ppt/theme/theme1.xml"
+                    : themePath).ConfigureAwait(false);
             XElement? colorScheme = theme?.Descendants().FirstOrDefault(e => e.Name.LocalName == "clrScheme");
             if (colorScheme == null)
             {
@@ -104,6 +115,42 @@ namespace TxtAIEditor.Core.Services
             }
 
             return colors;
+        }
+
+        public static async Task<IReadOnlyList<string>> LoadThemeColorsForSlideAsync(
+            ZipArchive archive,
+            IReadOnlyDictionary<string, string> slideRelationships)
+        {
+            string? layoutPath = FindRelationshipTarget(slideRelationships, "slideLayouts");
+            if (string.IsNullOrWhiteSpace(layoutPath))
+            {
+                return await LoadThemeColorsAsync(archive).ConfigureAwait(false);
+            }
+
+            IReadOnlyDictionary<string, string> layoutRelationships =
+                await LoadRelationshipsAsync(
+                    archive,
+                    GetRelationshipsPath(layoutPath),
+                    Path.GetDirectoryName(layoutPath)?.Replace('\\', '/') ?? string.Empty)
+                    .ConfigureAwait(false);
+            string? masterPath = FindRelationshipTarget(layoutRelationships, "slideMasters");
+            if (string.IsNullOrWhiteSpace(masterPath))
+            {
+                return await LoadThemeColorsAsync(archive).ConfigureAwait(false);
+            }
+
+            IReadOnlyDictionary<string, string> masterRelationships =
+                await LoadRelationshipsAsync(
+                    archive,
+                    GetRelationshipsPath(masterPath),
+                    Path.GetDirectoryName(masterPath)?.Replace('\\', '/') ?? string.Empty)
+                    .ConfigureAwait(false);
+            string? themePath = masterRelationships.Values.FirstOrDefault(path =>
+                path.Contains("/theme/", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("theme/", StringComparison.OrdinalIgnoreCase));
+            return await LoadThemeColorsAsync(
+                archive,
+                themePath ?? "ppt/theme/theme1.xml").ConfigureAwait(false);
         }
 
         public static async Task<List<string>> ReadSlidePathsAsync(
@@ -188,6 +235,15 @@ namespace TxtAIEditor.Core.Services
             };
 
             return "data:" + mime + ";base64," + Convert.ToBase64String(memory.ToArray());
+        }
+
+        private static string? FindRelationshipTarget(
+            IReadOnlyDictionary<string, string> relationships,
+            string partFolder)
+        {
+            return relationships.Values.FirstOrDefault(path =>
+                path.Contains("/" + partFolder + "/", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains(partFolder + "/", StringComparison.OrdinalIgnoreCase));
         }
 
         private static string? ReadThemeColor(XElement element)

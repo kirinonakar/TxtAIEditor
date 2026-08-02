@@ -37,6 +37,11 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyList<string> themeColors =
                 await OfficePresentationPackageReader.LoadThemeColorsAsync(archive)
                     .ConfigureAwait(false);
+            XDocument? tableStyles =
+                await OfficePresentationPackageReader.TryLoadXmlEntryAsync(
+                    archive,
+                    "ppt/tableStyles.xml")
+                    .ConfigureAwait(false);
             List<string> slidePaths =
                 await OfficePresentationPackageReader.ReadSlidePathsAsync(
                     archive,
@@ -61,7 +66,8 @@ namespace TxtAIEditor.Core.Services
                         slideWidth,
                         slideHeight,
                         PresentationBaseWidthPx,
-                        themeColors)
+                        themeColors,
+                        tableStyles)
                     .ConfigureAwait(false);
                 if (!string.IsNullOrEmpty(slideHtml))
                 {
@@ -176,16 +182,19 @@ body { padding: 28px 16px 40px; }
 .ppt-table table {
     width: 100%;
     height: 100%;
+    min-width: 100%;
+    min-height: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    background: rgba(255, 255, 255, .88);
+    background: transparent;
     color: #111827;
 }
 .ppt-table td {
-    border: 1px solid rgba(31, 41, 55, .28);
+    border: 0 solid transparent;
     padding: .32em .45em;
     vertical-align: top;
     overflow-wrap: anywhere;
+    white-space: pre-wrap;
 }
 .ppt-table p {
     margin: 0 0 .2em;

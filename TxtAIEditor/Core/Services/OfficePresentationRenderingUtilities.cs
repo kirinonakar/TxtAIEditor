@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -66,34 +67,30 @@ namespace TxtAIEditor.Core.Services
                 return null;
             }
 
-            XElement? solidFill = parent.Name.LocalName == "solidFill"
-                ? parent
-                : parent.Descendants().FirstOrDefault(e => e.Name.LocalName == "solidFill");
-            if (solidFill == null)
+            XElement? colorContainer = parent.Name.LocalName is
+                "solidFill" or "srgbClr" or "schemeClr" or "sysClr" or "prstClr"
+                    ? parent
+                    : parent.Descendants().FirstOrDefault(e => e.Name.LocalName == "solidFill");
+
+            if (colorContainer == null)
             {
-                return null;
+                colorContainer = parent;
             }
 
-            XElement? srgb = solidFill.Descendants().FirstOrDefault(e => e.Name.LocalName == "srgbClr");
-            string? value = srgb?.Attribute("val")?.Value;
-            string? color = !string.IsNullOrWhiteSpace(value) &&
-                Regex.IsMatch(value, "^[0-9A-Fa-f]{6}$")
-                    ? "#" + value
-                    : null;
-
-            if (string.IsNullOrWhiteSpace(color))
-            {
-                XElement? scheme = solidFill.Descendants().FirstOrDefault(e => e.Name.LocalName == "schemeClr");
-                color = ReadPresentationThemeColor(scheme?.Attribute("val")?.Value, themeColors);
-            }
+            XElement? colorElement = colorContainer.Name.LocalName is
+                "srgbClr" or "schemeClr" or "sysClr" or "prstClr"
+                    ? colorContainer
+                    : colorContainer.Descendants().FirstOrDefault(e =>
+                        e.Name.LocalName is "srgbClr" or "schemeClr" or "sysClr" or "prstClr");
+            string? color = ReadPresentationColorValue(colorElement, themeColors);
 
             if (string.IsNullOrWhiteSpace(color))
             {
                 return null;
             }
 
-            string transformedColor = ApplyColorTransforms(color, solidFill);
-            int alpha = Math.Clamp(ReadPercentageTransform(solidFill, "alpha", 100000), 0, 100000);
+            string transformedColor = ApplyColorTransforms(color, colorElement ?? colorContainer);
+            int alpha = ReadAlphaTransform(colorElement ?? colorContainer);
             if (alpha == 0)
             {
                 return null;
@@ -114,6 +111,162 @@ namespace TxtAIEditor.Core.Services
             return transformedColor;
         }
 
+        public static XElement? FindPresentationFill(XElement? parent)
+        {
+            if (parent == null)
+            {
+                return null;
+            }
+
+            if (parent.Name.LocalName is
+                "solidFill" or "gradFill" or "pattFill" or "blipFill" or "fillRef" or "noFill")
+            {
+                return parent;
+            }
+
+            return parent.Descendants().FirstOrDefault(e =>
+                e.Name.LocalName is
+                    "solidFill" or "gradFill" or "pattFill" or "blipFill" or "fillRef" or "noFill");
+        }
+
+        public static string? ReadPresentationFill(
+            XElement? parent,
+            IReadOnlyList<string> themeColors)
+        {
+            XElement? fill = FindPresentationFill(parent);
+            if (fill == null || fill.Name.LocalName is "noFill" or "blipFill")
+            {
+                return null;
+            }
+
+            if (fill.Name.LocalName == "gradFill")
+            {
+                return ReadGradientFill(fill, themeColors);
+            }
+
+            return ReadPresentationColor(fill, themeColors);
+        }
+
+        private static string? ReadGradientFill(
+            XElement gradientFill,
+            IReadOnlyList<string> themeColors)
+        {
+            XElement? stopList = gradientFill.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "gsLst");
+            if (stopList == null)
+            {
+                return null;
+            }
+
+            var stops = new List<(long Position, string Color)>();
+            foreach (XElement stop in stopList.Elements().Where(e => e.Name.LocalName == "gs"))
+            {
+                string? color = ReadPresentationColor(stop, themeColors);
+                if (string.IsNullOrWhiteSpace(color))
+                {
+                    continue;
+                }
+
+                long position = TryReadLong(stop, "pos", out long readPosition)
+                    ? Math.Clamp(readPosition, 0, 100000)
+                    : stops.Count == 0 ? 0 : 100000;
+                stops.Add((position, color));
+            }
+
+            if (stops.Count == 0)
+            {
+                return null;
+            }
+
+            stops.Sort((left, right) => left.Position.CompareTo(right.Position));
+            XElement? path = gradientFill.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "path");
+            string gradientName = path == null ? "linear-gradient" : "radial-gradient";
+            var builder = new StringBuilder(gradientName + "(");
+            if (path == null)
+            {
+                long angleValue = TryReadLong(
+                    gradientFill.Elements().FirstOrDefault(e => e.Name.LocalName == "lin") ?? gradientFill,
+                    "ang",
+                    out long readAngle)
+                        ? readAngle
+                        : 0;
+                double cssAngle = (angleValue / 60000.0 + 90.0) % 360.0;
+                if (cssAngle < 0)
+                {
+                    cssAngle += 360.0;
+                }
+
+                builder.Append(FormatInvariant(cssAngle)).Append("deg, ");
+            }
+
+            for (int index = 0; index < stops.Count; index++)
+            {
+                if (index > 0)
+                {
+                    builder.Append(", ");
+                }
+
+                (long position, string color) = stops[index];
+                builder.Append(color)
+                    .Append(' ')
+                    .Append(FormatInvariant(position / 1000.0))
+                    .Append('%');
+            }
+
+            builder.Append(')');
+            return builder.ToString();
+        }
+
+        private static string? ReadPresentationColorValue(
+            XElement? colorElement,
+            IReadOnlyList<string> themeColors)
+        {
+            if (colorElement == null)
+            {
+                return null;
+            }
+
+            string? value = colorElement.Attribute("val")?.Value;
+            if (colorElement.Name.LocalName == "srgbClr" &&
+                !string.IsNullOrWhiteSpace(value) &&
+                Regex.IsMatch(value, "^[0-9A-Fa-f]{6}$"))
+            {
+                return "#" + value;
+            }
+
+            if (colorElement.Name.LocalName == "sysClr")
+            {
+                value = colorElement.Attribute("lastClr")?.Value;
+                return !string.IsNullOrWhiteSpace(value) &&
+                    Regex.IsMatch(value, "^[0-9A-Fa-f]{6}$")
+                        ? "#" + value
+                        : null;
+            }
+
+            if (colorElement.Name.LocalName == "schemeClr")
+            {
+                return ReadPresentationThemeColor(value, themeColors);
+            }
+
+            return value?.ToLowerInvariant() switch
+            {
+                "black" => "#000000",
+                "white" => "#ffffff",
+                "red" => "#ff0000",
+                "green" => "#008000",
+                "blue" => "#0000ff",
+                "yellow" => "#ffff00",
+                "cyan" => "#00ffff",
+                "magenta" => "#ff00ff",
+                "gray" or "grey" => "#808080",
+                "orange" => "#ffa500",
+                "purple" => "#800080",
+                "brown" => "#a52a2a",
+                _ => null
+            };
+        }
+
         private static string? ReadPresentationThemeColor(
             string? schemeName,
             IReadOnlyList<string> themeColors)
@@ -123,7 +276,7 @@ namespace TxtAIEditor.Core.Services
                 return null;
             }
 
-            int index = schemeName switch
+            int index = schemeName.Trim().ToLowerInvariant() switch
             {
                 "bg1" or "lt1" => 0,
                 "tx1" or "dk1" => 1,
@@ -136,7 +289,7 @@ namespace TxtAIEditor.Core.Services
                 "accent5" => 8,
                 "accent6" => 9,
                 "hlink" => 10,
-                "folHlink" => 11,
+                "folhlink" => 11,
                 _ => -1
             };
 
@@ -159,7 +312,37 @@ namespace TxtAIEditor.Core.Services
             red = ApplyLumTransform(red, lumMod, lumOff);
             green = ApplyLumTransform(green, lumMod, lumOff);
             blue = ApplyLumTransform(blue, lumMod, lumOff);
+
+            int tint = ReadPercentageTransform(parent, "tint", 0);
+            if (tint > 0)
+            {
+                double tintFactor = Math.Clamp(tint / 100000.0, 0, 1);
+                red = (int)Math.Round(red + ((255 - red) * tintFactor));
+                green = (int)Math.Round(green + ((255 - green) * tintFactor));
+                blue = (int)Math.Round(blue + ((255 - blue) * tintFactor));
+            }
+
+            int shade = ReadPercentageTransform(parent, "shade", 100000);
+            if (shade < 100000)
+            {
+                double shadeFactor = Math.Clamp(shade / 100000.0, 0, 1);
+                red = (int)Math.Round(red * shadeFactor);
+                green = (int)Math.Round(green * shadeFactor);
+                blue = (int)Math.Round(blue * shadeFactor);
+            }
+
             return $"#{red:X2}{green:X2}{blue:X2}";
+        }
+
+        private static int ReadAlphaTransform(XElement parent)
+        {
+            int alpha = ReadPercentageTransform(parent, "alpha", 100000);
+            int alphaMod = ReadPercentageTransform(parent, "alphaMod", 100000);
+            int alphaOff = ReadPercentageTransform(parent, "alphaOff", 0);
+            return Math.Clamp(
+                (int)Math.Round(alpha * (alphaMod / 100000.0) + alphaOff),
+                0,
+                100000);
         }
 
         private static int ReadPercentageTransform(XElement parent, string localName, int fallback)
