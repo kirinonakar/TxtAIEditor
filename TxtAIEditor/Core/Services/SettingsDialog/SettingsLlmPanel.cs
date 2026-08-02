@@ -51,7 +51,10 @@ namespace TxtAIEditor.Core.Services
             _getString = getString;
 
             _llmProviderCombo = CreateProviderCombo(settings);
-            _llmEndpointBox = new TextBox { PlaceholderText = getString("SettingsLlmEndpointPlaceholder", "예: http://localhost:1234/v1"), Text = settings.LlmEndpoint, HorizontalAlignment = HorizontalAlignment.Stretch };
+            string initialLlmEndpoint = settings.LlmProvider.Equals("Custom", StringComparison.OrdinalIgnoreCase)
+                ? (settings.LlmEndpointCustom ?? string.Empty)
+                : settings.LlmEndpoint;
+            _llmEndpointBox = new TextBox { PlaceholderText = getString("SettingsLlmEndpointPlaceholder", "예: http://localhost:1234/v1"), Text = initialLlmEndpoint, HorizontalAlignment = HorizontalAlignment.Stretch };
             _llmModelCombo = new ComboBox { PlaceholderText = getString("SettingsLlmSelectModel", "모델 선택"), HorizontalAlignment = HorizontalAlignment.Stretch, IsEditable = true, Tag = "LlmModelCombo" };
             _llmModelCombo.Loaded += (_, __) => SettingsDialogStyler.ApplyEditableComboBoxVisualStyles(_llmModelCombo);
             string visionFallbackProvider = string.IsNullOrWhiteSpace(settings.LlmVisionFallbackProvider)
@@ -164,6 +167,10 @@ namespace TxtAIEditor.Core.Services
         {
             settings.LlmProvider = GetSelectedProviderName();
             settings.LlmEndpoint = _llmEndpointBox.Text.Trim();
+            if (GetSelectedProviderName().Equals("Custom", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.LlmEndpointCustom = settings.LlmEndpoint;
+            }
             string selectedModelText = _llmModelCombo.Text?.Trim() ?? string.Empty;
             settings.LlmModel = (!string.IsNullOrEmpty(selectedModelText) ? selectedModelText : (_llmModelCombo.SelectedItem as string ?? settings.LlmModel)).Trim();
             settings.LlmVisionFallbackProvider = GetSelectedVisionFallbackProviderName();
@@ -708,6 +715,12 @@ namespace TxtAIEditor.Core.Services
 
         private void ApplyProviderDefaults(string provider)
         {
+            if (provider.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+            {
+                _llmEndpointBox.Text = _settings.LlmEndpointCustom ?? string.Empty;
+                return;
+            }
+
             if (!SettingsLlmModelCatalog.IsKnownDefaultEndpoint(_llmEndpointBox.Text.Trim()))
             {
                 return;

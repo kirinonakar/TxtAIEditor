@@ -51,7 +51,8 @@ namespace TxtAIEditor.Core.Services
                 provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OllamaCloud", StringComparison.OrdinalIgnoreCase) ||
-                provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase);
+                provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Custom", StringComparison.OrdinalIgnoreCase);
         }
 
         public static string GetThinkingLevelDisplay(string thinkingLevel, string provider)

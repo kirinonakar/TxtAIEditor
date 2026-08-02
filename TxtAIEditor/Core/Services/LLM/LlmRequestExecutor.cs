@@ -73,7 +73,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 "opencode zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 "opencodezen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 "zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
-                "custom" => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: "", providerName: providerName),
+                "custom" => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName),
                 _ => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName)
             };
 

@@ -63,6 +63,7 @@ namespace TxtAIEditor.Core.Models
         // LLM Config
         public string LlmProvider { get; set; } = "OpenAI";
         public string LlmEndpoint { get; set; } = "https://api.openai.com/v1";
+        public string LlmEndpointCustom { get; set; } = "";
         public string LlmModel { get; set; } = "gpt-5.5";
         public string LlmModelGemini { get; set; } = "gemini-flash-lite-latest";
         public string LlmModelOpenAI { get; set; } = "gpt-5.5";
