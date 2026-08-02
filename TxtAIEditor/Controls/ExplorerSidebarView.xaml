@@ -63,6 +63,46 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="ExplorerGhostButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid x:Name="RootGrid" CornerRadius="{TemplateBinding CornerRadius}" Background="{TemplateBinding Background}">
+                            <ContentPresenter x:Name="ContentPresenter"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              Padding="{TemplateBinding Padding}"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal"/>
+                                    <VisualState x:Name="PointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SystemControlBackgroundBaseLowBrush}"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SystemControlBackgroundBaseMediumBrush}"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Disabled"/>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
     <Grid x:Name="RootGrid">
                                 <Grid.RowDefinitions>
@@ -80,22 +120,22 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                    <Button x:Name="ExplorerBackButton" Click="OnExplorerBackClick" ToolTipService.ToolTip="이전 폴더" AutomationProperties.Name="이전 폴더" Padding="0" Width="28" MinWidth="28" Height="28" IsEnabled="False">
+                                    <Button x:Name="ExplorerBackButton" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnExplorerBackClick" ToolTipService.ToolTip="이전 폴더" AutomationProperties.Name="이전 폴더" Padding="0" Width="28" MinWidth="28" Height="28" IsEnabled="False">
                                             <FontIcon Glyph="&#xE72B;" FontSize="10"/>
                                         </Button>
-                                    <Button x:Name="ExplorerUpButton" Grid.Column="1" Click="OnExplorerUpClick" ToolTipService.ToolTip="상위 폴더" Padding="0" Width="28" MinWidth="28" Height="28">
+                                    <Button x:Name="ExplorerUpButton" Grid.Column="1" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnExplorerUpClick" ToolTipService.ToolTip="상위 폴더" Padding="0" Width="28" MinWidth="28" Height="28">
                                             <FontIcon Glyph="&#xE74A;" FontSize="10"/>
                                         </Button>
-                                    <Button x:Name="ExplorerRefreshButton" Grid.Column="2" Click="OnRefreshClick" ToolTipService.ToolTip="새로고침" Padding="0" Width="28" MinWidth="28" Height="28">
+                                    <Button x:Name="ExplorerRefreshButton" Grid.Column="2" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnRefreshClick" ToolTipService.ToolTip="새로고침" Padding="0" Width="28" MinWidth="28" Height="28">
                                             <FontIcon Glyph="&#xE72C;" FontSize="10"/>
                                         </Button>
-                                    <Button x:Name="ExplorerSortButton" Grid.Column="3" Click="OnSortClick" ToolTipService.ToolTip="이름순 정렬" Padding="0" Width="28" MinWidth="28" Height="28">
+                                    <Button x:Name="ExplorerSortButton" Grid.Column="3" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnSortClick" ToolTipService.ToolTip="이름순 정렬" Padding="0" Width="28" MinWidth="28" Height="28">
                                             <FontIcon Glyph="&#xE8CB;" FontSize="10"/>
                                         </Button>
-                                    <Button x:Name="ExplorerSelectFolderButton" Grid.Column="5" Click="OnSelectFolderClick" ToolTipService.ToolTip="폴더 선택..." AutomationProperties.Name="폴더 선택..." Padding="0" Width="28" MinWidth="28" Height="28">
+                                    <Button x:Name="ExplorerSelectFolderButton" Grid.Column="5" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnSelectFolderClick" ToolTipService.ToolTip="폴더 선택..." AutomationProperties.Name="폴더 선택..." Padding="0" Width="28" MinWidth="28" Height="28">
                                             <FontIcon Glyph="&#xED25;" FontSize="10"/>
                                         </Button>
-                                    <Button x:Name="ExplorerCreateFolderButton" Grid.Column="6" ToolTipService.ToolTip="새 항목" Padding="0" Width="28" MinWidth="28" Height="28">
+                                    <Button x:Name="ExplorerCreateFolderButton" Grid.Column="6" Style="{StaticResource ExplorerGhostButtonStyle}" ToolTipService.ToolTip="새 항목" Padding="0" Width="28" MinWidth="28" Height="28">
                                         <Button.Flyout>
                                             <MenuFlyout Placement="BottomEdgeAlignedLeft">
                                                 <MenuFlyoutItem x:Name="ExplorerCreateFolderMenuItem" Text="새 폴더" Click="OnCreateFolderClick">
@@ -123,34 +163,6 @@
                                                            Visibility="Collapsed"
                                                            HorizontalAlignment="Stretch"
                                                            VerticalAlignment="Center"/>
-                                    <Grid ColumnSpacing="6">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="ExplorerStatusText" Text="폴더를 선택하세요." FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center"/>
-                                        <ToggleButton x:Name="ExplorerTreeModeButton" Grid.Column="1" Click="OnExplorerTreeModeClick" ToolTipService.ToolTip="트리 모드 (F3)" AutomationProperties.Name="트리 모드" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Center">
-                                            <FontIcon Glyph="&#xE8A4;" FontSize="10"/>
-                                        </ToggleButton>
-                                        <Button x:Name="ExplorerHomeButton" Grid.Column="2" Click="OnExplorerHomeClick" ToolTipService.ToolTip="홈 폴더로 이동" AutomationProperties.Name="홈 폴더로 이동" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
-                                            <FontIcon Glyph="&#xE80F;" FontSize="10"/>
-                                        </Button>
-                                        <Button x:Name="ExplorerRemoteButton" Grid.Column="3" ToolTipService.ToolTip="리모트 서버" AutomationProperties.Name="리모트 서버" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
-                                            <Button.Flyout>
-                                                <Flyout Placement="BottomEdgeAlignedRight" Opening="OnRemoteFlyoutOpening">
-                                                    <local:RemoteExplorerView x:Name="RemoteExplorer"/>
-                                                </Flyout>
-                                            </Button.Flyout>
-                                            <FontIcon Glyph="&#xE774;" FontSize="11"/>
-                                        </Button>
-                                        <Button x:Name="ExplorerOpenInWindowsButton" Grid.Column="4" Click="OnOpenInWindowsExplorerClick" ToolTipService.ToolTip="Windows 탐색기에서 열기" AutomationProperties.Name="Windows 탐색기에서 열기" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
-                                            <FontIcon Glyph="&#xE8DA;" FontSize="10"/>
-                                        </Button>
-                                    </Grid>
-
                                     <Grid x:Name="ExplorerFilterPanel">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -184,6 +196,33 @@
                                                       VerticalAlignment="Center">
                                             <FontIcon Glyph="&#xE7B3;" FontSize="10"/>
                                         </ToggleButton>
+                                    </Grid>
+                                    <Grid ColumnSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="ExplorerStatusText" Text="폴더를 선택하세요." FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center"/>
+                                        <ToggleButton x:Name="ExplorerTreeModeButton" Grid.Column="1" Style="{StaticResource ExplorerGhostToggleButtonStyle}" Click="OnExplorerTreeModeClick" ToolTipService.ToolTip="트리 모드 (F3)" AutomationProperties.Name="트리 모드" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Center">
+                                            <FontIcon Glyph="&#xE8A4;" FontSize="10"/>
+                                        </ToggleButton>
+                                        <Button x:Name="ExplorerHomeButton" Grid.Column="2" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnExplorerHomeClick" ToolTipService.ToolTip="홈 폴더로 이동" AutomationProperties.Name="홈 폴더로 이동" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
+                                            <FontIcon Glyph="&#xE80F;" FontSize="10"/>
+                                        </Button>
+                                        <Button x:Name="ExplorerRemoteButton" Grid.Column="3" Style="{StaticResource ExplorerGhostButtonStyle}" ToolTipService.ToolTip="리모트 서버" AutomationProperties.Name="리모트 서버" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
+                                            <Button.Flyout>
+                                                <Flyout Placement="BottomEdgeAlignedRight" Opening="OnRemoteFlyoutOpening">
+                                                    <local:RemoteExplorerView x:Name="RemoteExplorer"/>
+                                                </Flyout>
+                                            </Button.Flyout>
+                                            <FontIcon Glyph="&#xE774;" FontSize="11"/>
+                                        </Button>
+                                        <Button x:Name="ExplorerOpenInWindowsButton" Grid.Column="4" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnOpenInWindowsExplorerClick" ToolTipService.ToolTip="Windows 탐색기에서 열기" AutomationProperties.Name="Windows 탐색기에서 열기" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
+                                            <FontIcon Glyph="&#xE8DA;" FontSize="10"/>
+                                        </Button>
                                     </Grid>
                                 </StackPanel>
                                 <ListView x:Name="FileListView" Grid.Row="1" Margin="0,5,0,5" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnFileListViewItemClick" AllowDrop="True" DragOver="OnFileListViewDragOver" Drop="OnFileListViewDrop">
