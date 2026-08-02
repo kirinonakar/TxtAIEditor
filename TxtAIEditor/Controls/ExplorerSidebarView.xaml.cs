@@ -28,6 +28,7 @@ namespace TxtAIEditor.Controls
         public Button OpenInWindowsButton => ExplorerOpenInWindowsButton;
         public Button HomeButton => ExplorerHomeButton;
         public ToggleButton TreeModeButton => ExplorerTreeModeButton;
+        public ToggleButton HideUnwantedButton => ExplorerHideUnwantedButton;
         public TreeView Tree => ExplorerTreeView;
         public ListView FileList => FileListView;
 
@@ -70,6 +71,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? RenameClick;
         public event RoutedEventHandler? DeleteClick;
         public event TextChangedEventHandler? FilterTextChanged;
+        public event RoutedEventHandler? HideUnwantedChanged;
         public event DragEventHandler? FileListDragOver;
         public event DragEventHandler? FileListDrop;
         public event DragEventHandler? FileItemDragOver;
@@ -123,6 +125,10 @@ namespace TxtAIEditor.Controls
 
             ExplorerFilterBox.PlaceholderText = getString("ExplorerFilterPlaceholder", "파일명 필터 (하위 폴더 포함)...");
 
+            var hideUnwantedText = getString("ExplorerHideUnwantedTooltip", ".venv 등 .으로 시작하는 폴더와 node_modules, obj 보이기");
+            ToolTipService.SetToolTip(ExplorerHideUnwantedButton, hideUnwantedText);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerHideUnwantedButton, hideUnwantedText);
+
             var homeFolderText = getString("ExplorerHomeFolderTooltip", "홈 폴더로 이동");
             ToolTipService.SetToolTip(ExplorerHomeButton, homeFolderText);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerHomeButton, homeFolderText);
@@ -166,6 +172,7 @@ namespace TxtAIEditor.Controls
         private void OnRenameClick(object sender, RoutedEventArgs e) => RenameClick?.Invoke(sender, e);
         private void OnDeleteClick(object sender, RoutedEventArgs e) => DeleteClick?.Invoke(sender, e);
         private void OnExplorerFilterTextChanged(object sender, TextChangedEventArgs e) => FilterTextChanged?.Invoke(sender, e);
+        private void OnHideUnwantedClick(object sender, RoutedEventArgs e) => HideUnwantedChanged?.Invoke(sender, e);
         private void OnFileListViewDragOver(object sender, DragEventArgs e) => FileListDragOver?.Invoke(sender, e);
         private void OnFileListViewDrop(object sender, DragEventArgs e) => FileListDrop?.Invoke(sender, e);
         private void OnFileListViewItemDragOver(object sender, DragEventArgs e) => FileItemDragOver?.Invoke(sender, e);

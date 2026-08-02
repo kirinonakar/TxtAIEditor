@@ -93,6 +93,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? RemoveRecentFileClick { add => RecentView.RemoveClick += value; remove => RecentView.RemoveClick -= value; }
         public event ItemClickEventHandler? TocItemClick { add => TocView.ItemClick += value; remove => TocView.ItemClick -= value; }
         public event TextChangedEventHandler? ExplorerFilterTextChanged { add => ExplorerView.FilterTextChanged += value; remove => ExplorerView.FilterTextChanged -= value; }
+        public event RoutedEventHandler? ExplorerHideUnwantedChanged { add => ExplorerView.HideUnwantedChanged += value; remove => ExplorerView.HideUnwantedChanged -= value; }
         public event DragEventHandler? FileListViewDragOver { add => ExplorerView.FileListDragOver += value; remove => ExplorerView.FileListDragOver -= value; }
         public event DragEventHandler? FileListViewDrop { add => ExplorerView.FileListDrop += value; remove => ExplorerView.FileListDrop -= value; }
         public event DragEventHandler? FileListViewItemDragOver { add => ExplorerView.FileItemDragOver += value; remove => ExplorerView.FileItemDragOver -= value; }
@@ -147,6 +148,7 @@ namespace TxtAIEditor.Controls
         public Button ExplorerOpenInWindowsBtn => ExplorerView.OpenInWindowsButton;
         public Button ExplorerHomeBtn => ExplorerView.HomeButton;
         public ToggleButton ExplorerTreeModeBtn => ExplorerView.TreeModeButton;
+        public ToggleButton ExplorerHideUnwantedBtn => ExplorerView.HideUnwantedButton;
         public TreeView ExplorerTree => ExplorerView.Tree;
         public ExplorerPathBar ExplorerBreadcrumb => ExplorerView.Breadcrumb;
 

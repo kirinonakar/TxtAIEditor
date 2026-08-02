@@ -2937,6 +2937,9 @@
   <data name="ExplorerFilterPlaceholder" xml:space="preserve">
     <value>ファイル名でフィルター (サブフォルダを含む)...</value>
   </data>
+  <data name="ExplorerHideUnwantedTooltip" xml:space="preserve">
+    <value>.venv など . で始まるフォルダーと node_modules、obj を表示</value>
+  </data>
   <data name="ExplorerFilterClearTooltip" xml:space="preserve">
     <value>フィルターをクリア</value>
   </data>

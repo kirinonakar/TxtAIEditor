@@ -200,6 +200,11 @@ namespace TxtAIEditor.Controls
                     foreach (ExplorerItem item in _directoryService.CreateDirectoryItems(folderPath))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+                        if (_hideUnwantedFolders && item.IsFolder && IsHiddenFolderName(item.Name))
+                        {
+                            continue;
+                        }
+
                         item.IsDark = isDark;
                         item.IsArchive = !item.IsFolder &&
                             _archiveExplorerService.IsSupportedArchiveFile(item.Path);
@@ -290,7 +295,14 @@ namespace TxtAIEditor.Controls
                 CurrentArchiveDirectory = normalizedEntryDirectory;
 
                 bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-                foreach (var item in SortItems(_archiveExplorerService.CreateArchiveItems(archivePath, CurrentArchiveDirectory)))
+                System.Collections.Generic.IEnumerable<ExplorerItem> archiveItems =
+                    _archiveExplorerService.CreateArchiveItems(archivePath, CurrentArchiveDirectory);
+                if (_hideUnwantedFolders)
+                {
+                    archiveItems = archiveItems.Where(item => !item.IsFolder || !IsHiddenFolderName(item.Name));
+                }
+
+                foreach (var item in SortItems(archiveItems))
                 {
                     item.IsDark = isDark;
                     ApplyArchiveDisplayPath(item);
@@ -504,6 +516,11 @@ namespace TxtAIEditor.Controls
                 bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
                 foreach (RemoteDirectoryEntry entry in entries)
                 {
+                    if (_hideUnwantedFolders && entry.IsDirectory && IsHiddenFolderName(entry.Name))
+                    {
+                        continue;
+                    }
+
                     var item = new ExplorerItem
                     {
                         Name = entry.Name,
@@ -661,6 +678,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExplorerTreeItemInvoked += OnExplorerTreeItemInvoked;
             _leftSidebar.FileListViewItemClick += OnFileListViewItemClick;
             _leftSidebar.ExplorerFilterTextChanged += OnExplorerFilterTextChanged;
+            _leftSidebar.ExplorerHideUnwantedChanged += OnHideUnwantedChanged;
             _leftSidebar.ExplorerBreadcrumb.SegmentClicked += OnExplorerBreadcrumbItemClicked;
         }
 
@@ -1778,6 +1796,7 @@ namespace TxtAIEditor.Controls
         }
 
         private string _lastFilterQuery = string.Empty;
+        private bool _hideUnwantedFolders = true;
 
         private async void OnExplorerFilterTextChanged(object sender, Microsoft.UI.Xaml.Controls.TextChangedEventArgs e)
         {
@@ -1786,6 +1805,19 @@ namespace TxtAIEditor.Controls
                 string query = textBox.Text;
                 _lastFilterQuery = query;
                 await ApplyFilterAsync(query);
+            }
+        }
+
+        private async void OnHideUnwantedChanged(object sender, RoutedEventArgs e)
+        {
+            _hideUnwantedFolders = _leftSidebar.ExplorerHideUnwantedBtn.IsChecked != true;
+            if (!string.IsNullOrWhiteSpace(_lastFilterQuery))
+            {
+                await ApplyFilterAsync(_lastFilterQuery);
+            }
+            else
+            {
+                RefreshCurrentFolder();
             }
         }
 
@@ -1855,6 +1887,11 @@ namespace TxtAIEditor.Controls
             var matchedItems = await Task.Run(() =>
                 _archiveExplorerService.SearchArchiveItems(archivePath, archiveDirectory, query, MatchesPattern));
 
+            if (_hideUnwantedFolders)
+            {
+                matchedItems = matchedItems.Where(item => !item.IsFolder || !IsHiddenFolderName(item.Name)).ToList();
+            }
+
             if (query == _lastFilterQuery &&
                 archivePath == CurrentArchivePath &&
                 archiveDirectory == CurrentArchiveDirectory)
@@ -1872,6 +1909,13 @@ namespace TxtAIEditor.Controls
                     _leftSidebar.ExplorerStatus.Text = FormatExplorerFilterResult(_viewModel.ExplorerItems.Count);
                 });
             }
+        }
+
+        private static bool IsHiddenFolderName(string name)
+        {
+            return name.StartsWith(".", StringComparison.Ordinal) ||
+                string.Equals(name, "node_modules", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, "obj", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool MatchesPattern(string name, string pattern)
@@ -1923,7 +1967,8 @@ namespace TxtAIEditor.Controls
                     {
                         if (dirInfo.Attributes.HasFlag(FileAttributes.Hidden) ||
                             dirInfo.Attributes.HasFlag(FileAttributes.ReparsePoint) ||
-                            ignoredFolderNames.Contains(dirInfo.Name))
+                            ignoredFolderNames.Contains(dirInfo.Name) ||
+                            (_hideUnwantedFolders && IsHiddenFolderName(dirInfo.Name)))
                         {
                             continue;
                         }
@@ -1957,7 +2002,8 @@ namespace TxtAIEditor.Controls
                     {
                         if (subDir.Attributes.HasFlag(FileAttributes.Hidden) ||
                             subDir.Attributes.HasFlag(FileAttributes.ReparsePoint) ||
-                            ignoredFolderNames.Contains(subDir.Name))
+                            ignoredFolderNames.Contains(subDir.Name) ||
+                            (_hideUnwantedFolders && IsHiddenFolderName(subDir.Name)))
                         {
                             continue;
                         }

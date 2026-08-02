@@ -2937,6 +2937,9 @@
   <data name="ExplorerFilterPlaceholder" xml:space="preserve">
     <value>按名稱過濾（包括子資料夾）...</value>
   </data>
+  <data name="ExplorerHideUnwantedTooltip" xml:space="preserve">
+    <value>顯示以 . 開頭的資料夾（如 .venv）以及 node_modules、obj</value>
+  </data>
   <data name="ExplorerFilterClearTooltip" xml:space="preserve">
     <value>清除過濾器</value>
   </data>
