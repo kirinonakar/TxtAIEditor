@@ -30,7 +30,7 @@ namespace TxtAIEditor.Controls
         private const double MinFontSize = 8.0;
         private const double FontStep = 0.5;
         private const double RowSpacing = 2.0;
-        private const double TokenSpacing = 5.0;
+        private const double TokenSpacing = 0.0;
         private const double SpaceAfterSeparator = 4.0; // 구분자 뒤에 한 칸(픽셀) 추가
         private const double HorizontalPadding = 2.0;
         private const int MaxRows = 2;
