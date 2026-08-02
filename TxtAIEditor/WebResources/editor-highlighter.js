@@ -1,4 +1,4 @@
-import { escapeHtml, imeController, searchController, state } from './editor-core.js';
+import { escapeHtml, hexEditorMode, imeController, searchController, state } from './editor-core.js';
 import { selectionBoundsForLine } from './editor-selection.js';
 
 const MAX_SYNTAX_CONTEXT_LOOKBACK_LINES = 200;
@@ -574,7 +574,7 @@ function highlightHexLine(text, lineNumber = null, startCharIndex = 0) {
 }
 
 function normalizedHexSelection() {
-    const selection = state.hexSelection;
+    const selection = hexEditorMode.selection;
     if (!selection) return null;
 
     const startOffset = Math.max(0, Math.min(Number(selection.startOffset || 0), Number(selection.endOffset || 0)));

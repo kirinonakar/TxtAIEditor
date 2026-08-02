@@ -1,5 +1,5 @@
 import { contextMenu } from './editor-dom.js';
-import { post, state } from './editor-core.js';
+import { hexEditorMode, post, state } from './editor-core.js';
 import {
     changeLineIndent,
     copySelectionToClipboard,
@@ -17,7 +17,7 @@ import {
 export function showContextMenu(clientX, clientY) {
     for (const button of contextMenu.querySelectorAll('.context-menu-button')) {
         const requiresEdit = button.dataset.requiresEdit === 'true';
-        button.disabled = requiresEdit && state.readOnly && !state.hexEditable;
+        button.disabled = requiresEdit && state.readOnly && !hexEditorMode.isEditable;
     }
 
     const scrollSyncBtn = contextMenu.querySelector('[data-action="toggleScrollSync"]');

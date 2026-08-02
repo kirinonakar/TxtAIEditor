@@ -1,6 +1,8 @@
 import { contextMenu, scrollContainer, viewport, virtualSpacer } from './editor-dom.js';
+import { CsvInteractionController } from './editor-csv-interaction-state.js';
 import { EditorDocumentCache } from './editor-document-cache.js';
 import { DragDropController } from './editor-drag-drop-state.js';
+import { HostRequestController } from './editor-host-request-state.js';
 import { ImeController } from './editor-ime-state.js';
 import { SearchController } from './editor-search-state.js';
 import { SelectionController } from './editor-selection-state.js';
@@ -39,45 +41,37 @@ function configureEditorCoreRuntime(deps) {
 }
 
 const documentCache = new EditorDocumentCache();
+const csvInteractionController = new CsvInteractionController();
 const dragDropController = new DragDropController();
+const hostRequestController = new HostRequestController();
 const imeController = new ImeController({
     onRangeCompositionCleared: () => document.body.classList.remove('range-composition-active')
 });
 const selectionController = new SelectionController();
 const searchController = new SearchController();
 const viewportController = new ViewportController();
+const hexEditorMode = new HexEditorMode({
+    renderOverscan: HEX_RENDER_OVERSCAN,
+    prefetchAhead: HEX_PREFETCH_AHEAD
+});
+const csvTableMode = new CsvTableMode();
 const modeCoordinator = new EditorModeCoordinator({
     textMode: new TextEditorMode(),
-    hexMode: new HexEditorMode({
-        renderOverscan: HEX_RENDER_OVERSCAN,
-        prefetchAhead: HEX_PREFETCH_AHEAD
-    }),
-    csvMode: new CsvTableMode()
+    hexMode: hexEditorMode,
+    csvMode: csvTableMode
 });
 
 const state = {
     lineCount: 1,
-    lineHeight: 22,
-    overscan: 80,
     cache: documentCache,
-    pending: new Set(),
-    lineHeights: new Map(),
-    lineHeightIndex: null,
-    requestSeq: 1,
     currentLine: 1,
     currentColumn: 1,
     readOnly: false,
-    hexEditable: false,
     wordWrap: false,
     showDirtyLines: true,
     syntaxHighlighting: true,
     language: 'plaintext',
     tabSize: 4,
-    hexSelection: null,
-    hexSelectionAnchorOffset: null,
-    hexSelectionPane: 'hex',
-    hexCursorOffset: 0,
-    hexPendingHighNibble: null,
     initialized: false,
     cacheVersion: 0,
     documentVersion: 0,
@@ -88,7 +82,6 @@ const state = {
     pendingLinePatchBatch: null,
     textOperationLocked: false,
     textOperationPreviousReadOnly: false,
-    clipboardRequests: new Map(),
     pendingLineActions: [],
     autocompleteOnEnter: true,
     autocompleteOnTab: true,
@@ -105,16 +98,13 @@ const state = {
     lastManualDeleteAt: 0,
     editingLine: null,
     lastDeleteKeyDown: null,
-    pendingColumnTextInputs: [],
     dirtyLines: new Map(),
-    csvVirtualLineCount: 0,
     longLineProtectionFormat: '... too long ({0} characters total)'
 };
 
 function activeEditorMode() {
     return modeCoordinator.resolve({
-        language: state.language,
-        csvTableEnabled: state.csvTableEnabled
+        language: state.language
     });
 }
 
@@ -282,11 +272,12 @@ function applyOptions(msg) {
     const fg = resolveReadableColor(bg, preferredFg, theme === 'PastelDark' ? '#cad3f5' : (theme === 'Light' ? '#111111' : '#d4d4d4'));
     const fontSize = Number(msg.fontSize || 14);
     const baseLineHeight = Math.max(18, Math.ceil(fontSize + 8));
-    const previousLineHeight = state.lineHeight;
-    state.lineHeight = snapCssPixelsToDevicePixels(baseLineHeight);
+    const previousLineHeight = viewportController.setLineHeight(
+        snapCssPixelsToDevicePixels(baseLineHeight),
+        state.lineCount);
     state.tabSize = Number(msg.tabSize || 4);
     state.readOnly = !!msg.readOnly;
-    state.hexEditable = !!msg.hexEditable;
+    hexEditorMode.setEditable(msg.hexEditable);
     state.wordWrap = !!msg.wordWrap;
     state.syntaxHighlighting = msg.hasOwnProperty('syntaxHighlighting') ? !!msg.syntaxHighlighting : true;
     state.showDirtyLines = msg.hasOwnProperty('showDirtyLines') ? !!msg.showDirtyLines : true;
@@ -306,7 +297,7 @@ function applyOptions(msg) {
     document.documentElement.style.setProperty('--preview-code-bg', theme === 'PastelDark' ? '#1e2030' : (theme === 'Light' ? '#f3f5f7' : '#2d2d2d'));
     document.documentElement.style.setProperty('--font-size', `${fontSize}px`);
     document.documentElement.style.setProperty('--font-family', msg.fontFamily || 'Consolas, "Courier New", monospace');
-    document.documentElement.style.setProperty('--line-height', `${state.lineHeight}px`);
+    document.documentElement.style.setProperty('--line-height', `${viewportController.lineHeight}px`);
     document.documentElement.style.setProperty('--wrap', state.wordWrap ? 'break-spaces' : 'pre');
     document.body.classList.toggle('wrap-enabled', state.wordWrap);
     document.body.classList.toggle('dirty-lines-hidden', !state.showDirtyLines);
@@ -389,7 +380,7 @@ function applyOptions(msg) {
         document.documentElement.style.setProperty('--hex-data-odd', '#8a8a8a');
     }
 
-    if (usesMeasuredLineHeights() || previousLineHeight !== state.lineHeight) {
+    if (usesMeasuredLineHeights() || previousLineHeight !== viewportController.lineHeight) {
         clearMeasuredLineHeights();
     }
 
@@ -499,17 +490,15 @@ function applyOptions(msg) {
 
 function setupModel(lineCount) {
     state.lineCount = Math.max(1, Number(lineCount || 1));
-    state.csvVirtualLineCount = 0;
+    csvTableMode.virtualLineCount = 0;
     state.cache.clear();
-    state.pending.clear();
+    state.cache.clearLineRequests();
     viewportController.resetDocument();
     clearMeasuredLineHeights();
     state.cacheVersion++;
     state.documentVersion++;
     searchController.invalidateDocument({ clearPendingNavigation: true });
-    state.hexSelection = null;
-    state.hexSelectionAnchorOffset = null;
-    state.hexCursorOffset = 0;
+    hexEditorMode.resetSelection();
     state.dirtyLines.clear();
     setupVirtualHeight();
     queueRender(true);
@@ -534,14 +523,7 @@ function receiveLineBlock(startLine, lines) {
     if (changed) {
         state.cacheVersion++;
     }
-    for (const key of [...state.pending]) {
-        const [pendingStart, pendingCount] = key.split(':').map(Number);
-        const pendingEnd = pendingStart + pendingCount - 1;
-        const receivedEnd = start + safeLines.length - 1;
-        if (start <= pendingStart && (safeLines.length === 0 || receivedEnd >= pendingEnd || receivedEnd >= state.lineCount)) {
-            state.pending.delete(key);
-        }
-    }
+    state.cache.completeLineRequests(start, safeLines.length, state.lineCount);
     return safeLines.length;
 }
 
@@ -609,9 +591,7 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
     const savedCaretColumn = state.currentColumn;
 
     selectionController.clear();
-    state.hexSelection = null;
-    state.hexSelectionAnchorOffset = null;
-    state.hexCursorOffset = 0;
+    hexEditorMode.resetSelection();
     try {
         if (hasExplicitCaret) {
             window.getSelection()?.removeAllRanges();
@@ -707,7 +687,7 @@ function setupVirtualHeight() {
 
 function syncFullDocumentTrailingSpace() {
     const lastRow = viewport.lastElementChild;
-    const lastRowHeight = Math.max(1, lastRow?.offsetHeight || state.lineHeight);
+    const lastRowHeight = Math.max(1, lastRow?.offsetHeight || viewportController.lineHeight);
     const trailingHeight = Math.max(0, scrollContainer.clientHeight - lastRowHeight);
     viewport.style.setProperty('--full-document-trailing-height', `${trailingHeight}px`);
 }
@@ -727,125 +707,41 @@ function usesMeasuredLineHeights() {
 }
 
 function lineHeightFor(lineNumber) {
-    return usesMeasuredLineHeights() ? (state.lineHeights.get(lineNumber) || state.lineHeight) : state.lineHeight;
-}
-
-function createLineHeightIndex() {
-    const size = Math.max(2, state.lineCount + 2);
-    return {
-        size,
-        tree: new Map(),
-        totalDelta: 0
-    };
-}
-
-function measuredLineHeightDelta(height) {
-    return Math.max(0, Number(height || 0)) - state.lineHeight;
-}
-
-function resetLineHeightIndex() {
-    state.lineHeightIndex = createLineHeightIndex();
-}
-
-function rebuildLineHeightIndex() {
-    const index = createLineHeightIndex();
-    state.lineHeightIndex = index;
-    for (const [line, height] of state.lineHeights.entries()) {
-        addMeasuredLineHeightDelta(line, measuredLineHeightDelta(height));
-    }
-}
-
-function ensureLineHeightIndex() {
-    const requiredSize = Math.max(2, state.lineCount + 2);
-    if (!state.lineHeightIndex || state.lineHeightIndex.size < requiredSize) {
-        rebuildLineHeightIndex();
-    }
-}
-
-function addMeasuredLineHeightDelta(lineNumber, delta) {
-    if (!delta) return;
-    ensureLineHeightIndex();
-    const index = state.lineHeightIndex;
-    const line = Math.max(1, Math.min(Number(lineNumber || 1), index.size));
-    for (let i = line; i <= index.size; i += i & -i) {
-        const next = (index.tree.get(i) || 0) + delta;
-        if (Math.abs(next) < 0.0001) {
-            index.tree.delete(i);
-        } else {
-            index.tree.set(i, next);
-        }
-    }
-    index.totalDelta += delta;
+    return viewportController.lineHeightFor(lineNumber, {
+        useMeasured: usesMeasuredLineHeights()
+    });
 }
 
 function measuredLineHeightDeltaBefore(lineNumber) {
-    if (!usesMeasuredLineHeights() || state.lineHeights.size === 0) return 0;
-    ensureLineHeightIndex();
-    const index = state.lineHeightIndex;
-    let i = Math.max(0, Math.min(Number(lineNumber || 1) - 1, index.size));
-    let sum = 0;
-    while (i > 0) {
-        sum += index.tree.get(i) || 0;
-        i -= i & -i;
-    }
-    return sum;
+    if (!usesMeasuredLineHeights()) return 0;
+    return viewportController.measuredLineHeightDeltaBefore(lineNumber, state.lineCount);
 }
 
 function setMeasuredLineHeight(lineNumber, height) {
-    const line = Math.max(1, Number(lineNumber || 1));
-    const measured = Math.max(0, Number(height || 0));
-    const previous = state.lineHeights.get(line);
-    if (previous === measured) return false;
-
-    state.lineHeights.set(line, measured);
-    const previousDelta = previous === undefined ? 0 : measuredLineHeightDelta(previous);
-    const nextDelta = measuredLineHeightDelta(measured);
-    addMeasuredLineHeightDelta(line, nextDelta - previousDelta);
-    return true;
+    return viewportController.setMeasuredLineHeight(lineNumber, height, state.lineCount);
 }
 
 function deleteMeasuredLineHeight(lineNumber) {
-    const line = Math.max(1, Number(lineNumber || 1));
-    const previous = state.lineHeights.get(line);
-    if (previous === undefined) return false;
-
-    state.lineHeights.delete(line);
-    addMeasuredLineHeightDelta(line, -measuredLineHeightDelta(previous));
-    return true;
+    return viewportController.deleteMeasuredLineHeight(lineNumber, state.lineCount);
 }
 
 function clearMeasuredLineHeights() {
-    state.lineHeights.clear();
-    resetLineHeightIndex();
+    viewportController.clearMeasuredLineHeights(state.lineCount);
 }
 
 function shiftMeasuredLineHeights(fromLine, delta) {
-    const entries = [...state.lineHeights.entries()]
-        .filter(([line]) => line >= fromLine)
-        .sort((a, b) => delta > 0 ? b[0] - a[0] : a[0] - b[0]);
-    if (entries.length === 0) return;
-
-    for (const [line] of entries) {
-        state.lineHeights.delete(line);
-    }
-    for (const [line, value] of entries) {
-        const nextLine = line + delta;
-        if (nextLine >= 1 && nextLine <= state.lineCount + Math.max(delta, 0)) {
-            state.lineHeights.set(nextLine, value);
-        }
-    }
-    rebuildLineHeightIndex();
+    viewportController.shiftMeasuredLineHeights(fromLine, delta, state.lineCount);
 }
 
 function totalVirtualHeight() {
     if (usesFullDocumentRender()) {
-        return Math.max(1, scrollContainer.scrollHeight || (effectiveLineCount() * state.lineHeight));
+        return Math.max(1, scrollContainer.scrollHeight || (effectiveLineCount() * viewportController.lineHeight));
     }
 
     const total = rawTotalVirtualHeight();
     if (usesCompressedScroll()) {
-        const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
-        return Math.max(viewHeight + state.lineHeight, Math.min(total, BROWSER_SCROLL_HEIGHT_LIMIT));
+        const viewHeight = Math.max(scrollContainer.clientHeight, viewportController.lineHeight);
+        return Math.max(viewHeight + viewportController.lineHeight, Math.min(total, BROWSER_SCROLL_HEIGHT_LIMIT));
     }
 
     return total + trailingScrollHeight();
@@ -853,19 +749,18 @@ function totalVirtualHeight() {
 
 function rawTotalVirtualHeight() {
     if (usesFullDocumentRender()) {
-        return Math.max(1, scrollContainer.scrollHeight || (effectiveLineCount() * state.lineHeight));
+        return Math.max(1, scrollContainer.scrollHeight || (effectiveLineCount() * viewportController.lineHeight));
     }
 
-    let total = effectiveLineCount() * state.lineHeight;
+    let total = effectiveLineCount() * viewportController.lineHeight;
     if (usesMeasuredLineHeights()) {
-        ensureLineHeightIndex();
-        total += state.lineHeightIndex.totalDelta;
+        total += viewportController.totalMeasuredLineHeightDelta(state.lineCount);
     }
     return Math.max(1, total);
 }
 
 function trailingScrollHeight() {
-    const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
+    const viewHeight = Math.max(scrollContainer.clientHeight, viewportController.lineHeight);
     const lastLineHeight = Math.max(1, lineHeightFor(effectiveLineCount()));
     return Math.max(0, viewHeight - lastLineHeight);
 }
@@ -894,7 +789,7 @@ function lineTop(lineNumber) {
         return ((line - 1) / (metrics.maxFirstLine - 1)) * metrics.maxScrollTop;
     }
 
-    let top = (Math.max(1, lineNumber) - 1) * state.lineHeight;
+    let top = (Math.max(1, lineNumber) - 1) * viewportController.lineHeight;
     top += measuredLineHeightDeltaBefore(lineNumber);
     return Math.max(0, top);
 }
@@ -932,8 +827,8 @@ function lineAt(scrollTop) {
         return Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(ratio * (metrics.maxFirstLine - 1)) + 1));
     }
 
-    if (!usesMeasuredLineHeights() || state.lineHeights.size === 0) {
-        return Math.min(lineCount, Math.max(1, Math.floor(scrollTop / state.lineHeight) + 1));
+    if (!usesMeasuredLineHeights() || !viewportController.hasMeasuredLineHeights) {
+        return Math.min(lineCount, Math.max(1, Math.floor(scrollTop / viewportController.lineHeight) + 1));
     }
 
     const targetTop = Math.max(0, Number(scrollTop || 0));
@@ -953,7 +848,7 @@ function lineAt(scrollTop) {
 }
 
 function visibleRange() {
-    const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
+    const viewHeight = Math.max(scrollContainer.clientHeight, viewportController.lineHeight);
     const lineCount = effectiveLineCount();
     if (usesFullDocumentRender()) {
         return { start: 1, end: lineCount, count: lineCount };
@@ -961,15 +856,15 @@ function visibleRange() {
 
     const firstVisible = lineAt(scrollContainer.scrollTop);
     if (usesCompressedScroll()) {
-        const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight) + 1);
-        const overscan = activeEditorMode().renderOverscan({ defaultOverscan: state.overscan });
+        const visibleRows = Math.max(1, Math.ceil(viewHeight / viewportController.lineHeight) + 1);
+        const overscan = activeEditorMode().renderOverscan({ defaultOverscan: viewportController.overscan });
         const start = Math.max(1, firstVisible - overscan);
         const end = Math.min(lineCount, firstVisible + visibleRows + overscan);
         return { start, end, count: Math.max(0, end - start + 1) };
     }
 
     const lastVisible = lineAt(scrollContainer.scrollTop + viewHeight);
-    const overscan = activeEditorMode().renderOverscan({ defaultOverscan: state.overscan });
+    const overscan = activeEditorMode().renderOverscan({ defaultOverscan: viewportController.overscan });
     const windowStep = Math.max(1, Math.floor(overscan / 2));
     const windowAnchor = Math.floor((firstVisible - 1) / windowStep) * windowStep + 1;
     const visibleLineCount = Math.max(1, lastVisible - firstVisible + 1);
@@ -992,8 +887,8 @@ function usesCompressedScroll() {
 }
 
 function compressedScrollMetrics() {
-    const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
-    const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight));
+    const viewHeight = Math.max(scrollContainer.clientHeight, viewportController.lineHeight);
+    const visibleRows = Math.max(1, Math.ceil(viewHeight / viewportController.lineHeight));
     const lineCount = effectiveLineCount();
     const maxFirstLine = lineCount;
     const virtualHeight = totalVirtualHeight();
@@ -1011,30 +906,27 @@ function viewportTopForLine(startLine) {
     const firstVisibleTop = lineTop(firstVisible);
     const nextVisibleTop = firstVisible < metrics.maxFirstLine
         ? lineTop(firstVisible + 1)
-        : firstVisibleTop + state.lineHeight;
+        : firstVisibleTop + viewportController.lineHeight;
     const virtualLineSpan = Math.max(0.0001, nextVisibleTop - firstVisibleTop);
     const scrollOffset = Math.max(0, scrollContainer.scrollTop - firstVisibleTop);
-    const physicalOffset = Math.max(0, Math.min(1, scrollOffset / virtualLineSpan)) * state.lineHeight;
+    const physicalOffset = Math.max(0, Math.min(1, scrollOffset / virtualLineSpan)) * viewportController.lineHeight;
     return scrollContainer.scrollTop -
         physicalOffset -
-        ((firstVisible - Math.max(1, Number(startLine || 1))) * state.lineHeight);
+        ((firstVisible - Math.max(1, Number(startLine || 1))) * viewportController.lineHeight);
 }
 
 function effectiveLineCount() {
     return activeEditorMode().effectiveLineCount({
-        sourceLineCount: state.lineCount,
-        csvVirtualLineCount: state.csvVirtualLineCount
+        sourceLineCount: state.lineCount
     });
 }
 
 function requestLines(start, count) {
     if (count <= 0) return;
-    const key = `${start}:${count}`;
-    if (state.pending.has(key)) return;
-    state.pending.add(key);
+    if (!state.cache.beginLineRequest(start, count)) return;
     post({
         type: 'requestLines',
-        requestId: state.requestSeq++,
+        requestId: hostRequestController.nextRequestId(),
         startLine: start,
         count
     });
@@ -1047,13 +939,7 @@ function requestMissingLines(start, end) {
     start = Math.max(1, Number(start || 1));
     end = Math.min(sourceLineCount, Math.max(start, Number(end || start)));
 
-    const pendingRanges = [...state.pending].map(key => {
-        const [pendingStart, pendingCount] = key.split(':').map(Number);
-        return {
-            start: pendingStart,
-            end: pendingStart + pendingCount - 1
-        };
-    });
+    const pendingRanges = state.cache.pendingLineRanges();
     const isPending = line => pendingRanges.some(range => line >= range.start && line <= range.end);
     const requestMissingBlock = (missingStart, missingCount) => {
         let requestCount = Math.max(missingCount, MIN_BATCH_SIZE);
@@ -1089,11 +975,11 @@ function requestMissingLines(start, end) {
 }
 
 function prefetchAround(scrollTop) {
-    const viewHeight = Math.max(scrollContainer.clientHeight, state.lineHeight);
+    const viewHeight = Math.max(scrollContainer.clientHeight, viewportController.lineHeight);
     const firstVisible = lineAt(scrollTop);
     const prefetchAhead = activeEditorMode().prefetchAhead({ defaultPrefetchAhead: PREFETCH_AHEAD });
     if (usesCompressedScroll()) {
-        const visibleRows = Math.max(1, Math.ceil(viewHeight / state.lineHeight) + 1);
+        const visibleRows = Math.max(1, Math.ceil(viewHeight / viewportController.lineHeight) + 1);
         const prefetchStart = Math.max(1, firstVisible - prefetchAhead);
         const prefetchEnd = Math.min(state.lineCount, firstVisible + visibleRows + prefetchAhead);
         requestMissingLines(prefetchStart, prefetchEnd);
@@ -1137,7 +1023,7 @@ function captureScrollAnchor(scrollTop = scrollContainer.scrollTop) {
     const top = lineTop(line);
     const nextTop = line < effectiveLineCount()
         ? lineTop(line + 1)
-        : top + state.lineHeight;
+        : top + viewportController.lineHeight;
     const span = Math.max(0.0001, nextTop - top);
     const ratio = Math.max(0, Math.min(1, (Number(scrollTop || 0) - top) / span));
     return { line, ratio };
@@ -1150,7 +1036,7 @@ function restoreScrollAnchor(anchor) {
     const top = lineTop(line);
     const nextTop = line < effectiveLineCount()
         ? lineTop(line + 1)
-        : top + state.lineHeight;
+        : top + viewportController.lineHeight;
     const ratio = Math.max(0, Math.min(1, Number(anchor.ratio || 0)));
     const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
     scrollContainer.scrollTop = Math.min(maxScrollTop, Math.max(0, top + ((nextTop - top) * ratio)));
@@ -1191,40 +1077,15 @@ function queueRender(force = false) {
 }
 
 function queueColumnTextInputFallback(text, callback, delayMs = 40) {
-    const value = String(text ?? '');
-    if (!value || typeof callback !== 'function') return null;
-
-    const pending = { text: value, timer: 0 };
-    state.pendingColumnTextInputs.push(pending);
-    pending.timer = setTimeout(() => {
-        const index = state.pendingColumnTextInputs.indexOf(pending);
-        if (index < 0) return;
-        state.pendingColumnTextInputs.splice(index, 1);
-        callback(value);
-    }, Math.max(0, Number(delayMs || 0)));
-    return pending;
+    return imeController.queueColumnTextInputFallback(text, callback, delayMs);
 }
 
 function consumePendingColumnTextInput(text = null) {
-    const pendingInputs = state.pendingColumnTextInputs;
-    if (!pendingInputs.length) return null;
-
-    const value = text === null || text === undefined ? '' : String(text);
-    const index = value
-        ? pendingInputs.findIndex(pending => pending.text === value)
-        : 0;
-    if (index < 0) return null;
-
-    const [pending] = pendingInputs.splice(index, 1);
-    if (pending.timer) clearTimeout(pending.timer);
-    return pending.text;
+    return imeController.consumePendingColumnTextInput(text);
 }
 
 function cancelPendingColumnTextInputs() {
-    for (const pending of state.pendingColumnTextInputs) {
-        if (pending.timer) clearTimeout(pending.timer);
-    }
-    state.pendingColumnTextInputs.length = 0;
+    imeController.cancelPendingColumnTextInputs();
 }
 
 function measureRenderedRows(renderOnChange = true, force = false) {
@@ -1253,7 +1114,7 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
         // oscillate at a render-window boundary.
         if (state.inlineLivePreviewEnabled && rowRect.bottom <= containerRect.top) continue;
         const isSkipped = row.classList.contains('live-preview-skipped');
-        const minimum = isSkipped ? 0 : state.lineHeight;
+        const minimum = isSkipped ? 0 : viewportController.lineHeight;
         const measuredHeight = state.inlineLivePreviewEnabled
             ? Math.max(rowRect.height || 0, row.scrollHeight || 0)
             : (rowRect.height || row.scrollHeight || 0);
@@ -1422,7 +1283,7 @@ function hexSelectionInfo() {
     };
 }
 
-function normalizedHexSelection(selection = state.hexSelection) {
+function normalizedHexSelection(selection = hexEditorMode.selection) {
     if (!selection) return null;
     const startOffset = Math.max(0, Math.min(Number(selection.startOffset || 0), Number(selection.endOffset || 0)));
     const endOffset = Math.max(startOffset, Math.max(Number(selection.startOffset || 0), Number(selection.endOffset || 0)));
@@ -1640,17 +1501,16 @@ async function writeClipboardText(text) {
     return true;
 }
 
+function requestClipboardTextFromHost() {
+    return new Promise(resolve => {
+        const requestId = hostRequestController.beginClipboardRequest(resolve);
+        post({ type: 'clipboardRead', requestId });
+    });
+}
+
 async function readClipboardText() {
     if (window.chrome && window.chrome.webview) {
-        return await new Promise(resolve => {
-            const requestId = state.requestSeq++;
-            const timer = setTimeout(() => {
-                state.clipboardRequests.delete(requestId);
-                resolve('');
-            }, 1200);
-            state.clipboardRequests.set(requestId, { resolve, timer });
-            post({ type: 'clipboardRead', requestId });
-        });
+        return await requestClipboardTextFromHost();
     }
 
     if (navigator.clipboard?.readText) {
@@ -1659,15 +1519,7 @@ async function readClipboardText() {
         } catch { }
     }
 
-    return await new Promise(resolve => {
-        const requestId = state.requestSeq++;
-        const timer = setTimeout(() => {
-            state.clipboardRequests.delete(requestId);
-            resolve('');
-        }, 1200);
-        state.clipboardRequests.set(requestId, { resolve, timer });
-        post({ type: 'clipboardRead', requestId });
-    });
+    return await requestClipboardTextFromHost();
 }
 
 function selectedLineRange() {
@@ -1735,11 +1587,15 @@ export {
     compressedScrollMetrics,
     configureEditorCoreRuntime,
     containsHangulInputText,
+    csvInteractionController,
+    csvTableMode,
     dragDropController,
     escapeHtml,
     graphemeDeleteEnd,
     graphemeDeleteStart,
     hasTextAt,
+    hexEditorMode,
+    hostRequestController,
     imeController,
     isHangulImeKeyEvent,
     isPlainTextKey,

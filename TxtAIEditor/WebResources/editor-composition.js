@@ -757,7 +757,7 @@ function finishColumnComposition(element, lineNumber) {
         const scrollRect = scrollContainer.getBoundingClientRect();
         const styles = window.getComputedStyle(element);
         const parsedLineHeight = Number.parseFloat(styles.lineHeight);
-        const height = Math.max(1, anchorRect?.height || (Number.isFinite(parsedLineHeight) ? parsedLineHeight : state.lineHeight));
+        const height = Math.max(1, anchorRect?.height || (Number.isFinite(parsedLineHeight) ? parsedLineHeight : viewportController.lineHeight));
         const left = anchorRect?.left ?? elementRect.left;
         const top = anchorRect?.top ?? elementRect.top;
         const rightLimit = Math.max(hostRect.right, scrollRect.right);

@@ -1,11 +1,13 @@
 export function createClipboardCommandHandlers({
     activeEditableElement,
     copyCsvSelectionToClipboard,
+    csvTableMode,
     cutCsvSelectionToClipboard,
     commitLine,
     deleteForwardAtCaret,
     focusLine,
     hasCustomSelection,
+    hexEditorMode,
     insertTextAtCaret,
     normalizeSelection,
     post,
@@ -20,7 +22,7 @@ export function createClipboardCommandHandlers({
     writeClipboardText
 }) {
     function deleteSelectionOrForward() {
-        if (state.language === 'hex' && state.hexEditable) {
+        if (state.language === 'hex' && hexEditorMode.isEditable) {
             replaceHexSelectionWithZeros();
             return;
         }
@@ -46,14 +48,14 @@ export function createClipboardCommandHandlers({
     }
 
     async function cutSelectionToClipboard() {
-        if (state.csvTableEnabled) {
+        if (csvTableMode.isEnabled) {
             return await cutCsvSelectionToClipboard();
         }
 
         const text = selectedText();
         if (!text) return false;
         const copied = await writeClipboardText(text);
-        if (copied && state.language === 'hex' && state.hexEditable) {
+        if (copied && state.language === 'hex' && hexEditorMode.isEditable) {
             replaceHexSelectionWithZeros();
             return true;
         }
@@ -76,7 +78,7 @@ export function createClipboardCommandHandlers({
     }
 
     async function copySelectionToClipboard() {
-        if (state.csvTableEnabled) {
+        if (csvTableMode.isEnabled) {
             return await copyCsvSelectionToClipboard();
         }
 
@@ -86,7 +88,7 @@ export function createClipboardCommandHandlers({
     }
 
     async function pasteFromClipboard() {
-        if (state.language === 'hex' && state.hexEditable) {
+        if (state.language === 'hex' && hexEditorMode.isEditable) {
             const text = await readClipboardText();
             const bytes = parseHexClipboard(text);
             if (bytes.length > 0) submitHexEdit(bytes);
@@ -122,10 +124,10 @@ export function createClipboardCommandHandlers({
     }
 
     function hexEditOffset() {
-        const selection = state.hexSelection;
+        const selection = hexEditorMode.selection;
         return selection
             ? Math.max(0, Math.min(Number(selection.startOffset || 0), Number(selection.endOffset || 0)))
-            : Math.max(0, Number(state.hexCursorOffset || 0));
+            : Math.max(0, Number(hexEditorMode.cursorOffset || 0));
     }
 
     function submitHexEdit(bytes, offset = hexEditOffset()) {
@@ -134,16 +136,13 @@ export function createClipboardCommandHandlers({
         post({ type: 'hexEdit', offset, hex });
         post({ type: 'contentChanged' });
         const finalOffset = offset + bytes.length - 1;
-        state.hexCursorOffset = finalOffset;
-        state.hexSelectionAnchorOffset = finalOffset;
-        state.hexSelection = { startOffset: finalOffset, endOffset: finalOffset + 1 };
-        state.hexPendingHighNibble = null;
+        hexEditorMode.selectByte(finalOffset, { clearPendingHighNibble: true });
         queueRender(true);
         reportCursorAndSelection();
     }
 
     function replaceHexSelectionWithZeros() {
-        const selection = state.hexSelection;
+        const selection = hexEditorMode.selection;
         const start = hexEditOffset();
         const length = selection
             ? Math.max(1, Math.abs(Number(selection.endOffset || 0) - Number(selection.startOffset || 0)))

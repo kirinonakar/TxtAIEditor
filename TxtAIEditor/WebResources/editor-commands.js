@@ -5,9 +5,11 @@ import {
     cleanDirtyMarker,
     clearCustomSelectionVisuals,
     comparePositions,
+    csvTableMode,
     graphemeDeleteEnd,
     graphemeDeleteStart,
     hasTextAt,
+    hexEditorMode,
     imeController,
     isPlainTextKey,
     isStandaloneDelimiter,
@@ -349,7 +351,7 @@ function visualLineHeightFromCaret(element, caretRect) {
     if (caretRect && Number.isFinite(caretRect.height) && caretRect.height > 0) {
         return caretRect.height;
     }
-    return Math.max(1, Number(state.lineHeight || 1));
+    return Math.max(1, Number(viewportController.lineHeight || 1));
 }
 
 function captureSplitScrollAnchor(element, caretOffset) {
@@ -549,7 +551,7 @@ function splitCurrentLine(element, options = {}) {
     if (splitScrollAnchor) {
         alignSplitCaretAfterRender(nextLineNumber, nextCaretColumn, splitScrollAnchor, splitRestoreToken);
     } else {
-        focusLine(nextLineNumber, nextCaretColumn, 3 * state.lineHeight);
+        focusLine(nextLineNumber, nextCaretColumn, 3 * viewportController.lineHeight);
     }
 }
 
@@ -800,7 +802,7 @@ function applyMergeLineBackward(lineNumber, previous, current) {
     syncCustomSelectionClass();
     markLineBoundaryTransition(lineNumber - 1, previous.length);
     queueRender(true);
-    queuePostEditFocus(() => focusLine(lineNumber - 1, previous.length, 3 * state.lineHeight));
+    queuePostEditFocus(() => focusLine(lineNumber - 1, previous.length, 3 * viewportController.lineHeight));
 }
 
 function queueLineAction(action) {
@@ -1069,7 +1071,7 @@ function replaceSelectionWith(selection, text, editSelection = null) {
 
     // 삭제된 줄이 뷰포트 위쪽에 있을 때 스크롤 위치를 유지합니다.
     if (netLines < 0 && editLineTop < savedScrollTop) {
-        const scrollAdjust = -netLines * state.lineHeight;
+        const scrollAdjust = -netLines * viewportController.lineHeight;
         scrollContainer.scrollTop = Math.max(0, savedScrollTop - scrollAdjust);
     } else if (shouldPreserveScrollTop) {
         restoreScrollTop(savedScrollTop);
@@ -1184,7 +1186,7 @@ function deleteCurrentLine(element) {
 
         // 삭제된 줄이 뷰포트 위쪽에 있을 때 스크롤 위치를 유지합니다.
         if (deletedLineTop < savedScrollTop) {
-            scrollContainer.scrollTop = Math.max(0, savedScrollTop - state.lineHeight);
+            scrollContainer.scrollTop = Math.max(0, savedScrollTop - viewportController.lineHeight);
         }
         post({ type: 'mergeLineWithPrevious', lineNumber: lineNumber + 1 });
         post({ type: 'contentChanged' });
@@ -1328,6 +1330,7 @@ const {
     setCaret,
     state,
     syncCustomSelectionClass,
+    viewportController,
     viewport
 });
 
@@ -1387,11 +1390,13 @@ const {
 } = createClipboardCommandHandlers({
     activeEditableElement,
     copyCsvSelectionToClipboard,
+    csvTableMode,
     cutCsvSelectionToClipboard,
     commitLine,
     deleteForwardAtCaret,
     focusLine,
     hasCustomSelection,
+    hexEditorMode,
     insertTextAtCaret,
     normalizeSelection,
     post,

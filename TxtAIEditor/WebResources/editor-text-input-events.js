@@ -4,6 +4,7 @@ import {
     activeEditableElement,
     cancelPendingColumnTextInputs,
     consumePendingColumnTextInput,
+    csvTableMode,
     graphemeDeleteEnd,
     graphemeDeleteStart,
     imeController,
@@ -127,7 +128,7 @@ export function bindTextInputEvents({ renderer }) {
     });
 
     viewport.addEventListener('focusin', event => {
-        if (state.csvTableEnabled) return;
+        if (csvTableMode.isEnabled) return;
         const element = lineElementFromEvent(event);
         if (element && element.getAttribute('contenteditable') === 'true') {
             state.editingLine = Number(element.dataset.line || state.currentLine || 1);
@@ -137,7 +138,7 @@ export function bindTextInputEvents({ renderer }) {
     });
 
     viewport.addEventListener('focusout', () => {
-        if (state.csvTableEnabled) return;
+        if (csvTableMode.isEnabled) return;
         setTimeout(() => {
             const hasLineTextFocus = !!document.activeElement?.closest?.('.line-text');
             const shouldKeepSelectionEditContext = hasCustomSelection();
@@ -283,7 +284,7 @@ export function bindTextInputEvents({ renderer }) {
 
     viewport.addEventListener('beforeinput', event => {
         cancelAutocompleteCaretRestore();
-        if (state.csvTableEnabled) return;
+        if (csvTableMode.isEnabled) return;
         let element = lineElementFromEvent(event);
 
         if (event.isComposing || imeController.isComposing ||

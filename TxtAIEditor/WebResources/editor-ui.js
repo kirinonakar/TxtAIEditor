@@ -1,6 +1,7 @@
 import { scrollContainer, viewport } from './editor-dom.js';
 import {
     configureEditorCoreRuntime,
+    hexEditorMode,
     lineAt,
     lineTop,
     post,
@@ -173,7 +174,7 @@ function clampScrollTop(value) {
 
 function centeredScrollTopForLine(lineNumber) {
     if (state.language === 'hex' || usesCompressedScroll()) {
-        const visibleRows = Math.max(1, Math.floor(scrollContainer.clientHeight / state.lineHeight));
+        const visibleRows = Math.max(1, Math.floor(scrollContainer.clientHeight / viewportController.lineHeight));
         const firstLine = Math.max(1, Number(lineNumber || 1) - Math.floor(visibleRows / 2));
         return clampScrollTop(lineTop(firstLine));
     }
@@ -280,7 +281,9 @@ function revealLine(lineNumber, indexOfMatch = 0, matchLength = 0, query = '', p
     editorEvents.beginProgrammaticScroll(targetScrollTop);
     postEditorScroll();
 
-    requestLines(Math.max(1, safeLine - state.overscan), state.overscan * 2 + 1);
+    requestLines(
+        Math.max(1, safeLine - viewportController.overscan),
+        viewportController.overscan * 2 + 1);
     queueRender(true);
     scheduleRevealLineAlignment(safeLine, ++revealScrollToken);
     if (!preventFocus && state.language !== 'hex') {
@@ -294,9 +297,9 @@ function revealHexOffset(offset) {
     const byteIndex = safeOffset % HEX_BYTES_PER_ROW;
     const column = hexColumnForByteIndex(byteIndex);
 
-    state.hexSelection = null;
-    state.hexSelectionAnchorOffset = safeOffset;
-    state.hexCursorOffset = safeOffset;
+    hexEditorMode.clearSelection();
+    hexEditorMode.setSelectionAnchor(safeOffset);
+    hexEditorMode.setCursor(safeOffset);
     state.currentLine = lineNumber;
     state.currentColumn = column + 1;
 

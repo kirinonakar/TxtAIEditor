@@ -23,6 +23,7 @@ export function createCaretNavigationCommands({
     setCaret,
     state,
     syncCustomSelectionClass,
+    viewportController,
     viewport
 }) {
     let verticalCaretVisualAnchor = null;
@@ -110,7 +111,7 @@ export function createCaretNavigationCommands({
     }
 
     function rememberVerticalCaretVisualAnchor(line, column, left, top, height) {
-        const safeHeight = Math.max(1, Number(height || state.lineHeight));
+        const safeHeight = Math.max(1, Number(height || viewportController.lineHeight));
         verticalCaretVisualAnchor = {
             line,
             column,
@@ -250,7 +251,7 @@ export function createCaretNavigationCommands({
         const hasMoveElement = Number(moveElement?.dataset?.line || 0) === lineNumber;
         let caretRect = hasMoveElement ? caretRectForOffset(moveElement, caret) : null;
         let preferredX = null;
-        let lineStep = state.lineHeight;
+        let lineStep = viewportController.lineHeight;
         if (!caretRect) {
             target = adjacentLogicalLineTarget(lineNumber, direction, caret, lineStep, caret);
         } else {
@@ -259,7 +260,7 @@ export function createCaretNavigationCommands({
             const visualBounds = visualLineBoundsForElement(moveElement) || elementRect;
             const styles = window.getComputedStyle(moveElement);
             const parsedLineHeight = Number.parseFloat(styles.lineHeight);
-            lineStep = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : (caretRect.height || state.lineHeight));
+            lineStep = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : (caretRect.height || viewportController.lineHeight));
             preferredX = Math.max(elementRect.left + 1, Math.min(caretRect.left, elementRect.right - 1));
             const targetY = direction < 0
                 ? caretRect.top - lineStep / 2
@@ -306,10 +307,10 @@ export function createCaretNavigationCommands({
                 clearCustomSelectionVisuals();
                 if (target.line === lineNumber &&
                     Number(moveElement?.dataset?.line || 0) === target.line) {
-                    setCaret(moveElement, target.column, 3 * state.lineHeight, false);
+                    setCaret(moveElement, target.column, 3 * viewportController.lineHeight, false);
                 } else {
                     queueRender(true);
-                    setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
+                    setTimeout(() => focusLine(target.line, target.column, 3 * viewportController.lineHeight), 0);
                 }
             } else {
                 selectionController.selection = null;
@@ -318,9 +319,9 @@ export function createCaretNavigationCommands({
                 state.currentColumn = target.column + 1;
                 syncCustomSelectionClass();
                 if (target.line === lineNumber) {
-                    setCaret(moveElement, target.column, 3 * state.lineHeight);
+                    setCaret(moveElement, target.column, 3 * viewportController.lineHeight);
                 } else {
-                    focusLine(target.line, target.column, 3 * state.lineHeight);
+                    focusLine(target.line, target.column, 3 * viewportController.lineHeight);
                 }
             }
             return true;
@@ -387,10 +388,10 @@ export function createCaretNavigationCommands({
             clearCustomSelectionVisuals();
             if (target.line === lineNumber &&
                 Number(moveElement?.dataset?.line || 0) === target.line) {
-                setCaret(moveElement, target.column, 3 * state.lineHeight, false);
+                setCaret(moveElement, target.column, 3 * viewportController.lineHeight, false);
             } else {
                 queueRender(true);
-                setTimeout(() => focusLine(target.line, target.column, 3 * state.lineHeight), 0);
+                setTimeout(() => focusLine(target.line, target.column, 3 * viewportController.lineHeight), 0);
             }
         } else {
             selectionController.selection = null;
@@ -401,9 +402,9 @@ export function createCaretNavigationCommands({
             }
             if (target.line === lineNumber &&
                 Number(moveElement?.dataset?.line || 0) === target.line) {
-                setCaret(moveElement, target.column, 3 * state.lineHeight);
+                setCaret(moveElement, target.column, 3 * viewportController.lineHeight);
             } else {
-                focusLine(target.line, target.column, 3 * state.lineHeight);
+                focusLine(target.line, target.column, 3 * viewportController.lineHeight);
             }
         }
 

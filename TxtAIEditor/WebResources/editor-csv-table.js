@@ -1,5 +1,7 @@
 import {
     cleanDirtyMarker,
+    csvInteractionController,
+    csvTableMode,
     escapeHtml,
     invalidateMeasuredLineHeightsAround,
     markDirty,
@@ -33,22 +35,9 @@ const DEFAULT_TABLE_COLUMNS = 64;
 const MAX_TABLE_COLUMNS = 1000;
 const COLUMN_OVERSCAN_PX = 320;
 
-let resizeState = null;
-let csvDragState = null;
-
 function ensureCsvState() {
-    state.csvTableEnabled = !!state.csvTableEnabled;
-    state.csvTableColumnWidths ??= [];
-    state.csvTableColumnCount = Math.max(MIN_VISIBLE_COLUMNS, Number(state.csvTableColumnCount || 0));
-    state.csvSelectedLine = Math.max(1, Number(state.csvSelectedLine || state.currentLine || 1));
-    state.csvSelectedColumn = Math.max(0, Number(state.csvSelectedColumn || 0));
-    state.csvTableVersion = Number(state.csvTableVersion || 0);
-    state.csvCellComposing = !!state.csvCellComposing;
-    state.csvEditMode = state.csvEditMode === 'edit' ? 'edit' : 'select';
-    state.csvSelectedRows = Array.isArray(state.csvSelectedRows) ? state.csvSelectedRows : [];
-    state.csvSelectedColumns = Array.isArray(state.csvSelectedColumns) ? state.csvSelectedColumns : [];
-    state.csvJsonNavPath = Array.isArray(state.csvJsonNavPath) ? state.csvJsonNavPath : [];
-    state.csvBreadcrumbRoot = state.csvBreadcrumbRoot || 'root';
+    csvTableMode.ensureTableState({ minColumnCount: MIN_VISIBLE_COLUMNS });
+    csvTableMode.ensureSelection(state.currentLine);
 }
 
 function columnName(index) {
@@ -111,7 +100,7 @@ function serializeCsvRow(cells) {
 }
 
 function isJsonCsvTableMode() {
-    return state.csvTableEnabled && state.language === 'json';
+    return csvTableMode.isEnabled && state.language === 'json';
 }
 
 function allSourceLinesCached() {
@@ -220,11 +209,11 @@ function cellValueFromText(text, previousValue) {
 }
 
 function jsonTableKeyHeader() {
-    return state.csvJsonKeyHeader || 'key';
+    return csvTableMode.jsonKeyHeader;
 }
 
 function jsonTableValueHeader() {
-    return state.csvJsonValueHeader || 'value';
+    return csvTableMode.jsonValueHeader;
 }
 
 function isPlainJsonObject(value) {
@@ -383,29 +372,28 @@ function tableFromJsonValue(value) {
 function currentJsonTableModel() {
     if (!isJsonCsvTableMode()) return null;
 
-    const cacheKey = `${state.cacheVersion}:${state.lineCount}:${state.language}:${(state.csvJsonNavPath || []).join('.')}`;
-    if (state.csvJsonTableModel?.cacheKey === cacheKey) {
-        return state.csvJsonTableModel.model;
-    }
+    const cacheKey = `${state.cacheVersion}:${state.lineCount}:${state.language}:${csvTableMode.jsonNavigationKey}`;
+    const cached = csvTableMode.readJsonTableCache(cacheKey);
+    if (cached.hit) return cached.model;
 
     if (!allSourceLinesCached()) {
         requestMissingLines(1, state.lineCount);
-        state.csvJsonTableModel = { cacheKey, model: null };
+        csvTableMode.cacheJsonTableModel(cacheKey, null);
         return null;
     }
 
     try {
         const parsed = JSON.parse(sourceTextFromCache());
-        const navPath = Array.isArray(state.csvJsonNavPath) ? state.csvJsonNavPath : [];
+        const navPath = csvTableMode.jsonNavigationPath;
         const target = navPath.length > 0 ? getJsonPathValue(parsed, navPath) : parsed;
         const model = tableFromJsonValue(target);
         model.root = parsed;
         model.sourceText = sourceTextFromCache();
         model.navPath = navPath;
-        state.csvJsonTableModel = { cacheKey, model };
+        csvTableMode.cacheJsonTableModel(cacheKey, model);
         return model;
     } catch {
-        state.csvJsonTableModel = { cacheKey, model: null };
+        csvTableMode.cacheJsonTableModel(cacheKey, null);
         return null;
     }
 }
@@ -427,15 +415,9 @@ function navigateToCsvJsonSubTable(lineNumber, columnIndex) {
     const value = getJsonPathValue(model.root, path);
     if (!isPlainJsonObject(value) && !Array.isArray(value)) return;
 
-    state.csvJsonNavPath = path.slice();
-    state.csvJsonTableModel = null;
-    state.csvSelectedLine = 1;
-    state.csvSelectedColumn = 0;
-    state.csvEditMode = 'select';
-    state.csvSelection = null;
-    state.csvSelectedRows = [];
-    state.csvSelectedColumns = [];
-    state.csvTableVersion++;
+    csvTableMode.setJsonNavigationPath(path);
+    csvTableMode.resetSelection();
+    csvTableMode.bumpTableVersion();
     if (scrollContainer) {
         scrollContainer.scrollLeft = 0;
         scrollContainer.scrollTop = 0;
@@ -447,15 +429,9 @@ function navigateToCsvJsonSubTable(lineNumber, columnIndex) {
 }
 
 function navigateToCsvJsonRoot() {
-    state.csvJsonNavPath = [];
-    state.csvJsonTableModel = null;
-    state.csvSelectedLine = 1;
-    state.csvSelectedColumn = 0;
-    state.csvEditMode = 'select';
-    state.csvSelection = null;
-    state.csvSelectedRows = [];
-    state.csvSelectedColumns = [];
-    state.csvTableVersion++;
+    csvTableMode.resetJsonNavigation();
+    csvTableMode.resetSelection();
+    csvTableMode.bumpTableVersion();
     if (scrollContainer) {
         scrollContainer.scrollLeft = 0;
         scrollContainer.scrollTop = 0;
@@ -467,20 +443,14 @@ function navigateToCsvJsonRoot() {
 }
 
 function navigateToCsvJsonBreadcrumb(index) {
-    const navPath = Array.isArray(state.csvJsonNavPath) ? state.csvJsonNavPath : [];
+    const navPath = csvTableMode.jsonNavigationPath;
     if (index < 0 || index >= navPath.length) {
         navigateToCsvJsonRoot();
         return;
     }
-    state.csvJsonNavPath = navPath.slice(0, index + 1);
-    state.csvJsonTableModel = null;
-    state.csvSelectedLine = 1;
-    state.csvSelectedColumn = 0;
-    state.csvEditMode = 'select';
-    state.csvSelection = null;
-    state.csvSelectedRows = [];
-    state.csvSelectedColumns = [];
-    state.csvTableVersion++;
+    csvTableMode.trimJsonNavigation(index);
+    csvTableMode.resetSelection();
+    csvTableMode.bumpTableVersion();
     if (scrollContainer) {
         scrollContainer.scrollLeft = 0;
         scrollContainer.scrollTop = 0;
@@ -493,7 +463,7 @@ function navigateToCsvJsonBreadcrumb(index) {
 
 function updateCsvBreadcrumb() {
     if (!csvBreadcrumb) return;
-    const navPath = Array.isArray(state.csvJsonNavPath) ? state.csvJsonNavPath : [];
+    const navPath = csvTableMode.jsonNavigationPath;
     if (navPath.length === 0) {
         csvBreadcrumb.hidden = true;
         csvBreadcrumb.innerHTML = '';
@@ -501,7 +471,7 @@ function updateCsvBreadcrumb() {
     }
 
     csvBreadcrumb.hidden = false;
-    const rootLabel = state.csvBreadcrumbRoot || 'root';
+    const rootLabel = csvTableMode.breadcrumbRoot;
     const parts = [`<button type="button" class="csv-breadcrumb-item" data-csv-nav="-1">${escapeHtml(rootLabel)}</button>`];
     for (let i = 0; i < navPath.length; i++) {
         parts.push('<span class="csv-breadcrumb-sep">›</span>');
@@ -519,9 +489,9 @@ function updateCsvVirtualLineCount(lineCount) {
     const next = isJsonCsvTableMode() && currentJsonTableModel()
         ? Math.max(1, Number(lineCount || 1))
         : 0;
-    if (state.csvVirtualLineCount === next) return;
+    if (csvTableMode.virtualLineCount === next) return;
 
-    state.csvVirtualLineCount = next;
+    csvTableMode.virtualLineCount = next;
     setupVirtualHeight();
 }
 
@@ -549,7 +519,7 @@ function csvJsonCellPath(lineNumber, columnIndex) {
     if (!Array.isArray(path)) return null;
     // model.paths are relative to the current nav target; prepend navPath
     // so the returned path is absolute (relative to model.root).
-    const navPath = Array.isArray(state.csvJsonNavPath) ? state.csvJsonNavPath : [];
+    const navPath = csvTableMode.jsonNavigationPath;
     return navPath.concat(path);
 }
 
@@ -614,8 +584,8 @@ function replaceJsonDocumentText(nextText) {
     nextLines.forEach((line, index) => state.cache.set(index + 1, line));
     state.lineCount = Math.max(1, nextLines.length);
     state.cacheVersion++;
-    state.csvTableVersion++;
-    state.csvJsonTableModel = null;
+    csvTableMode.bumpTableVersion();
+    csvTableMode.invalidateJsonTableModel();
     searchController.invalidateDocument();
     state.livePreviewLocalResourceVersion = String(Date.now());
     state.dirtyLines.clear();
@@ -673,17 +643,17 @@ function writeJsonCell(lineNumber, columnIndex, value, sourceElement = null, ref
     const nextText = serializeJsonRoot(nextRoot, model.sourceText);
 
     replaceJsonDocumentText(nextText);
-    state.csvSelectedLine = Math.max(1, Number(lineNumber || 1));
-    state.csvSelectedColumn = Math.max(0, Number(columnIndex || 0));
-    state.csvEditMode = 'edit';
-    state.csvPendingFocus = {
-        line: state.csvSelectedLine,
-        column: state.csvSelectedColumn,
+    csvTableMode.selectedLine = Math.max(1, Number(lineNumber || 1));
+    csvTableMode.selectedColumn = Math.max(0, Number(columnIndex || 0));
+    csvTableMode.editMode = 'edit';
+    csvTableMode.pendingFocus = {
+        line: csvTableMode.selectedLine,
+        column: csvTableMode.selectedColumn,
         mode: 'edit',
         until: performance.now() + 1200
     };
-    state.currentLine = state.csvSelectedLine;
-    state.currentColumn = state.csvSelectedColumn + 1;
+    state.currentLine = csvTableMode.selectedLine;
+    state.currentColumn = csvTableMode.selectedColumn + 1;
 
     if (sourceElement) {
         sourceElement.textContent = jsonCellValue(nextValue);
@@ -698,7 +668,7 @@ function writeJsonCell(lineNumber, columnIndex, value, sourceElement = null, ref
 
 function columnWidth(index) {
     ensureCsvState();
-    const value = Number(state.csvTableColumnWidths[index] || DEFAULT_COLUMN_WIDTH);
+    const value = csvTableMode.columnWidth(index, DEFAULT_COLUMN_WIDTH);
     return Math.max(MIN_COLUMN_WIDTH, Math.min(800, value));
 }
 
@@ -708,10 +678,10 @@ function visibleColumnCount(startLine, endLine) {
     if (jsonModel) {
         return Math.min(
             MAX_TABLE_COLUMNS,
-            Math.max(MIN_VISIBLE_COLUMNS, state.csvSelectedColumn + 1, jsonModel.columnCount));
+            Math.max(MIN_VISIBLE_COLUMNS, csvTableMode.selectedColumn + 1, jsonModel.columnCount));
     }
 
-    let count = Math.max(DEFAULT_TABLE_COLUMNS, state.csvSelectedColumn + 1);
+    let count = Math.max(DEFAULT_TABLE_COLUMNS, csvTableMode.selectedColumn + 1);
     for (let line = startLine; line <= endLine; line++) {
         if (!state.cache.has(line)) continue;
         count = Math.max(count, csvCellsForLine(line).length + 1);
@@ -762,10 +732,10 @@ function renderedColumnRange(columnCount) {
 
 function applyCsvGridMetrics(columnCount, columnRange) {
     ensureCsvState();
-    state.csvTableColumnCount = Math.max(MIN_VISIBLE_COLUMNS, Number(columnCount || 0));
+    csvTableMode.columnCount = Math.max(MIN_VISIBLE_COLUMNS, Number(columnCount || 0));
 
     const widths = [];
-    const range = columnRange || renderedColumnRange(state.csvTableColumnCount);
+    const range = columnRange || renderedColumnRange(csvTableMode.columnCount);
     if (range.leftWidth > 0) {
         widths.push(`${range.leftWidth}px`);
     }
@@ -811,8 +781,8 @@ function renderCsvHeader(columnCount, columnRange) {
 
 function updateCsvFormula() {
     ensureCsvState();
-    const line = Math.max(1, Math.min(csvDisplayLineCount(), Number(state.csvSelectedLine || state.currentLine || 1)));
-    const column = Math.max(0, Number(state.csvSelectedColumn || 0));
+    const line = Math.max(1, Math.min(csvDisplayLineCount(), Number(csvTableMode.selectedLine || state.currentLine || 1)));
+    const column = Math.max(0, Number(csvTableMode.selectedColumn || 0));
     const cells = csvCellsForLine(line);
     csvNameBox.value = `${columnName(column)}${line}`;
     csvFormulaInput.value = cells[column] || '';
@@ -821,26 +791,26 @@ function updateCsvFormula() {
 
 function setSelectedCell(lineNumber, columnIndex, focusFormula = false) {
     ensureCsvState();
-    state.csvSelectedLine = Math.max(1, Math.min(csvDisplayLineCount(), Number(lineNumber || 1)));
-    state.csvSelectedColumn = Math.max(0, Number(columnIndex || 0));
-    state.currentLine = state.csvSelectedLine;
-    state.currentColumn = state.csvSelectedColumn + 1;
+    csvTableMode.selectedLine = Math.max(1, Math.min(csvDisplayLineCount(), Number(lineNumber || 1)));
+    csvTableMode.selectedColumn = Math.max(0, Number(columnIndex || 0));
+    state.currentLine = csvTableMode.selectedLine;
+    state.currentColumn = csvTableMode.selectedColumn + 1;
     selectionController.clear();
-    state.csvEditMode = 'select';
-    state.csvSelection = {
+    csvTableMode.editMode = 'select';
+    csvTableMode.selection = {
         mode: 'cells',
-        startLine: state.csvSelectedLine,
-        startColumn: state.csvSelectedColumn,
-        endLine: state.csvSelectedLine,
-        endColumn: state.csvSelectedColumn
+        startLine: csvTableMode.selectedLine,
+        startColumn: csvTableMode.selectedColumn,
+        endLine: csvTableMode.selectedLine,
+        endColumn: csvTableMode.selectedColumn
     };
-    state.csvSelectedRows = [];
-    state.csvSelectedColumns = [];
+    csvTableMode.selectedRows = [];
+    csvTableMode.selectedColumns = [];
     syncCustomSelectionClass();
 
     viewport.querySelectorAll('.csv-cell.selected-cell').forEach(cell => cell.classList.remove('selected-cell'));
     viewport
-        .querySelector(`.csv-cell[data-line="${state.csvSelectedLine}"][data-csv-column="${state.csvSelectedColumn}"]`)
+        .querySelector(`.csv-cell[data-line="${csvTableMode.selectedLine}"][data-csv-column="${csvTableMode.selectedColumn}"]`)
         ?.classList.add('selected-cell');
 
     updateCsvFormula();
@@ -872,11 +842,11 @@ function writeCsvCell(lineNumber, columnIndex, value, sourceElement = null, refr
 
     state.cache.set(line, nextText);
     state.cacheVersion++;
-    state.csvTableVersion++;
-    state.csvSelectedLine = line;
-    state.csvSelectedColumn = column;
-    state.csvEditMode = 'edit';
-    state.csvPendingFocus = {
+    csvTableMode.bumpTableVersion();
+    csvTableMode.selectedLine = line;
+    csvTableMode.selectedColumn = column;
+    csvTableMode.editMode = 'edit';
+    csvTableMode.pendingFocus = {
         line,
         column,
         mode: 'edit',
@@ -904,21 +874,21 @@ function writeCsvCell(lineNumber, columnIndex, value, sourceElement = null, refr
 }
 
 function activeCellMatches(lineNumber, columnIndex) {
-    return Number(lineNumber || 0) === Number(state.csvSelectedLine || 0) &&
-        Number(columnIndex || 0) === Number(state.csvSelectedColumn || 0);
+    return Number(lineNumber || 0) === Number(csvTableMode.selectedLine || 0) &&
+        Number(columnIndex || 0) === Number(csvTableMode.selectedColumn || 0);
 }
 
 function normalizedCsvSelection() {
     ensureCsvState();
     const rowCount = csvDisplayLineCount();
-    const sel = state.csvSelection;
+    const sel = csvTableMode.selection;
     if (!sel) {
         return {
             mode: 'cells',
-            startLine: state.csvSelectedLine,
-            endLine: state.csvSelectedLine,
-            startColumn: state.csvSelectedColumn,
-            endColumn: state.csvSelectedColumn
+            startLine: csvTableMode.selectedLine,
+            endLine: csvTableMode.selectedLine,
+            startColumn: csvTableMode.selectedColumn,
+            endColumn: csvTableMode.selectedColumn
         };
     }
 
@@ -926,7 +896,7 @@ function normalizedCsvSelection() {
         if (Array.isArray(sel.columns)) {
             const columns = sel.columns
                 .map(column => Math.max(0, Number(column || 0)))
-                .filter(column => column >= 0 && column < state.csvTableColumnCount)
+                .filter(column => column >= 0 && column < csvTableMode.columnCount)
                 .sort((a, b) => a - b);
             return {
                 mode: 'columns',
@@ -960,7 +930,7 @@ function normalizedCsvSelection() {
             startLine: 1,
             endLine: rowCount,
             startColumn: 0,
-            endColumn: Math.max(0, state.csvTableColumnCount - 1)
+            endColumn: Math.max(0, csvTableMode.columnCount - 1)
         };
     }
 
@@ -1003,7 +973,7 @@ function isCsvRowSelected(lineNumber) {
 function selectedCsvText() {
     const sel = normalizedCsvSelection();
     if (sel.mode === 'rows') {
-        const rows = sel.rows.length > 0 ? sel.rows : [state.csvSelectedLine];
+        const rows = sel.rows.length > 0 ? sel.rows : [csvTableMode.selectedLine];
         let width = 1;
         for (const line of rows) {
             width = Math.max(width, csvCellsForLine(line).length);
@@ -1060,7 +1030,7 @@ function clearCsvSelection() {
     
     let linesToModify = [];
     if (sel.mode === 'rows') {
-        linesToModify = sel.rows.length > 0 ? sel.rows : [state.csvSelectedLine];
+        linesToModify = sel.rows.length > 0 ? sel.rows : [csvTableMode.selectedLine];
     } else {
         for (let line = sel.startLine; line <= sel.endLine; line++) {
             linesToModify.push(line);
@@ -1108,7 +1078,7 @@ function clearCsvSelection() {
             const nextText = serializeCsvRow(cells);
             state.cache.set(line, nextText);
             state.cacheVersion++;
-            state.csvTableVersion++;
+            csvTableMode.bumpTableVersion();
             
             if (!cleanDirtyMarker(line)) {
                 markDirty(line, 'mod');
@@ -1123,9 +1093,9 @@ function clearCsvSelection() {
         post({ type: 'contentChanged', isComposing: false });
     }
 
-    state.csvPendingFocus = {
-        line: state.csvSelectedLine,
-        column: state.csvSelectedColumn,
+    csvTableMode.pendingFocus = {
+        line: csvTableMode.selectedLine,
+        column: csvTableMode.selectedColumn,
         mode: 'select',
         until: performance.now() + 900
     };
@@ -1137,25 +1107,25 @@ function clearCsvSelection() {
 function setCsvRangeSelection(startLine, startColumn, endLine, endColumn, mode = 'cells') {
     ensureCsvState();
     const rowCount = csvDisplayLineCount();
-    state.csvSelection = {
+    csvTableMode.selection = {
         mode,
         startLine: Math.max(1, Math.min(rowCount, Number(startLine || 1))),
         startColumn: Math.max(0, Number(startColumn || 0)),
         endLine: Math.max(1, Math.min(rowCount, Number(endLine || 1))),
         endColumn: Math.max(0, Number(endColumn || 0))
     };
-    state.csvSelectedRows = [];
-    state.csvSelectedColumns = mode === 'columns'
+    csvTableMode.selectedRows = [];
+    csvTableMode.selectedColumns = mode === 'columns'
         ? Array.from(
             { length: Math.abs(Math.max(0, Number(endColumn || 0)) - Math.max(0, Number(startColumn || 0))) + 1 },
             (_, index) => Math.min(Math.max(0, Number(startColumn || 0)), Math.max(0, Number(endColumn || 0))) + index)
         : [];
     const normalized = normalizedCsvSelection();
-    state.csvSelectedLine = Math.max(1, Math.min(rowCount, mode === 'columns' ? state.csvSelectedLine : normalized.startLine));
-    state.csvSelectedColumn = normalized.startColumn;
-    state.currentLine = state.csvSelectedLine;
-    state.currentColumn = state.csvSelectedColumn + 1;
-    state.csvTableVersion++;
+    csvTableMode.selectedLine = Math.max(1, Math.min(rowCount, mode === 'columns' ? csvTableMode.selectedLine : normalized.startLine));
+    csvTableMode.selectedColumn = normalized.startColumn;
+    state.currentLine = csvTableMode.selectedLine;
+    state.currentColumn = csvTableMode.selectedColumn + 1;
+    csvTableMode.bumpTableVersion();
     updateCsvFormula();
     post({ type: 'cursorChanged', line: state.currentLine, column: state.currentColumn });
     post({ type: 'selectionResult', text: selectedCsvText() });
@@ -1164,11 +1134,11 @@ function setCsvRangeSelection(startLine, startColumn, endLine, endColumn, mode =
 
 function setCsvColumnSelection(columnIndex, event) {
     ensureCsvState();
-    const column = Math.max(0, Math.min(state.csvTableColumnCount - 1, Number(columnIndex || 0)));
+    const column = Math.max(0, Math.min(csvTableMode.columnCount - 1, Number(columnIndex || 0)));
     const ctrl = !!(event?.ctrlKey || event?.metaKey);
     const shift = !!event?.shiftKey;
-    const currentColumns = new Set((state.csvSelectedColumns || []).map(col => Number(col || 0)).filter(col => col >= 0));
-    const anchor = Math.max(0, Math.min(state.csvTableColumnCount - 1, Number(state.csvColumnSelectionAnchor ?? state.csvSelectedColumn ?? column)));
+    const currentColumns = new Set((csvTableMode.selectedColumns || []).map(col => Number(col || 0)).filter(col => col >= 0));
+    const anchor = Math.max(0, Math.min(csvTableMode.columnCount - 1, Number(csvTableMode.columnSelectionAnchor ?? csvTableMode.selectedColumn ?? column)));
 
     if (shift) {
         const start = Math.min(anchor, column);
@@ -1185,11 +1155,11 @@ function setCsvColumnSelection(columnIndex, event) {
         } else {
             currentColumns.add(column);
         }
-        state.csvColumnSelectionAnchor = column;
+        csvTableMode.columnSelectionAnchor = column;
     } else {
         currentColumns.clear();
         currentColumns.add(column);
-        state.csvColumnSelectionAnchor = column;
+        csvTableMode.columnSelectionAnchor = column;
     }
 
     if (currentColumns.size === 0) {
@@ -1197,17 +1167,17 @@ function setCsvColumnSelection(columnIndex, event) {
     }
 
     const columns = [...currentColumns].sort((a, b) => a - b);
-    state.csvSelectedColumns = columns;
-    state.csvSelectedRows = [];
-    state.csvSelection = {
+    csvTableMode.selectedColumns = columns;
+    csvTableMode.selectedRows = [];
+    csvTableMode.selection = {
         mode: 'columns',
         columns
     };
-    state.csvSelectedColumn = column;
-    state.csvEditMode = 'select';
-    state.csvTableVersion++;
+    csvTableMode.selectedColumn = column;
+    csvTableMode.editMode = 'select';
+    csvTableMode.bumpTableVersion();
     updateCsvFormula();
-    post({ type: 'cursorChanged', line: state.csvSelectedLine, column: state.csvSelectedColumn + 1 });
+    post({ type: 'cursorChanged', line: csvTableMode.selectedLine, column: csvTableMode.selectedColumn + 1 });
     post({ type: 'selectionResult', text: selectedCsvText() });
     queueRender(true);
 }
@@ -1218,8 +1188,8 @@ function setCsvRowSelection(lineNumber, event) {
     const line = Math.max(1, Math.min(rowCount, Number(lineNumber || 1)));
     const ctrl = !!(event?.ctrlKey || event?.metaKey);
     const shift = !!event?.shiftKey;
-    const currentRows = new Set((state.csvSelectedRows || []).map(row => Number(row || 0)).filter(row => row >= 1));
-    const anchor = Math.max(1, Math.min(rowCount, Number(state.csvRowSelectionAnchor || state.csvSelectedLine || line)));
+    const currentRows = new Set((csvTableMode.selectedRows || []).map(row => Number(row || 0)).filter(row => row >= 1));
+    const anchor = Math.max(1, Math.min(rowCount, Number(csvTableMode.rowSelectionAnchor || csvTableMode.selectedLine || line)));
 
     if (shift) {
         const start = Math.min(anchor, line);
@@ -1236,11 +1206,11 @@ function setCsvRowSelection(lineNumber, event) {
         } else {
             currentRows.add(line);
         }
-        state.csvRowSelectionAnchor = line;
+        csvTableMode.rowSelectionAnchor = line;
     } else {
         currentRows.clear();
         currentRows.add(line);
-        state.csvRowSelectionAnchor = line;
+        csvTableMode.rowSelectionAnchor = line;
     }
 
     if (currentRows.size === 0) {
@@ -1248,18 +1218,18 @@ function setCsvRowSelection(lineNumber, event) {
     }
 
     const rows = [...currentRows].sort((a, b) => a - b);
-    state.csvSelectedRows = rows;
-    state.csvSelectedColumns = [];
-    state.csvSelection = {
+    csvTableMode.selectedRows = rows;
+    csvTableMode.selectedColumns = [];
+    csvTableMode.selection = {
         mode: 'rows',
         rows
     };
-    state.csvSelectedLine = line;
-    state.csvSelectedColumn = 0;
-    state.csvEditMode = 'select';
-    state.csvTableVersion++;
+    csvTableMode.selectedLine = line;
+    csvTableMode.selectedColumn = 0;
+    csvTableMode.editMode = 'select';
+    csvTableMode.bumpTableVersion();
     updateCsvFormula();
-    post({ type: 'cursorChanged', line: state.csvSelectedLine, column: 1 });
+    post({ type: 'cursorChanged', line: csvTableMode.selectedLine, column: 1 });
     post({ type: 'selectionResult', text: selectedCsvText() });
     queueRender(true);
 }
@@ -1272,7 +1242,7 @@ function insertCsvLine(lineNumber, text = '') {
     state.cache.set(targetLine, String(text ?? ''));
     state.lineCount++;
     state.cacheVersion++;
-    state.csvTableVersion++;
+    csvTableMode.bumpTableVersion();
     if (state.showDirtyLines) {
         state.dirtyLines.set(targetLine, 'add');
     }
@@ -1284,24 +1254,24 @@ function insertCsvLine(lineNumber, text = '') {
 function moveCsvFocus(lineNumber, columnIndex) {
     const line = Math.max(1, Math.min(csvDisplayLineCount(), Number(lineNumber || 1)));
     const column = Math.max(0, Number(columnIndex || 0));
-    state.csvSelectedLine = line;
-    state.csvSelectedColumn = column;
-    state.currentLine = state.csvSelectedLine;
-    state.currentColumn = state.csvSelectedColumn + 1;
+    csvTableMode.selectedLine = line;
+    csvTableMode.selectedColumn = column;
+    state.currentLine = csvTableMode.selectedLine;
+    state.currentColumn = csvTableMode.selectedColumn + 1;
     selectionController.clear();
-    state.csvEditMode = 'select';
-    state.csvSelection = {
+    csvTableMode.editMode = 'select';
+    csvTableMode.selection = {
         mode: 'cells',
-        startLine: state.csvSelectedLine,
-        startColumn: state.csvSelectedColumn,
-        endLine: state.csvSelectedLine,
-        endColumn: state.csvSelectedColumn
+        startLine: csvTableMode.selectedLine,
+        startColumn: csvTableMode.selectedColumn,
+        endLine: csvTableMode.selectedLine,
+        endColumn: csvTableMode.selectedColumn
     };
-    state.csvSelectedRows = [];
-    state.csvSelectedColumns = [];
+    csvTableMode.selectedRows = [];
+    csvTableMode.selectedColumns = [];
     syncCustomSelectionClass();
 
-    state.csvPendingFocus = {
+    csvTableMode.pendingFocus = {
         line,
         column,
         mode: 'select',
@@ -1332,7 +1302,7 @@ function focusCsvCell(lineNumber, columnIndex, mode = null) {
     const cell = viewport.querySelector(`.csv-cell[data-line="${lineNumber}"][data-csv-column="${columnIndex}"]`);
     if (!cell || cell.getAttribute('contenteditable') !== 'true') return false;
 
-    const focusMode = mode || state.csvEditMode || 'select';
+    const focusMode = mode || csvTableMode.editMode || 'select';
     cell.focus({ preventScroll: true });
     const selection = window.getSelection();
     const range = document.createRange();
@@ -1348,44 +1318,44 @@ function focusCsvCell(lineNumber, columnIndex, mode = null) {
 
 function beginCsvEdit(lineNumber, columnIndex, mode = 'edit') {
     ensureCsvState();
-    state.csvSelectedLine = Math.max(1, Number(lineNumber || 1));
-    state.csvSelectedColumn = Math.max(0, Number(columnIndex || 0));
-    state.csvEditMode = mode === 'select' ? 'select' : 'edit';
-    state.csvSelection = {
+    csvTableMode.selectedLine = Math.max(1, Number(lineNumber || 1));
+    csvTableMode.selectedColumn = Math.max(0, Number(columnIndex || 0));
+    csvTableMode.editMode = mode === 'select' ? 'select' : 'edit';
+    csvTableMode.selection = {
         mode: 'cells',
-        startLine: state.csvSelectedLine,
-        startColumn: state.csvSelectedColumn,
-        endLine: state.csvSelectedLine,
-        endColumn: state.csvSelectedColumn
+        startLine: csvTableMode.selectedLine,
+        startColumn: csvTableMode.selectedColumn,
+        endLine: csvTableMode.selectedLine,
+        endColumn: csvTableMode.selectedColumn
     };
-    state.csvPendingFocus = {
-        line: state.csvSelectedLine,
-        column: state.csvSelectedColumn,
-        mode: state.csvEditMode,
+    csvTableMode.pendingFocus = {
+        line: csvTableMode.selectedLine,
+        column: csvTableMode.selectedColumn,
+        mode: csvTableMode.editMode,
         until: performance.now() + 900
     };
-    state.csvTableVersion++;
+    csvTableMode.bumpTableVersion();
     queueRender(true);
     requestAnimationFrame(() => restoreCsvFocusAfterRender());
 }
 
 function restoreCsvFocusAfterRender() {
-    if (!state.csvTableEnabled || !state.csvPendingFocus) return;
-    if (csvDragState) return; // Do not focus cells while dragging to prevent browser text selection from interfering.
+    if (!csvTableMode.isEnabled || !csvTableMode.pendingFocus) return;
+    if (csvInteractionController.isDragging) return; // Do not focus cells while dragging to prevent browser text selection from interfering.
 
-    const pending = state.csvPendingFocus;
+    const pending = csvTableMode.pendingFocus;
     if (performance.now() > Number(pending.until || 0)) {
-        state.csvPendingFocus = null;
+        csvTableMode.pendingFocus = null;
         return;
     }
 
     if (pending.mode) {
-        state.csvEditMode = pending.mode;
+        csvTableMode.editMode = pending.mode;
     }
 
     if (focusCsvCell(pending.line, pending.column, pending.mode)) {
-        state.csvSelectedLine = pending.line;
-        state.csvSelectedColumn = pending.column;
+        csvTableMode.selectedLine = pending.line;
+        csvTableMode.selectedColumn = pending.column;
     }
 }
 
@@ -1403,7 +1373,7 @@ function renderCsvTableRows(startLine, endLine, hoveredLineNumber) {
         const dirtyClass = dirtyType ? ` dirty-${dirtyType}` : '';
         const hoveredClass = line === hoveredLineNumber ? ' hovered-row' : '';
         const rowSelected = isCsvRowSelected(line);
-        const selectedRowClass = rowSelected || line === state.csvSelectedLine ? ' selected-csv-row' : '';
+        const selectedRowClass = rowSelected || line === csvTableMode.selectedLine ? ' selected-csv-row' : '';
         const rowHeadingClass = rowSelected ? ' selected-row-heading' : '';
         const lineCells = [`<div class="line-number csv-row-heading${rowHeadingClass}">${line}</div>`];
 
@@ -1412,7 +1382,7 @@ function renderCsvTableRows(startLine, endLine, hoveredLineNumber) {
         }
 
 for (let column = columnRange.start; column < columnRange.end; column++) {
-            const activeClass = line === state.csvSelectedLine && column === state.csvSelectedColumn ? ' active-cell' : '';
+            const activeClass = line === csvTableMode.selectedLine && column === csvTableMode.selectedColumn ? ' active-cell' : '';
             const selectedClass = isCsvCellSelected(line, column) ? ' selected-cell' : '';
             const loadingClass = hasLine ? '' : ' loading';
             const value = hasLine ? (cells[column] || '') : '';
@@ -1440,12 +1410,11 @@ for (let column = columnRange.start; column < columnRange.end; column++) {
 
 function setCsvTableMode(enabled, options = {}) {
     ensureCsvState();
-    state.csvTableEnabled = !!enabled;
-    state.csvTableVersion++;
-    state.csvJsonNavPath = [];
-    state.csvJsonTableModel = null;
+    csvTableMode.isEnabled = enabled;
+    csvTableMode.bumpTableVersion();
+    csvTableMode.resetJsonNavigation();
     updateCsvLocalization(options);
-    if (state.csvTableEnabled) {
+    if (csvTableMode.isEnabled) {
         updateCsvBreadcrumb();
         prepareCsvTableRenderModel();
     } else {
@@ -1454,9 +1423,9 @@ function setCsvTableMode(enabled, options = {}) {
         if (csvBreadcrumb) csvBreadcrumb.hidden = true;
     }
 
-    document.body.classList.toggle('csv-table-mode', state.csvTableEnabled);
-    csvToolbar.hidden = !state.csvTableEnabled;
-    csvColumnHeader.hidden = !state.csvTableEnabled;
+    document.body.classList.toggle('csv-table-mode', csvTableMode.isEnabled);
+    csvToolbar.hidden = !csvTableMode.isEnabled;
+    csvColumnHeader.hidden = !csvTableMode.isEnabled;
     viewportController.invalidateRenderRange();
 
     // Reset scroll position to the top-left corner on toggle.
@@ -1476,21 +1445,19 @@ function updateCsvLocalization(options = {}) {
         csvFormulaInput.placeholder = options.csvFormulaPlaceholder;
     }
     if (options.csvJsonKeyHeader !== undefined) {
-        state.csvJsonKeyHeader = options.csvJsonKeyHeader;
-        state.csvJsonTableModel = null;
+        csvTableMode.setJsonKeyHeader(options.csvJsonKeyHeader);
     }
-if (options.csvJsonValueHeader !== undefined) {
-        state.csvJsonValueHeader = options.csvJsonValueHeader;
-        state.csvJsonTableModel = null;
+    if (options.csvJsonValueHeader !== undefined) {
+        csvTableMode.setJsonValueHeader(options.csvJsonValueHeader);
     }
     if (options.csvBreadcrumbRoot !== undefined) {
-        state.csvBreadcrumbRoot = options.csvBreadcrumbRoot;
+        csvTableMode.setBreadcrumbRoot(options.csvBreadcrumbRoot);
         updateCsvBreadcrumb();
     }
 }
 
 function syncCsvHeaderScroll() {
-    if (!state.csvTableEnabled) return;
+    if (!csvTableMode.isEnabled) return;
     csvColumnHeaderInner.style.transform = `translateX(${-scrollContainer.scrollLeft}px)`;
 }
 
@@ -1545,7 +1512,11 @@ const cell = event.target.closest?.('.csv-cell');
             setSelectedCell(line, column);
             return;
         }
-        csvDragState = { mode: 'cells', startLine: line, startColumn: column, pointerId: event.pointerId };
+        csvInteractionController.beginCellDrag({
+            startLine: line,
+            startColumn: column,
+            pointerId: event.pointerId
+        });
         try {
             viewport.setPointerCapture(event.pointerId);
         } catch (e) {}
@@ -1555,13 +1526,14 @@ const cell = event.target.closest?.('.csv-cell');
     });
 
     viewport.addEventListener('pointermove', event => {
-        if (!csvDragState || csvDragState.mode !== 'cells') return;
+        const dragState = csvInteractionController.dragState;
+        if (!dragState || dragState.mode !== 'cells') return;
         const hit = document.elementFromPoint(event.clientX, event.clientY);
         const cell = hit?.closest?.('.csv-cell');
         if (!cell || !viewport.contains(cell)) return;
         const line = Number(cell.dataset.line || 1);
         const column = Number(cell.dataset.csvColumn || 0);
-        setCsvRangeSelection(csvDragState.startLine, csvDragState.startColumn, line, column, 'cells');
+        setCsvRangeSelection(dragState.startLine, dragState.startColumn, line, column, 'cells');
     });
 
     viewport.addEventListener('focusin', event => {
@@ -1588,21 +1560,21 @@ const cell = event.target.closest?.('.csv-cell');
     viewport.addEventListener('input', event => {
         const cell = event.target.closest?.('.csv-cell');
         if (!cell || !viewport.contains(cell) || cell.getAttribute('contenteditable') !== 'true') return;
-        state.csvEditMode = 'edit';
+        csvTableMode.editMode = 'edit';
         writeCsvCell(
             Number(cell.dataset.line || 1),
             Number(cell.dataset.csvColumn || 0),
             cell.textContent || '',
             null,
             true,
-            state.csvCellComposing || event.isComposing);
+            csvTableMode.cellComposing || event.isComposing);
     });
 
     document.addEventListener('compositionstart', event => {
         const cell = event.target.closest?.('.csv-cell');
         const isFormula = event.target === csvFormulaInput;
         if ((cell && viewport.contains(cell)) || isFormula) {
-            state.csvCellComposing = true;
+            csvTableMode.cellComposing = true;
         }
     });
 
@@ -1610,7 +1582,7 @@ const cell = event.target.closest?.('.csv-cell');
         const cell = event.target.closest?.('.csv-cell');
         const isFormula = event.target === csvFormulaInput;
         if ((cell && viewport.contains(cell)) || isFormula) {
-            state.csvCellComposing = false;
+            csvTableMode.cellComposing = false;
             if (cell && viewport.contains(cell)) {
                 writeCsvCell(Number(cell.dataset.line || 1), Number(cell.dataset.csvColumn || 0), cell.textContent || '');
             }
@@ -1652,11 +1624,11 @@ const cell = event.target.closest?.('.csv-cell');
     }, true);
 
     document.addEventListener('keydown', event => {
-        if (!state.csvTableEnabled) return;
+        if (!csvTableMode.isEnabled) return;
         if (event.key === 'Delete') {
             const tag = event.target?.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-            if (state.csvEditMode === 'select' && !state.readOnly) {
+            if (csvTableMode.editMode === 'select' && !state.readOnly) {
                 event.preventDefault();
                 clearCsvSelection();
             }
@@ -1666,7 +1638,7 @@ const cell = event.target.closest?.('.csv-cell');
     document.addEventListener('copy', event => {
         const cell = event.target?.closest?.('.csv-cell');
         if (!cell && (event.target?.tagName === 'INPUT' || event.target?.tagName === 'TEXTAREA')) return;
-        const isCsvSelectionActive = state.csvTableEnabled && state.csvSelection;
+        const isCsvSelectionActive = csvTableMode.isEnabled && csvTableMode.selection;
         if ((!cell || !viewport.contains(cell)) && !isCsvSelectionActive) return;
         event.clipboardData?.setData('text/plain', selectedCsvText());
         event.preventDefault();
@@ -1676,11 +1648,11 @@ const cell = event.target.closest?.('.csv-cell');
     document.addEventListener('cut', event => {
         const cell = event.target?.closest?.('.csv-cell');
         if (!cell && (event.target?.tagName === 'INPUT' || event.target?.tagName === 'TEXTAREA')) return;
-        const isCsvSelectionActive = state.csvTableEnabled && state.csvSelection;
+        const isCsvSelectionActive = csvTableMode.isEnabled && csvTableMode.selection;
         if ((!cell || !viewport.contains(cell)) && !isCsvSelectionActive) return;
         if (state.readOnly) return;
 
-        if (state.csvEditMode === 'select') {
+        if (csvTableMode.editMode === 'select') {
             event.clipboardData?.setData('text/plain', selectedCsvText());
             event.preventDefault();
             event.stopImmediatePropagation();
@@ -1695,15 +1667,15 @@ const cell = event.target.closest?.('.csv-cell');
 
     csvFormulaInput.addEventListener('input', () => {
         ensureCsvState();
-        writeCsvCell(state.csvSelectedLine, state.csvSelectedColumn, csvFormulaInput.value, null, false);
-        const cell = viewport.querySelector(`.csv-cell[data-line="${state.csvSelectedLine}"][data-csv-column="${state.csvSelectedColumn}"]`);
+        writeCsvCell(csvTableMode.selectedLine, csvTableMode.selectedColumn, csvFormulaInput.value, null, false);
+        const cell = viewport.querySelector(`.csv-cell[data-line="${csvTableMode.selectedLine}"][data-csv-column="${csvTableMode.selectedColumn}"]`);
         if (cell) cell.textContent = csvFormulaInput.value;
     });
 
     csvFormulaInput.addEventListener('keydown', event => {
         if (event.key === 'Enter') {
             event.preventDefault();
-            moveCsvFocusOrInsert(state.csvSelectedLine + 1, state.csvSelectedColumn);
+            moveCsvFocusOrInsert(csvTableMode.selectedLine + 1, csvTableMode.selectedColumn);
         }
     });
 
@@ -1713,11 +1685,11 @@ const cell = event.target.closest?.('.csv-cell');
             event.preventDefault();
             event.stopPropagation();
             const column = Number(resizer.dataset.csvColumn || 0);
-            resizeState = {
+            csvInteractionController.beginResize({
                 column,
                 startX: event.clientX,
                 startWidth: columnWidth(column)
-            };
+            });
             resizer.setPointerCapture?.(event.pointerId);
             document.body.classList.add('csv-resizing');
             return;
@@ -1732,8 +1704,11 @@ const cell = event.target.closest?.('.csv-cell');
             return;
         }
 
-        state.csvColumnSelectionAnchor = column;
-        csvDragState = { mode: 'columns', startColumn: column, pointerId: event.pointerId };
+        csvTableMode.columnSelectionAnchor = column;
+        csvInteractionController.beginColumnDrag({
+            startColumn: column,
+            pointerId: event.pointerId
+        });
         try {
             csvColumnHeader.setPointerCapture(event.pointerId);
         } catch (e) {}
@@ -1742,48 +1717,49 @@ const cell = event.target.closest?.('.csv-cell');
     });
 
     csvColumnHeader.addEventListener('pointermove', event => {
-        if (!csvDragState || csvDragState.mode !== 'columns') return;
+        const dragState = csvInteractionController.dragState;
+        if (!dragState || dragState.mode !== 'columns') return;
         const hit = document.elementFromPoint(event.clientX, event.clientY);
         const heading = hit?.closest?.('.csv-column-heading');
         if (!heading || !csvColumnHeader.contains(heading)) return;
         const column = Number(heading.dataset.csvColumn || 0);
-        setCsvRangeSelection(1, csvDragState.startColumn, csvDisplayLineCount(), column, 'columns');
+        setCsvRangeSelection(1, dragState.startColumn, csvDisplayLineCount(), column, 'columns');
     });
 
     window.addEventListener('pointermove', event => {
-        if (!resizeState) return;
-        const width = Math.max(MIN_COLUMN_WIDTH, resizeState.startWidth + event.clientX - resizeState.startX);
-        state.csvTableColumnWidths[resizeState.column] = width;
-        state.csvTableVersion++;
-        applyCsvGridMetrics(state.csvTableColumnCount, renderedColumnRange(state.csvTableColumnCount));
+        const resizedColumn = csvInteractionController.resizedColumnAt(event.clientX, {
+            minWidth: MIN_COLUMN_WIDTH
+        });
+        if (!resizedColumn) return;
+        csvTableMode.setColumnWidth(resizedColumn.column, resizedColumn.width);
+        csvTableMode.bumpTableVersion();
+        applyCsvGridMetrics(csvTableMode.columnCount, renderedColumnRange(csvTableMode.columnCount));
     });
 
     window.addEventListener('pointerup', () => {
-        if (!resizeState) return;
-        resizeState = null;
+        if (!csvInteractionController.endResize()) return;
         document.body.classList.remove('csv-resizing');
         queueRender(true);
     });
 
-    window.addEventListener('pointerup', event => {
-        if (!csvDragState) return;
-        const finalDragState = csvDragState;
-        if (csvDragState.pointerId !== undefined) {
+    window.addEventListener('pointerup', () => {
+        const finalDragState = csvInteractionController.endDrag();
+        if (!finalDragState) return;
+        if (finalDragState.pointerId !== undefined) {
             try {
-                if (csvDragState.mode === 'cells') {
-                    viewport.releasePointerCapture(csvDragState.pointerId);
-                } else if (csvDragState.mode === 'columns') {
-                    csvColumnHeader.releasePointerCapture(csvDragState.pointerId);
+                if (finalDragState.mode === 'cells') {
+                    viewport.releasePointerCapture(finalDragState.pointerId);
+                } else if (finalDragState.mode === 'columns') {
+                    csvColumnHeader.releasePointerCapture(finalDragState.pointerId);
                 }
             } catch (e) {}
         }
-        csvDragState = null;
         document.body.classList.remove('csv-selecting');
 
         if (finalDragState.mode === 'cells') {
-            state.csvPendingFocus = {
-                line: state.csvSelectedLine,
-                column: state.csvSelectedColumn,
+            csvTableMode.pendingFocus = {
+                line: csvTableMode.selectedLine,
+                column: csvTableMode.selectedColumn,
                 mode: 'select',
                 until: performance.now() + 900
             };

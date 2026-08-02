@@ -6,7 +6,9 @@ import {
 } from './editor-dom.js';
 import {
     clearCustomSelectionVisuals,
+    csvTableMode,
     dragDropController,
+    hexEditorMode,
     post,
     preserveScrollTop,
     queueRender,
@@ -14,7 +16,8 @@ import {
     selectionController,
     selectedText,
     state,
-    syncCustomSelectionClass
+    syncCustomSelectionClass,
+    viewportController
 } from './editor-core.js';
 import {
     drawEditableSelectionOverlays,
@@ -182,7 +185,7 @@ export function bindPointerSelectionEvents({
             const elementRect = element.getBoundingClientRect();
             const computedStyle = window.getComputedStyle(element);
             const parsedLineHeight = Number.parseFloat(computedStyle.lineHeight);
-            const lineHeight = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : state.lineHeight);
+            const lineHeight = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : viewportController.lineHeight);
             const underlineInset = Math.max(2, Math.round(lineHeight * 0.12));
             const rects = [...range.getClientRects()].filter(rect => rect.width > 0 && rect.height > 0);
             for (const rect of rects) {
@@ -269,7 +272,7 @@ export function bindPointerSelectionEvents({
     }
 
     function updateOpenableHoverUnderline(event) {
-        if (state.csvTableEnabled ||
+        if (csvTableMode.isEnabled ||
             selectionController.isSelecting ||
             dragDropController.isActive ||
             hasCustomSelection() ||
@@ -400,8 +403,7 @@ export function bindPointerSelectionEvents({
     }
 
     function setHexCursor(position) {
-        state.hexCursorOffset = position.offset;
-        state.hexSelectionPane = position.pane;
+        hexEditorMode.setCursor(position.offset, { pane: position.pane });
         state.currentLine = position.line;
         state.currentColumn = position.column + 1;
     }
@@ -409,7 +411,7 @@ export function bindPointerSelectionEvents({
     function setHexSelectionFromOffsets(anchorOffset, cursorOffset) {
         const startOffset = Math.min(anchorOffset, cursorOffset);
         const endOffset = Math.max(anchorOffset, cursorOffset) + 1;
-        state.hexSelection = { startOffset, endOffset };
+        hexEditorMode.setSelection({ startOffset, endOffset });
     }
 
     function beginHexSelection(event) {
@@ -420,10 +422,10 @@ export function bindPointerSelectionEvents({
         captureSelectionPointer(event);
         clearNativeSelection();
 
-        const anchorOffset = event.shiftKey && state.hexSelectionAnchorOffset !== null
-            ? state.hexSelectionAnchorOffset
+        const anchorOffset = event.shiftKey && hexEditorMode.selectionAnchorOffset !== null
+            ? hexEditorMode.selectionAnchorOffset
             : position.offset;
-        state.hexSelectionAnchorOffset = anchorOffset;
+        hexEditorMode.setSelectionAnchor(anchorOffset);
         selectionController.selection = null;
         setHexCursor(position);
         setHexSelectionFromOffsets(anchorOffset, position.offset);
@@ -443,7 +445,7 @@ export function bindPointerSelectionEvents({
         if (!position) return false;
 
         clearNativeSelection();
-        const anchorOffset = state.hexSelectionAnchorOffset ?? position.offset;
+        const anchorOffset = hexEditorMode.selectionAnchorOffset ?? position.offset;
         setHexCursor(position);
         setHexSelectionFromOffsets(anchorOffset, position.offset);
         queueRender(true);
@@ -775,7 +777,7 @@ export function bindPointerSelectionEvents({
 
     scrollContainer.addEventListener('pointerdown', event => {
         cancelPostEditFocusFollowUps();
-        if (state.csvTableEnabled) return;
+        if (csvTableMode.isEnabled) return;
         if (event.button !== 0 || findPanel.contains(event.target)) return;
 
         if (!contextMenu.hidden && !contextMenu.contains(event.target)) {
@@ -1321,7 +1323,7 @@ export function bindPointerSelectionEvents({
     }
 
     scrollContainer.addEventListener('pointermove', event => {
-        if (state.csvTableEnabled) return;
+        if (csvTableMode.isEnabled) return;
         updateHoveredLineFromPointer(event);
         updateOpenableHoverUnderline(event);
 

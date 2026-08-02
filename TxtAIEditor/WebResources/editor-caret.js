@@ -11,7 +11,8 @@ import {
     state,
     usesFullDocumentRender,
     usesCompressedScroll,
-    visualScrollDeltaToScrollTopDelta
+    visualScrollDeltaToScrollTopDelta,
+    viewportController
 } from './editor-core.js';
 import { scrollContainer, viewport } from './editor-dom.js';
 import {
@@ -435,7 +436,7 @@ function caretRectForOffset(element, offset) {
         const styles = window.getComputedStyle(element);
         const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
         const parsedLineHeight = Number.parseFloat(styles.lineHeight);
-        const height = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : state.lineHeight);
+        const height = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : viewportController.lineHeight);
         const top = rect.top + Math.max(0, (rect.height - height) / 2);
         const left = rect.left + paddingLeft;
         return { left, right: left, top, bottom: top + height, height };
@@ -448,7 +449,7 @@ function caretRectForOffset(element, offset) {
     try {
         range.setStart(position.node, position.offset);
         range.collapse(true);
-        const maxCaretHeight = Math.max(state.lineHeight * 1.75, state.lineHeight + 8);
+        const maxCaretHeight = Math.max(viewportController.lineHeight * 1.75, viewportController.lineHeight + 8);
         let rect = range.getBoundingClientRect();
         if (rect && (rect.width > 0 || rect.height > 0) && rect.height <= maxCaretHeight) return rect;
 
@@ -458,7 +459,7 @@ function caretRectForOffset(element, offset) {
             range.setEnd(position.node, position.offset);
             rect = range.getBoundingClientRect();
             if (rect && (rect.width > 0 || rect.height > 0)) {
-                return { left: rect.right, right: rect.right, top: rect.top, bottom: rect.bottom, height: rect.height || state.lineHeight };
+                return { left: rect.right, right: rect.right, top: rect.top, bottom: rect.bottom, height: rect.height || viewportController.lineHeight };
             }
         }
         if (offset < textLength) {
@@ -467,7 +468,7 @@ function caretRectForOffset(element, offset) {
             range.setEnd(after.node, after.offset);
             rect = range.getBoundingClientRect();
             if (rect && (rect.width > 0 || rect.height > 0)) {
-                return { left: rect.left, right: rect.left, top: rect.top, bottom: rect.bottom, height: rect.height || state.lineHeight };
+                return { left: rect.left, right: rect.left, top: rect.top, bottom: rect.bottom, height: rect.height || viewportController.lineHeight };
             }
         }
     } catch {
@@ -512,7 +513,7 @@ function isRectOnAdjacentVisualLine(referenceRect, candidateRect, direction, lin
         : candidateCenter > referenceCenter + tolerance;
 }
 
-function offsetFromPointInElement(element, clientX, clientY, referenceRect = null, direction = 0, lineStep = state.lineHeight) {
+function offsetFromPointInElement(element, clientX, clientY, referenceRect = null, direction = 0, lineStep = viewportController.lineHeight) {
     const nativeOffset = nativeOffsetFromPointInElement(element, clientX, clientY);
     if (nativeOffset !== null) {
         const nativeRect = caretRectForOffset(element, nativeOffset);
@@ -529,7 +530,7 @@ function offsetFromPointInElement(element, clientX, clientY, referenceRect = nul
         if (!rect) continue;
         if (!isRectOnAdjacentVisualLine(referenceRect, rect, direction, lineStep)) continue;
         const x = rect.left;
-        const y = rect.top + (rect.height || state.lineHeight) / 2;
+        const y = rect.top + (rect.height || viewportController.lineHeight) / 2;
         const dx = x - clientX;
         const dy = y - clientY;
         const distance = (dy * dy * 8) + (dx * dx);
@@ -587,7 +588,7 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
         const metrics = compressedScrollMetrics();
         const firstVisible = lineAt(scrollContainer.scrollTop);
         const lastVisible = Math.min(state.lineCount, firstVisible + metrics.visibleRows - 1);
-        const marginRows = Math.max(0, Math.ceil(scrollMargin / state.lineHeight));
+        const marginRows = Math.max(0, Math.ceil(scrollMargin / viewportController.lineHeight));
         const isFarAway = lineNumber < firstVisible - metrics.visibleRows ||
             lineNumber > lastVisible + metrics.visibleRows;
         let nextFirstVisible = firstVisible;

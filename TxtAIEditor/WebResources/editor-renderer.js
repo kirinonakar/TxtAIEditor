@@ -1,6 +1,7 @@
 import { csvFormulaInput, scrollContainer, viewport } from './editor-dom.js';
 import {
     MAX_RENDER_CHARS,
+    csvTableMode,
     escapeHtml,
     imeController,
     lineAt,
@@ -191,12 +192,12 @@ function createEditorRenderer({
         syncCustomSelectionClass();
         updateHexStickyHeader();
 
-        const csvTableLineCount = state.csvTableEnabled ? prepareCsvTableRenderModel() : 0;
+        const csvTableLineCount = csvTableMode.isEnabled ? prepareCsvTableRenderModel() : 0;
         const renderFullDocument = usesFullDocumentRender();
         const range = visibleRange();
         const firstVisibleLine = lineAt(scrollContainer.scrollTop);
         const lastVisibleLine = lineAt(
-            scrollContainer.scrollTop + Math.max(scrollContainer.clientHeight, state.lineHeight));
+            scrollContainer.scrollTop + Math.max(scrollContainer.clientHeight, viewportController.lineHeight));
         const livePreviewLayoutOverscan = 10;
         const livePreviewLayoutStart = state.inlineLivePreviewEnabled
             ? Math.max(range.start, firstVisibleLine - livePreviewLayoutOverscan)
@@ -207,10 +208,11 @@ function createEditorRenderer({
         const livePreviewContextLines = state.inlineLivePreviewEnabled ? 120 : 0;
         let renderStart = Math.max(1, range.start - livePreviewContextLines);
         let renderEnd = range.end;
-        if (state.csvTableEnabled) {
+        if (csvTableMode.isEnabled) {
             const csvOverscan = 30;
             const firstVisibleCsvLine = lineAt(scrollContainer.scrollTop);
-            const lastVisibleCsvLine = lineAt(scrollContainer.scrollTop + Math.max(scrollContainer.clientHeight, state.lineHeight));
+            const lastVisibleCsvLine = lineAt(
+                scrollContainer.scrollTop + Math.max(scrollContainer.clientHeight, viewportController.lineHeight));
             renderStart = Math.max(1, firstVisibleCsvLine - csvOverscan);
             renderEnd = Math.min(Math.max(1, csvTableLineCount || state.lineCount), lastVisibleCsvLine + csvOverscan);
         }
@@ -248,11 +250,11 @@ function createEditorRenderer({
         const editablePreviewBlockKey = editablePreviewBlock
             ? `${editablePreviewBlock.kind}:${editablePreviewBlock.startLine}:${editablePreviewBlock.endLine}`
             : '';
-        const csvModeKey = state.csvTableEnabled ? `${state.csvTableVersion || 0}:${state.csvTableColumnCount || 0}:${state.csvSelectedLine || 0}:${state.csvSelectedColumn || 0}:${state.csvVirtualLineCount || 0}:${(state.csvJsonNavPath || []).join('.')}` : '0';
-        const horizontalRenderKey = state.csvTableEnabled ? scrollContainer.scrollLeft : 0;
+        const csvModeKey = csvTableMode.isEnabled ? `${csvTableMode.tableVersion || 0}:${csvTableMode.columnCount || 0}:${csvTableMode.selectedLine || 0}:${csvTableMode.selectedColumn || 0}:${csvTableMode.virtualLineCount || 0}:${csvTableMode.jsonNavigationKey}` : '0';
+        const horizontalRenderKey = csvTableMode.isEnabled ? scrollContainer.scrollLeft : 0;
         const virtualHeightRenderKey = renderFullDocument ? 'full-document' : totalVirtualHeight();
         const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${virtualHeightRenderKey}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${activeLine || 0}:${state.editingLine || 0}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}`;
-        if (!state.csvTableEnabled || !isJsonCsvTableMode()) {
+        if (!csvTableMode.isEnabled || !isJsonCsvTableMode()) {
             requestMissingLines(renderStart, renderEnd);
             trimHexCacheToRange(renderStart, renderEnd);
         }
@@ -269,15 +271,15 @@ function createEditorRenderer({
         const offsetY = viewportTopForLine(renderStart);
         viewport.style.transform = renderFullDocument ? 'none' : `translateY(${offsetY}px)`;
 
-        if (state.csvTableEnabled) {
+        if (csvTableMode.isEnabled) {
             const activeCell = document.activeElement?.closest?.('.csv-cell');
             const isEditingFormula = document.activeElement === csvFormulaInput;
-            const isEditingActiveCell = state.csvEditMode === 'edit' && ((activeCell &&
+            const isEditingActiveCell = csvTableMode.editMode === 'edit' && ((activeCell &&
                 activeCell.getAttribute('contenteditable') === 'true' &&
-                Number(activeCell.dataset.line || 0) === state.csvSelectedLine &&
-                Number(activeCell.dataset.csvColumn || 0) === state.csvSelectedColumn) || isEditingFormula);
+                Number(activeCell.dataset.line || 0) === csvTableMode.selectedLine &&
+                Number(activeCell.dataset.csvColumn || 0) === csvTableMode.selectedColumn) || isEditingFormula);
 
-            if (isEditingActiveCell || state.csvCellComposing) {
+            if (isEditingActiveCell || csvTableMode.cellComposing) {
                 return;
             }
 

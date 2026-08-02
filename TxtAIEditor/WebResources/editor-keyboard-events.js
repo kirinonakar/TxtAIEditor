@@ -5,7 +5,9 @@ import {
 import {
     activeEditableElement,
     clearCustomSelectionVisuals,
+    csvTableMode,
     dragDropController,
+    hexEditorMode,
     imeController,
     isHangulImeKeyEvent,
     isPlainTextKey,
@@ -17,7 +19,8 @@ import {
     requestLines,
     selectionController,
     state,
-    syncCustomSelectionClass
+    syncCustomSelectionClass,
+    viewportController
 } from './editor-core.js';
 import {
     activeColumnSelection,
@@ -105,7 +108,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
         state.currentColumn = targetColumn + 1;
         syncCustomSelectionClass();
         queueRender(true);
-        setTimeout(() => focusLine(targetLine, targetColumn, 3 * state.lineHeight), 0);
+        setTimeout(() => focusLine(targetLine, targetColumn, 3 * viewportController.lineHeight), 0);
         reportCursorAndSelection();
     }
 
@@ -241,9 +244,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
 
         selectionController.selection = null;
         selectionController.anchor = { line: caretLine, column: caretColumn };
-        state.hexSelection = null;
-        state.hexSelectionAnchorOffset = null;
-        state.hexCursorOffset = 0;
+        hexEditorMode.resetSelection();
 
         try {
             window.getSelection()?.removeAllRanges();
@@ -369,7 +370,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
             activeTarget.tagName === 'INPUT' ||
             activeTarget.tagName === 'TEXTAREA'
         );
-        if (state.language === 'hex' && state.hexEditable && !isNativeHexInputTarget &&
+        if (state.language === 'hex' && hexEditorMode.isEditable && !isNativeHexInputTarget &&
             !earlyCtrl && !event.altKey && handleHexEditorKey(event)) {
             return;
         }
@@ -625,7 +626,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
         }
 
         const element = activeEditableElement();
-        if (state.csvTableEnabled || !element || element.getAttribute('contenteditable') !== 'true') return;
+        if (csvTableMode.isEnabled || !element || element.getAttribute('contenteditable') !== 'true') return;
 
         if ((event.key === 'Home' || event.key === 'End') && event.ctrlKey) {
             event.preventDefault();
@@ -662,7 +663,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
         if (event.key === 'PageUp') {
             event.preventDefault();
             commitLine(element);
-            const pageLines = Math.max(1, Math.floor(scrollContainer.clientHeight / state.lineHeight) - 1);
+            const pageLines = Math.max(1, Math.floor(scrollContainer.clientHeight / viewportController.lineHeight) - 1);
             const currentLineNum = Number(element.dataset.line || state.currentLine || 1);
             const currentCol = getCaretOffset(element);
             const targetLineNum = Math.max(1, currentLineNum - pageLines);
@@ -683,14 +684,14 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
                 state.currentColumn = currentCol + 1;
                 syncCustomSelectionClass();
             }
-            setTimeout(() => focusLine(targetLineNum, currentCol, 3 * state.lineHeight), 0);
+            setTimeout(() => focusLine(targetLineNum, currentCol, 3 * viewportController.lineHeight), 0);
             return;
         }
 
         if (event.key === 'PageDown') {
             event.preventDefault();
             commitLine(element);
-            const pageLines = Math.max(1, Math.floor(scrollContainer.clientHeight / state.lineHeight) - 1);
+            const pageLines = Math.max(1, Math.floor(scrollContainer.clientHeight / viewportController.lineHeight) - 1);
             const currentLineNum = Number(element.dataset.line || state.currentLine || 1);
             const currentCol = getCaretOffset(element);
             const targetLineNum = Math.min(state.lineCount, currentLineNum + pageLines);
@@ -711,7 +712,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
                 state.currentColumn = currentCol + 1;
                 syncCustomSelectionClass();
             }
-            setTimeout(() => focusLine(targetLineNum, currentCol, 3 * state.lineHeight), 0);
+            setTimeout(() => focusLine(targetLineNum, currentCol, 3 * viewportController.lineHeight), 0);
             return;
         }
 
@@ -787,10 +788,10 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
 
     function handleHexEditorKey(event) {
         const key = event.key || '';
-        const selection = state.hexSelection;
+        const selection = hexEditorMode.selection;
         const startOffset = selection
             ? Math.max(0, Math.min(Number(selection.startOffset || 0), Number(selection.endOffset || 0)))
-            : Math.max(0, Number(state.hexCursorOffset || 0));
+            : Math.max(0, Number(hexEditorMode.cursorOffset || 0));
 
         if (key === 'Backspace' || key === 'Delete') {
             event.preventDefault();
@@ -812,19 +813,19 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
             return true;
         }
 
-        if (state.hexSelectionPane === 'ascii' && key.length === 1 && key.charCodeAt(0) <= 0xFF) {
+        if (hexEditorMode.selectionPane === 'ascii' && key.length === 1 && key.charCodeAt(0) <= 0xFF) {
             event.preventDefault();
             submitHexEdit([key.charCodeAt(0)], startOffset);
             moveHexCursor(startOffset + 1);
             return true;
         }
 
-        if (state.hexSelectionPane === 'hex' && /^[0-9a-f]$/i.test(key)) {
+        if (hexEditorMode.selectionPane === 'hex' && /^[0-9a-f]$/i.test(key)) {
             event.preventDefault();
             const nibble = key.toUpperCase();
-            const pending = state.hexPendingHighNibble;
+            const pending = hexEditorMode.pendingHighNibble;
             if (!pending || pending.offset !== startOffset) {
-                state.hexPendingHighNibble = { offset: startOffset, value: nibble };
+                hexEditorMode.setPendingHighNibble(startOffset, nibble);
             } else {
                 submitHexEdit([parseInt(pending.value + nibble, 16)], startOffset);
                 moveHexCursor(startOffset + 1);
@@ -837,17 +838,14 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
 
     function moveHexCursor(offset) {
         const safeOffset = Math.max(0, Number(offset || 0));
-        state.hexCursorOffset = safeOffset;
-        state.hexSelectionAnchorOffset = safeOffset;
-        state.hexSelection = { startOffset: safeOffset, endOffset: safeOffset + 1 };
-        state.hexPendingHighNibble = null;
+        hexEditorMode.selectByte(safeOffset, { clearPendingHighNibble: true });
         state.currentLine = Math.floor(safeOffset / 16) + 2;
 
         const byteIndex = safeOffset % 16;
         const text = state.cache.get(state.currentLine) || '';
         const firstPipe = text.indexOf('|');
         const hexStart = Math.max(0, firstPipe > 0 ? firstPipe - 50 : 11);
-        const column = state.hexSelectionPane === 'ascii' && firstPipe >= 0
+        const column = hexEditorMode.selectionPane === 'ascii' && firstPipe >= 0
             ? firstPipe + 1 + byteIndex
             : hexStart + (byteIndex * 3) + (byteIndex >= 8 ? 1 : 0);
         state.currentColumn = column + 1;

@@ -1,4 +1,4 @@
-import { imeController, selectionController, state } from './editor-core.js';
+import { imeController, selectionController, state, viewportController } from './editor-core.js';
 import { viewport } from './editor-dom.js';
 
 function lineTextFromElement(element) {
@@ -199,7 +199,7 @@ function selectionLineBoxForRect(element, rect) {
     const elementRect = element.getBoundingClientRect();
     const computedStyle = window.getComputedStyle(element);
     const parsedLineHeight = Number.parseFloat(computedStyle.lineHeight);
-    const lineHeight = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : state.lineHeight);
+    const lineHeight = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : viewportController.lineHeight);
     const visualLineIndex = Math.max(0, Math.round((rect.top - elementRect.top) / lineHeight));
 
     return {
@@ -360,7 +360,7 @@ function drawCaretOverlay(element, column, width, extraClass) {
 
     const rowRect = row.getBoundingClientRect();
     const lineRect = element.getBoundingClientRect();
-    const height = Math.max(1, Math.min(lineRect.height, state.lineHeight));
+    const height = Math.max(1, Math.min(lineRect.height, viewportController.lineHeight));
 
     const textLength = lineTextFromElement(element).length;
     if (textLength === 0) {
@@ -381,7 +381,7 @@ function drawEditableEmptyLineSelectionOverlay(element) {
 
     const rowRect = row.getBoundingClientRect();
     const lineRect = element.getBoundingClientRect();
-    const height = Math.max(1, Math.min(lineRect.height, state.lineHeight));
+    const height = Math.max(1, Math.min(lineRect.height, viewportController.lineHeight));
     appendEditableSelectionOverlay(
         row,
         lineRect.left - rowRect.left,

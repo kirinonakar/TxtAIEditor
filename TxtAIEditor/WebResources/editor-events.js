@@ -97,9 +97,9 @@ export function bindEditorEvents({
 
         event.preventDefault();
         const visualDelta = event.deltaMode === WheelEvent.DOM_DELTA_LINE
-            ? event.deltaY * state.lineHeight
+            ? event.deltaY * viewportController.lineHeight
             : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
-                ? event.deltaY * Math.max(scrollContainer.clientHeight, state.lineHeight)
+                ? event.deltaY * Math.max(scrollContainer.clientHeight, viewportController.lineHeight)
                 : event.deltaY;
         const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
         scrollContainer.scrollTop = Math.min(

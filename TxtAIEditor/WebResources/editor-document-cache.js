@@ -2,6 +2,7 @@ export class EditorDocumentCache {
     #lines = new Map();
     #lineEndStacks = new Map();
     #htmlLineEndContexts = new Map();
+    #pendingLineRequests = new Map();
 
     get size() {
         return this.#lines.size;
@@ -67,6 +68,49 @@ export class EditorDocumentCache {
 
     setHtmlLineEndContext(lineNumber, context) {
         this.#htmlLineEndContexts.set(lineNumber, context);
+    }
+
+    beginLineRequest(startLine, count) {
+        const start = Number(startLine);
+        const requestCount = Number(count);
+        if (!Number.isFinite(start) || !Number.isFinite(requestCount) || requestCount <= 0) {
+            return false;
+        }
+
+        const key = `${start}:${requestCount}`;
+        if (this.#pendingLineRequests.has(key)) return false;
+
+        this.#pendingLineRequests.set(key, {
+            start,
+            count: requestCount,
+            end: start + requestCount - 1
+        });
+        return true;
+    }
+
+    pendingLineRanges() {
+        return [...this.#pendingLineRequests.values()].map(range => ({ ...range }));
+    }
+
+    completeLineRequests(startLine, receivedCount, documentLineCount) {
+        const start = Number(startLine || 1);
+        const count = Math.max(0, Number(receivedCount || 0));
+        const receivedEnd = start + count - 1;
+        const finalLine = Math.max(1, Number(documentLineCount || 1));
+        let completed = 0;
+
+        for (const [key, pending] of this.#pendingLineRequests) {
+            if (start <= pending.start &&
+                (count === 0 || receivedEnd >= pending.end || receivedEnd >= finalLine)) {
+                this.#pendingLineRequests.delete(key);
+                completed++;
+            }
+        }
+        return completed;
+    }
+
+    clearLineRequests() {
+        this.#pendingLineRequests.clear();
     }
 
     #invalidateDerivedContexts(startLine) {

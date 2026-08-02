@@ -4,6 +4,8 @@ import {
     applyEditResultFromHost,
     clearMeasuredLineHeights,
     cleanDirtyMarker,
+    csvTableMode,
+    hostRequestController,
     imeController,
     markDirty,
     post,
@@ -422,7 +424,7 @@ export function createHostMessageHandler({
             openFindPanel();
             break;
         case 'getSelection':
-            if (state.csvTableEnabled) {
+            if (csvTableMode.isEnabled) {
                 post({ type: 'selectionResult', text: selectedCsvText(), startLine: 0, endLine: 0 });
             } else {
                 const selInfo = selectionInfo();
@@ -520,15 +522,7 @@ export function createHostMessageHandler({
             focusLine(state.currentLine, Math.max(0, state.currentColumn - 1));
             break;
         case 'clipboardReadResult':
-            {
-                const requestId = Number(msg.requestId || 0);
-                const pending = state.clipboardRequests.get(requestId);
-                if (pending) {
-                    clearTimeout(pending.timer);
-                    state.clipboardRequests.delete(requestId);
-                    pending.resolve(String(msg.text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
-                }
-            }
+            hostRequestController.completeClipboardRequest(msg.requestId, msg.text);
             break;
         case 'openableHoverResult':
             if (typeof handleOpenableHoverResult === 'function') {

@@ -28,10 +28,19 @@ export class ImeController {
     #bypassStartLine = null;
     #bypassCursorLine = null;
     #bypassCursorColumn = null;
+    #pendingColumnTextInputs = [];
     #onRangeCompositionCleared;
+    #setTimer;
+    #clearTimer;
 
-    constructor({ onRangeCompositionCleared = () => { } } = {}) {
+    constructor({
+        onRangeCompositionCleared = () => { },
+        setTimer = (callback, delay) => setTimeout(callback, delay),
+        clearTimer = timer => clearTimeout(timer)
+    } = {}) {
         this.#onRangeCompositionCleared = onRangeCompositionCleared;
+        this.#setTimer = setTimer;
+        this.#clearTimer = clearTimer;
     }
 
     get phase() {
@@ -118,6 +127,46 @@ export class ImeController {
         return !!(this.#isComposing || this.#rangeComposition || this.#columnComposition);
     }
 
+    get pendingColumnTextInputCount() {
+        return this.#pendingColumnTextInputs.length;
+    }
+
+    queueColumnTextInputFallback(text, callback, delayMs = 40) {
+        const value = String(text ?? '');
+        if (!value || typeof callback !== 'function') return null;
+
+        const pending = { text: value, timer: null };
+        this.#pendingColumnTextInputs.push(pending);
+        pending.timer = this.#setTimer(() => {
+            const index = this.#pendingColumnTextInputs.indexOf(pending);
+            if (index < 0) return;
+            this.#pendingColumnTextInputs.splice(index, 1);
+            callback(value);
+        }, Math.max(0, Number(delayMs || 0)));
+        return { ...pending };
+    }
+
+    consumePendingColumnTextInput(text = null) {
+        if (this.#pendingColumnTextInputs.length === 0) return null;
+
+        const value = text === null || text === undefined ? '' : String(text);
+        const index = value
+            ? this.#pendingColumnTextInputs.findIndex(pending => pending.text === value)
+            : 0;
+        if (index < 0) return null;
+
+        const [pending] = this.#pendingColumnTextInputs.splice(index, 1);
+        if (pending.timer) this.#clearTimer(pending.timer);
+        return pending.text;
+    }
+
+    cancelPendingColumnTextInputs() {
+        for (const pending of this.#pendingColumnTextInputs) {
+            if (pending.timer) this.#clearTimer(pending.timer);
+        }
+        this.#pendingColumnTextInputs.length = 0;
+    }
+
     beginComposition(phase, lineNumber) {
         if (!compositionPhases.has(phase)) return false;
 
@@ -188,6 +237,7 @@ export class ImeController {
     }
 
     reset() {
+        this.cancelPendingColumnTextInputs();
         this.#phase = ImePhase.Idle;
         this.#isComposing = false;
         this.#compositionLine = null;
