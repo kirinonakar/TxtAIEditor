@@ -224,7 +224,8 @@ namespace TxtAIEditor.Composition
                 callbacks.GetPreviewBaseHref,
                 () => ui.EditorWorkspace.IsTerminalVisible,
                 () => ui.TerminalPane.SuspendNativeWindows(),
-                () => ui.TerminalPane.ResumeNativeWindows());
+                () => ui.TerminalPane.ResumeNativeWindows(),
+                () => livePreview.PrintActivePreview());
 
             return new MainWindowStartupControllers(
                 lifecycle,

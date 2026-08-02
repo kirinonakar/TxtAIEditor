@@ -412,6 +412,75 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        /// <summary>
+        /// Prints the rendered live preview content for the currently previewed tab.
+        /// Returns false when no rendered preview is available so the caller can
+        /// fall back to printing the raw editor text.
+        /// </summary>
+        public bool PrintActivePreview()
+        {
+            if (!IsLivePreviewVisible)
+            {
+                return false;
+            }
+
+            var tab = PreviewTargetTab;
+            var coreWebView = PreviewWebViewIfCreated?.CoreWebView2;
+            if (tab == null || coreWebView == null || IsReadOnlyViewerTab(tab))
+            {
+                return false;
+            }
+
+            try
+            {
+                string mode = ResolvePreviewModeName(tab);
+                string previewText = _sessionProvider(tab.Id)?.GetText() ?? tab.ContentPreview ?? string.Empty;
+                var printMsg = new
+                {
+                    action = "printPreview",
+                    mode = mode,
+                    text = previewText,
+                    baseHref = GetPreviewBaseHref(tab),
+                    tabSize = _settingsService.CurrentSettings.TabSize,
+                    csvEmptyMessage = _getString("PreviewCsvEmpty", "빈 CSV 파일입니다.")
+                };
+                coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(printMsg));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to print live preview: {ex.Message}");
+                return false;
+            }
+        }
+
+        private string ResolvePreviewModeName(OpenedTab tab)
+        {
+            int selectedMode;
+            if (string.Equals(tab.Language, "html", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(tab.Language, "svg", StringComparison.OrdinalIgnoreCase))
+            {
+                selectedMode = 1; // HTML Preview is unconditionally forced for HTML and SVG files
+            }
+            else if (!_tabPreviewModes.TryGetValue(tab.Id, out selectedMode))
+            {
+                selectedMode = 0; // Default: Markdown
+                if (string.Equals(tab.Language, "csv", StringComparison.OrdinalIgnoreCase))
+                {
+                    selectedMode = 4; // CSV Table
+                }
+            }
+
+            return selectedMode switch
+            {
+                1 => "html",
+                2 => "latex",
+                3 => "aozora",
+                4 => "csv",
+                _ => "markdown"
+            };
+        }
+
         private void PostEmptyVirtualPreview()
         {
             var coreWebView = PreviewWebViewIfCreated?.CoreWebView2;

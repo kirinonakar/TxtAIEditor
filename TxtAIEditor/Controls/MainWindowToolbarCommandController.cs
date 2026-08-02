@@ -42,6 +42,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool> _isTerminalVisible;
         private readonly Action _suspendTerminal;
         private readonly Action _resumeTerminal;
+        private readonly Func<bool>? _printLivePreview;
 
         public MainWindowToolbarCommandController(
             Window ownerWindow,
@@ -71,7 +72,8 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab, string> getPreviewBaseHref,
             Func<bool> isTerminalVisible,
             Action suspendTerminal,
-            Action resumeTerminal)
+            Action resumeTerminal,
+            Func<bool>? printLivePreview = null)
         {
             _ownerWindow = ownerWindow;
             _topToolbar = topToolbar;
@@ -101,6 +103,7 @@ namespace TxtAIEditor.Controls
             _isTerminalVisible = isTerminalVisible;
             _suspendTerminal = suspendTerminal;
             _resumeTerminal = resumeTerminal;
+            _printLivePreview = printLivePreview;
 
             WireEvents();
         }
@@ -361,6 +364,11 @@ namespace TxtAIEditor.Controls
 
         private async Task PrintAsync()
         {
+            if (_printLivePreview != null && _printLivePreview())
+            {
+                return;
+            }
+
             if (_editorTabView.SelectedItem is TabViewItem activeTabItem &&
                 activeTabItem.Tag is string tabId &&
                 _editorSessions.TryGetValue(tabId, out var session) &&

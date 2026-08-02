@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 
 <head>
@@ -420,6 +420,45 @@
             padding: 20px 22px;
             color: var(--muted);
         }
+
+        #print-container {
+            display: none;
+        }
+
+        @media print {
+            :root,
+            body {
+                overflow: visible !important;
+                background: #fff !important;
+                color: #000 !important;
+                height: auto !important;
+            }
+
+            #preview-scroll,
+            #html-preview,
+            #virtual-spacer {
+                display: none !important;
+            }
+
+            #print-container {
+                display: block !important;
+                background: #fff !important;
+                color: #000 !important;
+                padding: 24px;
+                --bg: #fff;
+                --fg: #1a1a1a;
+                --muted: #555555;
+                --link: #0645ad;
+                --code-bg: #f3f5f7;
+                --border: #d8dee4;
+            }
+
+            body:not(.wrap-enabled) .preview-row {
+                width: auto !important;
+                white-space: normal !important;
+                overflow-wrap: anywhere !important;
+            }
+        }
     </style>
 </head>
 
@@ -704,33 +743,17 @@
             return `<${tag}${cls}>${escaped || '&nbsp;'}</${tag}>`;
         }
 
-        function renderCsvPreview(message) {
-            applyTheme(message);
-            state.mode = 'csv';
-            state.scrollSyncEnabled = message.scrollSyncEnabled !== false;
-            state.cache.clear();
-            state.pending.clear();
-            state.rowHeights.clear();
-            state.cacheVersion++;
-            state.lastRangeKey = '';
-            setHtmlMode(false);
-            document.body.classList.remove('wrap-enabled');
-            document.body.classList.add('csv-mode');
-            viewport.innerHTML = '';
-            spacer.style.height = '0';
-
-            const text = String(message.text || '');
-            const emptyMessage = escapeHtml(message.csvEmptyMessage || 'Empty CSV file.');
-            if (!text.trim()) {
-                viewport.innerHTML = `<div class="csv-empty">${emptyMessage}</div>`;
-                return;
+        function buildCsvPreviewHtml(text, emptyMessage) {
+            const safeText = String(text || '');
+            const safeEmpty = escapeHtml(emptyMessage || 'Empty CSV file.');
+            if (!safeText.trim()) {
+                return `<div class="csv-empty">${safeEmpty}</div>`;
             }
 
-            const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+            const lines = safeText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
             const nonEmpty = lines.filter(l => l.trim().length > 0);
             if (nonEmpty.length === 0) {
-                viewport.innerHTML = `<div class="csv-empty">${emptyMessage}</div>`;
-                return;
+                return `<div class="csv-empty">${safeEmpty}</div>`;
             }
 
             const parsedRows = nonEmpty.map(parseCsvLine);
@@ -755,7 +778,27 @@
             }
             html += '</tbody></table></div>';
 
-            viewport.innerHTML = html;
+            return html;
+        }
+
+        function renderCsvPreview(message) {
+            applyTheme(message);
+            state.mode = 'csv';
+            state.scrollSyncEnabled = message.scrollSyncEnabled !== false;
+            state.cache.clear();
+            state.pending.clear();
+            state.rowHeights.clear();
+            state.cacheVersion++;
+            state.lastRangeKey = '';
+            setHtmlMode(false);
+            document.body.classList.remove('wrap-enabled');
+            document.body.classList.add('csv-mode');
+            viewport.innerHTML = '';
+            spacer.style.height = '0';
+
+            viewport.innerHTML = buildCsvPreviewHtml(
+                String(message.text || ''),
+                message.csvEmptyMessage || 'Empty CSV file.');
         }
 
         function applyTheme(message) {
@@ -1218,6 +1261,79 @@
             queueRender(true);
         }
 
+        function buildPrintDocumentHtml(mode, fullText, baseHref, tabSize, csvEmptyMessage) {
+            if (mode === 'html') {
+                return buildHtmlPreviewDocument(fullText, baseHref || '');
+            }
+            if (mode === 'csv') {
+                return buildCsvPreviewHtml(fullText, csvEmptyMessage || 'Empty CSV file.');
+            }
+
+            // markdown / latex / aozora: render every line into a static document.
+            const lines = String(fullText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+            const skipRef = { val: 0 };
+            const options = {
+                mode,
+                baseHref: baseHref || state.baseHref,
+                tabSize: Number(tabSize || state.tabSize || 4),
+                rangeEnd: lines.length,
+                localResourceVersion: state.localResourceVersion
+            };
+            let html = '';
+            for (let lineNumber = 1; lineNumber <= lines.length; lineNumber++) {
+                const rendered = renderPreviewLineAt(lineNumber, lines.length, ln => lines[ln - 1], options, skipRef);
+                if (rendered.pending) continue;
+                const extraClass = rendered.skipped ? 'skipped' : (rendered.empty ? 'empty' : '');
+                html += `<div class="preview-row${extraClass ? ` ${extraClass}` : ''}">${rendered.html ?? ''}</div>`;
+            }
+            return html;
+        }
+
+        function printPreviewDocument(message) {
+            const mode = message.mode || 'markdown';
+            const fullText = String(message.text || '');
+
+            let printContainer = document.getElementById('print-container');
+            if (!printContainer) {
+                printContainer = document.createElement('div');
+                printContainer.id = 'print-container';
+                document.body.appendChild(printContainer);
+            }
+
+            setPreviewBaseHref(message.baseHref || '');
+            printContainer.innerHTML = buildPrintDocumentHtml(
+                mode,
+                fullText,
+                message.baseHref || '',
+                message.tabSize,
+                message.csvEmptyMessage);
+
+            document.body.classList.add('wrap-enabled');
+
+            let printed = false;
+            const triggerPrint = () => {
+                if (printed) return;
+                printed = true;
+                setTimeout(() => {
+                    window.onafterprint = () => {
+                        document.body.classList.remove('wrap-enabled');
+                        printContainer.innerHTML = '';
+                        window.onafterprint = null;
+                        queueRender(true);
+                    };
+                    window.print();
+                }, 100);
+            };
+
+            const mermaidBlocks = printContainer.querySelectorAll('.mermaid-block:not(.rendered)');
+            if (mermaidBlocks.length > 0 && typeof mermaid !== 'undefined') {
+                renderSharedMermaidBlocks(printContainer, triggerPrint);
+                setTimeout(triggerPrint, 1500); // Fallback in case a diagram render hangs.
+            } else {
+                triggerPrint();
+            }
+        }
+
         scroll.addEventListener('scroll', () => {
             const now = Date.now();
             queueRender();
@@ -1257,6 +1373,7 @@
                 else if (message.action === 'renderHtmlPreview') renderHtmlPreview(message);
                 else if (message.action === 'renderCsvPreview') renderCsvPreview(message);
                 else if (message.action === 'render') renderFullFallback(message);
+                else if (message.action === 'printPreview') printPreviewDocument(message);
                 else if (message.action === 'scrollSyncChanged') {
                     state.scrollSyncEnabled = !!message.enabled;
                 }
