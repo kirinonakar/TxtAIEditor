@@ -59,31 +59,26 @@
                                         </Button>
                                     </Grid>
 
+                                    <local:ExplorerPathBar x:Name="ExplorerPathBarControl"
+                                                           Visibility="Collapsed"
+                                                           HorizontalAlignment="Stretch"
+                                                           VerticalAlignment="Center"/>
                                     <Grid ColumnSpacing="6">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <local:ExplorerPathBar x:Name="ExplorerPathBarControl"
-                                                               Visibility="Collapsed"
-                                                               HorizontalAlignment="Stretch"
-                                                               VerticalAlignment="Center"/>
-                                        <ToggleButton x:Name="ExplorerTreeModeButton" Grid.Column="1" Click="OnExplorerTreeModeClick" ToolTipService.ToolTip="트리 모드 (F3)" AutomationProperties.Name="트리 모드" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Center">
-                                            <FontIcon Glyph="&#xE8A4;" FontSize="10"/>
-                                        </ToggleButton>
-                                    </Grid>
-                                    <Grid ColumnSpacing="6">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock x:Name="ExplorerStatusText" Text="폴더를 선택하세요." FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center"/>
-                                        <Button x:Name="ExplorerHomeButton" Grid.Column="1" Click="OnExplorerHomeClick" ToolTipService.ToolTip="홈 폴더로 이동" AutomationProperties.Name="홈 폴더로 이동" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
+                                        <ToggleButton x:Name="ExplorerTreeModeButton" Grid.Column="1" Click="OnExplorerTreeModeClick" ToolTipService.ToolTip="트리 모드 (F3)" AutomationProperties.Name="트리 모드" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Center">
+                                            <FontIcon Glyph="&#xE8A4;" FontSize="10"/>
+                                        </ToggleButton>
+                                        <Button x:Name="ExplorerHomeButton" Grid.Column="2" Click="OnExplorerHomeClick" ToolTipService.ToolTip="홈 폴더로 이동" AutomationProperties.Name="홈 폴더로 이동" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
                                             <FontIcon Glyph="&#xE80F;" FontSize="10"/>
                                         </Button>
-                                        <Button x:Name="ExplorerRemoteButton" Grid.Column="2" ToolTipService.ToolTip="리모트 서버" AutomationProperties.Name="리모트 서버" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
+                                        <Button x:Name="ExplorerRemoteButton" Grid.Column="3" ToolTipService.ToolTip="리모트 서버" AutomationProperties.Name="리모트 서버" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
                                             <Button.Flyout>
                                                 <Flyout Placement="BottomEdgeAlignedRight" Opening="OnRemoteFlyoutOpening">
                                                     <local:RemoteExplorerView x:Name="RemoteExplorer"/>
@@ -91,7 +86,7 @@
                                             </Button.Flyout>
                                             <FontIcon Glyph="&#xE774;" FontSize="11"/>
                                         </Button>
-                                        <Button x:Name="ExplorerOpenInWindowsButton" Grid.Column="3" Click="OnOpenInWindowsExplorerClick" ToolTipService.ToolTip="Windows 탐색기에서 열기" AutomationProperties.Name="Windows 탐색기에서 열기" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
+                                        <Button x:Name="ExplorerOpenInWindowsButton" Grid.Column="4" Click="OnOpenInWindowsExplorerClick" ToolTipService.ToolTip="Windows 탐색기에서 열기" AutomationProperties.Name="Windows 탐색기에서 열기" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
                                             <FontIcon Glyph="&#xE8DA;" FontSize="10"/>
                                         </Button>
                                     </Grid>
