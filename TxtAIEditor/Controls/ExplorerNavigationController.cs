@@ -661,7 +661,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExplorerTreeItemInvoked += OnExplorerTreeItemInvoked;
             _leftSidebar.FileListViewItemClick += OnFileListViewItemClick;
             _leftSidebar.ExplorerFilterTextChanged += OnExplorerFilterTextChanged;
-            _leftSidebar.ExplorerBreadcrumb.ItemClicked += OnExplorerBreadcrumbItemClicked;
+            _leftSidebar.ExplorerBreadcrumb.SegmentClicked += OnExplorerBreadcrumbItemClicked;
         }
 
         private async void OnSelectFolderClick(object sender, RoutedEventArgs e)
@@ -1450,14 +1450,9 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private void OnExplorerBreadcrumbItemClicked(
-            Microsoft.UI.Xaml.Controls.BreadcrumbBar sender,
-            Microsoft.UI.Xaml.Controls.BreadcrumbBarItemClickedEventArgs args)
+        private void OnExplorerBreadcrumbItemClicked(object? sender, ExplorerPathSegmentClickedEventArgs e)
         {
-            if (args.Item is not ExplorerBreadcrumbSegment segment)
-            {
-                return;
-            }
+            ExplorerBreadcrumbSegment segment = e.Segment;
 
             if (segment.IsArchive)
             {

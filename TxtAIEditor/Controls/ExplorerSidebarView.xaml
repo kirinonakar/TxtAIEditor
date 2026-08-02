@@ -64,17 +64,10 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <BreadcrumbBar x:Name="ExplorerBreadcrumbBar"
-                                                       Grid.Column="0"
-                                                       Visibility="Collapsed"
-                                                       HorizontalAlignment="Stretch"
-                                                       ItemClicked="OnExplorerBreadcrumbItemClicked">
-                                            <BreadcrumbBar.ItemTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis"/>
-                                                </DataTemplate>
-                                            </BreadcrumbBar.ItemTemplate>
-                                        </BreadcrumbBar>
+                                        <local:ExplorerPathBar x:Name="ExplorerPathBarControl"
+                                                               Visibility="Collapsed"
+                                                               HorizontalAlignment="Stretch"
+                                                               VerticalAlignment="Center"/>
                                         <ToggleButton x:Name="ExplorerTreeModeButton" Grid.Column="1" Click="OnExplorerTreeModeClick" ToolTipService.ToolTip="트리 모드 (F3)" AutomationProperties.Name="트리 모드" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Center">
                                             <FontIcon Glyph="&#xE8A4;" FontSize="10"/>
                                         </ToggleButton>

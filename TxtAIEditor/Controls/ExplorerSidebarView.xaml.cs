@@ -4,7 +4,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using TxtAIEditor.Core.Models;
-using Windows.Foundation;
 
 namespace TxtAIEditor.Controls
 {
@@ -18,7 +17,7 @@ namespace TxtAIEditor.Controls
 
         public Grid Root => RootGrid;
         public TextBlock Status => ExplorerStatusText;
-        public BreadcrumbBar Breadcrumb => ExplorerBreadcrumbBar;
+        public ExplorerPathBar Breadcrumb => ExplorerPathBarControl;
         public Button BackButton => ExplorerBackButton;
         public Button UpButton => ExplorerUpButton;
         public Button SelectFolderButton => ExplorerSelectFolderButton;
@@ -70,7 +69,6 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? CopyFolderPathClick;
         public event RoutedEventHandler? RenameClick;
         public event RoutedEventHandler? DeleteClick;
-        public event TypedEventHandler<BreadcrumbBar, BreadcrumbBarItemClickedEventArgs>? BreadcrumbItemClicked;
         public event TextChangedEventHandler? FilterTextChanged;
         public event DragEventHandler? FileListDragOver;
         public event DragEventHandler? FileListDrop;
@@ -135,7 +133,6 @@ namespace TxtAIEditor.Controls
         }
 
         private void OnExplorerBackClick(object sender, RoutedEventArgs e) => BackClick?.Invoke(sender, e);
-        private void OnExplorerBreadcrumbItemClicked(BreadcrumbBar sender, BreadcrumbBarItemClickedEventArgs args) => BreadcrumbItemClicked?.Invoke(sender, args);
         private void OnExplorerUpClick(object sender, RoutedEventArgs e) => UpClick?.Invoke(sender, e);
         private void OnSelectFolderClick(object sender, RoutedEventArgs e) => SelectFolderClick?.Invoke(sender, e);
         private void OnCreateFolderClick(object sender, RoutedEventArgs e) => CreateFolderClick?.Invoke(sender, e);
