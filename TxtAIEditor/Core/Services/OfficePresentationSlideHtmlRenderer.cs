@@ -19,6 +19,13 @@ namespace TxtAIEditor.Core.Services
             public string BoundsStyle { get; init; } = string.Empty;
         }
 
+        private sealed class PresentationInheritedPart
+        {
+            public XDocument Document { get; init; } = null!;
+            public IReadOnlyDictionary<string, string> Relationships { get; init; } =
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
         private sealed class PresentationGroupTransform
         {
             public double X { get; init; }
@@ -80,12 +87,19 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyList<string> slideThemeColors =
                 await OfficePresentationPackageReader.LoadThemeColorsForSlideAsync(
                     archive,
-                    relationships)
+                    relationships,
+                    slide)
                     .ConfigureAwait(false);
             if (slideThemeColors.Count > 0)
             {
                 themeColors = slideThemeColors;
             }
+
+            IReadOnlyList<PresentationInheritedPart> inheritedParts =
+                await LoadInheritedSlidePartsAsync(
+                    archive,
+                    relationships)
+                    .ConfigureAwait(false);
 
             double baseHeightPx =
                 baseWidthPx * slideHeight / Math.Max(1.0, slideWidth);
@@ -121,6 +135,23 @@ namespace TxtAIEditor.Core.Services
                 .Append(" / ")
                 .Append(slideCount)
                 .Append("</div>");
+
+            foreach (PresentationInheritedPart inheritedPart in inheritedParts)
+            {
+                foreach (string elementHtml in ReadInheritedSlideElements(
+                    archive,
+                    inheritedPart.Document,
+                    inheritedPart.Relationships,
+                    themeColors,
+                    slideWidth,
+                    slideHeight,
+                    baseWidthPx,
+                    baseHeightPx,
+                    tableStyles))
+                {
+                    html.Append(elementHtml);
+                }
+            }
 
             foreach (string elementHtml in ReadSlideElements(
                 archive,
@@ -180,6 +211,45 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        private static IEnumerable<string> ReadInheritedSlideElements(
+            ZipArchive archive,
+            XDocument part,
+            IReadOnlyDictionary<string, string> relationships,
+            IReadOnlyList<string> themeColors,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx,
+            XDocument? tableStyles)
+        {
+            XElement? shapeTree = part.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "spTree");
+            foreach (XElement element in shapeTree?.Elements() ?? Enumerable.Empty<XElement>())
+            {
+                if (element.Name.LocalName is "nvGrpSpPr" or "grpSpPr")
+                {
+                    continue;
+                }
+
+                foreach (string elementHtml in ReadSlideElement(
+                    archive,
+                    element,
+                    relationships,
+                    themeColors,
+                    slideWidth,
+                    slideHeight,
+                    baseWidthPx,
+                    baseHeightPx,
+                    Array.Empty<PresentationPlaceholderBounds>(),
+                    tableStyles,
+                    null,
+                    skipPlaceholders: true))
+                {
+                    yield return elementHtml;
+                }
+            }
+        }
+
         private static IEnumerable<string> ReadSlideElement(
             ZipArchive archive,
             XElement element,
@@ -191,8 +261,14 @@ namespace TxtAIEditor.Core.Services
             double baseHeightPx,
             IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds,
             XDocument? tableStyles,
-            PresentationGroupTransform? groupTransform)
+            PresentationGroupTransform? groupTransform,
+            bool skipPlaceholders = false)
         {
+            if (skipPlaceholders && TryReadPlaceholderInfo(element, out _, out _))
+            {
+                yield break;
+            }
+
             if (element.Name.LocalName == "grpSp")
             {
                 PresentationGroupTransform? nextTransform =
@@ -217,7 +293,8 @@ namespace TxtAIEditor.Core.Services
                         baseHeightPx,
                         placeholderBounds,
                         tableStyles,
-                        nextTransform))
+                        nextTransform,
+                        skipPlaceholders))
                     {
                         yield return childHtml;
                     }
@@ -384,6 +461,10 @@ namespace TxtAIEditor.Core.Services
                     : "left:48px;top:27px;width:864px;height:auto;";
             XElement? textBody = element.Descendants()
                 .FirstOrDefault(e => e.Name.LocalName == "txBody");
+            if (textBody != null && themeColors.Count > 1)
+            {
+                boxStyle += "color:" + themeColors[1] + ";";
+            }
             string textHtml = OfficePresentationTextHtmlRenderer.BuildShapeTextHtml(
                 element,
                 themeColors,
@@ -649,6 +730,61 @@ namespace TxtAIEditor.Core.Services
             }
 
             return result;
+        }
+
+        private static async Task<IReadOnlyList<PresentationInheritedPart>>
+            LoadInheritedSlidePartsAsync(
+                ZipArchive archive,
+                IReadOnlyDictionary<string, string> slideRelationships)
+        {
+            string? layoutPath = FindRelatedPart(slideRelationships, "slideLayouts");
+            if (string.IsNullOrWhiteSpace(layoutPath))
+            {
+                return Array.Empty<PresentationInheritedPart>();
+            }
+
+            IReadOnlyDictionary<string, string> layoutRelationships =
+                await OfficePresentationPackageReader.LoadRelationshipsAsync(
+                    archive,
+                    OfficePresentationPackageReader.GetRelationshipsPath(layoutPath),
+                    Path.GetDirectoryName(layoutPath)?.Replace('\\', '/') ?? string.Empty)
+                    .ConfigureAwait(false);
+            string? masterPath = FindRelatedPart(layoutRelationships, "slideMasters");
+            var parts = new List<PresentationInheritedPart>();
+            if (!string.IsNullOrWhiteSpace(masterPath))
+            {
+                XDocument? master = await OfficePresentationPackageReader
+                    .TryLoadXmlEntryAsync(archive, masterPath)
+                    .ConfigureAwait(false);
+                if (master != null)
+                {
+                    IReadOnlyDictionary<string, string> masterRelationships =
+                        await OfficePresentationPackageReader.LoadRelationshipsAsync(
+                            archive,
+                            OfficePresentationPackageReader.GetRelationshipsPath(masterPath),
+                            Path.GetDirectoryName(masterPath)?.Replace('\\', '/') ?? string.Empty)
+                            .ConfigureAwait(false);
+                    parts.Add(new PresentationInheritedPart
+                    {
+                        Document = master,
+                        Relationships = masterRelationships
+                    });
+                }
+            }
+
+            XDocument? layout = await OfficePresentationPackageReader
+                .TryLoadXmlEntryAsync(archive, layoutPath)
+                .ConfigureAwait(false);
+            if (layout != null)
+            {
+                parts.Add(new PresentationInheritedPart
+                {
+                    Document = layout,
+                    Relationships = layoutRelationships
+                });
+            }
+
+            return parts;
         }
 
         private static IEnumerable<PresentationPlaceholderBounds>

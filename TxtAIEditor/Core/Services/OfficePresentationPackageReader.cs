@@ -119,38 +119,50 @@ namespace TxtAIEditor.Core.Services
 
         public static async Task<IReadOnlyList<string>> LoadThemeColorsForSlideAsync(
             ZipArchive archive,
-            IReadOnlyDictionary<string, string> slideRelationships)
+            IReadOnlyDictionary<string, string> slideRelationships,
+            XDocument? slide = null)
         {
             string? layoutPath = FindRelationshipTarget(slideRelationships, "slideLayouts");
-            if (string.IsNullOrWhiteSpace(layoutPath))
-            {
-                return await LoadThemeColorsAsync(archive).ConfigureAwait(false);
-            }
-
+            XDocument? layout = null;
             IReadOnlyDictionary<string, string> layoutRelationships =
-                await LoadRelationshipsAsync(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(layoutPath))
+            {
+                layout = await TryLoadXmlEntryAsync(archive, layoutPath)
+                    .ConfigureAwait(false);
+                layoutRelationships = await LoadRelationshipsAsync(
                     archive,
                     GetRelationshipsPath(layoutPath),
                     Path.GetDirectoryName(layoutPath)?.Replace('\\', '/') ?? string.Empty)
                     .ConfigureAwait(false);
-            string? masterPath = FindRelationshipTarget(layoutRelationships, "slideMasters");
-            if (string.IsNullOrWhiteSpace(masterPath))
-            {
-                return await LoadThemeColorsAsync(archive).ConfigureAwait(false);
             }
 
+            string? masterPath = FindRelationshipTarget(layoutRelationships, "slideMasters");
+            XDocument? master = null;
             IReadOnlyDictionary<string, string> masterRelationships =
-                await LoadRelationshipsAsync(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(masterPath))
+            {
+                master = await TryLoadXmlEntryAsync(archive, masterPath)
+                    .ConfigureAwait(false);
+                masterRelationships = await LoadRelationshipsAsync(
                     archive,
                     GetRelationshipsPath(masterPath),
                     Path.GetDirectoryName(masterPath)?.Replace('\\', '/') ?? string.Empty)
                     .ConfigureAwait(false);
+            }
+
             string? themePath = masterRelationships.Values.FirstOrDefault(path =>
                 path.Contains("/theme/", StringComparison.OrdinalIgnoreCase) ||
                 path.StartsWith("theme/", StringComparison.OrdinalIgnoreCase));
-            return await LoadThemeColorsAsync(
+            IReadOnlyList<string> themeColors = await LoadThemeColorsAsync(
                 archive,
                 themePath ?? "ppt/theme/theme1.xml").ConfigureAwait(false);
+            IReadOnlyDictionary<string, string>? colorMap =
+                ReadPresentationColorMap(slide) ??
+                ReadPresentationColorMap(layout) ??
+                ReadPresentationColorMap(master);
+            return ApplyPresentationColorMap(themeColors, colorMap);
         }
 
         public static async Task<List<string>> ReadSlidePathsAsync(
@@ -244,6 +256,97 @@ namespace TxtAIEditor.Core.Services
             return relationships.Values.FirstOrDefault(path =>
                 path.Contains("/" + partFolder + "/", StringComparison.OrdinalIgnoreCase) ||
                 path.Contains(partFolder + "/", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static IReadOnlyDictionary<string, string>? ReadPresentationColorMap(
+            XDocument? part)
+        {
+            if (part == null)
+            {
+                return null;
+            }
+
+            XElement? map = part.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "overrideClrMapping") ??
+                part.Descendants().FirstOrDefault(e => e.Name.LocalName == "clrMap");
+            if (map == null)
+            {
+                return null;
+            }
+
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (XAttribute attribute in map.Attributes())
+            {
+                if (attribute.Name.LocalName is
+                    "bg1" or "tx1" or "bg2" or "tx2" or
+                    "accent1" or "accent2" or "accent3" or "accent4" or
+                    "accent5" or "accent6" or "hlink" or "folHlink")
+                {
+                    result[attribute.Name.LocalName] = attribute.Value;
+                }
+            }
+
+            return result.Count > 0 ? result : null;
+        }
+
+        private static IReadOnlyList<string> ApplyPresentationColorMap(
+            IReadOnlyList<string> themeColors,
+            IReadOnlyDictionary<string, string>? colorMap)
+        {
+            if (colorMap == null || themeColors.Count == 0)
+            {
+                return themeColors;
+            }
+
+            string[] semanticNames =
+            {
+                "bg1",
+                "tx1",
+                "bg2",
+                "tx2",
+                "accent1",
+                "accent2",
+                "accent3",
+                "accent4",
+                "accent5",
+                "accent6",
+                "hlink",
+                "folHlink"
+            };
+            var mappedColors = new List<string>(semanticNames.Length);
+            foreach (string semanticName in semanticNames)
+            {
+                string mappedName = colorMap.TryGetValue(semanticName, out string? value) &&
+                    !string.IsNullOrWhiteSpace(value)
+                    ? value
+                    : semanticName;
+                int index = ReadThemeColorIndex(mappedName);
+                mappedColors.Add(index >= 0 && index < themeColors.Count
+                    ? themeColors[index]
+                    : "#000000");
+            }
+
+            return mappedColors;
+        }
+
+        private static int ReadThemeColorIndex(string value)
+        {
+            return value.Trim().ToLowerInvariant() switch
+            {
+                "bg1" or "lt1" => 0,
+                "tx1" or "dk1" => 1,
+                "bg2" or "lt2" => 2,
+                "tx2" or "dk2" => 3,
+                "accent1" => 4,
+                "accent2" => 5,
+                "accent3" => 6,
+                "accent4" => 7,
+                "accent5" => 8,
+                "accent6" => 9,
+                "hlink" => 10,
+                "folhlink" => 11,
+                _ => -1
+            };
         }
 
         private static string? ReadThemeColor(XElement element)

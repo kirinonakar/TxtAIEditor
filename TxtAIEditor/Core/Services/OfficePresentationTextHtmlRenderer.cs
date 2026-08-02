@@ -101,6 +101,8 @@ namespace TxtAIEditor.Core.Services
                     ? 0
                     : rows.Max(row => row.Elements().Count(e => e.Name.LocalName == "tc")));
             XElement? tableStyle = ReadTableStyleDefinition(table, tableStyles);
+            bool useBuiltInMediumStyle2 = tableStyle == null &&
+                IsBuiltInMediumStyle2Accent1(table, tableStyles);
             XElement? tableProperties = table.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "tblPr");
             bool firstRow = ReadBooleanAttribute(tableProperties, "firstRow");
@@ -195,6 +197,7 @@ namespace TxtAIEditor.Core.Services
                         baseWidthPx,
                         baseHeightPx,
                         tableStyle,
+                        useBuiltInMediumStyle2,
                         firstRow && rowIndex == 0,
                         lastRow && rowIndex == rows.Count - 1,
                         bandRowName,
@@ -683,6 +686,7 @@ namespace TxtAIEditor.Core.Services
             double baseWidthPx,
             double baseHeightPx,
             XElement? tableStyle,
+            bool useBuiltInMediumStyle2,
             bool isFirstRow,
             bool isLastRow,
             string? bandRowName,
@@ -716,6 +720,9 @@ namespace TxtAIEditor.Core.Services
                 properties?.Elements().FirstOrDefault(e =>
                     e.Name.LocalName is "solidFill" or "gradFill" or "pattFill" or "blipFill"),
                 themeColors);
+            string? builtInFill = useBuiltInMediumStyle2
+                ? ReadBuiltInMediumStyle2Fill(themeColors, isFirstRow, bandRowName)
+                : null;
             if (hasNoFill)
             {
                 style.Append("background:transparent;");
@@ -723,6 +730,10 @@ namespace TxtAIEditor.Core.Services
             else if (!string.IsNullOrWhiteSpace(directFill))
             {
                 style.Append("background:").Append(directFill).Append(';');
+            }
+            else if (!string.IsNullOrWhiteSpace(builtInFill))
+            {
+                style.Append("background:").Append(builtInFill).Append(';');
             }
             else if (!string.IsNullOrWhiteSpace(fill))
             {
@@ -735,36 +746,53 @@ namespace TxtAIEditor.Core.Services
             textColor ??= ReadPresentationColor(
                 wholeTableRegion?.Descendants().FirstOrDefault(e => e.Name.LocalName == "tcTxStyle"),
                 themeColors);
+            if (useBuiltInMediumStyle2)
+            {
+                textColor = isFirstRow ? "#ffffff" : "#1f1f1f";
+            }
             if (!string.IsNullOrWhiteSpace(textColor))
             {
                 style.Append("color:").Append(textColor).Append(';');
             }
 
+            XElement? topLine = ReadTableLine(properties, styleRegion, wholeTableRegion, "lnT");
+            XElement? rightLine = ReadTableLine(properties, styleRegion, wholeTableRegion, "lnR");
+            XElement? bottomLine = ReadTableLine(properties, styleRegion, wholeTableRegion, "lnB");
+            XElement? leftLine = ReadTableLine(properties, styleRegion, wholeTableRegion, "lnL");
+            if (useBuiltInMediumStyle2 &&
+                topLine == null &&
+                rightLine == null &&
+                bottomLine == null &&
+                leftLine == null)
+            {
+                style.Append("border:1px solid #ffffff;");
+            }
+
             AppendTableCellBorder(
                 style,
                 "top",
-                ReadTableLine(properties, styleRegion, wholeTableRegion, "lnT"),
+                topLine,
                 themeColors,
                 slideWidth,
                 baseWidthPx);
             AppendTableCellBorder(
                 style,
                 "right",
-                ReadTableLine(properties, styleRegion, wholeTableRegion, "lnR"),
+                rightLine,
                 themeColors,
                 slideWidth,
                 baseWidthPx);
             AppendTableCellBorder(
                 style,
                 "bottom",
-                ReadTableLine(properties, styleRegion, wholeTableRegion, "lnB"),
+                bottomLine,
                 themeColors,
                 slideWidth,
                 baseWidthPx);
             AppendTableCellBorder(
                 style,
                 "left",
-                ReadTableLine(properties, styleRegion, wholeTableRegion, "lnL"),
+                leftLine,
                 themeColors,
                 slideWidth,
                 baseWidthPx);
@@ -816,11 +844,7 @@ namespace TxtAIEditor.Core.Services
                 return null;
             }
 
-            string? styleId = table.Elements()
-                .FirstOrDefault(e => e.Name.LocalName == "tblPr")?
-                .Elements()
-                .FirstOrDefault(e => e.Name.LocalName == "tableStyleId")?
-                .Value;
+            string? styleId = ReadTableStyleId(table);
             if (string.IsNullOrWhiteSpace(styleId))
             {
                 return null;
@@ -834,6 +858,90 @@ namespace TxtAIEditor.Core.Services
                         NormalizeTableStyleId(e.Attribute("styleId")?.Value),
                         normalizedStyleId,
                         StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string? ReadTableStyleId(XElement table)
+        {
+            return table.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "tblPr")?
+                .Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "tableStyleId")?
+                .Value;
+        }
+
+        private static bool IsBuiltInMediumStyle2Accent1(
+            XElement table,
+            XDocument? tableStyles)
+        {
+            const string mediumStyle2Accent1Id =
+                "5C22544A-7EE6-4342-B048-85BDC9FD1C3A";
+            string normalizedStyleId = NormalizeTableStyleId(ReadTableStyleId(table));
+            if (string.Equals(
+                normalizedStyleId,
+                mediumStyle2Accent1Id,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            string normalizedDefaultId = NormalizeTableStyleId(
+                tableStyles?.Root?.Attribute("def")?.Value);
+            return string.Equals(
+                normalizedStyleId,
+                normalizedDefaultId,
+                StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(
+                    normalizedDefaultId,
+                    mediumStyle2Accent1Id,
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string? ReadBuiltInMediumStyle2Fill(
+            IReadOnlyList<string> themeColors,
+            bool isFirstRow,
+            string? bandRowName)
+        {
+            string accent1 = themeColors.Count > 4 ? themeColors[4] : "#5b9bd5";
+            if (isFirstRow)
+            {
+                return accent1;
+            }
+
+            if (string.Equals(accent1, "#5b9bd5", StringComparison.OrdinalIgnoreCase))
+            {
+                return bandRowName switch
+                {
+                    "band1H" => "#d2deef",
+                    "band2H" => "#eaeff7",
+                    _ => null
+                };
+            }
+
+            return bandRowName switch
+            {
+                "band1H" => BlendWithWhite(accent1, .73),
+                "band2H" => BlendWithWhite(accent1, .90),
+                _ => null
+            };
+        }
+
+        private static string BlendWithWhite(string color, double whiteAmount)
+        {
+            if (string.IsNullOrWhiteSpace(color) ||
+                !color.StartsWith("#", StringComparison.Ordinal) ||
+                color.Length != 7 ||
+                !int.TryParse(color.Substring(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int red) ||
+                !int.TryParse(color.Substring(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int green) ||
+                !int.TryParse(color.Substring(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int blue))
+            {
+                return color;
+            }
+
+            double factor = Math.Clamp(whiteAmount, 0, 1);
+            red = (int)Math.Round(red + ((255 - red) * factor));
+            green = (int)Math.Round(green + ((255 - green) * factor));
+            blue = (int)Math.Round(blue + ((255 - blue) * factor));
+            return $"#{red:X2}{green:X2}{blue:X2}";
         }
 
         private static string NormalizeTableStyleId(string? value)
