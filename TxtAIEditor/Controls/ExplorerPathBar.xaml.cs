@@ -351,15 +351,12 @@ namespace TxtAIEditor.Controls
 
         private static Brush GetHoverBackgroundBrush(FrameworkElement element)
         {
-            if (Application.Current.Resources.TryGetValue("SystemControlBackgroundListLowBrush", out object? value) &&
-                value is Brush brush)
-            {
-                return brush;
-            }
-
+            // Application.Current.Resources 조회는 현재 테마를 따르지 않아 다크모드에서도
+            // 라이트용 브러시(검정 반투명)가 반환될 수 있으므로, 테마를 직접 판단한다.
             bool isDark = element.ActualTheme == ElementTheme.Dark;
+            byte alpha = isDark ? (byte)0x40 : (byte)0x1A; // 다크: 흰색 25%, 라이트: 검정 10%
             byte channel = isDark ? (byte)0xFF : (byte)0x00;
-            return new SolidColorBrush(Windows.UI.Color.FromArgb(0x33, channel, channel, channel));
+            return new SolidColorBrush(Windows.UI.Color.FromArgb(alpha, channel, channel, channel));
         }
 
         private sealed class PathToken
