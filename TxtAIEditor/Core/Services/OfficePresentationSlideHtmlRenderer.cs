@@ -18,6 +18,7 @@ namespace TxtAIEditor.Core.Services
             public string? Type { get; init; }
             public string? Index { get; init; }
             public string BoundsStyle { get; init; } = string.Empty;
+            public XElement? TextStyle { get; init; }
         }
 
         private sealed class PresentationInheritedPart
@@ -513,13 +514,28 @@ namespace TxtAIEditor.Core.Services
             {
                 boxStyle += "color:" + themeColors[1] + ";";
             }
+            XElement? placeholderTextStyle = null;
+            if (TryReadPlaceholderTextStyle(
+                element,
+                placeholderBounds,
+                out XElement? readPlaceholderTextStyle))
+            {
+                placeholderTextStyle = readPlaceholderTextStyle;
+            }
+
+            XElement? shapeBodyStyle = MergePresentationTextStyles(
+                placeholderTextStyle,
+                inheritedBodyStyle);
+            XElement? shapeTitleStyle = MergePresentationTextStyles(
+                placeholderTextStyle,
+                inheritedTitleStyle);
             string textHtml = OfficePresentationTextHtmlRenderer.BuildShapeTextHtml(
                 element,
                 themeColors,
                 slideWidth,
                 baseWidthPx,
-                inheritedBodyStyle,
-                inheritedTitleStyle);
+                shapeBodyStyle,
+                shapeTitleStyle);
             if (!string.IsNullOrWhiteSpace(textHtml))
             {
                 string textBoxStyle =
@@ -1295,7 +1311,11 @@ namespace TxtAIEditor.Core.Services
                 {
                     Type = type,
                     Index = index,
-                    BoundsStyle = bounds
+                    BoundsStyle = bounds,
+                    TextStyle = element.Descendants()
+                        .FirstOrDefault(e => e.Name.LocalName == "txBody")?
+                        .Elements()
+                        .FirstOrDefault(e => e.Name.LocalName == "lstStyle")
                 };
             }
         }
@@ -1306,9 +1326,35 @@ namespace TxtAIEditor.Core.Services
             out string bounds)
         {
             bounds = string.Empty;
-            if (!TryReadPlaceholderInfo(element, out string? type, out string? index))
+            PresentationPlaceholderBounds? match =
+                FindPlaceholderBounds(element, placeholderBounds);
+            if (match == null)
             {
                 return false;
+            }
+
+            bounds = match.BoundsStyle;
+            return true;
+        }
+
+        private static bool TryReadPlaceholderTextStyle(
+            XElement element,
+            IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds,
+            out XElement? textStyle)
+        {
+            PresentationPlaceholderBounds? match =
+                FindPlaceholderBounds(element, placeholderBounds);
+            textStyle = match?.TextStyle;
+            return match != null;
+        }
+
+        private static PresentationPlaceholderBounds? FindPlaceholderBounds(
+            XElement element,
+            IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds)
+        {
+            if (!TryReadPlaceholderInfo(element, out string? type, out string? index))
+            {
+                return null;
             }
 
             PresentationPlaceholderBounds? match = null;
@@ -1326,13 +1372,61 @@ namespace TxtAIEditor.Core.Services
                     PlaceholderTypesMatch(item.Type, "body"));
             }
 
-            if (match == null)
+            return match;
+        }
+
+        private static XElement? MergePresentationTextStyles(
+            XElement? overrideStyle,
+            XElement? fallbackStyle)
+        {
+            if (overrideStyle == null)
             {
-                return false;
+                return fallbackStyle;
             }
 
-            bounds = match.BoundsStyle;
-            return true;
+            if (fallbackStyle == null)
+            {
+                return overrideStyle;
+            }
+
+            return MergePresentationStyleElement(fallbackStyle, overrideStyle);
+        }
+
+        private static XElement MergePresentationStyleElement(
+            XElement fallback,
+            XElement overrideElement)
+        {
+            var merged = new XElement(fallback.Name);
+            foreach (XAttribute attribute in fallback.Attributes())
+            {
+                merged.SetAttributeValue(attribute.Name, attribute.Value);
+            }
+
+            foreach (XAttribute attribute in overrideElement.Attributes())
+            {
+                merged.SetAttributeValue(attribute.Name, attribute.Value);
+            }
+
+            foreach (XElement fallbackChild in fallback.Elements())
+            {
+                XElement? overrideChild = overrideElement.Elements()
+                    .FirstOrDefault(child =>
+                        child.Name.LocalName == fallbackChild.Name.LocalName);
+                merged.Add(overrideChild == null
+                    ? new XElement(fallbackChild)
+                    : MergePresentationStyleElement(fallbackChild, overrideChild));
+            }
+
+            foreach (XElement overrideChild in overrideElement.Elements())
+            {
+                if (!fallback.Elements().Any(child =>
+                    child.Name.LocalName == overrideChild.Name.LocalName))
+                {
+                    merged.Add(new XElement(overrideChild));
+                }
+            }
+
+            return merged;
         }
 
         private static bool TryReadPlaceholderInfo(
