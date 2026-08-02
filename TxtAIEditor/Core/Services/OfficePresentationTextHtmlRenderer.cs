@@ -698,6 +698,11 @@ namespace TxtAIEditor.Core.Services
                 .FirstOrDefault(e => e.Name.LocalName == "tcPr");
 
             var style = new StringBuilder();
+            AppendTableCellBaseFontStyle(
+                style,
+                cell,
+                slideWidth,
+                baseWidthPx);
             XElement? styleRegion = ReadTableStyleRegion(
                 tableStyle,
                 isFirstRow,
@@ -833,6 +838,66 @@ namespace TxtAIEditor.Core.Services
             }
 
             return style.ToString();
+        }
+
+        private static void AppendTableCellBaseFontStyle(
+            StringBuilder style,
+            XElement cell,
+            long slideWidth,
+            double baseWidthPx)
+        {
+            XElement? textBody = cell.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "txBody");
+            if (textBody == null)
+            {
+                return;
+            }
+
+            XElement? paragraph = textBody.Descendants()
+                .Where(e => e.Name.LocalName == "p")
+                .FirstOrDefault(e => e.Descendants().Any(child =>
+                    child.Name.LocalName is "t" or "br" or "cr"));
+            XElement? runProperties = paragraph?
+                .Elements()
+                .Where(e => e.Name.LocalName is "r" or "fld")
+                .SelectMany(e => e.Elements())
+                .FirstOrDefault(e => e.Name.LocalName == "rPr");
+            if (paragraph != null)
+            {
+                runProperties ??= ReadParagraphDefaultRunProperties(paragraph, textBody);
+            }
+            runProperties ??= textBody.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "rPr");
+            if (runProperties == null)
+            {
+                return;
+            }
+
+            double fontScale = ReadNormAutofitScale(textBody);
+            if (int.TryParse(
+                    runProperties.Attribute("sz")?.Value,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int size) &&
+                size > 0)
+            {
+                style.Append("font-size:")
+                    .Append(FormatInvariant(
+                        PointsToPixels(size / 100.0, slideWidth, baseWidthPx) *
+                        fontScale))
+                    .Append("px;");
+            }
+
+            string? typeface = runProperties.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "latin")?
+                .Attribute("typeface")?.Value;
+            if (!string.IsNullOrWhiteSpace(typeface) &&
+                !typeface.Contains('+', StringComparison.Ordinal))
+            {
+                style.Append("font-family:'")
+                    .Append(typeface.Replace("'", "\\'", StringComparison.Ordinal))
+                    .Append("','Segoe UI',Arial,sans-serif;");
+            }
         }
 
         private static XElement? ReadTableStyleDefinition(

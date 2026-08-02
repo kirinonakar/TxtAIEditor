@@ -193,14 +193,13 @@ body { padding: 28px 16px 40px; }
     border: 0 solid transparent;
     padding: .32em .45em;
     vertical-align: top;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
     white-space: pre-wrap;
 }
 .ppt-table p {
-    margin: 0 0 .2em;
-    line-height: 1.16;
+    margin: 0;
+    line-height: 1.1;
 }
-.ppt-table p:last-child { margin-bottom: 0; }
 </style>
 </head>
 <body>
