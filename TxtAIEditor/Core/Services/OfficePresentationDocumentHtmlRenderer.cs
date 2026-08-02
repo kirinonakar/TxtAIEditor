@@ -154,7 +154,7 @@ body { padding: 28px 16px 40px; }
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     padding: 0;
-    line-height: 1.16;
+    line-height: 1;
 }
 .ppt-text {
     display: block;

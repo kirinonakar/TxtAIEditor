@@ -43,13 +43,36 @@ namespace TxtAIEditor.Core.Services
             double fallbackFontSizePx =
                 PointsToPixels(ReadFallbackFontPoint(shape), slideWidth, baseWidthPx) * fontScale;
 
+            List<XElement> paragraphElements = textBody.Elements()
+                .Where(e => e.Name.LocalName == "p")
+                .ToList();
             int paragraphIndex = 0;
-            foreach (XElement paragraph in textBody.Elements().Where(e => e.Name.LocalName == "p"))
+            foreach (XElement paragraph in paragraphElements)
             {
                 paragraphIndex++;
                 string text = ReadParagraphText(paragraph);
                 if (string.IsNullOrWhiteSpace(text))
                 {
+                    if (paragraphIndex < paragraphElements.Count)
+                    {
+                        string emptyParagraphStyle = ReadParagraphStyle(
+                            paragraph,
+                            textBody,
+                            effectiveTextStyle,
+                            slideWidth,
+                            baseWidthPx) +
+                            ReadParagraphDefaultRunStyle(
+                                paragraph,
+                                textBody,
+                                themeColors,
+                                slideWidth,
+                                baseWidthPx,
+                                fontScale,
+                                fallbackFontSizePx,
+                                effectiveTextStyle);
+                        AppendEmptyParagraphHtml(paragraphs, emptyParagraphStyle);
+                    }
+
                     continue;
                 }
 
@@ -98,6 +121,21 @@ namespace TxtAIEditor.Core.Services
             }
 
             return paragraphs.ToString();
+        }
+
+        private static void AppendEmptyParagraphHtml(
+            StringBuilder builder,
+            string paragraphStyle)
+        {
+            builder.Append("<p");
+            if (!string.IsNullOrWhiteSpace(paragraphStyle))
+            {
+                builder.Append(" style=\"")
+                    .Append(Html(paragraphStyle))
+                    .Append('"');
+            }
+
+            builder.Append("><br></p>");
         }
 
         public static string BuildTableHtml(
@@ -317,12 +355,23 @@ namespace TxtAIEditor.Core.Services
                     paragraph,
                     textBody,
                     inheritedBodyStyle);
+            XElement? inheritedDefaultRunProperties =
+                ReadParagraphLevelDefaultRunProperties(
+                    paragraph,
+                    textBody,
+                    inheritedBodyStyle);
             string defaultRunStyle = ReadRunTextStyle(
-                defaultRunProperties,
-                themeColors,
-                slideWidth,
-                baseWidthPx,
-                fontScale);
+                    inheritedDefaultRunProperties,
+                    themeColors,
+                    slideWidth,
+                    baseWidthPx,
+                    fontScale) +
+                ReadRunTextStyle(
+                    defaultRunProperties,
+                    themeColors,
+                    slideWidth,
+                    baseWidthPx,
+                    fontScale);
             foreach (XElement element in paragraph.Elements())
             {
                 if (element.Name.LocalName == "r" || element.Name.LocalName == "fld")
@@ -339,6 +388,7 @@ namespace TxtAIEditor.Core.Services
                         element.Descendants()
                             .Where(e => e.Name.LocalName == "t")
                             .Select(e => e.Value));
+                    text = NormalizePresentationText(text, runProperties);
                     if (string.IsNullOrEmpty(text))
                     {
                         continue;
@@ -362,7 +412,9 @@ namespace TxtAIEditor.Core.Services
 
             if (builder.Length == 0)
             {
-                builder.Append(Html(ReadParagraphText(paragraph)));
+                builder.Append(Html(NormalizePresentationText(
+                    ReadParagraphText(paragraph),
+                    null)));
             }
 
             return builder.ToString();
@@ -668,6 +720,28 @@ namespace TxtAIEditor.Core.Services
             return builder.ToString();
         }
 
+        private static string NormalizePresentationText(
+            string text,
+            XElement? runProperties)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            bool usesWingdingsSymbol = runProperties?.Descendants()
+                .Any(element =>
+                    element.Name.LocalName == "sym" &&
+                    (element.Attribute("typeface")?.Value ?? string.Empty)
+                        .Contains("Wingdings", StringComparison.OrdinalIgnoreCase)) == true;
+            if (!usesWingdingsSymbol && !text.Contains('\uF0E0'))
+            {
+                return text;
+            }
+
+            return text.Replace('\uF0E0', '→');
+        }
+
         private static string ReadParagraphText(XElement paragraph)
         {
             var builder = new StringBuilder();
@@ -725,6 +799,19 @@ namespace TxtAIEditor.Core.Services
                 return endParagraphRunProperties;
             }
 
+            return ReadParagraphLevelProperties(
+                    textBody,
+                    inheritedBodyStyle,
+                    ReadParagraphLevel(paragraph))
+                ?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "defRPr");
+        }
+
+        private static XElement? ReadParagraphLevelDefaultRunProperties(
+            XElement paragraph,
+            XElement? textBody,
+            XElement? inheritedBodyStyle = null)
+        {
             return ReadParagraphLevelProperties(
                     textBody,
                     inheritedBodyStyle,
@@ -798,12 +885,23 @@ namespace TxtAIEditor.Core.Services
                     paragraph,
                     textBody,
                     inheritedBodyStyle);
+            XElement? inheritedDefaultRunProperties =
+                ReadParagraphLevelDefaultRunProperties(
+                    paragraph,
+                    textBody,
+                    inheritedBodyStyle);
             string style = ReadRunTextStyle(
-                defaultRunProperties,
-                themeColors,
-                slideWidth,
-                baseWidthPx,
-                fontScale);
+                    inheritedDefaultRunProperties,
+                    themeColors,
+                    slideWidth,
+                    baseWidthPx,
+                    fontScale) +
+                ReadRunTextStyle(
+                    defaultRunProperties,
+                    themeColors,
+                    slideWidth,
+                    baseWidthPx,
+                    fontScale);
             if (!style.Contains("font-size:", StringComparison.OrdinalIgnoreCase) &&
                 fallbackFontSizePx > 0)
             {
