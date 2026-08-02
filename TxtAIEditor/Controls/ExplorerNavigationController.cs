@@ -128,8 +128,7 @@ namespace TxtAIEditor.Controls
             }
 
             IsTreeMode = enableTreeMode;
-            _lastFilterQuery = string.Empty;
-            _leftSidebar.ClearExplorerFilter();
+            ClearExplorerFilterState();
             _leftSidebar.SetExplorerTreeMode(IsTreeMode);
             UpdateBackButtonState();
 
@@ -178,6 +177,7 @@ namespace TxtAIEditor.Controls
 
         private async Task<bool> LoadFlatDirectoryRootAsync(string folderPath, bool updateGitStatus)
         {
+            ClearExplorerFilterState();
             CancelFlatDirectoryLoad();
             var cancellation = new System.Threading.CancellationTokenSource();
             System.Threading.CancellationToken cancellationToken = cancellation.Token;
@@ -262,6 +262,7 @@ namespace TxtAIEditor.Controls
 
         private void LoadArchiveDirectoryRoot(string archivePath, string entryDirectory)
         {
+            ClearExplorerFilterState();
             CancelFlatDirectoryLoad();
             try
             {
@@ -485,11 +486,16 @@ namespace TxtAIEditor.Controls
                     : LoadRemoteDirectoryAsync();
         }
 
-        private async Task LoadRemoteDirectoryAsync()
+        private async Task LoadRemoteDirectoryAsync(bool clearFilter = true)
         {
             if (!IsViewingRemote || _remoteWorkspaceService.ActiveConnection == null)
             {
                 return;
+            }
+
+            if (clearFilter)
+            {
+                ClearExplorerFilterState();
             }
 
             CurrentArchivePath = string.Empty;
@@ -573,7 +579,7 @@ namespace TxtAIEditor.Controls
 
         private async Task ApplyRemoteFilterAsync(string query)
         {
-            await LoadRemoteDirectoryAsync();
+            await LoadRemoteDirectoryAsync(clearFilter: false);
             if (string.IsNullOrWhiteSpace(query))
             {
                 return;
@@ -719,7 +725,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExplorerTreeModeBtn.IsEnabled = true;
             SetCurrentFolderPath(_remoteWorkspaceService.ActiveDirectoryVirtualPath);
             _currentRepoPathChanged(string.Empty);
-            _leftSidebar.ClearExplorerFilter();
+            ClearExplorerFilterState();
             if (IsTreeMode)
             {
                 await LoadRemoteTreeRootAsync();
@@ -833,6 +839,7 @@ namespace TxtAIEditor.Controls
 
         private void LoadTreeRoot(string folderPath)
         {
+            ClearExplorerFilterState();
             if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
             {
                 return;
@@ -872,6 +879,7 @@ namespace TxtAIEditor.Controls
 
         private async Task LoadRemoteTreeRootAsync()
         {
+            ClearExplorerFilterState();
             if (!IsViewingRemote || _remoteWorkspaceService.ActiveConnection == null)
             {
                 return;
@@ -1799,9 +1807,29 @@ namespace TxtAIEditor.Controls
 
         private string _lastFilterQuery = string.Empty;
         private bool _hideUnwantedFolders = true;
+        private bool _isClearingExplorerFilter;
+
+        private void ClearExplorerFilterState()
+        {
+            _isClearingExplorerFilter = true;
+            try
+            {
+                _lastFilterQuery = string.Empty;
+                _leftSidebar.ClearExplorerFilter();
+            }
+            finally
+            {
+                _isClearingExplorerFilter = false;
+            }
+        }
 
         private async void OnExplorerFilterTextChanged(object sender, Microsoft.UI.Xaml.Controls.TextChangedEventArgs e)
         {
+            if (_isClearingExplorerFilter)
+            {
+                return;
+            }
+
             if (sender is Microsoft.UI.Xaml.Controls.TextBox textBox)
             {
                 string query = textBox.Text;
