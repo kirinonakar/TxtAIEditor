@@ -88,6 +88,14 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
+                // Collapsed 등 아직 배치 전에는 폭이 0이라, 폭 80px 가정으로 그리면
+                // 첫 화면에 잘못된 내용이 나왔다가 SizeChanged에서 다시 그려져
+                // 주소 표시줄이 한 템포 늦게 보인다. 실제 폭이 생길 때까지 기다린다.
+                if (ActualWidth <= HorizontalPadding * 2)
+                {
+                    return;
+                }
+
                 double availableWidth = Math.Max(ActualWidth - HorizontalPadding * 2, 80);
 
                 for (double fontSize = MaxFontSize; fontSize >= MinFontSize - 0.001; fontSize -= FontStep)

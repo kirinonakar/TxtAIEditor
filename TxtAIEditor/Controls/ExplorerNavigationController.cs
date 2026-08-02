@@ -1345,8 +1345,10 @@ namespace TxtAIEditor.Controls
             }
 
             bool hasSegments = segments.Count > 0;
-            _leftSidebar.ExplorerBreadcrumb.ItemsSource = hasSegments ? segments : null;
+            // 표시 상태를 먼저 정해야 폭이 이미 확보된 경우 ItemsSource 설정 시점에
+            // 바로 올바른 폭으로 그려 SizeChanged를 기다리지 않는다.
             _leftSidebar.ExplorerBreadcrumb.Visibility = hasSegments ? Visibility.Visible : Visibility.Collapsed;
+            _leftSidebar.ExplorerBreadcrumb.ItemsSource = hasSegments ? segments : null;
         }
 
         private void BuildLocalBreadcrumb(List<ExplorerBreadcrumbSegment> segments, string folderPath)
