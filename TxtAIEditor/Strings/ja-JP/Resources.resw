@@ -1199,6 +1199,21 @@
   <data name="SettingsPreviewFontSize" xml:space="preserve">
     <value>プレビューフォントサイズ</value>
   </data>
+  <data name="SettingsAozoraFontFamily" xml:space="preserve">
+    <value>Aozoraプレビューフォント</value>
+  </data>
+  <data name="SettingsAozoraUseCustomBg" xml:space="preserve">
+    <value>カスタムAozora背景色を使用</value>
+  </data>
+  <data name="SettingsAozoraUseCustomFg" xml:space="preserve">
+    <value>カスタムAozora文字色を使用</value>
+  </data>
+  <data name="SettingsAozoraFontSize" xml:space="preserve">
+    <value>Aozoraプレビューフォントサイズ</value>
+  </data>
+  <data name="SettingsAppearanceGroupAozora" xml:space="preserve">
+    <value>Aozora プレビューの外観と色</value>
+  </data>
   <data name="SettingsShortcuts" xml:space="preserve">
     <value>ショートカット</value>
   </data>

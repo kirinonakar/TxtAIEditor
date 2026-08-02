@@ -1199,6 +1199,21 @@
   <data name="SettingsPreviewFontSize" xml:space="preserve">
     <value>预览字号</value>
   </data>
+  <data name="SettingsAozoraFontFamily" xml:space="preserve">
+    <value>Aozora 预览字体</value>
+  </data>
+  <data name="SettingsAozoraUseCustomBg" xml:space="preserve">
+    <value>使用自定义 Aozora 背景色</value>
+  </data>
+  <data name="SettingsAozoraUseCustomFg" xml:space="preserve">
+    <value>使用自定义 Aozora 前景色</value>
+  </data>
+  <data name="SettingsAozoraFontSize" xml:space="preserve">
+    <value>Aozora 预览字号</value>
+  </data>
+  <data name="SettingsAppearanceGroupAozora" xml:space="preserve">
+    <value>Aozora 预览外观与颜色</value>
+  </data>
   <data name="SettingsShortcuts" xml:space="preserve">
     <value>快捷键</value>
   </data>

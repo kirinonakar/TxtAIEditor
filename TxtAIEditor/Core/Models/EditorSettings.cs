@@ -31,6 +31,10 @@ namespace TxtAIEditor.Core.Models
         public double PreviewFontSize { get; set; } = 15.0;
         public string PreviewCustomBackgroundColor { get; set; } = string.Empty;
         public string PreviewCustomForegroundColor { get; set; } = string.Empty;
+        public string AozoraPreviewFontFamily { get; set; } = "Noto Serif JP, \"Yu Mincho\", \"MS Mincho\", \"Hiragino Mincho ProN\", \"BIZ UDPMincho\", serif";
+        public double AozoraPreviewFontSize { get; set; } = 15.0;
+        public string AozoraPreviewCustomBackgroundColor { get; set; } = string.Empty;
+        public string AozoraPreviewCustomForegroundColor { get; set; } = string.Empty;
         public bool AutoSave { get; set; } = false;
         public bool AutoSaveAllowNonGitFolders { get; set; } = false;
         public string PreviewMode { get; set; } = "Markdown";

@@ -1199,6 +1199,21 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="SettingsPreviewFontSize" xml:space="preserve">
     <value>Preview Font Size</value>
   </data>
+  <data name="SettingsAozoraFontFamily" xml:space="preserve">
+    <value>Aozora Preview Font Family</value>
+  </data>
+  <data name="SettingsAozoraUseCustomBg" xml:space="preserve">
+    <value>Use Custom Aozora Background Color</value>
+  </data>
+  <data name="SettingsAozoraUseCustomFg" xml:space="preserve">
+    <value>Use Custom Aozora Foreground Color</value>
+  </data>
+  <data name="SettingsAozoraFontSize" xml:space="preserve">
+    <value>Aozora Preview Font Size</value>
+  </data>
+  <data name="SettingsAppearanceGroupAozora" xml:space="preserve">
+    <value>Aozora Preview Appearance &amp; Colors</value>
+  </data>
   <data name="SettingsShortcuts" xml:space="preserve">
     <value>Shortcuts</value>
   </data>

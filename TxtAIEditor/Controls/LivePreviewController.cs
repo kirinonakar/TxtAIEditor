@@ -401,6 +401,10 @@ namespace TxtAIEditor.Controls
                     previewFontSize = _settingsService.CurrentSettings.PreviewFontSize,
                     previewCustomBackgroundColor = _settingsService.CurrentSettings.PreviewCustomBackgroundColor,
                     previewCustomForegroundColor = _settingsService.CurrentSettings.PreviewCustomForegroundColor,
+                    aozoraPreviewFontFamily = _settingsService.CurrentSettings.AozoraPreviewFontFamily,
+                    aozoraPreviewFontSize = _settingsService.CurrentSettings.AozoraPreviewFontSize,
+                    aozoraPreviewCustomBackgroundColor = _settingsService.CurrentSettings.AozoraPreviewCustomBackgroundColor,
+                    aozoraPreviewCustomForegroundColor = _settingsService.CurrentSettings.AozoraPreviewCustomForegroundColor,
                     scrollSyncEnabled = _isScrollSyncEnabled()
                 };
 

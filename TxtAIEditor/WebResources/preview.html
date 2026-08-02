@@ -353,7 +353,7 @@
         }
 
         .aozora {
-            font-family: "Noto Serif JP", "Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif;
+            font-family: var(--aozora-font, "Noto Serif JP", "Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif);
             letter-spacing: 0.04em;
         }
 
@@ -803,18 +803,32 @@
 
         function applyTheme(message) {
             const theme = message.theme || 'Dark';
+            const isAozora = message.mode === 'aozora';
             const defaultBg = theme === 'PastelDark' ? '#24273a' : (theme === 'Light' ? '#ffffff' : '#1e1e1e');
             const defaultFg = theme === 'PastelDark' ? '#cad3f5' : (theme === 'Light' ? '#1a1a1a' : '#d4d4d4');
             const previewBg = message.previewCustomBackgroundColor || message.customBackgroundColor || defaultBg;
             const previewFg = message.previewCustomForegroundColor || message.customForegroundColor || defaultFg;
-            document.documentElement.style.setProperty('--bg', previewBg);
-            document.documentElement.style.setProperty('--fg', previewFg);
+            const bg = (isAozora && message.aozoraPreviewCustomBackgroundColor) ? message.aozoraPreviewCustomBackgroundColor : previewBg;
+            const fg = (isAozora && message.aozoraPreviewCustomForegroundColor) ? message.aozoraPreviewCustomForegroundColor : previewFg;
+            document.documentElement.style.setProperty('--bg', bg);
+            document.documentElement.style.setProperty('--fg', fg);
             document.documentElement.style.setProperty('--code-bg', theme === 'PastelDark' ? '#1e2030' : (theme === 'Light' ? '#f3f5f7' : '#2d2d2d'));
             document.documentElement.style.setProperty('--border', theme === 'PastelDark' ? '#36394f' : (theme === 'Light' ? '#d8dee4' : '#3e3e3e'));
             document.documentElement.style.setProperty('--muted', theme === 'PastelDark' ? '#a5adcb' : (theme === 'Light' ? '#667085' : '#9aa0a6'));
-            document.documentElement.style.setProperty('--font', message.previewFontFamily || message.uiFontFamily || '"Segoe UI", "Malgun Gothic", Arial, sans-serif');
-            var previewSize = message.previewFontSize || 15;
+            const defaultAozoraFont = '"Noto Serif JP", "Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif';
+            const font = isAozora
+                ? (message.aozoraPreviewFontFamily || defaultAozoraFont)
+                : (message.previewFontFamily || message.uiFontFamily || '"Segoe UI", "Malgun Gothic", Arial, sans-serif');
+            const previewSize = (isAozora && message.aozoraPreviewFontSize)
+                ? message.aozoraPreviewFontSize
+                : (message.previewFontSize || 15);
+            document.documentElement.style.setProperty('--font', font);
             document.documentElement.style.setProperty('--font-size', previewSize + 'px');
+            if (isAozora) {
+                document.documentElement.style.setProperty('--aozora-font', font);
+            } else {
+                document.documentElement.style.removeProperty('--aozora-font');
+            }
 
             state.theme = theme;
             if (typeof mermaid !== 'undefined') {

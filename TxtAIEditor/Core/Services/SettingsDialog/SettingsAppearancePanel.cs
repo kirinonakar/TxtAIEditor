@@ -24,6 +24,12 @@ namespace TxtAIEditor.Core.Services
         private readonly ColorPicker _customFgPicker;
         private readonly ColorPicker _previewBgPicker;
         private readonly ColorPicker _previewFgPicker;
+        private readonly ComboBox _aozoraFontFamilyCombo;
+        private readonly Slider _aozoraSizeSlider;
+        private readonly CheckBox _aozoraBgCheck;
+        private readonly CheckBox _aozoraFgCheck;
+        private readonly ColorPicker _aozoraBgPicker;
+        private readonly ColorPicker _aozoraFgPicker;
 
         public SettingsAppearancePanel(
             EditorSettings settings,
@@ -76,11 +82,27 @@ namespace TxtAIEditor.Core.Services
             BindEnabled(_previewBgCheck, previewBgDropdown);
             BindEnabled(_previewFgCheck, previewFgDropdown);
 
+            _aozoraFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AozoraPreviewFontFamily, fontFamilies);
+            _aozoraSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.AozoraPreviewFontSize, StepFrequency = 1 };
+            _aozoraBgCheck = new CheckBox { Content = getString("SettingsAozoraUseCustomBg", "커스텀 Aozora 배경색 사용"), IsChecked = !string.IsNullOrWhiteSpace(settings.AozoraPreviewCustomBackgroundColor) };
+            _aozoraFgCheck = new CheckBox { Content = getString("SettingsAozoraUseCustomFg", "커스텀 Aozora 글자색 사용"), IsChecked = !string.IsNullOrWhiteSpace(settings.AozoraPreviewCustomForegroundColor) };
+            var aozoraBgDropdown = SettingsDialogUi.CreateColorDropdown(
+                getString("SettingsAozoraUseCustomBg", "Aozora 배경색"),
+                SettingsDialogUi.ResolvePickerColor(settings.AozoraPreviewCustomBackgroundColor, defaultBg),
+                out _aozoraBgPicker);
+            var aozoraFgDropdown = SettingsDialogUi.CreateColorDropdown(
+                getString("SettingsAozoraUseCustomFg", "Aozora 글자색"),
+                SettingsDialogUi.ResolvePickerColor(settings.AozoraPreviewCustomForegroundColor, defaultFg),
+                out _aozoraFgPicker);
+            BindEnabled(_aozoraBgCheck, aozoraBgDropdown);
+            BindEnabled(_aozoraFgCheck, aozoraFgDropdown);
+
             var section = new StackPanel { Spacing = 10, Width = 460, Padding = new Thickness(2, 6, 2, 2) };
             section.Children.Add(CreateGeneralCard(getString));
             section.Children.Add(CreateUiCard(getString));
             section.Children.Add(CreateEditorCard(getString, settings, customBgDropdown, customFgDropdown));
             section.Children.Add(CreatePreviewCard(getString, settings, previewBgDropdown, previewFgDropdown));
+            section.Children.Add(CreateAozoraCard(getString, settings, aozoraBgDropdown, aozoraFgDropdown));
             Content = section;
         }
 
@@ -218,6 +240,55 @@ namespace TxtAIEditor.Core.Services
                 "\uE8A5");
         }
 
+        private Border CreateAozoraCard(
+            Func<string, string, string> getString,
+            EditorSettings settings,
+            UIElement aozoraBgDropdown,
+            UIElement aozoraFgDropdown)
+        {
+            var content = new StackPanel { Spacing = 6 };
+
+            SettingsDialogUi.AddLabel(content, getString("SettingsAozoraFontFamily", "Aozora 프리뷰 폰트"));
+            content.Children.Add(_aozoraFontFamilyCombo);
+
+            var aozoraSizeLabel = new TextBlock
+            {
+                Text = getString("SettingsAozoraFontSize", "Aozora 프리뷰 글자 크기") + $" ({settings.AozoraPreviewFontSize:0}pt)",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+            content.Children.Add(aozoraSizeLabel);
+            content.Children.Add(_aozoraSizeSlider);
+            _aozoraSizeSlider.ValueChanged += (_, args) => aozoraSizeLabel.Text = getString("SettingsAozoraFontSize", "Aozora 프리뷰 글자 크기") + $" ({args.NewValue:0}pt)";
+
+            var colorGrid = new Grid();
+            colorGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            colorGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12, GridUnitType.Pixel) });
+            colorGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var bgStack = new StackPanel { Spacing = 4 };
+            bgStack.Children.Add(_aozoraBgCheck);
+            bgStack.Children.Add(aozoraBgDropdown);
+            Grid.SetColumn(bgStack, 0);
+
+            var fgStack = new StackPanel { Spacing = 4 };
+            fgStack.Children.Add(_aozoraFgCheck);
+            fgStack.Children.Add(aozoraFgDropdown);
+            Grid.SetColumn(fgStack, 2);
+
+            colorGrid.Children.Add(bgStack);
+            colorGrid.Children.Add(fgStack);
+
+            var colorSubGroup = CreateSubGroup(
+                getString("SettingsAppearanceGroupCustomColors", "커스텀 색상 설정"),
+                colorGrid);
+            content.Children.Add(colorSubGroup);
+
+            return CreateCard(
+                getString("SettingsAppearanceGroupAozora", "Aozora 프리뷰 모양 & 색상"),
+                content,
+                "\uE8A5");
+        }
+
         public void ApplyToSettings(EditorSettings settings)
         {
             settings.Language = _languageCombo.SelectedIndex switch
@@ -245,6 +316,10 @@ namespace TxtAIEditor.Core.Services
             settings.PreviewFontSize = _previewSizeSlider.Value;
             settings.PreviewCustomBackgroundColor = _previewBgCheck.IsChecked == true ? SettingsDialogUi.ColorToHex(_previewBgPicker.Color) : string.Empty;
             settings.PreviewCustomForegroundColor = _previewFgCheck.IsChecked == true ? SettingsDialogUi.ColorToHex(_previewFgPicker.Color) : string.Empty;
+            settings.AozoraPreviewFontFamily = SettingsDialogUi.GetSelectedComboText(_aozoraFontFamilyCombo, settings.AozoraPreviewFontFamily);
+            settings.AozoraPreviewFontSize = _aozoraSizeSlider.Value;
+            settings.AozoraPreviewCustomBackgroundColor = _aozoraBgCheck.IsChecked == true ? SettingsDialogUi.ColorToHex(_aozoraBgPicker.Color) : string.Empty;
+            settings.AozoraPreviewCustomForegroundColor = _aozoraFgCheck.IsChecked == true ? SettingsDialogUi.ColorToHex(_aozoraFgPicker.Color) : string.Empty;
         }
 
         private static ComboBox CreateLanguageCombo(EditorSettings settings, Func<string, string, string> getString)
