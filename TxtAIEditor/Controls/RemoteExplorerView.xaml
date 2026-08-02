@@ -41,68 +41,148 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="RemoteFlyoutListItemStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="10,1"/>
+            <Setter Property="MinHeight" Value="40"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Grid x:Name="ItemRoot"
+                              CornerRadius="6"
+                              Background="Transparent"
+                              Control.IsTemplateFocusTarget="True">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal"/>
+                                    <VisualState x:Name="PointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="ItemRoot.Background" Value="{ThemeResource SystemControlHighlightListLowBrush}"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="ItemRoot.Background" Value="{ThemeResource SystemControlHighlightListMediumBrush}"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Selected">
+                                        <VisualState.Setters>
+                                            <Setter Target="ItemRoot.Background" Value="{ThemeResource SystemControlHighlightListAccentLowBrush}"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="SelectedUnfocused">
+                                        <VisualState.Setters>
+                                            <Setter Target="ItemRoot.Background" Value="{ThemeResource SystemControlHighlightListAccentLowBrush}"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="SelectedPointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="ItemRoot.Background" Value="{ThemeResource SystemControlHighlightListAccentMediumBrush}"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="SelectedPressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="ItemRoot.Background" Value="{ThemeResource SystemControlHighlightListAccentMediumBrush}"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              ContentTransitions="{TemplateBinding ContentTransitions}"
+                                              HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Stretch"
+                                              Padding="{TemplateBinding Padding}"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
-    <Grid Width="280" MinWidth="200" MaxHeight="520">
+    <Grid Width="300" MinWidth="200" MaxHeight="520">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="4,2,4,10" ColumnSpacing="8">
+        <Grid Margin="16,14,14,12" ColumnSpacing="10">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <StackPanel VerticalAlignment="Center">
-                <TextBlock x:Name="TitleText" Text="리모트 서버" FontSize="18" FontWeight="SemiBold"/>
+            <Border Width="34" Height="34" CornerRadius="8"
+                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                    VerticalAlignment="Center">
+                <FontIcon Glyph="&#xE774;" FontSize="15" Foreground="White"/>
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                <TextBlock x:Name="TitleText" Text="리모트 서버" FontSize="13" FontWeight="SemiBold"/>
                 <TextBlock x:Name="DescriptionText"
                            Text="WSL, SSH/SFTP, FTPS, WebDAV"
-                           FontSize="11"
+                           FontSize="10"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
             <Button x:Name="AddServerButton"
-                    Grid.Column="1"
+                    Grid.Column="2"
                     Click="OnAddServerClick"
-                    Padding="10,6"
-                    VerticalAlignment="Center">
+                    Padding="10,5"
+                    VerticalAlignment="Center"
+                    Background="Transparent"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE710;" FontSize="12"/>
-                    <TextBlock x:Name="AddServerButtonText" Text="서버 추가"/>
+                    <FontIcon Glyph="&#xE710;" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                    <TextBlock x:Name="AddServerButtonText" Text="서버 추가" FontSize="12"/>
                 </StackPanel>
             </Button>
         </Grid>
 
-        <Grid x:Name="ServerListPanel" Grid.Row="1" MinHeight="96">
+        <Border Grid.Row="1" Height="1" Margin="16,0" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+
+        <Grid x:Name="ServerListPanel" Grid.Row="2" MinHeight="96">
             <ListView x:Name="ServerList"
                       MaxHeight="360"
                       IsItemClickEnabled="True"
                       ItemClick="OnServerItemClick"
-                      SelectionMode="None">
+                      SelectionMode="None"
+                      ItemContainerStyle="{StaticResource RemoteFlyoutListItemStyle}">
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <Grid MinHeight="54" Padding="8,4" ColumnSpacing="10">
+                        <Grid ColumnSpacing="10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <FontIcon Glyph="&#xE774;" FontSize="18" VerticalAlignment="Center"
-                                      Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="{Binding Summary}" FontSize="11"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                           TextTrimming="CharacterEllipsis"/>
-                            </StackPanel>
-                            <Button Grid.Column="2"
+                            <Border Width="30" Height="30" CornerRadius="6"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE774;" FontSize="13"
+                                          Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                            <Border Grid.Column="2" CornerRadius="4" Padding="6,2" Margin="2,0"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Summary}" FontSize="10"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            </Border>
+                            <Button Grid.Column="3"
                                     Style="{StaticResource ExplorerGhostButtonStyle}"
                                     Click="OnDeleteServerClick"
                                     Tag="{Binding}"
                                     Visibility="{Binding DeleteVisibility}"
-                                    Padding="8"
+                                    Padding="6"
+                                    Margin="2,0,0,0"
                                     VerticalAlignment="Center">
-                                <FontIcon Glyph="&#xE74D;" FontSize="12"/>
+                                <FontIcon Glyph="&#xE74D;" FontSize="11"/>
                             </Button>
                         </Grid>
                     </DataTemplate>
@@ -113,39 +193,49 @@
                         VerticalAlignment="Center"
                         Spacing="8"
                         IsHitTestVisible="False">
-                <FontIcon Glyph="&#xE774;" FontSize="30" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                <Border Width="52" Height="52" CornerRadius="26"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                        HorizontalAlignment="Center">
+                    <FontIcon Glyph="&#xE774;" FontSize="22"
+                              Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                </Border>
                 <TextBlock x:Name="EmptyServersText"
                            Text="추가된 서버가 없습니다."
+                           FontSize="12"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
         </Grid>
 
-        <Grid x:Name="BrowserPanel" Grid.Row="1" Visibility="Collapsed">
+        <Grid x:Name="BrowserPanel" Grid.Row="2" Visibility="Collapsed">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <Grid Margin="0,0,0,8" ColumnSpacing="6">
+            <Grid Margin="14,4,12,8" ColumnSpacing="4">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Button x:Name="RemoteUpButton" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnRemoteUpClick" Padding="8">
+                <Button x:Name="RemoteUpButton" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnRemoteUpClick" Padding="7">
                     <FontIcon Glyph="&#xE74A;" FontSize="11"/>
                 </Button>
-                <StackPanel Grid.Column="1" Margin="4,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="ConnectedServerText" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                <StackPanel Grid.Column="1" Margin="6,0,4,0" VerticalAlignment="Center" Spacing="1">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                 Fill="{ThemeResource SystemFillColorSuccessBrush}"/>
+                        <TextBlock x:Name="ConnectedServerText" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
                     <TextBlock x:Name="CurrentPathText" FontSize="10"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
-                <Button x:Name="RemoteRefreshButton" Grid.Column="2" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnRemoteRefreshClick" Padding="8">
+                <Button x:Name="RemoteRefreshButton" Grid.Column="2" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnRemoteRefreshClick" Padding="7">
                     <FontIcon Glyph="&#xE72C;" FontSize="11"/>
                 </Button>
-                <Button x:Name="DisconnectButton" Grid.Column="3" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnDisconnectClick" Padding="8">
+                <Button x:Name="DisconnectButton" Grid.Column="3" Style="{StaticResource ExplorerGhostButtonStyle}" Click="OnDisconnectClick" Padding="7">
                     <FontIcon Glyph="&#xE8BB;" FontSize="11"/>
                 </Button>
             </Grid>
@@ -155,16 +245,17 @@
                      IsOpen="False"
                      Severity="Informational"
                      IsClosable="False"
-                     Margin="0,0,0,6"/>
+                     Margin="14,0,12,8"/>
 
             <ListView x:Name="RemoteEntryList"
                       Grid.Row="2"
                       IsItemClickEnabled="True"
                       ItemClick="OnRemoteEntryClick"
-                      SelectionMode="Single">
+                      SelectionMode="Single"
+                      ItemContainerStyle="{StaticResource RemoteFlyoutListItemStyle}">
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <Grid MinHeight="42" Padding="8,3" ColumnSpacing="9">
+                        <Grid ColumnSpacing="9">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
@@ -172,7 +263,7 @@
                             </Grid.ColumnDefinitions>
                             <FontIcon Glyph="{Binding IconGlyph}" FontSize="14" VerticalAlignment="Center"
                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
-                            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" VerticalAlignment="Center"
                                        TextTrimming="CharacterEllipsis"/>
                             <TextBlock Grid.Column="2" Text="{Binding Detail}" FontSize="10"
                                        VerticalAlignment="Center"
@@ -183,18 +274,25 @@
             </ListView>
         </Grid>
 
-        <Grid Grid.Row="2" Margin="4,8,4,2">
-            <TextBlock x:Name="StatusText"
-                       Text="서버를 선택하세요."
-                       FontSize="11"
-                       TextWrapping="Wrap"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-            <ProgressRing x:Name="BusyRing"
-                          Width="20"
-                          Height="20"
-                          HorizontalAlignment="Right"
-                          IsActive="False"
-                          Visibility="Collapsed"/>
+        <Grid Grid.Row="3" Margin="16,0,16,12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Border Height="1" Margin="0,0,0,8" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+            <Grid Grid.Row="1" ColumnSpacing="8">
+                <TextBlock x:Name="StatusText"
+                           Text="서버를 선택하세요."
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                <ProgressRing x:Name="BusyRing"
+                              Width="18"
+                              Height="18"
+                              HorizontalAlignment="Right"
+                              IsActive="False"
+                              Visibility="Collapsed"/>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>

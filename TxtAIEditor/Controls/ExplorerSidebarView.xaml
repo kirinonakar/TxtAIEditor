@@ -215,6 +215,14 @@
                                         <Button x:Name="ExplorerRemoteButton" Grid.Column="3" Style="{StaticResource ExplorerGhostButtonStyle}" ToolTipService.ToolTip="리모트 서버" AutomationProperties.Name="리모트 서버" Padding="0" Width="28" MinWidth="28" Height="28" VerticalAlignment="Top">
                                             <Button.Flyout>
                                                 <Flyout Placement="BottomEdgeAlignedRight" Opening="OnRemoteFlyoutOpening">
+                                                    <Flyout.FlyoutPresenterStyle>
+                                                        <Style TargetType="FlyoutPresenter">
+                                                            <Setter Property="CornerRadius" Value="12"/>
+                                                            <Setter Property="Padding" Value="0"/>
+                                                            <Setter Property="BorderThickness" Value="1"/>
+                                                            <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+                                                        </Style>
+                                                    </Flyout.FlyoutPresenterStyle>
                                                     <local:RemoteExplorerView x:Name="RemoteExplorer"/>
                                                 </Flyout>
                                             </Button.Flyout>
