@@ -61,12 +61,114 @@ export function bindPointerSelectionEvents({
 
         const separators = /[\s\"\'\(\)\[\]\{\}\<\>\`]/;
         
+        function findPathRootAtOrBefore(col) {
+            const roots = [];
+            let match;
+
+            const driveRoot = /[a-zA-Z]:[\\/]/g;
+            while ((match = driveRoot.exec(value)) !== null) {
+                if (match.index > col) break;
+                const before = match.index > 0 ? value[match.index - 1] : '';
+                if (match.index === 0 || separators.test(before) || before === ':' || before === '=') {
+                    roots.push({ index: match.index, length: match[0].length });
+                }
+            }
+
+            const uncRoot = /[\\/]{2}/g;
+            while ((match = uncRoot.exec(value)) !== null) {
+                if (match.index > col) break;
+                const before = match.index > 0 ? value[match.index - 1] : '';
+                if (match.index === 0 || separators.test(before)) {
+                    roots.push({ index: match.index, length: match[0].length });
+                }
+            }
+
+            const dotRoot = /(?:\.\.?)[\\/]/g;
+            while ((match = dotRoot.exec(value)) !== null) {
+                if (match.index > col) break;
+                const before = match.index > 0 ? value[match.index - 1] : '';
+                if (match.index === 0 || separators.test(before)) {
+                    roots.push({ index: match.index, length: match[0].length });
+                }
+            }
+
+            if (roots.length === 0) return null;
+            roots.sort((a, b) => b.index - a.index);
+            return roots[0];
+        }
+
+        function findExpandedPathToken(col) {
+            const root = findPathRootAtOrBefore(col);
+            if (!root) return null;
+
+            // Windows-reserved characters and control whitespace never appear inside
+            // a path, so the path cannot extend past them. A colon is allowed: the
+            // drive-letter root already consumed it and "https://" is rejected by
+            // the scheme check below.
+            const terminator = /[\"<>|*?`\t\r\n]/;
+            let end = root.index + root.length;
+            while (end < value.length && !terminator.test(value[end])) {
+                end++;
+            }
+
+            // A second absolute path on the same line ends the current one.
+            const nextRoot = /[a-zA-Z]:[\\/]|[\\/]{2}|(?:\.\.?)[\\/]/g;
+            nextRoot.lastIndex = root.index + root.length;
+            let nextMatch;
+            while ((nextMatch = nextRoot.exec(value)) !== null && nextMatch.index < end) {
+                const before = nextMatch.index > 0 ? value[nextMatch.index - 1] : '';
+                const isDrive = /^[a-zA-Z]:/.test(nextMatch[0]);
+                const boundary = nextMatch.index === 0 || separators.test(before) ||
+                    (isDrive && (before === ':' || before === '='));
+                if (boundary) {
+                    end = nextMatch.index;
+                    break;
+                }
+            }
+
+            let path = value.slice(root.index, end);
+
+            // Cut trailing natural-language tails (e.g. Korean annotations) and
+            // clock-style suffixes that follow a space and contain no path separator.
+            const cjk = /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF]/;
+            const timeSuffix = /^\d{1,2}:\d{2}(:\d{2})?$/;
+            for (let i = 0; i < path.length; i++) {
+                if (!/\s/.test(path[i]) || i === 0 || cjk.test(path[i - 1])) continue;
+                const tail = path.slice(i).replace(/^\s+/, '');
+                if (!tail) continue;
+                const firstPiece = tail.split(/\s+/, 1)[0];
+                if ((cjk.test(tail[0]) && !/[\\/]/.test(tail)) || timeSuffix.test(firstPiece)) {
+                    path = path.slice(0, i);
+                    break;
+                }
+            }
+
+            path = path.replace(/[\s.,;:!?]+$/, '');
+
+            if (path.length === 0 || /[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(path)) {
+                return null;
+            }
+
+            const pathEnd = root.index + path.length;
+            if (col < root.index || col > pathEnd) {
+                return null;
+            }
+
+            return {
+                text: path,
+                start: root.index,
+                end: pathEnd,
+                isUrl: false,
+                isPath: true
+            };
+        }
+
         let col = Math.min(column, value.length - 1);
         if (col >= 0 && separators.test(value[col])) {
             if (col > 0 && !separators.test(value[col - 1])) {
                 col--;
             } else {
-                return null;
+                return findExpandedPathToken(col);
             }
         }
 
@@ -80,7 +182,9 @@ export function bindPointerSelectionEvents({
             end++;
         }
 
-        if (start >= end) return null;
+        if (start >= end) {
+            return findExpandedPathToken(col);
+        }
 
         let tokenStart = start;
         let tokenEnd = end;
@@ -89,6 +193,11 @@ export function bindPointerSelectionEvents({
 
         const token = value.slice(tokenStart, tokenEnd);
         if (!token) return null;
+
+        const expandedPathToken = findExpandedPathToken(col);
+        if (expandedPathToken) {
+            return expandedPathToken;
+        }
 
         const isUrl = /^https?:\/\/[^\s\)\(\]\[\}\{\>\<\"\']+/i.test(token);
         const isPath = /^[a-zA-Z]:[\/\\]/.test(token) ||
