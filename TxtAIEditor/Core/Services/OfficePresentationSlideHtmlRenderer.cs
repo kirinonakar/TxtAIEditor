@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -440,6 +441,25 @@ namespace TxtAIEditor.Core.Services
                 yield break;
             }
 
+            if (element.Name.LocalName == "cxnSp" ||
+                IsLineShape(element))
+            {
+                if (TryBuildConnectorSvg(
+                        element,
+                        themeColors,
+                        slideWidth,
+                        slideHeight,
+                        baseWidthPx,
+                        baseHeightPx,
+                        groupTransform,
+                        out string connectorHtml))
+                {
+                    yield return connectorHtml;
+                }
+
+                yield break;
+            }
+
             if (element.Name.LocalName != "sp")
             {
                 yield break;
@@ -498,6 +518,253 @@ namespace TxtAIEditor.Core.Services
                     boxStyle +
                     "\"></div>";
             }
+        }
+
+        private static bool IsLineShape(XElement element)
+        {
+            if (element.Name.LocalName != "sp")
+            {
+                return false;
+            }
+
+            XElement? geometry = element.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "prstGeom");
+            string? preset = geometry?.Attribute("prst")?.Value;
+            return string.Equals(preset, "line", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(preset, "straightConnector1", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryBuildConnectorSvg(
+            XElement element,
+            IReadOnlyList<string> themeColors,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx,
+            PresentationGroupTransform? groupTransform,
+            out string connectorHtml)
+        {
+            connectorHtml = string.Empty;
+            if (!TryReadRawBounds(
+                    element,
+                    out long x,
+                    out long y,
+                    out long width,
+                    out long height,
+                    out int rotation))
+            {
+                return false;
+            }
+
+            XElement? shapeProperties = element.Elements()
+                .FirstOrDefault(e => e.Name.LocalName is "spPr" or "picPr" or "grpSpPr");
+            XElement? transform = shapeProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "xfrm") ??
+                element.Elements().FirstOrDefault(e => e.Name.LocalName == "xfrm");
+            XElement? line = shapeProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "ln");
+            if (line == null || line.Descendants().Any(e => e.Name.LocalName == "noFill"))
+            {
+                return false;
+            }
+
+            string lineColor = ReadPresentationColor(line, themeColors) ?? "#000000";
+            double lineWidthPx = 1;
+            if (TryReadLong(line, "w", out long lineWidth) && lineWidth > 0)
+            {
+                lineWidthPx = Math.Max(.5, lineWidth / 12700.0);
+            }
+
+            double mappedX = groupTransform?.MapX(x) ?? x;
+            double mappedY = groupTransform?.MapY(y) ?? y;
+            double mappedWidth = groupTransform?.MapCx(width) ?? width;
+            double mappedHeight = groupTransform?.MapCy(height) ?? height;
+            double startX = mappedX;
+            double startY = mappedY;
+            double endX = mappedX + mappedWidth;
+            double endY = mappedY + mappedHeight;
+            if (ReadBooleanAttribute(transform, "flipH"))
+            {
+                (startX, endX) = (endX, startX);
+            }
+
+            if (ReadBooleanAttribute(transform, "flipV"))
+            {
+                (startY, endY) = (endY, startY);
+            }
+
+            if (rotation != 0)
+            {
+                double centerX = mappedX + mappedWidth / 2.0;
+                double centerY = mappedY + mappedHeight / 2.0;
+                (startX, startY) = RotatePoint(
+                    startX,
+                    startY,
+                    centerX,
+                    centerY,
+                    rotation / 60000.0);
+                (endX, endY) = RotatePoint(
+                    endX,
+                    endY,
+                    centerX,
+                    centerY,
+                    rotation / 60000.0);
+            }
+
+            double startXPx = startX / Math.Max(1.0, slideWidth) * baseWidthPx;
+            double startYPx = startY / Math.Max(1.0, slideHeight) * baseHeightPx;
+            double endXPx = endX / Math.Max(1.0, slideWidth) * baseWidthPx;
+            double endYPx = endY / Math.Max(1.0, slideHeight) * baseHeightPx;
+
+            string? dashArray = ReadConnectorDashArray(line);
+            string lineCap = ReadConnectorLineCap(line);
+            string? headEnd = ReadConnectorEndType(line, "headEnd");
+            string? tailEnd = ReadConnectorEndType(line, "tailEnd");
+            string markerId = "ppt-connector-arrow-" +
+                (element.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "cNvPr")
+                    ?.Attribute("id")?.Value ??
+                 Math.Abs(element.GetHashCode()).ToString(CultureInfo.InvariantCulture));
+
+            var svg = new StringBuilder();
+            svg.Append("<svg class=\"ppt-connector\" aria-hidden=\"true\" viewBox=\"0 0 ")
+                .Append(FormatInvariant(baseWidthPx))
+                .Append(' ')
+                .Append(FormatInvariant(baseHeightPx))
+                .Append("\" style=\"left:0;top:0;width:")
+                .Append(FormatInvariant(baseWidthPx))
+                .Append("px;height:")
+                .Append(FormatInvariant(baseHeightPx))
+                .Append("px;\">");
+
+            if (headEnd != null || tailEnd != null)
+            {
+                svg.Append("<defs><marker id=\"")
+                    .Append(Html(markerId))
+                    .Append("\" markerUnits=\"userSpaceOnUse\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"5\" orient=\"auto-start-reverse\" viewBox=\"0 0 10 10\">")
+                    .Append(BuildConnectorMarkerPath(headEnd ?? tailEnd ?? "triangle", lineColor))
+                    .Append("</marker></defs>");
+            }
+
+            svg.Append("<line x1=\"")
+                .Append(FormatInvariant(startXPx))
+                .Append("\" y1=\"")
+                .Append(FormatInvariant(startYPx))
+                .Append("\" x2=\"")
+                .Append(FormatInvariant(endXPx))
+                .Append("\" y2=\"")
+                .Append(FormatInvariant(endYPx))
+                .Append("\" stroke=\"")
+                .Append(Html(lineColor))
+                .Append("\" stroke-width=\"")
+                .Append(FormatInvariant(lineWidthPx))
+                .Append("\" stroke-linecap=\"")
+                .Append(lineCap)
+                .Append("\" fill=\"none\"");
+            if (!string.IsNullOrWhiteSpace(dashArray))
+            {
+                svg.Append(" stroke-dasharray=\"")
+                    .Append(dashArray)
+                    .Append("\"");
+            }
+
+            if (headEnd != null)
+            {
+                svg.Append(" marker-start=\"url(#")
+                    .Append(Html(markerId))
+                    .Append(")\"");
+            }
+
+            if (tailEnd != null)
+            {
+                svg.Append(" marker-end=\"url(#")
+                    .Append(Html(markerId))
+                    .Append(")\"");
+            }
+
+            svg.Append(" /></svg>");
+            connectorHtml = svg.ToString();
+            return true;
+        }
+
+        private static bool ReadBooleanAttribute(XElement? element, string attributeName)
+        {
+            string? value = element?.Attribute(attributeName)?.Value;
+            return string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static (double X, double Y) RotatePoint(
+            double x,
+            double y,
+            double centerX,
+            double centerY,
+            double degrees)
+        {
+            double radians = degrees * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double offsetX = x - centerX;
+            double offsetY = y - centerY;
+            return (
+                centerX + offsetX * cos - offsetY * sin,
+                centerY + offsetX * sin + offsetY * cos);
+        }
+
+        private static string? ReadConnectorDashArray(XElement line)
+        {
+            string? dash = line.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "prstDash")
+                ?.Attribute("val")?.Value;
+            return dash?.ToLowerInvariant() switch
+            {
+                "dot" or "sysdot" => "1 4",
+                "dash" or "sysdash" => "8 5",
+                "dashdot" or "sysdashdot" => "8 5 1 5",
+                "lgdash" => "12 5",
+                "lgdashdot" => "12 5 1 5",
+                "lgdashdotdot" => "12 5 1 5 1 5",
+                "solid" or "sysdashdotdot" or null => null,
+                _ => null
+            };
+        }
+
+        private static string ReadConnectorLineCap(XElement line)
+        {
+            if (line.Descendants().Any(e => e.Name.LocalName == "round"))
+            {
+                return "round";
+            }
+
+            if (line.Descendants().Any(e => e.Name.LocalName == "square"))
+            {
+                return "square";
+            }
+
+            return "butt";
+        }
+
+        private static string? ReadConnectorEndType(XElement line, string elementName)
+        {
+            string? type = line.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == elementName)
+                ?.Attribute("type")?.Value;
+            return string.IsNullOrWhiteSpace(type) ||
+                string.Equals(type, "none", StringComparison.OrdinalIgnoreCase)
+                    ? null
+                    : type;
+        }
+
+        private static string BuildConnectorMarkerPath(string type, string color)
+        {
+            string path = type.ToLowerInvariant() switch
+            {
+                "stealth" => "M 0 0 L 10 5 L 0 10 L 3 5 Z",
+                "diamond" => "M 0 5 L 5 0 L 10 5 L 5 10 Z",
+                "oval" => "M 5 0 A 5 5 0 1 1 5 10 A 5 5 0 1 1 5 0 Z",
+                _ => "M 0 0 L 10 5 L 0 10 Z"
+            };
+            return "<path d=\"" + path + "\" fill=\"" + Html(color) + "\" />";
         }
 
         private static string ReadShapeBoxStyle(

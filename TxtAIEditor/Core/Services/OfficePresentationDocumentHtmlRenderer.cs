@@ -179,6 +179,11 @@ body { padding: 28px 16px 40px; }
     width: 100%;
     height: 100%;
 }
+.ppt-connector {
+    position: absolute;
+    overflow: visible;
+    pointer-events: none;
+}
 .ppt-table table {
     width: 100%;
     height: 100%;
