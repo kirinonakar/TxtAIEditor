@@ -82,7 +82,6 @@ namespace TxtAIEditor.Controls
             ExplorerTreeModeButton.IsChecked = isTreeMode;
             FileListView.Visibility = isTreeMode ? Visibility.Collapsed : Visibility.Visible;
             ExplorerTreeView.Visibility = isTreeMode ? Visibility.Visible : Visibility.Collapsed;
-            ExplorerFilterPanel.Visibility = isTreeMode ? Visibility.Collapsed : Visibility.Visible;
             ExplorerBackButton.IsEnabled = !isTreeMode;
             ExplorerUpButton.IsEnabled = !isTreeMode;
         }
