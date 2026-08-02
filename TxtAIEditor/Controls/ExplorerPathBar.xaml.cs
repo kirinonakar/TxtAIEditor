@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
@@ -99,11 +100,12 @@ namespace TxtAIEditor.Controls
                     }
                 }
 
-                // 아주 긴 경로: 최소 글자 크기에서도 두 줄을 넘으면 남은 부분을 생략 부호로 표시한다.
+                // 아주 긴 경로: 최소 글자 크기에서도 두 줄을 넘으면 앞쪽부터 생략하고
+                // 맨 앞의 생략 부호(…)를 클릭하면 숨겨진 앞쪽 경로가 펼쳐진다.
                 List<PathToken> minTokens = BuildTokens(MinFontSize, availableWidth);
                 if (Wrap(minTokens, availableWidth) > MaxRows)
                 {
-                    minTokens = TruncateToTwoRows(minTokens, availableWidth);
+                    minTokens = TruncateKeepingTail(minTokens, availableWidth);
                 }
 
                 PlaceTokens(minTokens);
@@ -190,52 +192,72 @@ namespace TxtAIEditor.Controls
             return row + 1;
         }
 
-        private List<PathToken> TruncateToTwoRows(List<PathToken> tokens, double availableWidth)
+        private List<PathToken> TruncateKeepingTail(List<PathToken> tokens, double availableWidth)
         {
-            var kept = new List<PathToken>(tokens.Count);
-            double x = 0;
-            int row = 0;
-            int lastRow = 0;
-            double lastX = 0;
-            foreach (PathToken token in tokens)
+            var ellipsisToken = CreateEllipsisToken(availableWidth);
+            var best = new List<PathToken> { ellipsisToken };
+            int bestTailCount = 0;
+
+            // 뒤(최근 경로)부터 최대한 많은 토큰을 남기되, 맨 앞에 생략 부호(…)를 둬도
+            // 두 줄 안에 들어오는 가장 큰 꼬리(tail)를 찾는다.
+            for (int tailCount = 0; tailCount <= tokens.Count; tailCount++)
             {
-                if (x > 0 && x + token.Width > availableWidth)
+                var candidate = new List<PathToken>(tailCount + 1) { ellipsisToken };
+                for (int i = tokens.Count - tailCount; i < tokens.Count; i++)
                 {
-                    row++;
-                    x = 0;
+                    candidate.Add(tokens[i]);
                 }
 
-                if (row >= MaxRows)
+                if (Wrap(candidate, availableWidth) > MaxRows)
                 {
                     break;
                 }
 
-                token.Row = row;
-                token.X = x;
-                kept.Add(token);
-                x += token.Width + TokenSpacing;
-                lastRow = row;
-                lastX = x;
+                best = candidate;
+                bestTailCount = tailCount;
             }
 
-            if (kept.Count < tokens.Count)
+            Wrap(best, availableWidth);
+
+            int hiddenCount = tokens.Count - bestTailCount;
+            if (hiddenCount > 0)
             {
-                var ellipsis = new TextBlock
+                var hidden = new List<ExplorerBreadcrumbSegment>(hiddenCount);
+                for (int i = 0; i < hiddenCount; i++)
                 {
-                    Text = "…",
-                    FontSize = MinFontSize,
-                    Style = (Style)Resources["PathSeparatorStyle"],
-                    Padding = SeparatorPadding
-                };
-                ellipsis.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                kept.Add(new PathToken(new List<FrameworkElement> { ellipsis }, ellipsis.DesiredSize.Width)
-                {
-                    Row = lastRow,
-                    X = lastX
-                });
+                    if (tokens[i].Elements[^1].Tag is ExplorerBreadcrumbSegment segment)
+                    {
+                        hidden.Add(segment);
+                    }
+                }
+
+                ellipsisToken.Elements[0].Tag = hidden;
             }
 
-            return kept;
+            return best;
+        }
+
+        private PathToken CreateEllipsisToken(double availableWidth)
+        {
+            var ellipsisText = new TextBlock
+            {
+                Text = "…",
+                FontSize = MinFontSize,
+                IsHitTestVisible = false
+            };
+            var ellipsisBorder = new Border
+            {
+                Child = ellipsisText,
+                Padding = SegmentPadding,
+                CornerRadius = new CornerRadius(3),
+                MaxWidth = availableWidth,
+                Background = TransparentBrush
+            };
+            ellipsisBorder.Tapped += OnEllipsisTapped;
+            ellipsisBorder.PointerEntered += OnSegmentPointerEntered;
+            ellipsisBorder.PointerExited += OnSegmentPointerExited;
+            ellipsisBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            return new PathToken(new List<FrameworkElement> { ellipsisBorder }, ellipsisBorder.DesiredSize.Width);
         }
 
         private void PlaceTokens(List<PathToken> tokens)
@@ -272,6 +294,40 @@ namespace TxtAIEditor.Controls
         private void OnSegmentTapped(object sender, TappedRoutedEventArgs e)
         {
             if (sender is Border { Tag: ExplorerBreadcrumbSegment segment })
+            {
+                SegmentClicked?.Invoke(this, new ExplorerPathSegmentClickedEventArgs(segment));
+            }
+        }
+
+        private void OnEllipsisTapped(object sender, TappedRoutedEventArgs e)
+        {
+            if (sender is not Border { Tag: List<ExplorerBreadcrumbSegment> hidden })
+            {
+                return;
+            }
+
+            var flyout = new MenuFlyout
+            {
+                Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft
+            };
+            foreach (ExplorerBreadcrumbSegment segment in hidden)
+            {
+                var item = new MenuFlyoutItem
+                {
+                    Text = segment.Name,
+                    Tag = segment
+                };
+                ToolTipService.SetToolTip(item, segment.Path);
+                item.Click += OnHiddenSegmentClick;
+                flyout.Items.Add(item);
+            }
+
+            flyout.ShowAt((FrameworkElement)sender);
+        }
+
+        private void OnHiddenSegmentClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuFlyoutItem { Tag: ExplorerBreadcrumbSegment segment })
             {
                 SegmentClicked?.Invoke(this, new ExplorerPathSegmentClickedEventArgs(segment));
             }
