@@ -17,7 +17,8 @@ namespace TxtAIEditor.Core.Services
             "OpenCode Go",
             "OpenCode Zen",
             "Ollama",
-            "Ollama Cloud"
+            "Ollama Cloud",
+            "Custom"
         };
 
         public static int GetProviderIndex(string provider)
@@ -314,6 +315,11 @@ namespace TxtAIEditor.Core.Services
                 return !string.IsNullOrEmpty(settings.LlmModelOllamaCloud) ? settings.LlmModelOllamaCloud : selectedModel;
             }
 
+            if (provider.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelCustom) ? settings.LlmModelCustom : string.Empty;
+            }
+
             return selectedModel;
         }
 
@@ -364,6 +370,11 @@ namespace TxtAIEditor.Core.Services
                 return !string.IsNullOrEmpty(settings.LlmModelOllamaCloud) ? settings.LlmModelOllamaCloud : "llama3:latest";
             }
 
+            if (provider.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelCustom) ? settings.LlmModelCustom : string.Empty;
+            }
+
             return settings.LlmModel;
         }
 
@@ -397,6 +408,11 @@ namespace TxtAIEditor.Core.Services
             if (provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelOllamaCloud) ? settings.LlmModelOllamaCloud : settings.LlmModel;
+            }
+
+            if (provider.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelCustom) ? settings.LlmModelCustom : settings.LlmModel;
             }
 
             return !string.IsNullOrEmpty(settings.LlmModelOpenRouter) ? settings.LlmModelOpenRouter : settings.LlmModel;
@@ -439,6 +455,10 @@ namespace TxtAIEditor.Core.Services
             else if (settings.LlmProvider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
             {
                 settings.LlmModelOllamaCloud = settings.LlmModel;
+            }
+            else if (settings.LlmProvider.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.LlmModelCustom = settings.LlmModel;
             }
         }
 

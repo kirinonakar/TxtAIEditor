@@ -73,6 +73,7 @@ namespace TxtAIEditor.Core.Models
         public string LlmModelOpenCodeZen { get; set; } = "";
         public string LlmModelOllama { get; set; } = "";
         public string LlmModelOllamaCloud { get; set; } = "";
+        public string LlmModelCustom { get; set; } = "";
         public string LlmVisionFallbackProvider { get; set; } = "";
         public string LlmVisionFallbackModel { get; set; } = "";
         public string LlmThinkingLevel { get; set; } = "";

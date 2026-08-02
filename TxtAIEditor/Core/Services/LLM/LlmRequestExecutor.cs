@@ -42,6 +42,13 @@ namespace TxtAIEditor.Core.Services.LLM
                                     !providerName.Equals("Ollama", StringComparison.OrdinalIgnoreCase) &&
                                     !providerName.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) &&
                                     !providerName.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
+            if (providerName.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+            {
+                string customEndpoint = settings.LlmEndpoint?.Trim() ?? string.Empty;
+                bool isLocalEndpoint = customEndpoint.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+                                       customEndpoint.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase);
+                requiresApiKey = !isLocalEndpoint;
+            }
 
             if (requiresApiKey && string.IsNullOrEmpty(apiKey))
             {
@@ -66,6 +73,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 "opencode zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 "opencodezen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 "zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
+                "custom" => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: "", providerName: providerName),
                 _ => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName)
             };
 
