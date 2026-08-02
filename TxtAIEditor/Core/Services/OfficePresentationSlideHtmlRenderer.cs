@@ -101,6 +101,14 @@ namespace TxtAIEditor.Core.Services
                     archive,
                     relationships)
                     .ConfigureAwait(false);
+            XElement? inheritedBodyStyle = inheritedParts
+                .Select(part => part.Document.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "bodyStyle"))
+                .FirstOrDefault(style => style != null);
+            XElement? inheritedTitleStyle = inheritedParts
+                .Select(part => part.Document.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "titleStyle"))
+                .FirstOrDefault(style => style != null);
 
             double baseHeightPx =
                 baseWidthPx * slideHeight / Math.Max(1.0, slideWidth);
@@ -148,7 +156,9 @@ namespace TxtAIEditor.Core.Services
                     slideHeight,
                     baseWidthPx,
                     baseHeightPx,
-                    tableStyles))
+                    tableStyles,
+                    inheritedBodyStyle,
+                    inheritedTitleStyle))
                 {
                     html.Append(elementHtml);
                 }
@@ -164,7 +174,9 @@ namespace TxtAIEditor.Core.Services
                 baseWidthPx,
                 baseHeightPx,
                 placeholderBounds,
-                tableStyles))
+                tableStyles,
+                inheritedBodyStyle,
+                inheritedTitleStyle))
             {
                 html.Append(elementHtml);
             }
@@ -183,7 +195,9 @@ namespace TxtAIEditor.Core.Services
             double baseWidthPx,
             double baseHeightPx,
             IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds,
-            XDocument? tableStyles)
+            XDocument? tableStyles,
+            XElement? inheritedBodyStyle,
+            XElement? inheritedTitleStyle)
         {
             XElement? shapeTree = slide.Descendants()
                 .FirstOrDefault(e => e.Name.LocalName == "spTree");
@@ -205,6 +219,8 @@ namespace TxtAIEditor.Core.Services
                     baseHeightPx,
                     placeholderBounds,
                     tableStyles,
+                    inheritedBodyStyle,
+                    inheritedTitleStyle,
                     null))
                 {
                     yield return elementHtml;
@@ -221,7 +237,9 @@ namespace TxtAIEditor.Core.Services
             long slideHeight,
             double baseWidthPx,
             double baseHeightPx,
-            XDocument? tableStyles)
+            XDocument? tableStyles,
+            XElement? inheritedBodyStyle,
+            XElement? inheritedTitleStyle)
         {
             XElement? shapeTree = part.Descendants()
                 .FirstOrDefault(e => e.Name.LocalName == "spTree");
@@ -243,6 +261,8 @@ namespace TxtAIEditor.Core.Services
                     baseHeightPx,
                     Array.Empty<PresentationPlaceholderBounds>(),
                     tableStyles,
+                    inheritedBodyStyle,
+                    inheritedTitleStyle,
                     null,
                     skipPlaceholders: true))
                 {
@@ -262,6 +282,8 @@ namespace TxtAIEditor.Core.Services
             double baseHeightPx,
             IReadOnlyList<PresentationPlaceholderBounds> placeholderBounds,
             XDocument? tableStyles,
+            XElement? inheritedBodyStyle,
+            XElement? inheritedTitleStyle,
             PresentationGroupTransform? groupTransform,
             bool skipPlaceholders = false)
         {
@@ -294,6 +316,8 @@ namespace TxtAIEditor.Core.Services
                         baseHeightPx,
                         placeholderBounds,
                         tableStyles,
+                        inheritedBodyStyle,
+                        inheritedTitleStyle,
                         nextTransform,
                         skipPlaceholders))
                     {
@@ -467,7 +491,11 @@ namespace TxtAIEditor.Core.Services
 
             XElement? shapeProperties = element.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "spPr");
-            string boxStyle = ReadShapeBoxStyle(shapeProperties, themeColors);
+            string boxStyle = ReadShapeBoxStyle(
+                shapeProperties,
+                themeColors,
+                archive,
+                relationships);
             string boundsStyle = TryReadBounds(
                 element,
                 slideWidth,
@@ -489,7 +517,9 @@ namespace TxtAIEditor.Core.Services
                 element,
                 themeColors,
                 slideWidth,
-                baseWidthPx);
+                baseWidthPx,
+                inheritedBodyStyle,
+                inheritedTitleStyle);
             if (!string.IsNullOrWhiteSpace(textHtml))
             {
                 string textBoxStyle =
@@ -769,7 +799,9 @@ namespace TxtAIEditor.Core.Services
 
         private static string ReadShapeBoxStyle(
             XElement? shapeProperties,
-            IReadOnlyList<string> themeColors)
+            IReadOnlyList<string> themeColors,
+            ZipArchive archive,
+            IReadOnlyDictionary<string, string> relationships)
         {
             if (shapeProperties == null)
             {
@@ -787,6 +819,37 @@ namespace TxtAIEditor.Core.Services
             if (!string.IsNullOrWhiteSpace(fill) && !hasShapeNoFill)
             {
                 style.Append("background:").Append(fill).Append(';');
+            }
+
+            if (fillElement?.Name.LocalName == "blipFill")
+            {
+                string? relationshipId = fillElement.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "blip")
+                    ?.Attributes()
+                    .FirstOrDefault(attribute => attribute.Name.LocalName == "embed")
+                    ?.Value;
+                if (!string.IsNullOrWhiteSpace(relationshipId) &&
+                    relationships.TryGetValue(relationshipId, out string? imagePath))
+                {
+                    string? imageDataUri =
+                        OfficePresentationPackageReader.TryReadImageDataUri(
+                            archive,
+                            imagePath);
+                    if (!string.IsNullOrWhiteSpace(imageDataUri))
+                    {
+                        style.Append("background-image:url(")
+                            .Append(Html(imageDataUri))
+                            .Append(");background-size:100% 100%;background-position:center;background-repeat:no-repeat;");
+                    }
+                }
+            }
+
+            string? customGeometryClipPath = ReadCustomGeometryClipPath(shapeProperties);
+            if (!string.IsNullOrWhiteSpace(customGeometryClipPath))
+            {
+                style.Append("clip-path:")
+                    .Append(customGeometryClipPath)
+                    .Append(';');
             }
 
             XElement? line = shapeProperties.Elements()
@@ -812,6 +875,156 @@ namespace TxtAIEditor.Core.Services
             }
 
             return style.ToString();
+        }
+
+        private static string? ReadCustomGeometryClipPath(XElement? shapeProperties)
+        {
+            XElement? customGeometry = shapeProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "custGeom");
+            XElement? path = customGeometry?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "pathLst")?
+                .Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "path");
+            if (path == null ||
+                !TryReadLong(path, "w", out long pathWidth) ||
+                !TryReadLong(path, "h", out long pathHeight) ||
+                pathWidth <= 0 ||
+                pathHeight <= 0)
+            {
+                return null;
+            }
+
+            var points = new List<(double X, double Y)>();
+            (double X, double Y)? current = null;
+            foreach (XElement command in path.Elements())
+            {
+                if (command.Name.LocalName is "moveTo" or "lnTo")
+                {
+                    if (TryReadGeometryPoint(command, out (double X, double Y) point))
+                    {
+                        points.Add(point);
+                        current = point;
+                    }
+
+                    continue;
+                }
+
+                if (command.Name.LocalName == "cubicBezTo")
+                {
+                    List<(double X, double Y)> controlPoints = command.Elements()
+                        .Where(e => e.Name.LocalName == "pt")
+                        .Select(e =>
+                            TryReadGeometryPoint(e, out (double X, double Y) point)
+                                ? point
+                                : (double.NaN, double.NaN))
+                        .ToList();
+                    if (current.HasValue && controlPoints.Count >= 3 &&
+                        controlPoints.Take(3).All(point =>
+                            !double.IsNaN(point.X) && !double.IsNaN(point.Y)))
+                    {
+                        (double X, double Y) start = current.Value;
+                        (double X, double Y) firstControl = controlPoints[0];
+                        (double X, double Y) secondControl = controlPoints[1];
+                        (double X, double Y) end = controlPoints[2];
+                        const int sampleCount = 10;
+                        for (int sample = 1; sample <= sampleCount; sample++)
+                        {
+                            double t = sample / (double)sampleCount;
+                            double inverseT = 1.0 - t;
+                            points.Add((
+                                inverseT * inverseT * inverseT * start.X +
+                                3 * inverseT * inverseT * t * firstControl.X +
+                                3 * inverseT * t * t * secondControl.X +
+                                t * t * t * end.X,
+                                inverseT * inverseT * inverseT * start.Y +
+                                3 * inverseT * inverseT * t * firstControl.Y +
+                                3 * inverseT * t * t * secondControl.Y +
+                                t * t * t * end.Y));
+                        }
+
+                        current = end;
+                    }
+
+                    continue;
+                }
+
+                if (command.Name.LocalName == "quadBezTo")
+                {
+                    List<(double X, double Y)> controlPoints = command.Elements()
+                        .Where(e => e.Name.LocalName == "pt")
+                        .Select(e =>
+                            TryReadGeometryPoint(e, out (double X, double Y) point)
+                                ? point
+                                : (double.NaN, double.NaN))
+                        .ToList();
+                    if (current.HasValue && controlPoints.Count >= 2 &&
+                        controlPoints.Take(2).All(point =>
+                            !double.IsNaN(point.X) && !double.IsNaN(point.Y)))
+                    {
+                        (double X, double Y) start = current.Value;
+                        (double X, double Y) control = controlPoints[0];
+                        (double X, double Y) end = controlPoints[1];
+                        const int sampleCount = 8;
+                        for (int sample = 1; sample <= sampleCount; sample++)
+                        {
+                            double t = sample / (double)sampleCount;
+                            double inverseT = 1.0 - t;
+                            points.Add((
+                                inverseT * inverseT * start.X +
+                                2 * inverseT * t * control.X +
+                                t * t * end.X,
+                                inverseT * inverseT * start.Y +
+                                2 * inverseT * t * control.Y +
+                                t * t * end.Y));
+                        }
+
+                        current = end;
+                    }
+                }
+            }
+
+            if (points.Count < 3)
+            {
+                return null;
+            }
+
+            var clipPath = new StringBuilder("polygon(");
+            for (int index = 0; index < points.Count; index++)
+            {
+                if (index > 0)
+                {
+                    clipPath.Append(',');
+                }
+
+                (double x, double y) = points[index];
+                clipPath.Append(FormatInvariant(
+                        Math.Clamp(x / pathWidth * 100.0, 0, 100)))
+                    .Append("% ")
+                    .Append(FormatInvariant(
+                        Math.Clamp(y / pathHeight * 100.0, 0, 100)))
+                    .Append('%');
+            }
+
+            return clipPath.Append(')').ToString();
+        }
+
+        private static bool TryReadGeometryPoint(
+            XElement command,
+            out (double X, double Y) point)
+        {
+            XElement? pointElement = command.Name.LocalName == "pt"
+                ? command
+                : command.Elements().FirstOrDefault(e => e.Name.LocalName == "pt");
+            if (pointElement != null &&
+                TryReadLong(pointElement, "x", out long x) &&
+                TryReadLong(pointElement, "y", out long y))
+            {
+                point = (x, y);
+                return true;
+            }
+
+            point = (double.NaN, double.NaN);
+            return false;
         }
 
         private static async Task<string?> ReadSlideBackgroundAsync(

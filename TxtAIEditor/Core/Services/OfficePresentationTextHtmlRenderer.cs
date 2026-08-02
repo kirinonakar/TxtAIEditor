@@ -10,11 +10,22 @@ namespace TxtAIEditor.Core.Services
 {
     internal static class OfficePresentationTextHtmlRenderer
     {
+        private sealed class PresentationBulletMarker
+        {
+            public string Text { get; init; } = "•";
+            public string? Typeface { get; init; }
+            public string? Color { get; init; }
+            public double SizeScale { get; init; } = 1.0;
+            public bool IsTriangle { get; init; }
+        }
+
         public static string BuildShapeTextHtml(
             XElement shape,
             IReadOnlyList<string> themeColors,
             long slideWidth,
-            double baseWidthPx)
+            double baseWidthPx,
+            XElement? inheritedBodyStyle = null,
+            XElement? inheritedTitleStyle = null)
         {
             var paragraphs = new StringBuilder();
             XElement? textBody = shape.Descendants().FirstOrDefault(e => e.Name.LocalName == "txBody");
@@ -23,21 +34,37 @@ namespace TxtAIEditor.Core.Services
                 return string.Empty;
             }
 
+            XElement? effectiveTextStyle = ShouldUseInheritedTitleStyle(shape)
+                ? inheritedTitleStyle
+                : ShouldUseInheritedBodyStyle(shape)
+                    ? inheritedBodyStyle
+                    : null;
             double fontScale = ReadNormAutofitScale(textBody);
             double fallbackFontSizePx =
                 PointsToPixels(ReadFallbackFontPoint(shape), slideWidth, baseWidthPx) * fontScale;
 
+            int paragraphIndex = 0;
             foreach (XElement paragraph in textBody.Elements().Where(e => e.Name.LocalName == "p"))
             {
+                paragraphIndex++;
                 string text = ReadParagraphText(paragraph);
                 if (string.IsNullOrWhiteSpace(text))
                 {
                     continue;
                 }
 
-                bool hasBullet = paragraph.Descendants()
-                    .Any(e => e.Name.LocalName == "buChar" || e.Name.LocalName == "buAutoNum");
-                string paragraphStyle = ReadParagraphStyle(paragraph, slideWidth, baseWidthPx);
+                PresentationBulletMarker? bullet = ReadParagraphBullet(
+                    paragraph,
+                    textBody,
+                    effectiveTextStyle,
+                    themeColors,
+                    paragraphIndex);
+                string paragraphStyle = ReadParagraphStyle(
+                    paragraph,
+                    textBody,
+                    effectiveTextStyle,
+                    slideWidth,
+                    baseWidthPx);
                 paragraphStyle += ReadParagraphDefaultRunStyle(
                     paragraph,
                     textBody,
@@ -45,7 +72,8 @@ namespace TxtAIEditor.Core.Services
                     slideWidth,
                     baseWidthPx,
                     fontScale,
-                    fallbackFontSizePx);
+                    fallbackFontSizePx,
+                    effectiveTextStyle);
                 paragraphs.Append("<p");
                 if (!string.IsNullOrWhiteSpace(paragraphStyle))
                 {
@@ -53,12 +81,9 @@ namespace TxtAIEditor.Core.Services
                 }
 
                 paragraphs.Append('>');
-                if (hasBullet)
+                if (bullet != null)
                 {
-                    string bullet = paragraph.Descendants()
-                        .FirstOrDefault(e => e.Name.LocalName == "buChar")
-                        ?.Attribute("char")?.Value ?? "•";
-                    paragraphs.Append("<span>").Append(Html(bullet)).Append(" </span>");
+                    AppendBulletHtml(paragraphs, bullet);
                 }
 
                 paragraphs.Append(BuildParagraphRunsHtml(
@@ -67,7 +92,8 @@ namespace TxtAIEditor.Core.Services
                     slideWidth,
                     baseWidthPx,
                     fontScale,
-                    textBody));
+                    textBody,
+                    effectiveTextStyle));
                 paragraphs.Append("</p>");
             }
 
@@ -282,19 +308,28 @@ namespace TxtAIEditor.Core.Services
             long slideWidth,
             double baseWidthPx,
             double fontScale = 1.0,
-            XElement? textBody = null)
+            XElement? textBody = null,
+            XElement? inheritedBodyStyle = null)
         {
             var builder = new StringBuilder();
             XElement? defaultRunProperties =
-                ReadParagraphDefaultRunProperties(paragraph, textBody);
+                ReadParagraphDefaultRunProperties(
+                    paragraph,
+                    textBody,
+                    inheritedBodyStyle);
+            string defaultRunStyle = ReadRunTextStyle(
+                defaultRunProperties,
+                themeColors,
+                slideWidth,
+                baseWidthPx,
+                fontScale);
             foreach (XElement element in paragraph.Elements())
             {
                 if (element.Name.LocalName == "r" || element.Name.LocalName == "fld")
                 {
                     XElement? runProperties = element.Elements()
-                        .FirstOrDefault(e => e.Name.LocalName == "rPr") ??
-                        defaultRunProperties;
-                    string runStyle = ReadRunTextStyle(
+                        .FirstOrDefault(e => e.Name.LocalName == "rPr");
+                    string runStyle = defaultRunStyle + ReadRunTextStyle(
                         runProperties,
                         themeColors,
                         slideWidth,
@@ -406,22 +441,41 @@ namespace TxtAIEditor.Core.Services
             double fontScale = textBody == null ? 1.0 : ReadNormAutofitScale(textBody);
 
             var builder = new StringBuilder();
+            int paragraphIndex = 0;
             foreach (XElement paragraph in cell.Descendants().Where(e => e.Name.LocalName == "p"))
             {
+                paragraphIndex++;
                 string text = ReadParagraphText(paragraph);
                 if (string.IsNullOrWhiteSpace(text))
                 {
                     continue;
                 }
 
-                string paragraphStyle = ReadParagraphStyle(paragraph, slideWidth, baseWidthPx);
+                PresentationBulletMarker? bullet = ReadParagraphBullet(
+                    paragraph,
+                    textBody,
+                    null,
+                    themeColors,
+                    paragraphIndex);
+                string paragraphStyle = ReadParagraphStyle(
+                    paragraph,
+                    textBody,
+                    null,
+                    slideWidth,
+                    baseWidthPx);
                 builder.Append("<p");
                 if (!string.IsNullOrWhiteSpace(paragraphStyle))
                 {
                     builder.Append(" style=\"").Append(Html(paragraphStyle)).Append('"');
                 }
 
-                builder.Append('>')
+                builder.Append('>');
+                if (bullet != null)
+                {
+                    AppendBulletHtml(builder, bullet);
+                }
+
+                builder
                     .Append(BuildParagraphRunsHtml(
                         paragraph,
                         themeColors,
@@ -430,6 +484,185 @@ namespace TxtAIEditor.Core.Services
                         fontScale,
                         textBody))
                     .Append("</p>");
+            }
+
+            return builder.ToString();
+        }
+
+        private static PresentationBulletMarker? ReadParagraphBullet(
+            XElement paragraph,
+            XElement? textBody,
+            XElement? inheritedBodyStyle,
+            IReadOnlyList<string> themeColors,
+            int paragraphIndex)
+        {
+            XElement? paragraphProperties = paragraph.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "pPr");
+            XElement? levelProperties = ReadParagraphLevelProperties(
+                textBody,
+                inheritedBodyStyle,
+                ReadParagraphLevel(paragraph));
+            XElement? bullet = paragraphProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName is
+                    "buNone" or "buChar" or "buAutoNum");
+            if (bullet?.Name.LocalName == "buNone")
+            {
+                return null;
+            }
+
+            bullet ??= ReadParagraphLevelProperties(
+                    textBody,
+                    inheritedBodyStyle,
+                    ReadParagraphLevel(paragraph))
+                ?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName is "buChar" or "buAutoNum");
+            if (bullet == null)
+            {
+                return null;
+            }
+
+            if (bullet.Name.LocalName == "buChar")
+            {
+                string marker = bullet.Attribute("char")?.Value ?? "•";
+                string? typeface = ReadBulletTypeface(bullet, levelProperties);
+                bool isTriangle = marker.Any(char.IsControl) &&
+                    !string.IsNullOrWhiteSpace(typeface) &&
+                    typeface.Contains("Wingdings 3", StringComparison.OrdinalIgnoreCase);
+                if (marker.Any(char.IsControl) && !isTriangle)
+                {
+                    marker = "•";
+                }
+
+                return new PresentationBulletMarker
+                {
+                    Text = string.IsNullOrEmpty(marker) ? "•" : marker,
+                    Typeface = typeface,
+                    Color = ReadBulletColor(levelProperties, bullet, themeColors),
+                    SizeScale = ReadBulletSizeScale(levelProperties),
+                    IsTriangle = isTriangle
+                };
+            }
+
+            int startAt = 1;
+            if (int.TryParse(
+                    bullet.Attribute("startAt")?.Value,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int readStartAt))
+            {
+                startAt = readStartAt;
+            }
+
+            return new PresentationBulletMarker
+            {
+                Text = (startAt + Math.Max(0, paragraphIndex - 1))
+                    .ToString(CultureInfo.InvariantCulture) + "."
+            };
+        }
+
+        private static string? ReadBulletTypeface(
+            XElement bullet,
+            XElement? levelProperties)
+        {
+            return levelProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "buFont")
+                ?.Attribute("typeface")?.Value ??
+                bullet.Parent?.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "buFont")
+                    ?.Attribute("typeface")?.Value;
+        }
+
+        private static string? ReadBulletColor(
+            XElement? levelProperties,
+            XElement bullet,
+            IReadOnlyList<string> themeColors)
+        {
+            XElement? levelColor = levelProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "buClr");
+            string? color = ReadPresentationColor(levelColor, themeColors);
+            if (!string.IsNullOrWhiteSpace(color))
+            {
+                return color;
+            }
+
+            XElement? directColor = bullet.Parent?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "buClr");
+            return ReadPresentationColor(directColor, themeColors);
+        }
+
+        private static double ReadBulletSizeScale(XElement? levelProperties)
+        {
+            XElement? size = levelProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "buSzPct");
+            return size != null &&
+                TryReadLong(size, "val", out long value) &&
+                value > 0
+                ? Math.Clamp(value / 100000.0, 0.2, 3.0)
+                : 1.0;
+        }
+
+        private static void AppendBulletHtml(
+            StringBuilder builder,
+            PresentationBulletMarker bullet)
+        {
+            var style = new StringBuilder();
+            if (bullet.IsTriangle)
+            {
+                style.Append("font-size:")
+                    .Append(FormatInvariant(bullet.SizeScale * 100.0))
+                    .Append("%;");
+            }
+
+            builder.Append("<span class=\"ppt-bullet\"");
+            if (!string.IsNullOrWhiteSpace(bullet.Typeface))
+            {
+                style.Append("font-family:'")
+                    .Append(bullet.Typeface.Replace("'", "\\'", StringComparison.Ordinal))
+                    .Append("';");
+            }
+
+            if (!string.IsNullOrWhiteSpace(bullet.Color))
+            {
+                style.Append("color:")
+                    .Append(bullet.Color)
+                    .Append(';');
+            }
+
+            if (style.Length > 0)
+            {
+                builder.Append(" style=\"")
+                    .Append(Html(style.ToString()))
+                    .Append('"');
+            }
+
+            builder.Append('>');
+            if (bullet.IsTriangle)
+            {
+                builder.Append("<span class=\"ppt-bullet-triangle\"></span>");
+            }
+            else
+            {
+                builder.Append(EncodeBulletText(bullet.Text));
+            }
+
+            builder.Append(" </span>");
+        }
+
+        private static string EncodeBulletText(string text)
+        {
+            var builder = new StringBuilder();
+            foreach (char character in text)
+            {
+                if (char.IsControl(character))
+                {
+                    builder.Append("&#x")
+                        .Append(((int)character).ToString("X", CultureInfo.InvariantCulture))
+                        .Append(';');
+                }
+                else
+                {
+                    builder.Append(Html(character.ToString()));
+                }
             }
 
             return builder.ToString();
@@ -472,38 +705,82 @@ namespace TxtAIEditor.Core.Services
 
         private static XElement? ReadParagraphDefaultRunProperties(
             XElement paragraph,
-            XElement? textBody)
+            XElement? textBody,
+            XElement? inheritedBodyStyle = null)
         {
             XElement? paragraphProperties = paragraph.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "pPr");
-            XElement? defaultRunProperties = paragraphProperties?.Elements()
+            XElement? explicitRunProperties = paragraphProperties?.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "defRPr") ??
-                paragraph.Elements().FirstOrDefault(e => e.Name.LocalName == "endParaRPr");
-            if (defaultRunProperties != null)
+                null;
+            if (HasRunVisualProperties(explicitRunProperties))
             {
-                return defaultRunProperties;
+                return explicitRunProperties;
             }
 
-            int level = 0;
-            if (paragraphProperties != null &&
+            XElement? endParagraphRunProperties = paragraph.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "endParaRPr");
+            if (HasRunVisualProperties(endParagraphRunProperties))
+            {
+                return endParagraphRunProperties;
+            }
+
+            return ReadParagraphLevelProperties(
+                    textBody,
+                    inheritedBodyStyle,
+                    ReadParagraphLevel(paragraph))
+                ?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "defRPr");
+        }
+
+        private static bool HasRunVisualProperties(XElement? runProperties)
+        {
+            if (runProperties == null)
+            {
+                return false;
+            }
+
+            return runProperties.Attributes().Any(attribute =>
+                    attribute.Name.LocalName is not "lang" and
+                    not "altLang" and
+                    not "smtClean") ||
+                runProperties.Descendants().Any();
+        }
+
+        private static int ReadParagraphLevel(XElement paragraph)
+        {
+            XElement? paragraphProperties = paragraph.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "pPr");
+            return paragraphProperties != null &&
                 int.TryParse(
                     paragraphProperties.Attribute("lvl")?.Value,
                     NumberStyles.Integer,
                     CultureInfo.InvariantCulture,
-                    out int readLevel) &&
-                readLevel >= 0)
-            {
-                level = Math.Min(8, readLevel);
-            }
+                    out int level) &&
+                level >= 0
+                    ? Math.Min(8, level)
+                    : 0;
+        }
 
+        private static XElement? ReadParagraphLevelProperties(
+            XElement? textBody,
+            XElement? inheritedBodyStyle,
+            int level)
+        {
             XElement? listStyle = textBody?.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "lstStyle");
-            return listStyle?.Elements()
+            XElement? localProperties = listStyle?.Elements()
                 .FirstOrDefault(e =>
                     e.Name.LocalName ==
-                    "lvl" + (level + 1).ToString(CultureInfo.InvariantCulture) + "pPr")
-                ?.Elements()
-                .FirstOrDefault(e => e.Name.LocalName == "defRPr");
+                    "lvl" + (Math.Clamp(level, 0, 8) + 1)
+                        .ToString(CultureInfo.InvariantCulture) +
+                    "pPr");
+            return localProperties ?? inheritedBodyStyle?.Elements()
+                .FirstOrDefault(e =>
+                    e.Name.LocalName ==
+                    "lvl" + (Math.Clamp(level, 0, 8) + 1)
+                        .ToString(CultureInfo.InvariantCulture) +
+                    "pPr");
         }
 
         private static string ReadParagraphDefaultRunStyle(
@@ -513,10 +790,14 @@ namespace TxtAIEditor.Core.Services
             long slideWidth,
             double baseWidthPx,
             double fontScale,
-            double fallbackFontSizePx)
+            double fallbackFontSizePx,
+            XElement? inheritedBodyStyle = null)
         {
             XElement? defaultRunProperties =
-                ReadParagraphDefaultRunProperties(paragraph, textBody);
+                ReadParagraphDefaultRunProperties(
+                    paragraph,
+                    textBody,
+                    inheritedBodyStyle);
             string style = ReadRunTextStyle(
                 defaultRunProperties,
                 themeColors,
@@ -533,6 +814,36 @@ namespace TxtAIEditor.Core.Services
             }
 
             return style;
+        }
+
+        private static bool ShouldUseInheritedBodyStyle(XElement shape)
+        {
+            XElement? placeholder = shape.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "ph");
+            if (placeholder == null)
+            {
+                return false;
+            }
+
+            string? type = placeholder.Attribute("type")?.Value;
+            return string.IsNullOrWhiteSpace(type) ||
+                string.Equals(type, "body", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(type, "obj", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(type, "text", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ShouldUseInheritedTitleStyle(XElement shape)
+        {
+            XElement? placeholder = shape.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "ph");
+            if (placeholder == null)
+            {
+                return false;
+            }
+
+            string? type = placeholder.Attribute("type")?.Value;
+            return string.Equals(type, "title", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(type, "ctrTitle", StringComparison.OrdinalIgnoreCase);
         }
 
         private static double ReadFallbackFontPoint(XElement shape)
@@ -571,18 +882,22 @@ namespace TxtAIEditor.Core.Services
 
         private static string ReadParagraphStyle(
             XElement paragraph,
+            XElement? textBody,
+            XElement? inheritedBodyStyle,
             long slideWidth,
             double baseWidthPx)
         {
             XElement? paragraphProperties = paragraph.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "pPr");
-            if (paragraphProperties == null)
-            {
-                return string.Empty;
-            }
+            XElement? levelProperties = ReadParagraphLevelProperties(
+                textBody,
+                inheritedBodyStyle,
+                ReadParagraphLevel(paragraph));
 
             var style = new StringBuilder();
-            string align = paragraphProperties.Attribute("algn")?.Value ?? string.Empty;
+            string align = paragraphProperties?.Attribute("algn")?.Value ??
+                levelProperties?.Attribute("algn")?.Value ??
+                string.Empty;
             string? cssAlign = align switch
             {
                 "l" => "left",
@@ -596,21 +911,37 @@ namespace TxtAIEditor.Core.Services
                 style.Append("text-align:").Append(cssAlign).Append(';');
             }
 
-            if (TryReadLong(paragraphProperties, "marL", out long marginLeft) &&
+            long marginLeft = 0;
+            bool hasMarginLeft = paragraphProperties != null &&
+                TryReadLong(paragraphProperties, "marL", out marginLeft);
+            if (!hasMarginLeft && levelProperties != null)
+            {
+                hasMarginLeft = TryReadLong(levelProperties, "marL", out marginLeft);
+            }
+
+            if (hasMarginLeft &&
                 marginLeft > 0)
             {
                 style.Append("padding-left:")
                     .Append(FormatInvariant(
-                        PointsToPixels(marginLeft / 1000.0, slideWidth, baseWidthPx)))
+                        PointsToPixels(marginLeft / 12700.0, slideWidth, baseWidthPx)))
                     .Append("px;");
             }
 
-            if (TryReadLong(paragraphProperties, "indent", out long indent) &&
+            long indent = 0;
+            bool hasIndent = paragraphProperties != null &&
+                TryReadLong(paragraphProperties, "indent", out indent);
+            if (!hasIndent && levelProperties != null)
+            {
+                hasIndent = TryReadLong(levelProperties, "indent", out indent);
+            }
+
+            if (hasIndent &&
                 indent != 0)
             {
                 style.Append("text-indent:")
                     .Append(FormatInvariant(
-                        PointsToPixels(indent / 1000.0, slideWidth, baseWidthPx)))
+                        PointsToPixels(indent / 12700.0, slideWidth, baseWidthPx)))
                     .Append("px;");
             }
 

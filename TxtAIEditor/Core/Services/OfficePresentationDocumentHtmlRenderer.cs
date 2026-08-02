@@ -164,6 +164,16 @@ body { padding: 28px 16px 40px; }
 .ppt-shape p { width: 100%; margin: 0 0 .24em; line-height: inherit; }
 .ppt-shape p:last-child { margin-bottom: 0; }
 .ppt-shape span { white-space: pre-wrap; }
+.ppt-bullet { display: inline-block; min-width: .75em; text-indent: 0; }
+.ppt-bullet-triangle {
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border-top: .36em solid transparent;
+    border-bottom: .36em solid transparent;
+    border-left: .58em solid currentColor;
+    vertical-align: -.08em;
+}
 .ppt-box { padding: 0; }
 .ppt-image img {
     width: 100%;
