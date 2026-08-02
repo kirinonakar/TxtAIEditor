@@ -1625,13 +1625,46 @@ const cell = event.target.closest?.('.csv-cell');
 
     document.addEventListener('keydown', event => {
         if (!csvTableMode.isEnabled) return;
+
+        const target = event.target;
+        const cell = target?.closest?.('.csv-cell');
+        const isCellTarget = !!cell && viewport.contains(cell);
+        const isNativeInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA';
+
         if (event.key === 'Delete') {
-            const tag = event.target?.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            if (isNativeInput) return;
             if (csvTableMode.editMode === 'select' && !state.readOnly) {
                 event.preventDefault();
                 clearCsvSelection();
             }
+            return;
+        }
+
+        // 셀에 포커스가 있으면 viewport keydown 핸들러가 이동을 처리한다.
+        // JSON 테이블은 중첩 객체/배열(확장) 셀이 contenteditable="false"라
+        // 포커스가 body로 빠질 수 있으므로, 셀 밖(입력/버튼 제외)에서도
+        // 선택 상태 기준으로 Enter/Shift+Enter, Tab/Shift+Tab 이동이
+        // 동작하도록 한다.
+        if (isCellTarget || isNativeInput || target?.tagName === 'BUTTON') return;
+
+        const line = Math.max(1, Number(csvTableMode.selectedLine || state.currentLine || 1));
+        const column = Math.max(0, Number(csvTableMode.selectedColumn || 0));
+        if (event.key === 'Tab') {
+            event.preventDefault();
+            moveCsvFocus(line, column + (event.shiftKey ? -1 : 1));
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            if (event.shiftKey) {
+                moveCsvFocus(line - 1, column);
+            } else {
+                moveCsvFocusOrInsert(line + 1, column);
+            }
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            moveCsvFocus(line - 1, column);
+        } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            moveCsvFocus(line + 1, column);
         }
     }, true);
 
