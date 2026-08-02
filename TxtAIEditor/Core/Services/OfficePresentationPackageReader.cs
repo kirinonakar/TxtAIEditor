@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -14,6 +17,8 @@ namespace TxtAIEditor.Core.Services
     {
         private const long DefaultSlideWidthEmu = 9144000;
         private const long DefaultSlideHeightEmu = 5143500;
+        private const int MaxMetafileRenderDimension = 4096;
+        private static readonly object MetafileRenderLock = new();
 
         public static async Task<ZipArchive> OpenArchiveAsync(string filePath)
         {
@@ -234,7 +239,16 @@ namespace TxtAIEditor.Core.Services
             using Stream stream = entry.Open();
             using var memory = new MemoryStream();
             stream.CopyTo(memory);
+            byte[] bytes = memory.ToArray();
             string extension = Path.GetExtension(imagePath).ToLowerInvariant();
+            if (extension is ".wmf" or ".emf")
+            {
+                byte[]? pngBytes = ConvertMetafileToPngBytes(bytes, imagePath);
+                return pngBytes == null || pngBytes.Length == 0
+                    ? null
+                    : "data:image/png;base64," + Convert.ToBase64String(pngBytes);
+            }
+
             string mime = extension switch
             {
                 ".jpg" or ".jpeg" => "image/jpeg",
@@ -246,7 +260,48 @@ namespace TxtAIEditor.Core.Services
                 _ => "image/png"
             };
 
-            return "data:" + mime + ";base64," + Convert.ToBase64String(memory.ToArray());
+            return "data:" + mime + ";base64," + Convert.ToBase64String(bytes);
+        }
+
+        private static byte[]? ConvertMetafileToPngBytes(byte[] metafileBytes, string imagePath)
+        {
+            try
+            {
+                lock (MetafileRenderLock)
+                {
+                    using var source = new MemoryStream(metafileBytes, writable: false);
+                    using var metafile = new Metafile(source);
+
+                    int sourceWidth = Math.Max(1, metafile.Width);
+                    int sourceHeight = Math.Max(1, metafile.Height);
+                    double scale = Math.Min(
+                        1.0,
+                        MaxMetafileRenderDimension /
+                        (double)Math.Max(sourceWidth, sourceHeight));
+                    int width = Math.Max(1, (int)Math.Round(sourceWidth * scale));
+                    int height = Math.Max(1, (int)Math.Round(sourceHeight * scale));
+
+                    using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppPArgb);
+                    using (Graphics graphics = Graphics.FromImage(bitmap))
+                    {
+                        graphics.Clear(Color.Transparent);
+                        graphics.SmoothingMode = SmoothingMode.HighQuality;
+                        graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                        graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                        graphics.DrawImage(metafile, new Rectangle(0, 0, width, height));
+                    }
+
+                    using var output = new MemoryStream();
+                    bitmap.Save(output, ImageFormat.Png);
+                    return output.ToArray();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"Failed to convert embedded presentation metafile '{imagePath}' to PNG: {ex.Message}");
+                return null;
+            }
         }
 
         private static string? FindRelationshipTarget(
