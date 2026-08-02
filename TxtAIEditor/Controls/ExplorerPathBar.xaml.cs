@@ -4,6 +4,7 @@ using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 
 namespace TxtAIEditor.Controls
@@ -29,9 +30,13 @@ namespace TxtAIEditor.Controls
         private const double FontStep = 0.5;
         private const double RowSpacing = 2.0;
         private const double TokenSpacing = 5.0;
+        private const double SpaceAfterSeparator = 4.0; // 구분자 뒤에 한 칸(픽셀) 추가
         private const double HorizontalPadding = 2.0;
         private const int MaxRows = 2;
-        private const string SeparatorText = "› "; // 구분자 뒤에 한 칸 공백
+        private const string SeparatorText = "›";
+        private static readonly Thickness SegmentPadding = new(4, 2, 4, 2);
+        private static readonly Thickness SeparatorPadding = new(0, 2, 0, 2);
+        private static readonly Brush TransparentBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
 
         private IReadOnlyList<ExplorerBreadcrumbSegment>? _segments;
         private bool _rendering;
@@ -115,7 +120,7 @@ namespace TxtAIEditor.Controls
             for (int i = 0; i < _segments.Count; i++)
             {
                 ExplorerBreadcrumbSegment segment = _segments[i];
-                var elements = new List<TextBlock>(2);
+                var elements = new List<FrameworkElement>(2);
                 double width = 0;
 
                 if (i > 0)
@@ -124,11 +129,12 @@ namespace TxtAIEditor.Controls
                     {
                         Text = SeparatorText,
                         FontSize = fontSize,
-                        Style = (Style)Resources["PathSeparatorStyle"]
+                        Style = (Style)Resources["PathSeparatorStyle"],
+                        Padding = SeparatorPadding
                     };
                     separator.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                     elements.Add(separator);
-                    width += separator.DesiredSize.Width + TokenSpacing;
+                    width += separator.DesiredSize.Width + TokenSpacing + SpaceAfterSeparator;
                 }
 
                 var segmentBlock = new TextBlock
@@ -138,14 +144,25 @@ namespace TxtAIEditor.Controls
                     MaxWidth = availableWidth,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     TextWrapping = TextWrapping.NoWrap,
+                    IsHitTestVisible = false
+                };
+                var segmentBorder = new Border
+                {
+                    Child = segmentBlock,
+                    Padding = SegmentPadding,
+                    CornerRadius = new CornerRadius(3),
+                    MaxWidth = availableWidth,
+                    Background = TransparentBrush,
                     Tag = segment
                 };
-                ToolTipService.SetToolTip(segmentBlock, segment.Path);
-                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(segmentBlock, segment.Name);
-                segmentBlock.Tapped += OnSegmentTapped;
-                segmentBlock.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                elements.Add(segmentBlock);
-                width += segmentBlock.DesiredSize.Width;
+                ToolTipService.SetToolTip(segmentBorder, segment.Path);
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(segmentBorder, segment.Name);
+                segmentBorder.Tapped += OnSegmentTapped;
+                segmentBorder.PointerEntered += OnSegmentPointerEntered;
+                segmentBorder.PointerExited += OnSegmentPointerExited;
+                segmentBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                elements.Add(segmentBorder);
+                width += segmentBorder.DesiredSize.Width;
 
                 tokens.Add(new PathToken(elements, width));
             }
@@ -207,10 +224,11 @@ namespace TxtAIEditor.Controls
                 {
                     Text = "…",
                     FontSize = MinFontSize,
-                    Style = (Style)Resources["PathSeparatorStyle"]
+                    Style = (Style)Resources["PathSeparatorStyle"],
+                    Padding = SeparatorPadding
                 };
                 ellipsis.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                kept.Add(new PathToken(new List<TextBlock> { ellipsis }, ellipsis.DesiredSize.Width)
+                kept.Add(new PathToken(new List<FrameworkElement> { ellipsis }, ellipsis.DesiredSize.Width)
                 {
                     Row = lastRow,
                     X = lastX
@@ -225,7 +243,7 @@ namespace TxtAIEditor.Controls
             double rowHeight = 0;
             foreach (PathToken token in tokens)
             {
-                foreach (TextBlock element in token.Elements)
+                foreach (FrameworkElement element in token.Elements)
                 {
                     rowHeight = Math.Max(rowHeight, element.DesiredSize.Height);
                 }
@@ -236,12 +254,13 @@ namespace TxtAIEditor.Controls
             {
                 double top = token.Row * (rowHeight + RowSpacing);
                 double x = token.X;
-                foreach (TextBlock element in token.Elements)
+                foreach (FrameworkElement element in token.Elements)
                 {
                     Canvas.SetLeft(element, x);
                     Canvas.SetTop(element, top);
                     PathCanvas.Children.Add(element);
-                    x += element.DesiredSize.Width + TokenSpacing;
+                    bool isSeparator = token.Elements.Count > 1 && element == token.Elements[0];
+                    x += element.DesiredSize.Width + TokenSpacing + (isSeparator ? SpaceAfterSeparator : 0);
                 }
 
                 height = Math.Max(height, top + rowHeight);
@@ -252,21 +271,50 @@ namespace TxtAIEditor.Controls
 
         private void OnSegmentTapped(object sender, TappedRoutedEventArgs e)
         {
-            if (sender is TextBlock { Tag: ExplorerBreadcrumbSegment segment })
+            if (sender is Border { Tag: ExplorerBreadcrumbSegment segment })
             {
                 SegmentClicked?.Invoke(this, new ExplorerPathSegmentClickedEventArgs(segment));
             }
         }
 
+        private void OnSegmentPointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Border border)
+            {
+                border.Background = GetHoverBackgroundBrush(border);
+            }
+        }
+
+        private void OnSegmentPointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Border border)
+            {
+                border.Background = TransparentBrush;
+            }
+        }
+
+        private static Brush GetHoverBackgroundBrush(FrameworkElement element)
+        {
+            if (Application.Current.Resources.TryGetValue("SystemControlBackgroundListLowBrush", out object? value) &&
+                value is Brush brush)
+            {
+                return brush;
+            }
+
+            bool isDark = element.ActualTheme == ElementTheme.Dark;
+            byte channel = isDark ? (byte)0xFF : (byte)0x00;
+            return new SolidColorBrush(Windows.UI.Color.FromArgb(0x33, channel, channel, channel));
+        }
+
         private sealed class PathToken
         {
-            public PathToken(List<TextBlock> elements, double width)
+            public PathToken(List<FrameworkElement> elements, double width)
             {
                 Elements = elements;
                 Width = width;
             }
 
-            public List<TextBlock> Elements { get; }
+            public List<FrameworkElement> Elements { get; }
             public double Width { get; }
             public int Row { get; set; }
             public double X { get; set; }
