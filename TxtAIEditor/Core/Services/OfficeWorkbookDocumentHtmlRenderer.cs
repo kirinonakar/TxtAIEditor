@@ -2273,11 +2273,15 @@ renderSheet(0);
         private static string FormatWorkbookCellValue(string rawValue, ViewerCellStyle style, bool use1904Dates)
         {
             string formatCode = style.NumberFormatCode ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(formatCode) ||
-                formatCode.Equals("General", StringComparison.OrdinalIgnoreCase) ||
-                !double.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out double numericValue))
+            if (!double.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out double numericValue))
             {
                 return rawValue;
+            }
+
+            if (string.IsNullOrWhiteSpace(formatCode) ||
+                formatCode.Equals("General", StringComparison.OrdinalIgnoreCase))
+            {
+                return FormatWorkbookGeneralNumberValue(numericValue, rawValue);
             }
 
             if (IsWorkbookDateFormat(formatCode) &&
@@ -2287,6 +2291,23 @@ renderSheet(0);
             }
 
             return FormatWorkbookNumberValue(numericValue, formatCode, rawValue);
+        }
+
+        private static string FormatWorkbookGeneralNumberValue(double numericValue, string rawValue)
+        {
+            if (double.IsNaN(numericValue) || double.IsInfinity(numericValue))
+            {
+                return rawValue;
+            }
+
+            try
+            {
+                return numericValue.ToString("G15", CultureInfo.CurrentCulture);
+            }
+            catch
+            {
+                return rawValue;
+            }
         }
 
         private static bool IsWorkbookDateFormat(string formatCode)
