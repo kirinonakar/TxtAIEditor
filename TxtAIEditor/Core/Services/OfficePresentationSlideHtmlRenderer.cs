@@ -431,6 +431,40 @@ namespace TxtAIEditor.Core.Services
                 yield break;
             }
 
+            if (element.Name.LocalName == "AlternateContent")
+            {
+                XElement? selectedBranch = element.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "Choice") ??
+                    element.Elements()
+                        .FirstOrDefault(e => e.Name.LocalName == "Fallback");
+                foreach (XElement child in selectedBranch?.Elements() ??
+                    Enumerable.Empty<XElement>())
+                {
+                    foreach (string childHtml in ReadSlideElement(
+                        archive,
+                        child,
+                        relationships,
+                        themeColors,
+                        slideWidth,
+                        slideHeight,
+                        baseWidthPx,
+                        baseHeightPx,
+                        placeholderBounds,
+                        tableStyles,
+                        inheritedBodyStyle,
+                        inheritedTitleStyle,
+                        groupTransform,
+                        diagramDrawings,
+                        forcedTextColor,
+                        skipPlaceholders))
+                    {
+                        yield return childHtml;
+                    }
+                }
+
+                yield break;
+            }
+
             if (element.Name.LocalName == "grpSp")
             {
                 PresentationGroupTransform? nextTransform =

@@ -70,7 +70,14 @@ namespace TxtAIEditor.Core.Services
                                 baseWidthPx,
                                 fontScale,
                                 fallbackFontSizePx,
-                                effectiveTextStyle);
+                                effectiveTextStyle) +
+                            ReadExplicitParagraphFontSizeStyle(
+                                paragraph,
+                                textBody,
+                                effectiveTextStyle,
+                                slideWidth,
+                                baseWidthPx,
+                                fontScale);
                         AppendEmptyParagraphHtml(paragraphs, emptyParagraphStyle);
                     }
 
@@ -99,6 +106,13 @@ namespace TxtAIEditor.Core.Services
                     fontScale,
                     fallbackFontSizePx,
                     effectiveTextStyle);
+                paragraphStyle += ReadExplicitParagraphFontSizeStyle(
+                    paragraph,
+                    textBody,
+                    effectiveTextStyle,
+                    slideWidth,
+                    baseWidthPx,
+                    fontScale);
                 paragraphs.Append("<p");
                 if (!string.IsNullOrWhiteSpace(paragraphStyle))
                 {
@@ -915,6 +929,77 @@ namespace TxtAIEditor.Core.Services
             }
 
             return style;
+        }
+
+        private static string ReadExplicitParagraphFontSizeStyle(
+            XElement paragraph,
+            XElement? textBody,
+            XElement? inheritedBodyStyle,
+            long slideWidth,
+            double baseWidthPx,
+            double fontScale)
+        {
+            IEnumerable<XElement> runProperties = paragraph.Elements()
+                .Where(e => e.Name.LocalName is "r" or "fld")
+                .SelectMany(e => e.Elements())
+                .Where(e => e.Name.LocalName == "rPr");
+            List<int> sizes = runProperties
+                .Select(properties => properties.Attribute("sz")?.Value)
+                .Where(value => int.TryParse(
+                    value,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out _))
+                .Select(value => int.Parse(
+                    value!,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture))
+                .Where(size => size > 0)
+                .ToList();
+
+            XElement? endParagraphProperties = paragraph.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "endParaRPr");
+            if (endParagraphProperties?.Attribute("sz")?.Value is string endSizeValue &&
+                int.TryParse(
+                    endSizeValue,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int endSize) &&
+                endSize > 0)
+            {
+                sizes.Add(endSize);
+            }
+
+            if (sizes.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            double points = sizes.Max() / 100.0;
+            var style = new StringBuilder("font-size:");
+            style.Append(
+                FormatInvariant(
+                    PointsToPixels(points, slideWidth, baseWidthPx) * fontScale) +
+                "px;");
+
+            XElement? levelProperties = ReadParagraphLevelProperties(
+                textBody,
+                inheritedBodyStyle,
+                ReadParagraphLevel(paragraph));
+            XElement? inheritedDefaultRunProperties = levelProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "defRPr");
+            if (inheritedDefaultRunProperties?.Attribute("sz")?.Value is string inheritedSizeValue &&
+                int.TryParse(
+                    inheritedSizeValue,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int inheritedSize) &&
+                inheritedSize > sizes.Max())
+            {
+                style.Append("line-height:1.2;");
+            }
+
+            return style.ToString();
         }
 
         private static bool ShouldUseInheritedBodyStyle(XElement shape)
