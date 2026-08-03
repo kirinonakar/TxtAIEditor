@@ -2141,9 +2141,6 @@
   <data name="AgentExceptionFormat" xml:space="preserve">
     <value>Agent実行中に例外が発生しました: {0}</value>
   </data>
-  <data name="AgentModeRun" xml:space="preserve">
-    <value>実行</value>
-  </data>
   <data name="AgentLanguageCode" xml:space="preserve">
     <value>ja-JP</value>
   </data>

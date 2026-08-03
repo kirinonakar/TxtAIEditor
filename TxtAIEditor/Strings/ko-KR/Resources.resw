@@ -2141,9 +2141,6 @@
   <data name="AgentExceptionFormat" xml:space="preserve">
     <value>Agent 실행 도중 예외가 발생했습니다: {0}</value>
   </data>
-  <data name="AgentModeRun" xml:space="preserve">
-    <value>실행</value>
-  </data>
   <data name="AgentLanguageCode" xml:space="preserve">
     <value>ko-KR</value>
   </data>

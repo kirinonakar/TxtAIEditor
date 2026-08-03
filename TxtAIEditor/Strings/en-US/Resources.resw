@@ -2141,9 +2141,6 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentExceptionFormat" xml:space="preserve">
     <value>An exception occurred during Agent execution: {0}</value>
   </data>
-  <data name="AgentModeRun" xml:space="preserve">
-    <value>Run</value>
-  </data>
   <data name="AgentLanguageCode" xml:space="preserve">
     <value>en-US</value>
   </data>

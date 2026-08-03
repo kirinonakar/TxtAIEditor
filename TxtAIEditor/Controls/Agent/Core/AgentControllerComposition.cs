@@ -94,7 +94,7 @@ namespace TxtAIEditor.Controls
         {
             var uiDispatcher = new AgentUiDispatcher(agentPane.DispatcherQueue);
             var displayText = new AgentDisplayLocalizer(getString);
-            var runTextFormatter = new AgentRunTextFormatter(getString);
+            var runTextFormatter = new AgentRunTextFormatter();
             var runWorkspaceResolver = new AgentRunWorkspaceResolver(() => fileTools.WorkspaceRoot);
             var modelContextLimits = new AgentModelContextLimitProvider();
             var llmToolCatalog = new AgentLlmToolCatalog();

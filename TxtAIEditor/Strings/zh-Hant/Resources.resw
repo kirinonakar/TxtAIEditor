@@ -2141,9 +2141,6 @@
   <data name="AgentExceptionFormat" xml:space="preserve">
     <value>Agent執行期間發生異常：{0}</value>
   </data>
-  <data name="AgentModeRun" xml:space="preserve">
-    <value>運行</value>
-  </data>
   <data name="AgentLanguageCode" xml:space="preserve">
     <value>zh-Hant</value>
   </data>

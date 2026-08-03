@@ -541,6 +541,23 @@ namespace TxtAIEditor.Controls
                 return paragraph;
             }
 
+            if (TryGetUserPromptLineParts(line, out string promptPrefix, out string promptMarkerAndText))
+            {
+                if (promptPrefix.Length > 0)
+                {
+                    AddTextRunsWithEmojiSupport(promptPrefix, paragraph.Inlines, false, 0);
+                }
+
+                AddTextRunsWithEmojiSupport(
+                    promptMarkerAndText,
+                    paragraph.Inlines,
+                    false,
+                    0,
+                    null,
+                    GetBrushResource("AgentUserPromptForeground", Microsoft.UI.Colors.DodgerBlue));
+                return paragraph;
+            }
+
             bool isHeading = TryParseMarkdownHeading(line, out int headingLevel, out string displayLine);
             double headingFontSize = GetMarkdownHeadingFontSize(headingLevel);
             line = displayLine;
@@ -600,6 +617,41 @@ namespace TxtAIEditor.Controls
             }
 
             return paragraph;
+        }
+
+        private static bool TryGetUserPromptLineParts(string line, out string prefix, out string markerAndPrompt)
+        {
+            prefix = string.Empty;
+            markerAndPrompt = string.Empty;
+
+            const string userPromptMarker = "[User Prompt]:";
+            int markerIndex = line.IndexOf(userPromptMarker, StringComparison.Ordinal);
+            if (markerIndex < 0)
+            {
+                return false;
+            }
+
+            string before = line.Substring(0, markerIndex).Trim();
+            if (before.Length > 0 && !IsTimestampPrefix(before))
+            {
+                return false;
+            }
+
+            prefix = line.Substring(0, markerIndex);
+            markerAndPrompt = line.Substring(markerIndex);
+            return true;
+        }
+
+        private static bool IsTimestampPrefix(string prefix)
+        {
+            if (prefix.Length != 8 || prefix[2] != ':' || prefix[5] != ':')
+            {
+                return false;
+            }
+
+            return char.IsDigit(prefix[0]) && char.IsDigit(prefix[1]) &&
+                char.IsDigit(prefix[3]) && char.IsDigit(prefix[4]) &&
+                char.IsDigit(prefix[6]) && char.IsDigit(prefix[7]);
         }
 
         private void EnsureRenderedLineExists()
