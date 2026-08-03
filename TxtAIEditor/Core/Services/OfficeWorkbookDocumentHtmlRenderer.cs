@@ -179,6 +179,32 @@ td.row-header {
     cursor: cell;
 }
 td:not(.row-header) { cursor: cell; }
+th.col-resize-hover { cursor: ew-resize !important; }
+th.col-resize-hover::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 2px;
+    height: 100%;
+    background: color-mix(in srgb, var(--accent) 60%, transparent);
+    pointer-events: none;
+}
+td.row-resize-hover { cursor: ns-resize !important; }
+td.row-resize-hover::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 2px;
+    background: color-mix(in srgb, var(--accent) 60%, transparent);
+    pointer-events: none;
+}
+body.resizing { user-select: none; -webkit-user-select: none; }
+body.resizing * { cursor: inherit !important; }
+body.resizing-col { cursor: ew-resize !important; }
+body.resizing-row { cursor: ns-resize !important; }
 th.selected-column-heading,
 td.selected-row-heading {
     color: var(--text);
@@ -218,6 +244,11 @@ let activeSheetIndex = 0;
 let columnCount = 1;
 let selectionState = null;
 let dragState = null;
+let resizeState = null;
+let resizeHover = null;
+const sheetLayouts = [];
+const resizeStyle = document.createElement('style');
+document.head.appendChild(resizeStyle);
 select.setAttribute('aria-label', sheetAriaLabel);
 
 function colName(index) {
@@ -441,6 +472,22 @@ function handleCellPointerDown(event) {
 }
 
 function handleCellPointerMove(event) {
+    if (resizeState) {
+        if ((event.buttons & 1) === 1) {
+            const layout = sheetLayouts[activeSheetIndex];
+            if (resizeState.type === 'column') {
+                const px = Math.max(40, Math.round(resizeState.startWidth + event.clientX - resizeState.startX));
+                layout.columns.set(resizeState.index, px);
+            } else {
+                const px = Math.max(20, Math.round(resizeState.startHeight + event.clientY - resizeState.startY));
+                layout.rows.set(resizeState.index, px);
+            }
+            updateResizedStyles();
+        }
+        event.preventDefault();
+        return;
+    }
+
     if (!dragState || (event.buttons & 1) !== 1) return;
 
     const td = cellFromPoint(event);
@@ -452,6 +499,86 @@ function handleCellPointerMove(event) {
 
 function handlePointerUp() {
     dragState = null;
+    if (resizeState) {
+        resizeState = null;
+        document.body.classList.remove('resizing', 'resizing-col', 'resizing-row');
+    }
+}
+
+function sheetLayout() {
+    if (!sheetLayouts[activeSheetIndex]) {
+        sheetLayouts[activeSheetIndex] = { columns: new Map(), rows: new Map() };
+    }
+    return sheetLayouts[activeSheetIndex];
+}
+
+function clearResizeHover() {
+    resizeHover = null;
+    wrap.querySelectorAll('.col-resize-hover, .row-resize-hover').forEach(el => {
+        el.classList.remove('col-resize-hover', 'row-resize-hover');
+    });
+}
+
+function updateResizeHover(event) {
+    clearResizeHover();
+    const th = event.target.closest?.('th[data-csv-column]');
+    if (th) {
+        const rect = th.getBoundingClientRect();
+        const distanceToRightEdge = rect.right - event.clientX;
+        if (distanceToRightEdge > 0 && distanceToRightEdge <= 8) {
+            th.classList.add('col-resize-hover');
+            resizeHover = { type: 'column', index: Number(th.dataset.csvColumn) };
+            return;
+        }
+    }
+    const rowHeader = event.target.closest?.('td.row-header[data-csv-row]');
+    if (rowHeader) {
+        const rect = rowHeader.getBoundingClientRect();
+        const distanceToBottomEdge = rect.bottom - event.clientY;
+        if (distanceToBottomEdge > 0 && distanceToBottomEdge <= 8) {
+            rowHeader.classList.add('row-resize-hover');
+            resizeHover = { type: 'row', index: Number(rowHeader.dataset.csvRow) };
+        }
+    }
+}
+
+function updateResizedStyles() {
+    const layout = sheetLayouts[activeSheetIndex];
+    if (!layout) return;
+    let css = '';
+    layout.columns.forEach((px, columnIndex) => {
+        css += `table tr > :nth-child(${columnIndex + 2}) { width: ${px}px !important; min-width: ${px}px !important; max-width: none !important; }`;
+    });
+    layout.rows.forEach((px, rowIndex) => {
+        css += `table tbody tr:nth-child(${rowIndex + 1}) > * { height: ${px}px !important; }`;
+    });
+    resizeStyle.textContent = css;
+}
+
+function startColumnResize(columnIndex, event) {
+    const header = wrap.querySelector(`thead th[data-csv-column="${columnIndex}"]`);
+    resizeState = {
+        type: 'column',
+        index: columnIndex,
+        startX: event.clientX,
+        startWidth: header ? header.getBoundingClientRect().width : 96
+    };
+    document.body.classList.add('resizing', 'resizing-col');
+    event.preventDefault();
+    event.stopPropagation();
+}
+
+function startRowResize(rowIndex, event) {
+    const headerCell = wrap.querySelector(`tbody td.row-header[data-csv-row="${rowIndex}"]`);
+    resizeState = {
+        type: 'row',
+        index: rowIndex,
+        startY: event.clientY,
+        startHeight: headerCell ? headerCell.getBoundingClientRect().height : 30
+    };
+    document.body.classList.add('resizing', 'resizing-row');
+    event.preventDefault();
+    event.stopPropagation();
 }
 
 function renderSheet(index) {
@@ -460,6 +587,7 @@ function renderSheet(index) {
     const visibleRows = rows.slice(0, maxRows);
     columnCount = Math.max(1, ...visibleRows.map(row => row.length));
     wrap.textContent = '';
+    sheetLayout();
 
     if (!rows.length) {
         selectionState = null;
@@ -507,6 +635,7 @@ function renderSheet(index) {
         selectionState = createCellSelection(0, 0);
     }
     applySelectionClasses();
+    updateResizedStyles();
 }
 
 sheets.forEach((sheet, index) => {
@@ -521,6 +650,16 @@ select.addEventListener('change', () => {
     renderSheet(activeSheetIndex);
 });
 wrap.addEventListener('pointerdown', event => {
+    updateResizeHover(event);
+    if (resizeHover) {
+        if (resizeHover.type === 'column') {
+            startColumnResize(resizeHover.index, event);
+        } else {
+            startRowResize(resizeHover.index, event);
+        }
+        return;
+    }
+
     const columnHeader = event.target.closest?.('th[data-csv-column]');
     if (columnHeader) {
         setColumnSelection(Number(columnHeader.dataset.csvColumn), event);
@@ -537,8 +676,18 @@ wrap.addEventListener('pointerdown', event => {
 
     handleCellPointerDown(event);
 });
+wrap.addEventListener('pointermove', event => {
+    if ((event.buttons & 1) === 0) updateResizeHover(event);
+});
+wrap.addEventListener('pointerleave', clearResizeHover);
 document.addEventListener('pointermove', handleCellPointerMove);
 document.addEventListener('pointerup', handlePointerUp);
+window.addEventListener('blur', () => {
+    if (resizeState) {
+        resizeState = null;
+        document.body.classList.remove('resizing', 'resizing-col', 'resizing-row');
+    }
+});
 document.addEventListener('copy', event => {
     const csv = selectedCellsAsCsv();
     if (!csv) return;
