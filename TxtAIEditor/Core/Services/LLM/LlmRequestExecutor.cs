@@ -262,10 +262,9 @@ namespace TxtAIEditor.Core.Services.LLM
 
             bool sameProvider = fallbackProvider.Equals(settings.LlmProvider, StringComparison.OrdinalIgnoreCase);
             string fallbackThinkingLevel = settings.LlmVisionFallbackThinkingLevel;
-            if (string.IsNullOrWhiteSpace(fallbackThinkingLevel) ||
-                fallbackThinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrWhiteSpace(fallbackThinkingLevel))
             {
-                fallbackThinkingLevel = settings.LlmThinkingLevel;
+                fallbackThinkingLevel = "default";
             }
             fallbackSettings = new EditorSettings
             {
