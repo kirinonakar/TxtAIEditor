@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
@@ -20,6 +21,17 @@ namespace TxtAIEditor.Core.Services
             public string Color { get; init; } = "#2864DC";
             public IReadOnlyDictionary<int, string> PointColors { get; init; } =
                 new Dictionary<int, string>();
+        }
+
+        private sealed class PresentationChartUserShape
+        {
+            public double X { get; init; }
+            public double Y { get; init; }
+            public double Width { get; init; }
+            public double Height { get; init; }
+            public IReadOnlyList<string> Lines { get; init; } = Array.Empty<string>();
+            public double FontSize { get; init; } = 21;
+            public string FontFamily { get; init; } = "Arial";
         }
 
         public static string? TryBuild(
@@ -52,6 +64,11 @@ namespace TxtAIEditor.Core.Services
             {
                 return null;
             }
+
+            XDocument? chartUserShapes = TryLoadChartUserShapes(
+                archive,
+                chartPath,
+                chartDocument);
 
             int categoryCount = series.Max(item =>
                 Math.Max(item.Categories.Count, item.Values.Count));
@@ -102,7 +119,8 @@ namespace TxtAIEditor.Core.Services
                     varyColors,
                     background,
                     chart.Name.LocalName == "pie3DChart",
-                    themeColors);
+                    themeColors,
+                    chartUserShapes);
             }
 
             XElement? valueAxis = plotArea.Elements()
@@ -141,6 +159,35 @@ namespace TxtAIEditor.Core.Services
                 maximum,
                 percentage,
                 background);
+        }
+
+        private static XDocument? TryLoadChartUserShapes(
+            ZipArchive archive,
+            string chartPath,
+            XDocument? chartDocument)
+        {
+            string? relationshipId = chartDocument?.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "userShapes")
+                ?.Attributes()
+                .FirstOrDefault(attribute => attribute.Name.LocalName == "id")
+                ?.Value;
+            if (string.IsNullOrWhiteSpace(relationshipId))
+            {
+                return null;
+            }
+
+            string basePath = Path.GetDirectoryName(chartPath)?.Replace('\\', '/') ?? string.Empty;
+            IReadOnlyDictionary<string, string> relationships =
+                OfficePresentationPackageReader.LoadRelationships(
+                    archive,
+                    OfficePresentationPackageReader.GetRelationshipsPath(chartPath),
+                    basePath);
+            return relationships.TryGetValue(relationshipId, out string? userShapesPath)
+                ? OfficePresentationPackageReader.TryLoadXmlEntry(
+                    archive,
+                    userShapesPath,
+                    5_000_000)
+                : null;
         }
 
         private static PresentationChartSeries ReadChartSeries(
@@ -356,7 +403,8 @@ namespace TxtAIEditor.Core.Services
             bool varyColors,
             string background,
             bool isThreeDimensional,
-            IReadOnlyList<string> themeColors)
+            IReadOnlyList<string> themeColors,
+            XDocument? chartUserShapes)
         {
             const double centerX = 360;
             const double centerY = 300;
@@ -457,7 +505,7 @@ namespace TxtAIEditor.Core.Services
                         .Append(FormatInvariant(labelX))
                         .Append("\" y=\"")
                         .Append(FormatInvariant(labelY))
-                        .Append("\" dy=\".35em\" text-anchor=\"middle\" font-family=\"Segoe UI,Arial,sans-serif\" font-size=\"26\" font-weight=\"700\" fill=\"#FFFFFF\" stroke=\"#1F2937\" stroke-opacity=\".78\" stroke-width=\"5\" stroke-linejoin=\"round\" paint-order=\"stroke fill\">")
+                        .Append("\" dy=\".35em\" text-anchor=\"middle\" font-family=\"Segoe UI,Arial,sans-serif\" font-size=\"26\" font-weight=\"700\" fill=\"#20222B\" stroke=\"#FFFFFF\" stroke-opacity=\".9\" stroke-width=\"2\" stroke-linejoin=\"round\" paint-order=\"stroke fill\">")
                         .Append(Html(FormatPiePercent(value, total)))
                         .Append("</text>");
                 }
@@ -466,6 +514,7 @@ namespace TxtAIEditor.Core.Services
             }
 
             svg.Append("</g>").Append(labelsSvg);
+            AppendChartUserShapeText(svg, chartUserShapes);
             const double legendX = 650;
             const double legendTop = 84;
             const double legendRowHeight = 76;
@@ -505,6 +554,132 @@ namespace TxtAIEditor.Core.Services
 
             svg.Append("</svg>");
             return svg.ToString();
+        }
+
+        private static void AppendChartUserShapeText(
+            StringBuilder svg,
+            XDocument? chartUserShapes)
+        {
+            if (chartUserShapes == null)
+            {
+                return;
+            }
+
+            foreach (XElement anchor in chartUserShapes.Descendants()
+                .Where(e => e.Name.LocalName == "relSizeAnchor"))
+            {
+                XElement? from = anchor.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "from");
+                XElement? to = anchor.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "to");
+                if (!TryReadDouble(from?.Elements()
+                        .FirstOrDefault(e => e.Name.LocalName == "x"),
+                        out double fromX) ||
+                    !TryReadDouble(from?.Elements()
+                        .FirstOrDefault(e => e.Name.LocalName == "y"),
+                        out double fromY) ||
+                    !TryReadDouble(to?.Elements()
+                        .FirstOrDefault(e => e.Name.LocalName == "x"),
+                        out double toX) ||
+                    !TryReadDouble(to?.Elements()
+                        .FirstOrDefault(e => e.Name.LocalName == "y"),
+                        out double toY))
+                {
+                    continue;
+                }
+
+                XElement? textBody = anchor.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "txBody");
+                if (textBody == null)
+                {
+                    continue;
+                }
+
+                List<string> lines = textBody.Elements()
+                    .Where(e => e.Name.LocalName == "p")
+                    .Select(paragraph => string.Concat(
+                        paragraph.Descendants()
+                            .Where(e => e.Name.LocalName == "t")
+                            .Select(text => text.Value)))
+                    .Where(line => !string.IsNullOrWhiteSpace(line))
+                    .ToList();
+                if (lines.Count == 0)
+                {
+                    continue;
+                }
+
+                var userShape = new PresentationChartUserShape
+                {
+                    X = Math.Clamp(fromX * 1000, 0, 1000),
+                    Y = Math.Clamp(fromY * 600, 0, 600),
+                    Width = Math.Max(1, (toX - fromX) * 1000),
+                    Height = Math.Max(1, (toY - fromY) * 600),
+                    Lines = lines,
+                    FontSize = ReadChartUserShapeFontSize(textBody),
+                    FontFamily = ReadChartUserShapeFontFamily(textBody)
+                };
+                double lineHeight = userShape.FontSize * 1.16;
+                svg.Append("<text x=\"")
+                    .Append(FormatInvariant(userShape.X + 4))
+                    .Append("\" y=\"")
+                    .Append(FormatInvariant(userShape.Y + userShape.FontSize))
+                    .Append("\" font-family=\"")
+                    .Append(Html(userShape.FontFamily))
+                    .Append("\" font-size=\"")
+                    .Append(FormatInvariant(userShape.FontSize))
+                    .Append("\" font-weight=\"400\" fill=\"#20222B\" text-anchor=\"start\">");
+                for (int lineIndex = 0; lineIndex < userShape.Lines.Count; lineIndex++)
+                {
+                    svg.Append("<tspan x=\"")
+                        .Append(FormatInvariant(userShape.X + 4))
+                        .Append("\" dy=\"")
+                        .Append(FormatInvariant(lineIndex == 0 ? 0 : lineHeight))
+                        .Append("\">")
+                        .Append(Html(userShape.Lines[lineIndex]))
+                        .Append("</tspan>");
+                }
+
+                svg.Append("</text>");
+            }
+        }
+
+        private static double ReadChartUserShapeFontSize(XElement textBody)
+        {
+            XElement? runProperties = textBody.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "rPr" &&
+                    e.Attribute("sz") != null);
+            if (runProperties != null &&
+                int.TryParse(
+                    runProperties.Attribute("sz")?.Value,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int size) &&
+                size > 0)
+            {
+                return Math.Clamp(size / 100.0 * 1.5, 14, 32);
+            }
+
+            return 21;
+        }
+
+        private static string ReadChartUserShapeFontFamily(XElement textBody)
+        {
+            string? typeface = textBody.Descendants()
+                .Where(e => e.Name.LocalName == "latin")
+                .Select(e => e.Attribute("typeface")?.Value)
+                .FirstOrDefault(value =>
+                    !string.IsNullOrWhiteSpace(value) &&
+                    !value.Contains('+', StringComparison.Ordinal));
+            return string.IsNullOrWhiteSpace(typeface) ? "Arial" : typeface;
+        }
+
+        private static bool TryReadDouble(XElement? element, out double value)
+        {
+            return double.TryParse(
+                element?.Value,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out value);
         }
 
         private static void AppendPieSlices(

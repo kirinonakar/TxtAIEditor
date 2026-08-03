@@ -217,6 +217,36 @@ namespace TxtAIEditor.Core.Services
                     StringComparer.OrdinalIgnoreCase);
         }
 
+        public static IReadOnlyDictionary<string, string> LoadRelationships(
+            ZipArchive archive,
+            string relationshipPath,
+            string basePath)
+        {
+            XDocument? relationships = TryLoadXmlEntry(
+                archive,
+                relationshipPath,
+                1_000_000);
+            if (relationships == null)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            return relationships.Descendants()
+                .Where(e => e.Name.LocalName == "Relationship")
+                .Select(e => new
+                {
+                    Id = e.Attribute("Id")?.Value ?? string.Empty,
+                    Target = NormalizeZipPath(basePath, e.Attribute("Target")?.Value ?? string.Empty)
+                })
+                .Where(item =>
+                    !string.IsNullOrWhiteSpace(item.Id) &&
+                    !string.IsNullOrWhiteSpace(item.Target))
+                .ToDictionary(
+                    item => item.Id,
+                    item => item.Target,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+
         public static string GetRelationshipsPath(string partPath)
         {
             string directory = Path.GetDirectoryName(partPath)?.Replace('\\', '/') ?? string.Empty;
