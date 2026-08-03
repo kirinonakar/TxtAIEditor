@@ -2356,6 +2356,12 @@ Plan: {0}</value>
   <data name="AgentStopButton" xml:space="preserve">
     <value>Stop</value>
   </data>
+  <data name="AgentSendButton" xml:space="preserve">
+    <value>Send</value>
+  </data>
+  <data name="AgentFollowUpQueued" xml:space="preserve">
+    <value>Additional instruction is queued. It will be sent after the next tool call finishes.</value>
+  </data>
   <data name="AgentActivityHeader" xml:space="preserve">
     <value>Progress</value>
   </data>

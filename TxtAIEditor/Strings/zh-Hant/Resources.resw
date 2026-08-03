@@ -2356,6 +2356,12 @@
   <data name="AgentStopButton" xml:space="preserve">
     <value>停止</value>
   </data>
+  <data name="AgentSendButton" xml:space="preserve">
+    <value>傳送</value>
+  </data>
+  <data name="AgentFollowUpQueued" xml:space="preserve">
+    <value>附加指令正在等待中。將在下一個工具呼叫結束後傳送。</value>
+  </data>
   <data name="AgentActivityHeader" xml:space="preserve">
     <value>進展</value>
   </data>

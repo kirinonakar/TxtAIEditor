@@ -9,6 +9,7 @@ namespace TxtAIEditor.Controls
             AgentPane agentPane,
             Func<Task> runAgentAsync,
             Action stopAgent,
+            Action<string> queueFollowUpPrompt,
             AgentOpenSessionController openSessionController,
             AgentSessionRewindController sessionRewindController,
             AgentSessionHistoryCoordinator sessionHistoryCoordinator,
@@ -25,6 +26,7 @@ namespace TxtAIEditor.Controls
         {
             agentPane.RunRequested += async (_, _) => await runAgentAsync();
             agentPane.StopRequested += (_, _) => stopAgent();
+            agentPane.PromptQueued += (_, prompt) => queueFollowUpPrompt(prompt);
             agentPane.NewSessionRequested += (_, _) =>
             {
                 agentPane.PlanningModeCheckBox.IsChecked = false;
@@ -68,6 +70,11 @@ namespace TxtAIEditor.Controls
             agentPane.AgentSkillRemoved += (_, skillName) => skillController.RemoveSelectedSkill(skillName);
             agentPane.Prompt.TextChanged += (_, _) =>
             {
+                if (agentPane.IsProgrammaticPromptClear)
+                {
+                    return;
+                }
+
                 openSessionController.SavePromptTitleFromUI();
                 updatePromptTokenEstimate();
             };

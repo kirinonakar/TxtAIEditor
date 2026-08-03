@@ -160,6 +160,7 @@ namespace TxtAIEditor.Controls
 
         public event RoutedEventHandler? RunRequested;
         public event RoutedEventHandler? StopRequested;
+        public event EventHandler<string>? PromptQueued;
         public event RoutedEventHandler? NewSessionRequested;
         public event RoutedEventHandler? RewindSessionRequested;
         public event RoutedEventHandler? InsertOutputRequested;
@@ -220,8 +221,10 @@ namespace TxtAIEditor.Controls
 
         private bool _isBusy;
         private bool _canRewindSession;
+        private bool _isProgrammaticPromptClear;
         private string _runButtonText = string.Empty;
         private string _stopButtonText = string.Empty;
+        private string _sendButtonText = string.Empty;
         public void Localize(Func<string, string, string> getString)
         {
             _getString = getString;
@@ -251,7 +254,8 @@ namespace TxtAIEditor.Controls
             AgentImportPresetText.Text = getString("PresetImportText", "가져오기");
             _runButtonText = getString("AgentRunButton", "실행");
             _stopButtonText = getString("AgentStopButton", "중단");
-            AgentRunButton.Content = _isBusy ? _stopButtonText : _runButtonText;
+            _sendButtonText = getString("AgentSendButton", "전송");
+            UpdateRunButtonContent();
             string newSessionButtonText = getString("AgentNewSessionButton", "새 세션");
             ToolTipService.SetToolTip(AgentRewindSessionButton, getString("AgentRewindSessionTooltip", "이전 프롬프트 입력 전으로 되감기"));
             ToolTipService.SetToolTip(AgentOpenSessionsButton, getString("AgentOpenSessionsTooltip", "열린 세션"));
@@ -292,23 +296,12 @@ namespace TxtAIEditor.Controls
 
             _isBusy = isBusy;
             AgentRunButton.IsEnabled = true;
-            AgentRunButton.Content = isBusy ? _stopButtonText : _runButtonText;
-            UpdateRunButtonColor(isBusy);
+            UpdateRunButtonContent();
             AgentNewSessionButton.IsEnabled = true;
             UpdateRewindSessionButtonEnabled();
             AgentOpenSessionsButton.IsEnabled = true;
             AgentHistoryButton.IsEnabled = true;
             AgentDeleteHistoryButton.IsEnabled = !isBusy;
-            AgentPromptInput.IsEnabled = !isBusy;
-            AgentPlanningModeCheckBox.IsEnabled = !isBusy;
-            AgentStreamToTabToggleButton.IsEnabled = !isBusy;
-            AgentMcpButton.IsEnabled = !isBusy;
-            AgentAddAttachmentButton.IsEnabled = !isBusy;
-            AgentSkillButton.IsEnabled = !isBusy;
-            AgentAttachmentsList.IsEnabled = !isBusy;
-            AgentPresetButton.IsEnabled = !isBusy;
-            AgentSelectedPresetScrollViewer.IsHitTestVisible = !isBusy;
-            AgentSelectedPresetScrollViewer.Opacity = isBusy ? 0.65 : 1.0;
             _sessionMenuCoordinator.SetBusy(isBusy);
 
             if (!isBusy)
@@ -335,12 +328,21 @@ namespace TxtAIEditor.Controls
 
 private Style? _accentRunButtonStyle;
 
-        private void UpdateRunButtonColor(bool isBusy)
+        private void UpdateRunButtonContent()
         {
             _accentRunButtonStyle ??= AgentRunButton.Style;
-            AgentRunButton.Style = isBusy
-                ? (Style)Application.Current.Resources["StopButtonStyle"]
-                : _accentRunButtonStyle;
+            if (!_isBusy)
+            {
+                AgentRunButton.Content = _runButtonText;
+                AgentRunButton.Style = _accentRunButtonStyle;
+                return;
+            }
+
+            bool hasPendingPrompt = !string.IsNullOrWhiteSpace(AgentPromptInput.Text);
+            AgentRunButton.Content = hasPendingPrompt ? _sendButtonText : _stopButtonText;
+            AgentRunButton.Style = hasPendingPrompt
+                ? _accentRunButtonStyle
+                : (Style)Application.Current.Resources["StopButtonStyle"];
         }
 
         public void ClearActivity(string idleText)
@@ -432,6 +434,11 @@ private Style? _accentRunButtonStyle;
         {
             if (_isBusy)
             {
+                if (!string.IsNullOrWhiteSpace(AgentPromptInput.Text))
+                {
+                    QueueFollowUpPrompt();
+                }
+
                 return;
             }
 
@@ -442,6 +449,12 @@ private Style? _accentRunButtonStyle;
         {
             if (_isBusy)
             {
+                if (!string.IsNullOrWhiteSpace(AgentPromptInput.Text))
+                {
+                    QueueFollowUpPrompt();
+                    return;
+                }
+
                 StopRequested?.Invoke(sender, e);
                 return;
             }
@@ -465,6 +478,35 @@ private Style? _accentRunButtonStyle;
             AgentPromptInput.Focus(FocusState.Programmatic);
         }
 
+        public bool IsProgrammaticPromptClear => _isProgrammaticPromptClear;
+
+        public void ClearPromptForRun()
+        {
+            _isProgrammaticPromptClear = true;
+            try
+            {
+                AgentPromptInput.Text = string.Empty;
+            }
+            finally
+            {
+                _isProgrammaticPromptClear = false;
+            }
+
+            UpdateRunButtonContent();
+        }
+
+        private void QueueFollowUpPrompt()
+        {
+            string prompt = AgentPromptInput.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                return;
+            }
+
+            ClearPromptForRun();
+            PromptQueued?.Invoke(this, prompt);
+        }
+
         private void OnPromptTextChanged(object sender, TextChangedEventArgs e)
         {
             Visibility visibility = string.IsNullOrEmpty(AgentPromptInput.Text)
@@ -474,6 +516,8 @@ private Style? _accentRunButtonStyle;
             {
                 AgentClearPromptButton.Visibility = visibility;
             }
+
+            UpdateRunButtonContent();
         }
 
         private void OnAgentHistoryFlyoutOpened(object sender, object e)

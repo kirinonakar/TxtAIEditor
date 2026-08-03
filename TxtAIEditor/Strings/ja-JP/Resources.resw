@@ -2356,6 +2356,12 @@
   <data name="AgentStopButton" xml:space="preserve">
     <value>中断</value>
   </data>
+  <data name="AgentSendButton" xml:space="preserve">
+    <value>送信</value>
+  </data>
+  <data name="AgentFollowUpQueued" xml:space="preserve">
+    <value>追加の指示が待機中です。次のツール呼び出しの終了後に送信されます。</value>
+  </data>
   <data name="AgentActivityHeader" xml:space="preserve">
     <value>進行状況</value>
   </data>

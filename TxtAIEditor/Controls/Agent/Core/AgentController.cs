@@ -188,6 +188,7 @@ namespace TxtAIEditor.Controls
                 agentPane,
                 _runCoordinator.RunAgentAsync,
                 _runCoordinator.StopAgent,
+                prompt => _runCoordinator.QueueFollowUpPrompt(prompt),
                 _openSessionController,
                 _sessionRewindController,
                 _sessionHistoryCoordinator,
