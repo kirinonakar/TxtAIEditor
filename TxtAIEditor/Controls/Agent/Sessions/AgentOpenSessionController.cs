@@ -1032,6 +1032,7 @@ namespace TxtAIEditor.Controls
                 LlmModelOllamaCloud = settings.LlmModelOllamaCloud,
                 LlmVisionFallbackProvider = settings.LlmVisionFallbackProvider,
                 LlmVisionFallbackModel = settings.LlmVisionFallbackModel,
+                LlmVisionFallbackThinkingLevel = settings.LlmVisionFallbackThinkingLevel,
                 LlmThinkingLevel = settings.LlmThinkingLevel,
                 LlmConfirmBeforeSending = settings.LlmConfirmBeforeSending,
                 LlmAgentVerbose = settings.LlmAgentVerbose,

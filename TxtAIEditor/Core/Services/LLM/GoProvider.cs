@@ -127,7 +127,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (HasThinking)
             {
-                string effort = _thinkingLevel.ToLowerInvariant();
+                string effort = LlmThinkingLevelMapper.MapEffort(model, _thinkingLevel);
                 if (effort == "xhigh" && IsDeepSeekOrGlm(model))
                 {
                     effort = "max";
@@ -273,7 +273,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (HasThinking)
             {
-                string effort = _thinkingLevel.ToLowerInvariant();
+                string effort = LlmThinkingLevelMapper.MapEffort(model, _thinkingLevel);
                 if (effort == "xhigh" && IsDeepSeekOrGlm(model))
                 {
                     effort = "max";

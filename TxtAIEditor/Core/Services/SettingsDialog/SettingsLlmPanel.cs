@@ -21,6 +21,7 @@ namespace TxtAIEditor.Core.Services
         private readonly ComboBox _llmModelCombo;
         private readonly ComboBox _visionFallbackProviderCombo;
         private readonly ComboBox _visionFallbackModelCombo;
+        private readonly ComboBox _visionFallbackThinkingLevelCombo;
         private readonly PasswordBox _llmApiKeyBox;
         private readonly TextBox _exaEndpointBox;
         private readonly PasswordBox _exaApiKeyBox;
@@ -80,7 +81,8 @@ namespace TxtAIEditor.Core.Services
             _agentAutoApprovePlanningCheck = new CheckBox { Content = getString("SettingsLlmAgentAutoApprovePlanning", "계획 실행 자동 승인"), IsChecked = settings.LlmAgentAutoApprovePlanning };
             _sourceLangCombo = CreateSourceLanguageCombo(settings, getString);
             _targetLangCombo = CreateTargetLanguageCombo(settings, getString);
-            _llmThinkingLevelCombo = CreateThinkingLevelCombo(settings, getString);
+            _llmThinkingLevelCombo = CreateThinkingLevelCombo(settings.LlmThinkingLevel, getString);
+            _visionFallbackThinkingLevelCombo = CreateThinkingLevelCombo(settings.LlmVisionFallbackThinkingLevel, getString);
             _refreshModelsButton = new Button
             {
                 Content = new FontIcon { Glyph = "\uE72C", FontSize = 12 },
@@ -178,6 +180,16 @@ namespace TxtAIEditor.Core.Services
             settings.LlmVisionFallbackModel = (!string.IsNullOrEmpty(selectedVisionFallbackModelText)
                 ? selectedVisionFallbackModelText
                 : (_visionFallbackModelCombo.SelectedItem as string ?? settings.LlmVisionFallbackModel)).Trim();
+            settings.LlmVisionFallbackThinkingLevel = _visionFallbackThinkingLevelCombo.SelectedIndex switch
+            {
+                1 => "disabled",
+                2 => "low",
+                3 => "medium",
+                4 => "high",
+                5 => "xhigh",
+                6 => "max",
+                _ => "default"
+            };
             settings.LlmConfirmBeforeSending = _confirmBeforeSendingCheck.IsChecked == true;
             settings.LlmAgentVerbose = _agentVerboseCheck.IsChecked == true;
             settings.LlmRetainThinking = _retainThinkingCheck.IsChecked == true;
@@ -333,6 +345,9 @@ namespace TxtAIEditor.Core.Services
             visionModelGrid.Children.Add(_visionFallbackModelCombo);
             visionModelGrid.Children.Add(_visionFallbackRefreshModelsButton);
             content.Children.Add(visionModelGrid);
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmThinkingLevel", "Thinking Level"));
+            content.Children.Add(_visionFallbackThinkingLevelCombo);
 
             return CreateCard(
                 _getString("SettingsLlmGroupVisionFallback", "비전 대체 모델"),
@@ -887,6 +902,10 @@ namespace TxtAIEditor.Core.Services
         private void UpdateVisionFallbackRefreshButtonVisibility()
         {
             string provider = GetSelectedVisionFallbackProviderName();
+            _visionFallbackThinkingLevelCombo.Visibility =
+                SettingsLlmModelCatalog.SupportsThinkingLevel(provider)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
             _visionFallbackRefreshModelsButton.Visibility =
                 SettingsLlmModelCatalog.SupportsRemoteModelFetch(provider)
                     ? Visibility.Visible
@@ -995,7 +1014,7 @@ namespace TxtAIEditor.Core.Services
             return comboBox;
         }
 
-        private static ComboBox CreateThinkingLevelCombo(EditorSettings settings, Func<string, string, string> getString)
+        private static ComboBox CreateThinkingLevelCombo(string thinkingLevel, Func<string, string, string> getString)
         {
             var comboBox = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, Visibility = Visibility.Collapsed };
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelDefault", "기본값 (Default)"));
@@ -1005,7 +1024,7 @@ namespace TxtAIEditor.Core.Services
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelHigh", "높음 (High)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelXHigh", "매우 높음 (Very High)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelMax", "최대 (Max)"));
-            comboBox.SelectedIndex = settings.LlmThinkingLevel.ToLowerInvariant() switch
+            comboBox.SelectedIndex = thinkingLevel.ToLowerInvariant() switch
             {
                 "disabled" => 1,
                 "low" => 2,

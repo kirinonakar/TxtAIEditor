@@ -109,7 +109,7 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 payloadDict["reasoning"] = new Dictionary<string, object>
                 {
-                    ["effort"] = _thinkingLevel.ToLowerInvariant()
+                    ["effort"] = LlmThinkingLevelMapper.MapEffort(model, _thinkingLevel)
                 };
             }
             else if (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||

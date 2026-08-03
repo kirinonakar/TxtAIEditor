@@ -77,6 +77,7 @@ namespace TxtAIEditor.Core.Models
         public string LlmModelCustom { get; set; } = "";
         public string LlmVisionFallbackProvider { get; set; } = "";
         public string LlmVisionFallbackModel { get; set; } = "";
+        public string LlmVisionFallbackThinkingLevel { get; set; } = "";
         public string LlmThinkingLevel { get; set; } = "";
         public bool LlmConfirmBeforeSending { get; set; } = false;
         public bool LlmAgentVerbose { get; set; } = false;

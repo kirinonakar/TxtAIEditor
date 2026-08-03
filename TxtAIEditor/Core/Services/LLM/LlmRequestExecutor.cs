@@ -261,6 +261,12 @@ namespace TxtAIEditor.Core.Services.LLM
             }
 
             bool sameProvider = fallbackProvider.Equals(settings.LlmProvider, StringComparison.OrdinalIgnoreCase);
+            string fallbackThinkingLevel = settings.LlmVisionFallbackThinkingLevel;
+            if (string.IsNullOrWhiteSpace(fallbackThinkingLevel) ||
+                fallbackThinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase))
+            {
+                fallbackThinkingLevel = settings.LlmThinkingLevel;
+            }
             fallbackSettings = new EditorSettings
             {
                 Language = settings.Language,
@@ -269,7 +275,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     ? settings.LlmEndpoint
                     : SettingsLlmModelCatalog.GetDefaultEndpoint(fallbackProvider, settings.LlmEndpoint),
                 LlmModel = fallbackModel,
-                LlmThinkingLevel = settings.LlmThinkingLevel,
+                LlmThinkingLevel = fallbackThinkingLevel,
                 LlmAgentVerbose = settings.LlmAgentVerbose,
                 LlmRetainThinking = settings.LlmRetainThinking,
                 LlmSourceLanguage = settings.LlmSourceLanguage,
