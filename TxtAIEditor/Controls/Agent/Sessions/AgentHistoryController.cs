@@ -530,6 +530,10 @@ namespace TxtAIEditor.Controls
                         result.AppendLine(line);
                     }
                 }
+                else if (line.StartsWith("[User request]", StringComparison.OrdinalIgnoreCase))
+                {
+                    result.AppendLine("[User Prompt]:");
+                }
                 else
                 {
                     if (inToolResult)
