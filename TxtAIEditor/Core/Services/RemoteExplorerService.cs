@@ -1147,7 +1147,16 @@ namespace TxtAIEditor.Core.Services
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken);
             response.EnsureSuccessStatusCode();
+
             long? contentLength = response.Content.Headers.ContentLength;
+            if ((!contentLength.HasValue || contentLength.Value <= 0) && progress != null)
+            {
+                contentLength = await TryGetWebDavContentLengthAsync(
+                    client,
+                    connection,
+                    remotePath,
+                    cancellationToken);
+            }
             await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken);
             await using FileStream output = new(localPath, FileMode.Create, FileAccess.Write, FileShare.None);
             byte[] buffer = new byte[81920];
@@ -1163,6 +1172,37 @@ namespace TxtAIEditor.Core.Services
                 }
             }
             progress?.Report(100.0);
+        }
+
+        private static async Task<long?> TryGetWebDavContentLengthAsync(
+            HttpClient client,
+            RemoteConnectionSettings connection,
+            string remotePath,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                using HttpRequestMessage headRequest = new(
+                    HttpMethod.Head,
+                    BuildWebDavUri(connection, remotePath));
+                using HttpResponseMessage headResponse = await client.SendAsync(
+                    headRequest,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken);
+                if (headResponse.IsSuccessStatusCode)
+                {
+                    long? length = headResponse.Content.Headers.ContentLength;
+                    if (length.HasValue && length.Value > 0)
+                    {
+                        return length;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+            }
+
+            return null;
         }
 
         private static async Task CopyWslFileWithProgressAsync(
