@@ -293,8 +293,8 @@ namespace TxtAIEditor.Controls
                         {
                             path = new { type = "string", description = "Relative path to the file" },
                             content = new { type = "string", description = "Content to insert" },
-                            insert_after = new { type = "string", description = "Unique context lines to insert after" },
-                            insert_before = new { type = "string", description = "Unique context lines to insert before" }
+                            insert_after = new { type = "string", description = "2+ unique context lines to insert after" },
+                            insert_before = new { type = "string", description = "2+ unique context lines to insert before" }
                         },
                         required = new[] { "path", "content", "insert_after", "insert_before" }
                     }

@@ -923,6 +923,11 @@ namespace TxtAIEditor.Controls
                 return "insert_to_file failed: both before and after context must be provided.";
             }
 
+            if (TrimBoundaryBlankLines(normalizedBefore).Length < 2 || TrimBoundaryBlankLines(normalizedAfter).Length < 2)
+            {
+                return "insert_to_file failed: insert_after and insert_before must each contain at least 2 context lines.";
+            }
+
             int insertIndex = FindInsertionPoint(fileContent, normalizedBefore, normalizedAfter);
             if (insertIndex < 0)
             {
@@ -968,8 +973,8 @@ namespace TxtAIEditor.Controls
         private static int FindInsertionPoint(string fileContent, string before, string after)
         {
             string[] lines = fileContent.Split('\n');
-            string[] beforeLines = string.IsNullOrEmpty(before) ? Array.Empty<string>() : before.Split('\n');
-            string[] afterLines = string.IsNullOrEmpty(after) ? Array.Empty<string>() : after.Split('\n');
+            string[] beforeLines = TrimBoundaryBlankLines(before);
+            string[] afterLines = TrimBoundaryBlankLines(after);
 
             List<int> FindCandidates(int mode)
             {
@@ -1004,13 +1009,21 @@ namespace TxtAIEditor.Controls
 
                     if (!beforeMatch) continue;
 
-                    bool afterMatch = true;
+                    int insertionLine = i;
                     if (afterLines.Length > 0)
                     {
-                        if (i + afterLines.Length > lines.Length) continue;
+                        int afterStart = i;
+                        while (afterStart < lines.Length && string.IsNullOrWhiteSpace(lines[afterStart]))
+                        {
+                            afterStart++;
+                        }
+
+                        if (afterStart + afterLines.Length > lines.Length) continue;
+
+                        bool afterMatch = true;
                         for (int j = 0; j < afterLines.Length; j++)
                         {
-                            string fileLine = lines[i + j];
+                            string fileLine = lines[afterStart + j];
                             string queryLine = afterLines[j];
                             bool lineMatches = mode == 1
                                 ? fileLine.TrimEnd() == queryLine.TrimEnd()
@@ -1022,12 +1035,18 @@ namespace TxtAIEditor.Controls
                                 break;
                             }
                         }
+
+                        if (!afterMatch) continue;
+
+                        insertionLine = afterStart;
                     }
 
-                    if (beforeMatch && afterMatch)
+                    if (candidates.Count > 0 && candidates[^1] == insertionLine)
                     {
-                        candidates.Add(i);
+                        continue;
                     }
+
+                    candidates.Add(insertionLine);
                 }
                 return candidates;
             }
@@ -1056,6 +1075,36 @@ namespace TxtAIEditor.Controls
             }
 
             return offset;
+        }
+
+        private static string[] TrimBoundaryBlankLines(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return Array.Empty<string>();
+            }
+
+            string[] rawLines = text.Split('\n');
+            int start = 0;
+            int end = rawLines.Length - 1;
+            while (start <= end && string.IsNullOrWhiteSpace(rawLines[start]))
+            {
+                start++;
+            }
+
+            while (end >= start && string.IsNullOrWhiteSpace(rawLines[end]))
+            {
+                end--;
+            }
+
+            if (start > end)
+            {
+                return Array.Empty<string>();
+            }
+
+            string[] trimmed = new string[end - start + 1];
+            Array.Copy(rawLines, start, trimmed, 0, trimmed.Length);
+            return trimmed;
         }
 
         public async Task<string> SplitFileAsync(string path, List<AgentFileToolService.SplitRange>? ranges, int linesPerFile)
