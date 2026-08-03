@@ -3015,6 +3015,18 @@ Plan: {0}</value>
   <data name="OfficeViewerSheetSelectorLabel" xml:space="preserve">
     <value>Sheet</value>
   </data>
+  <data name="OfficeViewerSheetObjectsLabel" xml:space="preserve">
+    <value>Sheet objects</value>
+  </data>
+  <data name="OfficeViewerChartsLabel" xml:space="preserve">
+    <value>Charts</value>
+  </data>
+  <data name="OfficeViewerTablesLabel" xml:space="preserve">
+    <value>Tables</value>
+  </data>
+  <data name="OfficeViewerImagesLabel" xml:space="preserve">
+    <value>Images</value>
+  </data>
   <data name="AgentMcpButtonTooltip" xml:space="preserve">
     <value>MCP Servers</value>
   </data>

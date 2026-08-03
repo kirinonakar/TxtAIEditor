@@ -3015,6 +3015,18 @@
   <data name="OfficeViewerSheetSelectorLabel" xml:space="preserve">
     <value>시트</value>
   </data>
+  <data name="OfficeViewerSheetObjectsLabel" xml:space="preserve">
+    <value>시트 개체</value>
+  </data>
+  <data name="OfficeViewerChartsLabel" xml:space="preserve">
+    <value>차트</value>
+  </data>
+  <data name="OfficeViewerTablesLabel" xml:space="preserve">
+    <value>표</value>
+  </data>
+  <data name="OfficeViewerImagesLabel" xml:space="preserve">
+    <value>이미지</value>
+  </data>
   <data name="AgentMcpButtonTooltip" xml:space="preserve">
     <value>MCP 서버</value>
   </data>

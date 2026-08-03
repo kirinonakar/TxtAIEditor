@@ -3015,6 +3015,18 @@
   <data name="OfficeViewerSheetSelectorLabel" xml:space="preserve">
     <value>シート</value>
   </data>
+  <data name="OfficeViewerSheetObjectsLabel" xml:space="preserve">
+    <value>シートのオブジェクト</value>
+  </data>
+  <data name="OfficeViewerChartsLabel" xml:space="preserve">
+    <value>グラフ</value>
+  </data>
+  <data name="OfficeViewerTablesLabel" xml:space="preserve">
+    <value>テーブル</value>
+  </data>
+  <data name="OfficeViewerImagesLabel" xml:space="preserve">
+    <value>画像</value>
+  </data>
   <data name="AgentMcpButtonTooltip" xml:space="preserve">
     <value>MCP サーバー</value>
   </data>

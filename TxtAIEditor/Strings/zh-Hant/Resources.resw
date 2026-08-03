@@ -3015,6 +3015,18 @@
   <data name="OfficeViewerSheetSelectorLabel" xml:space="preserve">
     <value>板材</value>
   </data>
+  <data name="OfficeViewerSheetObjectsLabel" xml:space="preserve">
+    <value>工作表物件</value>
+  </data>
+  <data name="OfficeViewerChartsLabel" xml:space="preserve">
+    <value>圖表</value>
+  </data>
+  <data name="OfficeViewerTablesLabel" xml:space="preserve">
+    <value>表格</value>
+  </data>
+  <data name="OfficeViewerImagesLabel" xml:space="preserve">
+    <value>圖片</value>
+  </data>
   <data name="AgentMcpButtonTooltip" xml:space="preserve">
     <value>MCP 伺服器</value>
   </data>

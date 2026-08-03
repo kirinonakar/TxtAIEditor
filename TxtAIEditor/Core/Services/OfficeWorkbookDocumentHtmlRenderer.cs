@@ -19,6 +19,8 @@ namespace TxtAIEditor.Core.Services
         {
             public string Name { get; init; } = string.Empty;
             public List<List<ViewerWorkbookCell>> Rows { get; } = new();
+            public Dictionary<(int Row, int Column), ViewerWorkbookCell> Cells { get; } = new();
+            public List<ViewerWorkbookObject> Objects { get; } = new();
         }
 
         private sealed class ViewerWorkbookCell
@@ -40,6 +42,27 @@ namespace TxtAIEditor.Core.Services
             public bool Italic { get; init; }
         }
 
+        private sealed class ViewerWorkbookObject
+        {
+            public string Kind { get; init; } = string.Empty;
+            public string Title { get; init; } = string.Empty;
+            public string? Svg { get; init; }
+            public string? ImageData { get; init; }
+            public int Width { get; init; }
+            public int Height { get; init; }
+            public int AnchorRow { get; init; }
+            public int AnchorColumn { get; init; }
+            public bool HasHeader { get; init; }
+            public List<List<ViewerWorkbookCell>> Rows { get; } = new();
+        }
+
+        private sealed class ViewerChartSeries
+        {
+            public string Name { get; init; } = string.Empty;
+            public IReadOnlyList<string> Categories { get; init; } = Array.Empty<string>();
+            public IReadOnlyList<double?> Values { get; init; } = Array.Empty<double?>();
+        }
+
 
         public static async Task<string> BuildAsync(string filePath, Func<string, string, string> getString)
         {
@@ -59,7 +82,25 @@ namespace TxtAIEditor.Core.Services
                     textColor = cell.TextColor,
                     bold = cell.Bold,
                     italic = cell.Italic
-                }).ToArray()).ToArray()
+                }).ToArray()).ToArray(),
+                objects = sheet.Objects.Select(item => new
+                {
+                    type = item.Kind,
+                    title = item.Title,
+                    svg = item.Svg,
+                    imageData = item.ImageData,
+                    width = item.Width,
+                    height = item.Height,
+                    hasHeader = item.HasHeader,
+                    rows = item.Rows.Select(row => row.Select(cell => new
+                    {
+                        value = cell.Value,
+                        backgroundColor = cell.BackgroundColor,
+                        textColor = cell.TextColor,
+                        bold = cell.Bold,
+                        italic = cell.Italic
+                    }).ToArray()).ToArray()
+                }).ToArray()
             }).ToArray();
             string sheetsJson = JsonSerializer.Serialize(sheetPayload);
             string emptySheetTextJson = JsonSerializer.Serialize(getString("OfficeViewerEmptySheet", "Empty sheet."));
@@ -67,6 +108,10 @@ namespace TxtAIEditor.Core.Services
             string columnsTextJson = JsonSerializer.Serialize(getString("OfficeViewerColumnsLabel", "columns"));
             string firstShownTextJson = JsonSerializer.Serialize(getString("OfficeViewerFirstRowsShownFormat", "first {0} shown"));
             string sheetAriaLabelJson = JsonSerializer.Serialize(getString("OfficeViewerSheetSelectorLabel", "Sheet"));
+            string objectsLabelJson = JsonSerializer.Serialize(getString("OfficeViewerSheetObjectsLabel", "Sheet objects"));
+            string chartsLabelJson = JsonSerializer.Serialize(getString("OfficeViewerChartsLabel", "Charts"));
+            string tablesLabelJson = JsonSerializer.Serialize(getString("OfficeViewerTablesLabel", "Tables"));
+            string imagesLabelJson = JsonSerializer.Serialize(getString("OfficeViewerImagesLabel", "Images"));
 
             return $$"""
 <!doctype html>
@@ -221,6 +266,83 @@ td.selected-cell.active-cell {
 }
 .empty { padding: 28px; color: var(--muted); }
 .truncated { color: var(--accent); }
+.sheet-objects {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px 14px 28px;
+}
+.sheet-objects-heading {
+    margin: 0;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 650;
+}
+.sheet-object-card {
+    width: min(100%, 980px);
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, .07);
+}
+.sheet-object-title {
+    margin: 0;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 650;
+}
+.sheet-object-body { padding: 12px; }
+.sheet-object-chart {
+    width: min(100%, 900px);
+    min-height: 260px;
+    margin: 0 auto;
+    overflow: auto;
+}
+.sheet-object-chart svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    min-height: 260px;
+}
+.sheet-object-image {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: 720px;
+    margin: 0 auto;
+    object-fit: contain;
+}
+.sheet-object-table-wrap { overflow: auto; }
+.sheet-object-table {
+    border-collapse: collapse;
+    min-width: 100%;
+    background: var(--panel);
+}
+.sheet-object-table th,
+.sheet-object-table td {
+    min-width: 96px;
+    max-width: 360px;
+    height: 30px;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    color: var(--text);
+    text-align: left;
+    vertical-align: top;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+    user-select: text;
+    -webkit-user-select: text;
+}
+.sheet-object-table th {
+    background: var(--header);
+    color: var(--muted);
+    font-weight: 650;
+}
 </style>
 </head>
 <body>
@@ -236,6 +358,10 @@ const rowsText = {{rowsTextJson}};
 const columnsText = {{columnsTextJson}};
 const firstShownText = {{firstShownTextJson}};
 const sheetAriaLabel = {{sheetAriaLabelJson}};
+const objectsLabel = {{objectsLabelJson}};
+const chartsLabel = {{chartsLabelJson}};
+const tablesLabel = {{tablesLabelJson}};
+const imagesLabel = {{imagesLabelJson}};
 const maxRows = 5000;
 const select = document.getElementById('sheetSelect');
 const meta = document.getElementById('sheetMeta');
@@ -581,6 +707,85 @@ function startRowResize(rowIndex, event) {
     event.stopPropagation();
 }
 
+function objectLabel(object) {
+    switch (object?.type) {
+        case 'chart': return chartsLabel;
+        case 'table': return tablesLabel;
+        case 'image': return imagesLabel;
+        default: return objectsLabel;
+    }
+}
+
+function renderSheetObjectTable(item) {
+    const rows = Array.isArray(item?.rows) ? item.rows : [];
+    if (!rows.length) return null;
+
+    const table = document.createElement('table');
+    table.className = 'sheet-object-table';
+    const body = document.createElement('tbody');
+    rows.forEach((row, rowIndex) => {
+        const tr = document.createElement('tr');
+        (Array.isArray(row) ? row : []).forEach(sourceCell => {
+            const tag = item.hasHeader && rowIndex === 0 ? 'th' : 'td';
+            const td = cell(tag, valueOf(sourceCell));
+            applyCellStyle(td, sourceCell);
+            tr.appendChild(td);
+        });
+        body.appendChild(tr);
+    });
+    table.appendChild(body);
+
+    const tableWrap = document.createElement('div');
+    tableWrap.className = 'sheet-object-table-wrap';
+    tableWrap.appendChild(table);
+    return tableWrap;
+}
+
+function renderSheetObjects(sheet) {
+    const objects = Array.isArray(sheet?.objects) ? sheet.objects : [];
+    if (!objects.length) return;
+
+    const section = document.createElement('section');
+    section.className = 'sheet-objects';
+    section.appendChild(cell('h2', objectsLabel, 'sheet-objects-heading'));
+
+    objects.forEach((item, objectIndex) => {
+        const card = document.createElement('article');
+        card.className = 'sheet-object-card';
+        const label = objectLabel(item);
+        const title = item.title || `${label} ${objectIndex + 1}`;
+        card.appendChild(cell('h3', title, 'sheet-object-title'));
+
+        const body = document.createElement('div');
+        body.className = 'sheet-object-body';
+        if (item.type === 'chart' && item.svg) {
+            const chart = document.createElement('div');
+            chart.className = 'sheet-object-chart';
+            chart.innerHTML = item.svg;
+            body.appendChild(chart);
+        } else if (item.type === 'image' && item.imageData) {
+            const image = document.createElement('img');
+            image.className = 'sheet-object-image';
+            image.src = item.imageData;
+            image.alt = title;
+            if (Number(item.width) > 0) image.width = Number(item.width);
+            if (Number(item.height) > 0) image.height = Number(item.height);
+            body.appendChild(image);
+        } else if (item.type === 'table') {
+            const table = renderSheetObjectTable(item);
+            if (table) body.appendChild(table);
+        }
+
+        if (!body.childElementCount) {
+            body.appendChild(cell('div', title, 'empty'));
+        }
+        card.appendChild(body);
+        section.appendChild(card);
+    });
+
+    wrap.appendChild(section);
+}
+
 function renderSheet(index) {
     const sheet = sheets[index];
     const rows = sheet.rows || [];
@@ -592,6 +797,7 @@ function renderSheet(index) {
     if (!rows.length) {
         selectionState = null;
         wrap.appendChild(cell('div', emptySheetText, 'empty'));
+        renderSheetObjects(sheet);
         meta.textContent = `0 ${rowsText}`;
         return;
     }
@@ -626,6 +832,7 @@ function renderSheet(index) {
     });
     table.appendChild(tbody);
     wrap.appendChild(table);
+    renderSheetObjects(sheet);
 
     const firstShown = firstShownText.replace('{0}', maxRows.toLocaleString());
     meta.innerHTML = `${rows.length.toLocaleString()} ${rowsText} x ${columnCount.toLocaleString()} ${columnsText}` +
@@ -696,7 +903,7 @@ document.addEventListener('copy', event => {
     event.preventDefault();
 });
 document.addEventListener('selectstart', event => {
-    if (event.target?.closest?.('#tableWrap')) {
+    if (event.target?.closest?.('#tableWrap') && !event.target?.closest?.('.sheet-objects')) {
         event.preventDefault();
     }
 });
@@ -731,8 +938,11 @@ renderSheet(0);
 
                 var sheet = new ViewerWorkbookSheet { Name = sheetName };
                 XDocument sheetDoc = await LoadXmlEntryAsync(sheetEntry).ConfigureAwait(false);
+                int rowSequence = 0;
                 foreach (XElement rowElement in sheetDoc.Descendants().Where(e => e.Name.LocalName == "row"))
                 {
+                    int rowNumber = GetWorkbookRowIndex(rowElement, rowSequence + 1);
+                    rowSequence = Math.Max(rowSequence + 1, rowNumber);
                     var row = new List<ViewerWorkbookCell>();
                     foreach (XElement cellElement in rowElement.Elements().Where(e => e.Name.LocalName == "c"))
                     {
@@ -746,14 +956,19 @@ renderSheet(0);
                         }
 
                         ViewerCellStyle style = ReadWorkbookCellStyle(cellElement, styles);
-                        row.Add(new ViewerWorkbookCell
+                        var viewerCell = new ViewerWorkbookCell
                         {
                             Value = GetWorkbookCellText(cellElement, sharedStrings, style, use1904Dates),
                             BackgroundColor = style.BackgroundColor,
                             TextColor = style.TextColor,
                             Bold = style.Bold,
                             Italic = style.Italic
-                        });
+                        };
+                        row.Add(viewerCell);
+                        if (columnIndex > 0)
+                        {
+                            sheet.Cells[(rowNumber, columnIndex)] = viewerCell;
+                        }
                     }
 
                     if (row.Any(cell =>
@@ -765,10 +980,651 @@ renderSheet(0);
                     }
                 }
 
+                await LoadWorkbookObjectsAsync(
+                    archive,
+                    sheetEntry,
+                    sheet,
+                    sheetDoc,
+                    themeColors).ConfigureAwait(false);
+
                 sheets.Add(sheet);
             }
 
             return sheets;
+        }
+
+        private static async Task LoadWorkbookObjectsAsync(
+            ZipArchive archive,
+            ZipArchiveEntry sheetEntry,
+            ViewerWorkbookSheet sheet,
+            XDocument sheetDocument,
+            IReadOnlyList<string> themeColors)
+        {
+            string relationshipPath = OfficePresentationPackageReader.GetRelationshipsPath(sheetEntry.FullName);
+            string basePath = Path.GetDirectoryName(sheetEntry.FullName)?.Replace('\\', '/') ?? string.Empty;
+            IReadOnlyDictionary<string, string> relationships =
+                await OfficePresentationPackageReader.LoadRelationshipsAsync(
+                    archive,
+                    relationshipPath,
+                    basePath).ConfigureAwait(false);
+
+            foreach (XElement tablePart in sheetDocument.Descendants().Where(e => e.Name.LocalName == "tablePart"))
+            {
+                string relationshipId = ReadWorkbookRelationshipId(tablePart);
+                if (string.IsNullOrWhiteSpace(relationshipId) ||
+                    !relationships.TryGetValue(relationshipId, out string? tablePath))
+                {
+                    continue;
+                }
+
+                ViewerWorkbookObject? table = await LoadWorkbookTableAsync(
+                    archive,
+                    tablePath,
+                    sheet).ConfigureAwait(false);
+                if (table != null)
+                {
+                    sheet.Objects.Add(table);
+                }
+            }
+
+            XElement? drawingElement = sheetDocument.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "drawing");
+            string drawingRelationshipId = drawingElement == null
+                ? string.Empty
+                : ReadWorkbookRelationshipId(drawingElement);
+            if (!string.IsNullOrWhiteSpace(drawingRelationshipId) &&
+                relationships.TryGetValue(drawingRelationshipId, out string? drawingPath))
+            {
+                await LoadWorkbookDrawingObjectsAsync(
+                    archive,
+                    drawingPath,
+                    sheet,
+                    themeColors).ConfigureAwait(false);
+            }
+
+            sheet.Objects.Sort((left, right) =>
+            {
+                int rowOrder = left.AnchorRow.CompareTo(right.AnchorRow);
+                return rowOrder != 0
+                    ? rowOrder
+                    : left.AnchorColumn.CompareTo(right.AnchorColumn);
+            });
+        }
+
+        private static async Task<ViewerWorkbookObject?> LoadWorkbookTableAsync(
+            ZipArchive archive,
+            string tablePath,
+            ViewerWorkbookSheet sheet)
+        {
+            XDocument? tableDocument = await TryLoadXmlEntryAsync(archive, tablePath).ConfigureAwait(false);
+            XElement? tableElement = tableDocument?.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "table");
+            string reference = tableElement?.Attribute("ref")?.Value ?? string.Empty;
+            if (tableElement == null ||
+                !TryParseWorkbookRange(reference, out int startRow, out int startColumn, out int endRow, out int endColumn))
+            {
+                return null;
+            }
+
+            const int maxTableRows = 5000;
+            const int maxTableColumns = 200;
+            endRow = Math.Min(endRow, startRow + maxTableRows - 1);
+            endColumn = Math.Min(endColumn, startColumn + maxTableColumns - 1);
+
+            bool hasHeader = !IsWorkbookBooleanFalse(tableElement.Attribute("headerRowCount")?.Value);
+            var result = new ViewerWorkbookObject
+            {
+                Kind = "table",
+                Title = tableElement.Attribute("displayName")?.Value ??
+                    tableElement.Attribute("name")?.Value ??
+                    Path.GetFileNameWithoutExtension(tablePath),
+                AnchorRow = startRow,
+                AnchorColumn = startColumn,
+                HasHeader = hasHeader
+            };
+
+            for (int rowIndex = startRow; rowIndex <= endRow; rowIndex++)
+            {
+                var row = new List<ViewerWorkbookCell>();
+                for (int columnIndex = startColumn; columnIndex <= endColumn; columnIndex++)
+                {
+                    row.Add(sheet.Cells.TryGetValue((rowIndex, columnIndex), out ViewerWorkbookCell? cell)
+                        ? cell
+                        : new ViewerWorkbookCell());
+                }
+
+                result.Rows.Add(row);
+            }
+
+            return result;
+        }
+
+        private static async Task LoadWorkbookDrawingObjectsAsync(
+            ZipArchive archive,
+            string drawingPath,
+            ViewerWorkbookSheet sheet,
+            IReadOnlyList<string> themeColors)
+        {
+            XDocument? drawingDocument = await TryLoadXmlEntryAsync(archive, drawingPath).ConfigureAwait(false);
+            if (drawingDocument == null)
+            {
+                return;
+            }
+
+            IReadOnlyDictionary<string, string> relationships =
+                await OfficePresentationPackageReader.LoadRelationshipsAsync(
+                    archive,
+                    OfficePresentationPackageReader.GetRelationshipsPath(drawingPath),
+                    Path.GetDirectoryName(drawingPath)?.Replace('\\', '/') ?? string.Empty)
+                    .ConfigureAwait(false);
+
+            foreach (XElement anchor in drawingDocument.Descendants().Where(IsWorkbookDrawingAnchor))
+            {
+                (int row, int column) = ReadWorkbookAnchorPosition(anchor);
+                (int width, int height) = ReadWorkbookAnchorSize(anchor);
+
+                foreach (XElement chartElement in anchor.Descendants().Where(e => e.Name.LocalName == "chart"))
+                {
+                    string relationshipId = ReadWorkbookRelationshipId(chartElement);
+                    if (string.IsNullOrWhiteSpace(relationshipId) ||
+                        !relationships.TryGetValue(relationshipId, out string? chartPath))
+                    {
+                        continue;
+                    }
+
+                    string? svg = await BuildWorkbookChartSvgAsync(
+                        archive,
+                        chartPath,
+                        themeColors).ConfigureAwait(false);
+                    if (string.IsNullOrWhiteSpace(svg))
+                    {
+                        continue;
+                    }
+
+                    XDocument? chartDocument = await TryLoadXmlEntryAsync(archive, chartPath).ConfigureAwait(false);
+                    sheet.Objects.Add(new ViewerWorkbookObject
+                    {
+                        Kind = "chart",
+                        Title = ReadWorkbookChartTitle(chartDocument),
+                        Svg = svg,
+                        Width = width,
+                        Height = height,
+                        AnchorRow = row,
+                        AnchorColumn = column
+                    });
+                }
+
+                foreach (XElement picture in anchor.Descendants().Where(e => e.Name.LocalName == "pic"))
+                {
+                    string relationshipId = picture.Descendants()
+                        .FirstOrDefault(e => e.Name.LocalName == "blip")?
+                        .Attributes()
+                        .FirstOrDefault(attribute => attribute.Name.LocalName is "embed" or "link")
+                        ?.Value ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(relationshipId) ||
+                        !relationships.TryGetValue(relationshipId, out string? imagePath))
+                    {
+                        continue;
+                    }
+
+                    string? imageData;
+                    try
+                    {
+                        imageData = OfficePresentationPackageReader.TryReadImageDataUri(archive, imagePath);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(imageData))
+                    {
+                        continue;
+                    }
+
+                    sheet.Objects.Add(new ViewerWorkbookObject
+                    {
+                        Kind = "image",
+                        Title = ReadWorkbookDrawingObjectTitle(picture),
+                        ImageData = imageData,
+                        Width = width,
+                        Height = height,
+                        AnchorRow = row,
+                        AnchorColumn = column
+                    });
+                }
+            }
+        }
+
+        private static async Task<string?> BuildWorkbookChartSvgAsync(
+            ZipArchive archive,
+            string chartPath,
+            IReadOnlyList<string> themeColors)
+        {
+            try
+            {
+                string? svg = OfficePresentationChartSvgRenderer.TryBuild(
+                    archive,
+                    chartPath,
+                    themeColors);
+                if (!string.IsNullOrWhiteSpace(svg))
+                {
+                    return svg;
+                }
+            }
+            catch
+            {
+                // Fall back to a simple chart for chart types not handled by the presentation renderer.
+            }
+
+            XDocument? chartDocument = await TryLoadXmlEntryAsync(archive, chartPath).ConfigureAwait(false);
+            return BuildWorkbookFallbackChartSvg(chartDocument);
+        }
+
+        private static string? BuildWorkbookFallbackChartSvg(XDocument? chartDocument)
+        {
+            XElement? plotArea = chartDocument?.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "plotArea");
+            XElement? chart = plotArea?.Elements().FirstOrDefault(e =>
+                e.Name.LocalName is
+                    "areaChart" or "barChart" or "bubbleChart" or "doughnutChart" or
+                    "lineChart" or "pie3DChart" or "pieChart" or "radarChart" or
+                    "scatterChart" or "stockChart");
+            if (chart == null)
+            {
+                return null;
+            }
+
+            List<ViewerChartSeries> series = chart.Elements()
+                .Where(e => e.Name.LocalName == "ser")
+                .Select(ReadWorkbookChartSeries)
+                .Where(item => item.Values.Any(value => value.HasValue))
+                .ToList();
+            if (series.Count == 0)
+            {
+                return null;
+            }
+
+            int categoryCount = series.Max(item => Math.Max(item.Categories.Count, item.Values.Count));
+            if (categoryCount <= 0)
+            {
+                return null;
+            }
+
+            List<string> categories = Enumerable.Range(0, categoryCount)
+                .Select(index => series
+                    .Select(item => index < item.Categories.Count ? item.Categories[index] : string.Empty)
+                    .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ??
+                    (index + 1).ToString(CultureInfo.InvariantCulture))
+                .ToList();
+            List<double> values = series.SelectMany(item => item.Values)
+                .Where(value => value.HasValue && !double.IsNaN(value.Value) && !double.IsInfinity(value.Value))
+                .Select(value => value!.Value)
+                .ToList();
+            if (values.Count == 0)
+            {
+                return null;
+            }
+
+            const double svgHeight = 520;
+            const double plotLeft = 78;
+            const double plotTop = 66;
+            const double plotWidth = 832;
+            const double plotHeight = 350;
+            double minimum = Math.Min(0, values.Min());
+            double maximum = Math.Max(0, values.Max());
+            if (maximum <= minimum)
+            {
+                maximum = minimum + Math.Max(1, Math.Abs(minimum) * .1);
+            }
+
+            double zeroY = plotTop + ((maximum / (maximum - minimum)) * plotHeight);
+            double categoryWidth = plotWidth / categoryCount;
+            double groupWidth = categoryWidth * .72;
+            double barWidth = groupWidth / Math.Max(1, series.Count);
+            string title = ReadWorkbookChartTitle(chartDocument);
+            string[] colors = { "#2864DC", "#16A46C", "#7656D6", "#D97706", "#DC3E42", "#0891B2" };
+            var svg = new StringBuilder();
+            svg.Append("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 520\" role=\"img\" aria-label=\"")
+                .Append(Html(title))
+                .Append("\"><rect width=\"960\" height=\"520\" fill=\"#FFFFFF\"/>");
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                svg.Append("<text x=\"480\" y=\"30\" text-anchor=\"middle\" font-family=\"Segoe UI,Arial,sans-serif\" font-size=\"20\" font-weight=\"600\" fill=\"#111827\">")
+                    .Append(Html(title))
+                    .Append("</text>");
+            }
+
+            for (int gridIndex = 0; gridIndex <= 5; gridIndex++)
+            {
+                double ratio = gridIndex / 5.0;
+                double y = plotTop + (ratio * plotHeight);
+                double value = maximum - (ratio * (maximum - minimum));
+                svg.Append("<line x1=\"").Append(FormatInvariant(plotLeft)).Append("\" y1=\"")
+                    .Append(FormatInvariant(y)).Append("\" x2=\"")
+                    .Append(FormatInvariant(plotLeft + plotWidth)).Append("\" y2=\"")
+                    .Append(FormatInvariant(y)).Append("\" stroke=\"#D9E0EA\" stroke-width=\"1\"/>")
+                    .Append("<text x=\"").Append(FormatInvariant(plotLeft - 10)).Append("\" y=\"")
+                    .Append(FormatInvariant(y + 4)).Append("\" text-anchor=\"end\" font-family=\"Segoe UI,Arial,sans-serif\" font-size=\"11\" fill=\"#667085\">")
+                    .Append(Html(FormatInvariant(value))).Append("</text>");
+            }
+
+            svg.Append("<line x1=\"").Append(FormatInvariant(plotLeft)).Append("\" y1=\"")
+                .Append(FormatInvariant(plotTop)).Append("\" x2=\"").Append(FormatInvariant(plotLeft))
+                .Append("\" y2=\"").Append(FormatInvariant(plotTop + plotHeight))
+                .Append("\" stroke=\"#667085\" stroke-width=\"1.2\"/>");
+            svg.Append("<line x1=\"").Append(FormatInvariant(plotLeft)).Append("\" y1=\"")
+                .Append(FormatInvariant(zeroY)).Append("\" x2=\"")
+                .Append(FormatInvariant(plotLeft + plotWidth)).Append("\" y2=\"")
+                .Append(FormatInvariant(zeroY)).Append("\" stroke=\"#667085\" stroke-width=\"1.2\"/>");
+
+            for (int categoryIndex = 0; categoryIndex < categoryCount; categoryIndex++)
+            {
+                double categoryLeft = plotLeft + (categoryIndex * categoryWidth) + ((categoryWidth - groupWidth) / 2);
+                for (int seriesIndex = 0; seriesIndex < series.Count; seriesIndex++)
+                {
+                    double? value = categoryIndex < series[seriesIndex].Values.Count
+                        ? series[seriesIndex].Values[categoryIndex]
+                        : null;
+                    if (!value.HasValue || double.IsNaN(value.Value) || double.IsInfinity(value.Value))
+                    {
+                        continue;
+                    }
+
+                    double valueY = plotTop + ((maximum - value.Value) / (maximum - minimum) * plotHeight);
+                    double y = Math.Min(valueY, zeroY);
+                    double height = Math.Max(1, Math.Abs(zeroY - valueY));
+                    svg.Append("<rect x=\"").Append(FormatInvariant(categoryLeft + (seriesIndex * barWidth)))
+                        .Append("\" y=\"").Append(FormatInvariant(y)).Append("\" width=\"")
+                        .Append(FormatInvariant(Math.Max(1, barWidth - 2))).Append("\" height=\"")
+                        .Append(FormatInvariant(height)).Append("\" rx=\"2\" fill=\"")
+                        .Append(colors[seriesIndex % colors.Length]).Append("\"/>");
+                }
+
+                if (categoryIndex % Math.Max(1, (int)Math.Ceiling(categoryCount / 16.0)) == 0)
+                {
+                    double labelX = plotLeft + (categoryIndex * categoryWidth) + (categoryWidth / 2);
+                    svg.Append("<text x=\"").Append(FormatInvariant(labelX)).Append("\" y=\"")
+                        .Append(FormatInvariant(plotTop + plotHeight + 22))
+                        .Append("\" text-anchor=\"middle\" font-family=\"Segoe UI,Arial,sans-serif\" font-size=\"11\" fill=\"#667085\">")
+                        .Append(Html(TrimWorkbookChartLabel(categories[categoryIndex])))
+                        .Append("</text>");
+                }
+            }
+
+            double legendX = plotLeft;
+            double legendY = svgHeight - 44;
+            for (int seriesIndex = 0; seriesIndex < series.Count; seriesIndex++)
+            {
+                string label = string.IsNullOrWhiteSpace(series[seriesIndex].Name)
+                    ? (seriesIndex + 1).ToString(CultureInfo.InvariantCulture)
+                    : series[seriesIndex].Name;
+                svg.Append("<rect x=\"").Append(FormatInvariant(legendX)).Append("\" y=\"")
+                    .Append(FormatInvariant(legendY - 10)).Append("\" width=\"12\" height=\"12\" rx=\"2\" fill=\"")
+                    .Append(colors[seriesIndex % colors.Length]).Append("\"/>")
+                    .Append("<text x=\"").Append(FormatInvariant(legendX + 18)).Append("\" y=\"")
+                    .Append(FormatInvariant(legendY)).Append("\" font-family=\"Segoe UI,Arial,sans-serif\" font-size=\"12\" fill=\"#334155\">")
+                    .Append(Html(TrimWorkbookChartLabel(label, 26))).Append("</text>");
+                legendX += 130;
+            }
+
+            svg.Append("</svg>");
+            return svg.ToString();
+        }
+
+        private static ViewerChartSeries ReadWorkbookChartSeries(XElement series)
+        {
+            XElement? categorySource = series.Elements().FirstOrDefault(e => e.Name.LocalName is "cat" or "xVal");
+            XElement? valueSource = series.Elements().FirstOrDefault(e => e.Name.LocalName is "val" or "yVal" or "bubbleSize");
+            return new ViewerChartSeries
+            {
+                Name = series.Elements().FirstOrDefault(e => e.Name.LocalName == "tx")?.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName is "v" or "t")?.Value ?? string.Empty,
+                Categories = ReadWorkbookChartTextPoints(categorySource),
+                Values = ReadWorkbookChartNumberPoints(valueSource)
+            };
+        }
+
+        private static IReadOnlyList<string> ReadWorkbookChartTextPoints(XElement? source)
+        {
+            if (source == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            var points = new SortedDictionary<int, string>();
+            int fallbackIndex = 0;
+            foreach (XElement point in source.Descendants().Where(e => e.Name.LocalName == "pt"))
+            {
+                int index = int.TryParse(point.Attribute("idx")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int readIndex)
+                    ? readIndex
+                    : fallbackIndex;
+                points[index] = point.Descendants().FirstOrDefault(e => e.Name.LocalName == "v")?.Value ?? string.Empty;
+                fallbackIndex++;
+            }
+
+            if (points.Count == 0)
+            {
+                string value = source.Descendants().FirstOrDefault(e => e.Name.LocalName == "v")?.Value ?? string.Empty;
+                return string.IsNullOrEmpty(value) ? Array.Empty<string>() : new[] { value };
+            }
+
+            int count = Math.Max(points.Keys.Max() + 1, TryReadInt(source.Descendants().FirstOrDefault(e => e.Name.LocalName == "ptCount") ?? source, "val"));
+            return Enumerable.Range(0, count)
+                .Select(index => points.TryGetValue(index, out string? value) ? value : string.Empty)
+                .ToList();
+        }
+
+        private static IReadOnlyList<double?> ReadWorkbookChartNumberPoints(XElement? source)
+        {
+            if (source == null)
+            {
+                return Array.Empty<double?>();
+            }
+
+            var points = new SortedDictionary<int, double?>();
+            int fallbackIndex = 0;
+            foreach (XElement point in source.Descendants().Where(e => e.Name.LocalName == "pt"))
+            {
+                int index = int.TryParse(point.Attribute("idx")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int readIndex)
+                    ? readIndex
+                    : fallbackIndex;
+                string? text = point.Descendants().FirstOrDefault(e => e.Name.LocalName == "v")?.Value;
+                points[index] = double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double value)
+                    ? value
+                    : null;
+                fallbackIndex++;
+            }
+
+            if (points.Count == 0)
+            {
+                string? text = source.Descendants().FirstOrDefault(e => e.Name.LocalName == "v")?.Value;
+                return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double value)
+                    ? new double?[] { value }
+                    : Array.Empty<double?>();
+            }
+
+            int count = Math.Max(points.Keys.Max() + 1, TryReadInt(source.Descendants().FirstOrDefault(e => e.Name.LocalName == "ptCount") ?? source, "val"));
+            return Enumerable.Range(0, count)
+                .Select(index => points.TryGetValue(index, out double? value) ? value : null)
+                .ToList();
+        }
+
+        private static string ReadWorkbookChartTitle(XDocument? chartDocument)
+        {
+            XElement? title = chartDocument?.Descendants().FirstOrDefault(e => e.Name.LocalName == "title");
+            if (title == null)
+            {
+                return string.Empty;
+            }
+
+            string text = string.Concat(title.Descendants().Where(e => e.Name.LocalName == "t").Select(e => e.Value));
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                return text.Trim();
+            }
+
+            return title.Descendants().FirstOrDefault(e => e.Name.LocalName == "v")?.Value?.Trim() ?? string.Empty;
+        }
+
+        private static string ReadWorkbookDrawingObjectTitle(XElement drawingObject)
+        {
+            XElement? nonVisualProperties = drawingObject.Descendants().FirstOrDefault(e => e.Name.LocalName == "cNvPr");
+            return nonVisualProperties?.Attribute("descr")?.Value ??
+                nonVisualProperties?.Attribute("name")?.Value ??
+                string.Empty;
+        }
+
+        private static bool IsWorkbookDrawingAnchor(XElement element)
+        {
+            return element.Name.LocalName is "twoCellAnchor" or "oneCellAnchor" or "absoluteAnchor";
+        }
+
+        private static (int Row, int Column) ReadWorkbookAnchorPosition(XElement anchor)
+        {
+            XElement? from = anchor.Elements().FirstOrDefault(e => e.Name.LocalName == "from");
+            return (
+                ReadWorkbookChildInt(from, "row"),
+                ReadWorkbookChildInt(from, "col"));
+        }
+
+        private static (int Width, int Height) ReadWorkbookAnchorSize(XElement anchor)
+        {
+            XElement? extent = anchor.Elements().FirstOrDefault(e => e.Name.LocalName == "ext");
+            if (extent == null)
+            {
+                extent = anchor.Elements().FirstOrDefault(e => e.Name.LocalName == "to");
+            }
+
+            long width = ReadWorkbookLongAttribute(extent, "cx");
+            long height = ReadWorkbookLongAttribute(extent, "cy");
+            return (EmuToPixels(width), EmuToPixels(height));
+        }
+
+        private static int ReadWorkbookChildInt(XElement? parent, string name)
+        {
+            return int.TryParse(
+                parent?.Elements().FirstOrDefault(e => e.Name.LocalName == name)?.Value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out int value)
+                    ? Math.Max(0, value)
+                    : 0;
+        }
+
+        private static long ReadWorkbookLongAttribute(XElement? element, string name)
+        {
+            return long.TryParse(
+                element?.Attribute(name)?.Value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out long value)
+                    ? Math.Max(0, value)
+                    : 0;
+        }
+
+        private static int EmuToPixels(long emu)
+        {
+            return emu <= 0
+                ? 0
+                : Math.Clamp((int)Math.Round(emu / 9525.0), 1, 4000);
+        }
+
+        private static string ReadWorkbookRelationshipId(XElement element)
+        {
+            return element.Attributes()
+                .FirstOrDefault(attribute => attribute.Name.LocalName == "id")
+                ?.Value ?? string.Empty;
+        }
+
+        private static bool IsWorkbookBooleanFalse(string? value)
+        {
+            return value is "0" or "false" or "off";
+        }
+
+        private static int GetWorkbookRowIndex(XElement row, int fallback)
+        {
+            return int.TryParse(
+                row.Attribute("r")?.Value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out int value) && value > 0
+                    ? value
+                    : fallback;
+        }
+
+        private static bool TryParseWorkbookRange(
+            string reference,
+            out int startRow,
+            out int startColumn,
+            out int endRow,
+            out int endColumn)
+        {
+            startRow = 0;
+            startColumn = 0;
+            endRow = 0;
+            endColumn = 0;
+            string[] parts = reference.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (parts.Length == 0 || parts.Length > 2 ||
+                !TryParseWorkbookCellReference(parts[0], out startRow, out startColumn))
+            {
+                return false;
+            }
+
+            if (parts.Length == 1)
+            {
+                endRow = startRow;
+                endColumn = startColumn;
+                return true;
+            }
+
+            if (!TryParseWorkbookCellReference(parts[1], out endRow, out endColumn))
+            {
+                return false;
+            }
+
+            if (endRow < startRow)
+            {
+                (startRow, endRow) = (endRow, startRow);
+            }
+
+            if (endColumn < startColumn)
+            {
+                (startColumn, endColumn) = (endColumn, startColumn);
+            }
+
+            return true;
+        }
+
+        private static bool TryParseWorkbookCellReference(string reference, out int row, out int column)
+        {
+            row = 0;
+            column = 0;
+            Match match = Regex.Match(reference.Trim(), @"^\$?([A-Za-z]+)\$?(\d+)$");
+            if (!match.Success ||
+                !int.TryParse(match.Groups[2].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out row) ||
+                row <= 0)
+            {
+                return false;
+            }
+
+            foreach (char character in match.Groups[1].Value)
+            {
+                column = column * 26 + (char.ToUpperInvariant(character) - 'A' + 1);
+            }
+
+            return column > 0;
+        }
+
+        private static string TrimWorkbookChartLabel(string value, int maxLength = 18)
+        {
+            string text = value ?? string.Empty;
+            return text.Length <= maxLength ? text : text.Substring(0, Math.Max(1, maxLength - 1)) + "…";
+        }
+
+        private static string FormatInvariant(double value)
+        {
+            return value.ToString("0.##", CultureInfo.InvariantCulture);
         }
 
         private static async Task<IReadOnlyList<string>> LoadWorkbookSharedStringsAsync(ZipArchive archive)
