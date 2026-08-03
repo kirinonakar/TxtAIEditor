@@ -124,7 +124,7 @@ namespace TxtAIEditor.Controls
 
             if (!string.IsNullOrWhiteSpace(userInstruction))
             {
-                builder.AppendLine("[User request]");
+                builder.AppendLine("[User Prompt]:");
                 builder.Append(userInstruction);
             }
 

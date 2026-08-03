@@ -44,6 +44,7 @@ namespace TxtAIEditor.Controls
             var openSession = _openSessionController.EnsureSession(context.SessionId);
             _openSessionController.UpdateSessionTitle(openSession, userInstruction);
             string historyText = AgentRunTranscriptService.ConvertToolCallTagsToLogTags(context.SessionHistory.ToString());
+            historyText = AgentRunTranscriptService.ConvertUserRequestMarkersForHistory(historyText);
             openSession.SessionHistoryText = historyText;
             openSession.LastAnswerText = context.LastAnswerText;
             openSession.SessionHistoryTokenCount = context.SessionHistoryTokenCount;

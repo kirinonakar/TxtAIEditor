@@ -20,6 +20,46 @@ namespace TxtAIEditor.Controls
             text = Regex.Replace(text, @"</tool_call>", "</log_tool_call>", RegexOptions.IgnoreCase);
             return text;
         }
+
+        public static string ConvertUserRequestMarkersForHistory(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text ?? string.Empty;
+            }
+
+            string newline = text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+            string[] lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            bool inUserTurn = false;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i];
+                if (line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase))
+                {
+                    inUserTurn = true;
+                    continue;
+                }
+
+                if (inUserTurn && line.Equals("[User request]", StringComparison.OrdinalIgnoreCase))
+                {
+                    lines[i] = "[User Prompt]:";
+                    continue;
+                }
+
+                if (line.StartsWith("[assistant:", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[tool:", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase))
+                {
+                    inUserTurn = false;
+                }
+            }
+
+            return string.Join(newline, lines);
+        }
+
         public string BuildWithEditLedger(
             string transcript,
             int currentTaskStartEditIndex,

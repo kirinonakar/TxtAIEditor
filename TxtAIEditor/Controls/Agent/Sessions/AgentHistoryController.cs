@@ -69,6 +69,7 @@ namespace TxtAIEditor.Controls
         public async Task SaveSessionAsync(AgentHistoryItem session, string currentSessionId)
         {
             session.SessionHistoryText = AgentRunTranscriptService.ConvertToolCallTagsToLogTags(session.SessionHistoryText);
+            session.SessionHistoryText = AgentRunTranscriptService.ConvertUserRequestMarkersForHistory(session.SessionHistoryText);
             var existing = _history.FirstOrDefault(h => h.Id == session.Id);
             if (existing != null)
             {
@@ -530,10 +531,6 @@ namespace TxtAIEditor.Controls
                         result.AppendLine(line);
                     }
                 }
-                else if (line.StartsWith("[User request]", StringComparison.OrdinalIgnoreCase))
-                {
-                    result.AppendLine("[User Prompt]:");
-                }
                 else
                 {
                     if (inToolResult)
@@ -616,7 +613,9 @@ namespace TxtAIEditor.Controls
                     ? lines[i].Substring("[User Prompt]:".Length).Trim()
                     : string.Empty;
                 int end = i + 1;
-                while (end < lines.Length && !IsStructuredUserTurnBoundary(lines[end]))
+                while (end < lines.Length &&
+                    (!IsStructuredUserTurnBoundary(lines[end]) ||
+                     (isUserRoleLine && lines[end].Equals("[User Prompt]:", StringComparison.OrdinalIgnoreCase))))
                 {
                     end++;
                 }
@@ -686,6 +685,7 @@ namespace TxtAIEditor.Controls
                     hasStructuredMetadata = true;
                 }
                 else if (line.StartsWith("[User request]", StringComparison.OrdinalIgnoreCase) ||
+                    line.Equals("[User Prompt]:", StringComparison.OrdinalIgnoreCase) ||
                     line.StartsWith("[Original user request]", StringComparison.OrdinalIgnoreCase))
                 {
                     section = string.Empty;

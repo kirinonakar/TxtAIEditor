@@ -33,7 +33,8 @@ namespace TxtAIEditor.Controls
             string[] lines = historyText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             for (int i = 0; i < lines.Length; i++)
             {
-                if (!lines[i].StartsWith("[User request]", StringComparison.OrdinalIgnoreCase))
+                if (!lines[i].StartsWith("[User request]", StringComparison.OrdinalIgnoreCase) &&
+                    !lines[i].Equals("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
