@@ -86,6 +86,27 @@ namespace TxtAIEditor.Core.Services
                     .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ??
                     (index + 1).ToString(CultureInfo.InvariantCulture))
                 .ToList();
+            string categoryFormatCode = plotArea.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "catAx")?
+                .Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "numFmt")
+                ?.Attribute("formatCode")?.Value ??
+                chart.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "numCache")?
+                    .Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "formatCode")
+                    ?.Value ??
+                string.Empty;
+            if (IsChartDateFormat(categoryFormatCode))
+            {
+                bool use1904Dates = IsPresentationBooleanTrue(
+                    chartDocument?.Descendants()
+                        .FirstOrDefault(e => e.Name.LocalName == "date1904")
+                        ?.Attribute("val")?.Value);
+                categories = categories
+                    .Select(value => FormatChartCategoryDate(value, use1904Dates))
+                    .ToList();
+            }
 
             List<double> values = series.SelectMany(item => item.Values)
                 .Where(value =>
@@ -1164,6 +1185,41 @@ namespace TxtAIEditor.Core.Services
             return value.ToString(
                 absolute >= 100 ? "0" : "0.##",
                 CultureInfo.InvariantCulture);
+        }
+
+        private static bool IsChartDateFormat(string formatCode)
+        {
+            if (string.IsNullOrWhiteSpace(formatCode) ||
+                formatCode.Equals("General", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string cleaned = Regex.Replace(formatCode, "\"[^\"]*\"", string.Empty);
+            cleaned = Regex.Replace(cleaned, @"\[[^\]]+\]", string.Empty);
+            return Regex.IsMatch(cleaned, @"(?i)(?<!\\)[ymdh]");
+        }
+
+        private static string FormatChartCategoryDate(string value, bool use1904Dates)
+        {
+            if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double serial) ||
+                double.IsNaN(serial) ||
+                double.IsInfinity(serial))
+            {
+                return value;
+            }
+
+            try
+            {
+                DateTime date = use1904Dates
+                    ? new DateTime(1904, 1, 1).AddDays(serial)
+                    : new DateTime(1899, 12, 30).AddDays(serial);
+                return date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return value;
+            }
         }
     }
 }
