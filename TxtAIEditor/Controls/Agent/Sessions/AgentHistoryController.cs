@@ -249,6 +249,7 @@ namespace TxtAIEditor.Controls
             }
 
             var lines = historyText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            lines = NormalizeStructuredUserTurns(lines, getString);
             var result = new StringBuilder();
             bool inToolCall = false;
             bool toolCallSyntaxReached = false;
@@ -262,6 +263,24 @@ namespace TxtAIEditor.Controls
             bool inRetainedThinking = false;
             string? pendingToolResultToolName = null;
             var pendingToolResultBody = new StringBuilder();
+            bool agentRunHeaderWritten = false;
+
+            void StartUserTurn()
+            {
+                agentRunHeaderWritten = false;
+            }
+
+            void EnsureAgentRunHeader()
+            {
+                if (agentRunHeaderWritten)
+                {
+                    return;
+                }
+
+                result.AppendLine();
+                result.AppendLine("[Agent run]:");
+                agentRunHeaderWritten = true;
+            }
 
             bool IsPendingToolResultFailed()
             {
@@ -388,6 +407,7 @@ namespace TxtAIEditor.Controls
                     suppressInstructionMetadataSection = true;
                     afterUserRequest = false;
                     inPlanningModeTaskDetails = false;
+                    StartUserTurn();
                     result.AppendLine("[User Prompt]:");
                 }
                 else if (line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
@@ -405,6 +425,7 @@ namespace TxtAIEditor.Controls
                         line.Contains("[Enabled MCP servers]", StringComparison.OrdinalIgnoreCase);
                     afterUserRequest = false;
                     inPlanningModeTaskDetails = line.Contains("[Planning-mode task]", StringComparison.OrdinalIgnoreCase);
+                    StartUserTurn();
                     result.AppendLine(inUserPromptInstructionMetadata ? "[User Prompt]:" : line);
                 }
                 else if (line.StartsWith("[Previous Tool Call]:", StringComparison.OrdinalIgnoreCase) ||
@@ -423,6 +444,7 @@ namespace TxtAIEditor.Controls
                 else if (line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase) ||
                     line.StartsWith("[assistant: tool call]", StringComparison.OrdinalIgnoreCase))
                 {
+                    EnsureAgentRunHeader();
                     inToolCall = true;
                     toolCallSyntaxReached = false;
                     inToolResult = false;
@@ -436,6 +458,7 @@ namespace TxtAIEditor.Controls
                     (line.StartsWith("[tool:", StringComparison.OrdinalIgnoreCase) &&
                         line.EndsWith(" result]", StringComparison.OrdinalIgnoreCase)))
                 {
+                    EnsureAgentRunHeader();
                     inToolCall = false;
                     toolCallSyntaxReached = false;
                     inToolResult = true;
@@ -566,6 +589,172 @@ namespace TxtAIEditor.Controls
             }
 
             return result.ToString().TrimEnd();
+        }
+
+        private static string[] NormalizeStructuredUserTurns(
+            string[] lines,
+            Func<string, string, string>? getString)
+        {
+            var normalized = new List<string>(lines.Length);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                bool isUserRoleLine = lines[i].StartsWith("[user]", StringComparison.OrdinalIgnoreCase);
+                bool isUserPromptLine = lines[i].StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase);
+                if (!isUserRoleLine && !isUserPromptLine)
+                {
+                    normalized.Add(lines[i]);
+                    continue;
+                }
+
+                string inlinePrompt = isUserPromptLine
+                    ? lines[i].Substring("[User Prompt]:".Length).Trim()
+                    : string.Empty;
+                int end = i + 1;
+                while (end < lines.Length && !IsStructuredUserTurnBoundary(lines[end]))
+                {
+                    end++;
+                }
+
+                if (isUserPromptLine && end == i + 1)
+                {
+                    if (string.IsNullOrWhiteSpace(inlinePrompt) &&
+                        end < lines.Length &&
+                        lines[end].StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    normalized.Add(lines[i]);
+                    continue;
+                }
+
+                normalized.Add(BuildUserPromptDisplayLine(lines, i + 1, end, getString, inlinePrompt));
+                i = end - 1;
+            }
+
+            return normalized.ToArray();
+        }
+
+        private static string BuildUserPromptDisplayLine(
+            string[] lines,
+            int start,
+            int end,
+            Func<string, string, string>? getString,
+            string inlinePrompt = "")
+        {
+            var presetNames = new List<string>();
+            var skillNames = new List<string>();
+            var promptLines = new List<string>();
+            var fallbackPromptLines = new List<string>();
+            string mcpLabel = string.Empty;
+            string section = string.Empty;
+            bool inUserRequest = false;
+            bool hasStructuredMetadata = false;
+            bool foundUserRequest = false;
+
+            if (!string.IsNullOrWhiteSpace(inlinePrompt))
+            {
+                fallbackPromptLines.Add(inlinePrompt);
+            }
+
+            for (int i = start; i < end; i++)
+            {
+                string line = lines[i];
+                fallbackPromptLines.Add(line);
+                if (line.StartsWith("[Current Skill]", StringComparison.OrdinalIgnoreCase))
+                {
+                    section = "skill";
+                    inUserRequest = false;
+                    hasStructuredMetadata = true;
+                }
+                else if (line.StartsWith("[Current Preset]", StringComparison.OrdinalIgnoreCase))
+                {
+                    section = "preset";
+                    inUserRequest = false;
+                    hasStructuredMetadata = true;
+                }
+                else if (line.StartsWith("[Current MCP]", StringComparison.OrdinalIgnoreCase))
+                {
+                    section = "mcp";
+                    inUserRequest = false;
+                    hasStructuredMetadata = true;
+                }
+                else if (line.StartsWith("[User request]", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[Original user request]", StringComparison.OrdinalIgnoreCase))
+                {
+                    section = string.Empty;
+                    inUserRequest = true;
+                    foundUserRequest = true;
+                    promptLines.Clear();
+                }
+                else if (inUserRequest)
+                {
+                    promptLines.Add(line);
+                }
+                else if (line.StartsWith("## ", StringComparison.Ordinal))
+                {
+                    string name = line.Substring(3).Trim();
+                    if (name.Length > 0 && section == "preset")
+                    {
+                        presetNames.Add(name);
+                    }
+                    else if (name.Length > 0 && section == "skill")
+                    {
+                        skillNames.Add(name);
+                    }
+                }
+                else if (section == "mcp" && string.IsNullOrWhiteSpace(mcpLabel) && !string.IsNullOrWhiteSpace(line))
+                {
+                    mcpLabel = line.Trim();
+                }
+            }
+
+            if (!foundUserRequest && !hasStructuredMetadata)
+            {
+                promptLines.AddRange(fallbackPromptLines);
+            }
+
+            var labels = new List<string>();
+            if (presetNames.Count > 0)
+            {
+                labels.Add(string.Join(", ", presetNames));
+            }
+            if (!string.IsNullOrWhiteSpace(mcpLabel))
+            {
+                string format = getString?.Invoke("AgentMcpDisplayLabelFormat", "MCP: {0}") ?? "MCP: {0}";
+                labels.Add(string.Format(format, mcpLabel));
+            }
+            if (skillNames.Count > 0)
+            {
+                string format = getString?.Invoke("AgentSkillDisplayLabelFormat", "Skill: {0}") ?? "Skill: {0}";
+                labels.Add(string.Format(format, string.Join(", ", skillNames)));
+            }
+
+            string labelPrefix = labels.Count == 0 ? string.Empty : $"[{string.Join(" · ", labels)}]";
+            string promptText = string.Join(Environment.NewLine, promptLines).Trim();
+            string prompt = string.IsNullOrWhiteSpace(promptText)
+                ? string.Empty
+                : AgentRunTextFormatter.TruncateUserPrompt(promptText);
+            string display = string.IsNullOrWhiteSpace(labelPrefix)
+                ? prompt
+                : string.IsNullOrWhiteSpace(prompt) ? labelPrefix : $"{labelPrefix} {prompt}";
+            return string.IsNullOrWhiteSpace(display)
+                ? "[User Prompt]:"
+                : $"[User Prompt]: {display}";
+        }
+
+        private static bool IsStructuredUserTurnBoundary(string line)
+        {
+            return line.StartsWith("[assistant:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[tool:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Previous Tool Call]:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Previous Response]:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[Retry detail:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsHistorySectionBoundaryLine(string line)

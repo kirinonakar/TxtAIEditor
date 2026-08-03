@@ -88,6 +88,7 @@ namespace TxtAIEditor.Controls
         {
             string presetSection = _presetController.BuildSelectedPresetSection();
             string skillSection = _skillController.BuildSelectedSkillSection();
+            string mcpLabel = _mcpController.GetSelectedMcpLabel();
             if (string.IsNullOrWhiteSpace(presetSection) &&
                 string.IsNullOrWhiteSpace(skillSection) &&
                 string.IsNullOrWhiteSpace(userInstruction))
@@ -104,6 +105,13 @@ namespace TxtAIEditor.Controls
                 builder.AppendLine();
                 builder.AppendLine("[Current Skill]");
                 builder.AppendLine(skillSection);
+                builder.AppendLine();
+            }
+
+            if (!string.IsNullOrWhiteSpace(mcpLabel))
+            {
+                builder.AppendLine("[Current MCP]");
+                builder.AppendLine(mcpLabel);
                 builder.AppendLine();
             }
 
