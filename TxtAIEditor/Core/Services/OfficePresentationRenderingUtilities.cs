@@ -67,21 +67,10 @@ namespace TxtAIEditor.Core.Services
                 return null;
             }
 
-            XElement? colorContainer = parent.Name.LocalName is
-                "solidFill" or "srgbClr" or "schemeClr" or "sysClr" or "prstClr"
-                    ? parent
-                    : parent.Descendants().FirstOrDefault(e => e.Name.LocalName == "solidFill");
-
-            if (colorContainer == null)
-            {
-                colorContainer = parent;
-            }
-
-            XElement? colorElement = colorContainer.Name.LocalName is
+            XElement? colorElement = parent.Name.LocalName is
                 "srgbClr" or "schemeClr" or "sysClr" or "prstClr"
-                    ? colorContainer
-                    : colorContainer.Descendants().FirstOrDefault(e =>
-                        e.Name.LocalName is "srgbClr" or "schemeClr" or "sysClr" or "prstClr");
+                    ? parent
+                    : FindPresentationColorElement(parent);
             string? color = ReadPresentationColorValue(colorElement, themeColors);
 
             if (string.IsNullOrWhiteSpace(color))
@@ -89,8 +78,8 @@ namespace TxtAIEditor.Core.Services
                 return null;
             }
 
-            string transformedColor = ApplyColorTransforms(color, colorElement ?? colorContainer);
-            int alpha = ReadAlphaTransform(colorElement ?? colorContainer);
+            string transformedColor = ApplyColorTransforms(color, colorElement ?? parent);
+            int alpha = ReadAlphaTransform(colorElement ?? parent);
             if (alpha == 0)
             {
                 return null;
@@ -109,6 +98,50 @@ namespace TxtAIEditor.Core.Services
             }
 
             return transformedColor;
+        }
+
+        private static XElement? FindPresentationColorElement(XElement parent)
+        {
+            if (parent.Name.LocalName == "solidFill")
+            {
+                return parent.Elements().FirstOrDefault(IsPresentationColorElement);
+            }
+
+            XElement? directSolidFill = parent.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "solidFill");
+            if (directSolidFill != null)
+            {
+                return directSolidFill.Elements()
+                    .FirstOrDefault(IsPresentationColorElement);
+            }
+
+            XElement? directColor = parent.Elements()
+                .FirstOrDefault(IsPresentationColorElement);
+            if (directColor != null)
+            {
+                return directColor;
+            }
+
+            XElement? referenceColor = parent.Elements()
+                .Where(e => e.Name.LocalName is
+                    "fontRef" or "lnRef" or "fillRef" or "effectRef")
+                .SelectMany(e => e.Elements())
+                .FirstOrDefault(IsPresentationColorElement);
+            if (referenceColor != null)
+            {
+                return referenceColor;
+            }
+
+            XElement? nestedSolidFill = parent.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "solidFill");
+            return nestedSolidFill?.Elements()
+                .FirstOrDefault(IsPresentationColorElement);
+        }
+
+        private static bool IsPresentationColorElement(XElement element)
+        {
+            return element.Name.LocalName is
+                "srgbClr" or "schemeClr" or "sysClr" or "prstClr";
         }
 
         public static XElement? FindPresentationFill(XElement? parent)

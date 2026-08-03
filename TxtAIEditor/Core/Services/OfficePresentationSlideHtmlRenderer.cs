@@ -331,52 +331,20 @@ namespace TxtAIEditor.Core.Services
 
             if (element.Name.LocalName == "pic")
             {
-                if (!TryReadBounds(
-                    element,
-                    slideWidth,
-                    slideHeight,
-                    baseWidthPx,
-                    baseHeightPx,
-                    groupTransform,
-                    out string bounds))
+                if (TryBuildPictureHtml(
+                        archive,
+                        element,
+                        relationships,
+                        slideWidth,
+                        slideHeight,
+                        baseWidthPx,
+                        baseHeightPx,
+                        groupTransform,
+                        out string pictureHtml))
                 {
-                    yield break;
+                    yield return pictureHtml;
                 }
 
-                string? relationshipId = element.Descendants()
-                    .FirstOrDefault(e => e.Name.LocalName == "blip")
-                    ?.Attributes()
-                    .FirstOrDefault(attribute => attribute.Name.LocalName == "embed")
-                    ?.Value;
-                if (string.IsNullOrWhiteSpace(relationshipId) ||
-                    !relationships.TryGetValue(relationshipId, out string? imagePath))
-                {
-                    yield break;
-                }
-
-                string? dataUri =
-                    OfficePresentationPackageReader.TryReadImageDataUri(archive, imagePath);
-                if (string.IsNullOrEmpty(dataUri))
-                {
-                    yield break;
-                }
-
-                string pictureStyle = ReadPictureFrameStyle(element);
-                string imageStyle = ReadPictureImageStyle(element);
-                string alt = element.Descendants()
-                    .FirstOrDefault(e => e.Name.LocalName == "cNvPr")
-                    ?.Attribute("name")?.Value ?? string.Empty;
-                yield return
-                    "<div class=\"ppt-image\" style=\"" +
-                    bounds +
-                    pictureStyle +
-                    "\"><img alt=\"" +
-                    Html(alt) +
-                    "\" src=\"" +
-                    Html(dataUri) +
-                    "\" style=\"" +
-                    imageStyle +
-                    "\"></div>";
                 yield break;
             }
 
@@ -461,6 +429,28 @@ namespace TxtAIEditor.Core.Services
                         "\">" +
                         tableHtml +
                         "</div>";
+                }
+
+                yield break;
+            }
+
+            if (element.Name.LocalName == "graphicFrame")
+            {
+                XElement? fallbackPicture = element.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "pic");
+                if (fallbackPicture != null &&
+                    TryBuildPictureHtml(
+                        archive,
+                        fallbackPicture,
+                        relationships,
+                        slideWidth,
+                        slideHeight,
+                        baseWidthPx,
+                        baseHeightPx,
+                        groupTransform,
+                        out string pictureHtml))
+                {
+                    yield return pictureHtml;
                 }
 
                 yield break;
@@ -564,6 +554,67 @@ namespace TxtAIEditor.Core.Services
                     boxStyle +
                     "\"></div>";
             }
+        }
+
+        private static bool TryBuildPictureHtml(
+            ZipArchive archive,
+            XElement picture,
+            IReadOnlyDictionary<string, string> relationships,
+            long slideWidth,
+            long slideHeight,
+            double baseWidthPx,
+            double baseHeightPx,
+            PresentationGroupTransform? groupTransform,
+            out string pictureHtml)
+        {
+            pictureHtml = string.Empty;
+            if (!TryReadBounds(
+                    picture,
+                    slideWidth,
+                    slideHeight,
+                    baseWidthPx,
+                    baseHeightPx,
+                    groupTransform,
+                    out string bounds))
+            {
+                return false;
+            }
+
+            string? relationshipId = picture.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "blip")
+                ?.Attributes()
+                .FirstOrDefault(attribute => attribute.Name.LocalName == "embed")
+                ?.Value;
+            if (string.IsNullOrWhiteSpace(relationshipId) ||
+                !relationships.TryGetValue(relationshipId, out string? imagePath))
+            {
+                return false;
+            }
+
+            string? dataUri =
+                OfficePresentationPackageReader.TryReadImageDataUri(archive, imagePath);
+            if (string.IsNullOrEmpty(dataUri))
+            {
+                return false;
+            }
+
+            string pictureStyle = ReadPictureFrameStyle(picture);
+            string imageStyle = ReadPictureImageStyle(picture);
+            string alt = picture.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "cNvPr")
+                ?.Attribute("name")?.Value ?? string.Empty;
+            pictureHtml =
+                "<div class=\"ppt-image\" style=\"" +
+                bounds +
+                pictureStyle +
+                "\"><img alt=\"" +
+                Html(alt) +
+                "\" src=\"" +
+                Html(dataUri) +
+                "\" style=\"" +
+                imageStyle +
+                "\"></div>";
+            return true;
         }
 
         private static bool IsLineShape(XElement element)
