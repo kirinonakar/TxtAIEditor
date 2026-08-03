@@ -194,6 +194,33 @@ th, td {
     user-select: none;
     -webkit-user-select: none;
 }
+/* Keep workbook cell text out of table sizing so it can flow over empty cells. */
+.workbook-table td.xlsx-cell {
+    position: relative;
+    overflow: visible;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+.workbook-table td.xlsx-cell[data-xlsx-has-value="true"] {
+    z-index: 1;
+}
+.workbook-table .xlsx-cell-text {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    display: block;
+    width: max-content;
+    min-width: 0;
+    max-width: none;
+    overflow: hidden;
+    white-space: pre;
+    overflow-wrap: normal;
+    word-break: normal;
+    text-overflow: clip;
+    pointer-events: none;
+    z-index: 2;
+}
 th {
     position: sticky;
     top: 0;
@@ -372,6 +399,7 @@ let selectionState = null;
 let dragState = null;
 let resizeState = null;
 let resizeHover = null;
+let workbookTextOverflowFrame = 0;
 const sheetLayouts = [];
 const resizeStyle = document.createElement('style');
 document.head.appendChild(resizeStyle);
@@ -405,6 +433,57 @@ function applyCellStyle(td, cell) {
     if (cell.textColor) td.style.color = cell.textColor;
     if (cell.bold) td.style.fontWeight = '700';
     if (cell.italic) td.style.fontStyle = 'italic';
+}
+
+function createWorkbookCell(sourceCell) {
+    const value = String(valueOf(sourceCell) ?? '');
+    const td = document.createElement('td');
+    td.className = 'xlsx-cell';
+    td.dataset.xlsxHasValue = value.length > 0 ? 'true' : 'false';
+
+    const text = document.createElement('span');
+    text.className = 'xlsx-cell-text';
+    text.textContent = value;
+    td.appendChild(text);
+    applyCellStyle(td, sourceCell);
+    return td;
+}
+
+function updateWorkbookTextOverflow() {
+    const table = wrap.querySelector('table.workbook-table');
+    if (!table) return;
+
+    table.querySelectorAll('tbody tr').forEach(row => {
+        const cells = Array.from(row.querySelectorAll('td.xlsx-cell[data-csv-column]'));
+        let nextValueCell = null;
+
+        for (let index = cells.length - 1; index >= 0; index--) {
+            const currentCell = cells[index];
+            const text = currentCell.querySelector('.xlsx-cell-text');
+            if (!text) continue;
+
+            text.style.width = 'max-content';
+            if (currentCell.dataset.xlsxHasValue !== 'true') continue;
+
+            if (nextValueCell) {
+                const currentRect = currentCell.getBoundingClientRect();
+                const nextRect = nextValueCell.getBoundingClientRect();
+                const availableWidth = Math.max(0, Math.round(nextRect.left - currentRect.left - 8));
+                text.style.width = `${availableWidth}px`;
+            }
+
+            nextValueCell = currentCell;
+        }
+    });
+}
+
+function scheduleWorkbookTextOverflowUpdate() {
+    if (workbookTextOverflowFrame) return;
+
+    workbookTextOverflowFrame = requestAnimationFrame(() => {
+        workbookTextOverflowFrame = 0;
+        updateWorkbookTextOverflow();
+    });
 }
 
 function escapeCsvValue(value) {
@@ -628,6 +707,7 @@ function handlePointerUp() {
     if (resizeState) {
         resizeState = null;
         document.body.classList.remove('resizing', 'resizing-col', 'resizing-row');
+        scheduleWorkbookTextOverflowUpdate();
     }
 }
 
@@ -679,6 +759,7 @@ function updateResizedStyles() {
         css += `table tbody tr:nth-child(${rowIndex + 1}) > * { height: ${px}px !important; }`;
     });
     resizeStyle.textContent = css;
+    scheduleWorkbookTextOverflowUpdate();
 }
 
 function startColumnResize(columnIndex, event) {
@@ -803,6 +884,7 @@ function renderSheet(index) {
     }
 
     const table = document.createElement('table');
+    table.className = 'workbook-table';
     const thead = document.createElement('thead');
     const headRow = document.createElement('tr');
     headRow.appendChild(cell('th', '', 'row-header'));
@@ -822,10 +904,9 @@ function renderSheet(index) {
         tr.appendChild(rowHeader);
         for (let c = 0; c < columnCount; c++) {
             const sourceCell = row[c] || null;
-            const td = cell('td', valueOf(sourceCell));
+            const td = createWorkbookCell(sourceCell);
             td.dataset.csvRow = String(r);
             td.dataset.csvColumn = String(c);
-            applyCellStyle(td, sourceCell);
             tr.appendChild(td);
         }
         tbody.appendChild(tr);
@@ -889,6 +970,7 @@ wrap.addEventListener('pointermove', event => {
 wrap.addEventListener('pointerleave', clearResizeHover);
 document.addEventListener('pointermove', handleCellPointerMove);
 document.addEventListener('pointerup', handlePointerUp);
+window.addEventListener('resize', scheduleWorkbookTextOverflowUpdate);
 window.addEventListener('blur', () => {
     if (resizeState) {
         resizeState = null;
