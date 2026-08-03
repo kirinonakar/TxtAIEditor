@@ -428,8 +428,7 @@ namespace TxtAIEditor.Core.Services
                     element,
                     diagramDrawing,
                     themeColors,
-                    "txFillClrLst") ??
-                    (themeColors.Count > 1 ? themeColors[1] : null);
+                    "txFillClrLst");
                 foreach (string elementHtml in ReadSlideElement(
                     archive,
                     element,
@@ -850,8 +849,8 @@ namespace TxtAIEditor.Core.Services
                 .FirstOrDefault(e => e.Name.LocalName == "style")?
                 .Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "fontRef");
-            string? textColor = forcedTextColor ??
-                ReadPresentationColor(diagramFontReference, themeColors) ??
+            string? textColor = ReadPresentationColor(diagramFontReference, themeColors) ??
+                forcedTextColor ??
                 (themeColors.Count > 1 ? themeColors[1] : null);
             if (textBody != null && !string.IsNullOrWhiteSpace(textColor))
             {
@@ -1279,11 +1278,41 @@ namespace TxtAIEditor.Core.Services
                 ?.Attribute("prst")?.Value;
             if (string.Equals(presetGeometry, "roundRect", StringComparison.OrdinalIgnoreCase))
             {
-                style.Append("border-radius:4%;");
+                style.Append("border-radius:8%;");
             }
             else if (string.Equals(presetGeometry, "rightArrow", StringComparison.OrdinalIgnoreCase))
             {
                 style.Append("clip-path:polygon(0 25%,60% 25%,60% 0,100% 50%,60% 100%,60% 75%,0 75%);");
+            }
+
+            XElement? shadow = shapeProperties.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "effectLst")?
+                .Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "outerShdw");
+            if (shadow != null)
+            {
+                double distance = TryReadLong(shadow, "dist", out long readDistance)
+                    ? Math.Max(0, readDistance / 12700.0)
+                    : 0;
+                double angle = TryReadLong(shadow, "dir", out long readDirection)
+                    ? readDirection / 60000.0 * Math.PI / 180.0
+                    : Math.PI / 4;
+                double offsetX = Math.Cos(angle) * distance;
+                double offsetY = Math.Sin(angle) * distance;
+                double blur = TryReadLong(shadow, "blurRad", out long readBlur)
+                    ? Math.Max(.5, readBlur / 12700.0)
+                    : 4;
+                string shadowColor = ReadPresentationColor(shadow, themeColors) ??
+                    "rgba(0,0,0,.35)";
+                style.Append("box-shadow:")
+                    .Append(FormatInvariant(offsetX))
+                    .Append("px ")
+                    .Append(FormatInvariant(offsetY))
+                    .Append("px ")
+                    .Append(FormatInvariant(blur))
+                    .Append("px ")
+                    .Append(shadowColor)
+                    .Append(';');
             }
 
             string? customGeometryClipPath = ReadCustomGeometryClipPath(shapeProperties);

@@ -35,7 +35,9 @@ namespace TxtAIEditor.Core.Services
                 .FirstOrDefault(e => e.Name.LocalName == "plotArea");
             XElement? chart = plotArea?.Elements().FirstOrDefault(e =>
                 e.Name.LocalName == "barChart" ||
-                e.Name.LocalName == "lineChart");
+                e.Name.LocalName == "lineChart" ||
+                e.Name.LocalName == "pieChart" ||
+                e.Name.LocalName == "pie3DChart");
             if (plotArea == null || chart == null)
             {
                 return null;
@@ -80,6 +82,29 @@ namespace TxtAIEditor.Core.Services
                 return null;
             }
 
+            string background = ReadPresentationColor(
+                chartDocument?.Root?.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "spPr"),
+                themeColors) ?? "#FFFFFF";
+            if (chart.Name.LocalName is "pieChart" or "pie3DChart")
+            {
+                bool varyColors = IsPresentationBooleanTrue(
+                    chart.Elements()
+                        .FirstOrDefault(e => e.Name.LocalName == "varyColors")
+                        ?.Attribute("val")?.Value);
+                bool showPercent = chart.Descendants()
+                    .Where(e => e.Name.LocalName == "showPercent")
+                    .Any(e => IsPresentationBooleanTrue(e.Attribute("val")?.Value));
+                return BuildPieChartSvg(
+                    series,
+                    categories,
+                    showPercent,
+                    varyColors,
+                    background,
+                    chart.Name.LocalName == "pie3DChart",
+                    themeColors);
+            }
+
             XElement? valueAxis = plotArea.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "valAx");
             double minimum = ReadChartAxisLimit(valueAxis, "min") ??
@@ -99,10 +124,6 @@ namespace TxtAIEditor.Core.Services
                     ?.Value ??
                 string.Empty;
             bool percentage = numberFormat.Contains('%', StringComparison.Ordinal);
-            string background = ReadPresentationColor(
-                chartDocument?.Root?.Elements()
-                    .FirstOrDefault(e => e.Name.LocalName == "spPr"),
-                themeColors) ?? "#FFFFFF";
             bool horizontalBars = chart.Name.LocalName == "barChart" &&
                 string.Equals(
                     chart.Elements()
@@ -319,6 +340,254 @@ namespace TxtAIEditor.Core.Services
                 "#0891B2"
             };
             return palette[index % palette.Length];
+        }
+
+        private static bool IsPresentationBooleanTrue(string? value)
+        {
+            return string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "on", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string BuildPieChartSvg(
+            IReadOnlyList<PresentationChartSeries> series,
+            IReadOnlyList<string> categories,
+            bool showPercent,
+            bool varyColors,
+            string background,
+            bool isThreeDimensional,
+            IReadOnlyList<string> themeColors)
+        {
+            const double centerX = 360;
+            const double centerY = 300;
+            const double radius = 208;
+            PresentationChartSeries dataSeries = series[0];
+            int pointCount = Math.Max(categories.Count, dataSeries.Values.Count);
+            var values = Enumerable.Range(0, pointCount)
+                .Select(index =>
+                {
+                    double? value = index < dataSeries.Values.Count
+                        ? dataSeries.Values[index]
+                        : null;
+                    return value.HasValue &&
+                        !double.IsNaN(value.Value) &&
+                        !double.IsInfinity(value.Value)
+                            ? Math.Max(0, value.Value)
+                            : 0;
+                })
+                .ToList();
+            double total = values.Sum();
+            if (total <= double.Epsilon)
+            {
+                return string.Empty;
+            }
+
+            List<string> labels = Enumerable.Range(0, pointCount)
+                .Select(index => index < categories.Count &&
+                    !string.IsNullOrWhiteSpace(categories[index])
+                        ? categories[index]
+                        : (index + 1).ToString(CultureInfo.InvariantCulture))
+                .ToList();
+            string ariaLabel = string.Join(", ", labels.Select((label, index) =>
+                label + " " + FormatPiePercent(values[index], total)));
+
+            var svg = new StringBuilder();
+            svg.Append("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1000 600\" role=\"img\" aria-label=\"")
+                .Append(Html(ariaLabel))
+                .Append("\"><defs><filter id=\"pie-shadow\" x=\"-30%\" y=\"-30%\" width=\"160%\" height=\"180%\"><feDropShadow dx=\"0\" dy=\"8\" stdDeviation=\"8\" flood-color=\"#1F2937\" flood-opacity=\".28\"/></filter></defs><rect width=\"1000\" height=\"600\" fill=\"")
+                .Append(Html(background))
+                .Append("\"/>");
+
+            if (isThreeDimensional)
+            {
+                svg.Append("<g transform=\"translate(0,16)\" opacity=\".55\">");
+                AppendPieSlices(
+                    svg,
+                    dataSeries,
+                    values,
+                    total,
+                    varyColors,
+                    themeColors,
+                    centerX,
+                    centerY,
+                    radius);
+                svg.Append("</g>");
+            }
+
+            svg.Append("<g filter=\"url(#pie-shadow)\">");
+            var labelsSvg = new StringBuilder();
+            double startAngle = -Math.PI / 2;
+            for (int index = 0; index < values.Count; index++)
+            {
+                double value = values[index];
+                if (value <= double.Epsilon)
+                {
+                    continue;
+                }
+
+                double sweep = value / total * Math.PI * 2;
+                double endAngle = startAngle + sweep;
+                string color = dataSeries.PointColors.TryGetValue(
+                    index,
+                    out string? pointColor)
+                        ? pointColor
+                        : varyColors
+                            ? GetChartFallbackColor(index, themeColors)
+                            : dataSeries.Color;
+                string path = BuildPieSlicePath(
+                    centerX,
+                    centerY,
+                    radius,
+                    startAngle,
+                    endAngle);
+                svg.Append("<path d=\"")
+                    .Append(path)
+                    .Append("\" fill=\"")
+                    .Append(Html(color))
+                    .Append("\" stroke=\"#FFFFFF\" stroke-width=\"3\" stroke-linejoin=\"round\"/>");
+
+                double fraction = value / total;
+                if (showPercent && fraction >= .035)
+                {
+                    double labelAngle = startAngle + sweep / 2;
+                    double labelRadius = radius * .64;
+                    double labelX = centerX + Math.Cos(labelAngle) * labelRadius;
+                    double labelY = centerY + Math.Sin(labelAngle) * labelRadius;
+                    labelsSvg.Append("<text x=\"")
+                        .Append(FormatInvariant(labelX))
+                        .Append("\" y=\"")
+                        .Append(FormatInvariant(labelY))
+                        .Append("\" dy=\".35em\" text-anchor=\"middle\" font-family=\"Segoe UI,Arial,sans-serif\" font-size=\"26\" font-weight=\"700\" fill=\"#FFFFFF\" stroke=\"#1F2937\" stroke-opacity=\".78\" stroke-width=\"5\" stroke-linejoin=\"round\" paint-order=\"stroke fill\">")
+                        .Append(Html(FormatPiePercent(value, total)))
+                        .Append("</text>");
+                }
+
+                startAngle = endAngle;
+            }
+
+            svg.Append("</g>").Append(labelsSvg);
+            const double legendX = 650;
+            const double legendTop = 84;
+            const double legendRowHeight = 76;
+            for (int index = 0; index < labels.Count; index++)
+            {
+                double value = values[index];
+                string color = dataSeries.PointColors.TryGetValue(
+                    index,
+                    out string? pointColor)
+                        ? pointColor
+                        : varyColors
+                            ? GetChartFallbackColor(index, themeColors)
+                            : dataSeries.Color;
+                double y = legendTop + index * legendRowHeight;
+                svg.Append("<rect x=\"")
+                    .Append(FormatInvariant(legendX))
+                    .Append("\" y=\"")
+                    .Append(FormatInvariant(y))
+                    .Append("\" width=\"22\" height=\"22\" rx=\"4\" fill=\"")
+                    .Append(Html(color))
+                    .Append("\"/>");
+                svg.Append("<text x=\"")
+                    .Append(FormatInvariant(legendX + 36))
+                    .Append("\" y=\"")
+                    .Append(FormatInvariant(y + 18))
+                    .Append("\" font-family=\"Segoe UI,Arial,sans-serif\" font-size=\"20\" fill=\"#465264\">")
+                    .Append(Html(labels[index]))
+                    .Append("</text>");
+                svg.Append("<text x=\"")
+                    .Append(FormatInvariant(legendX + 36))
+                    .Append("\" y=\"")
+                    .Append(FormatInvariant(y + 43))
+                    .Append("\" font-family=\"Segoe UI,Arial,sans-serif\" font-size=\"17\" fill=\"#6B7280\">")
+                    .Append(Html(FormatPiePercent(value, total)))
+                    .Append("</text>");
+            }
+
+            svg.Append("</svg>");
+            return svg.ToString();
+        }
+
+        private static void AppendPieSlices(
+            StringBuilder svg,
+            PresentationChartSeries dataSeries,
+            IReadOnlyList<double> values,
+            double total,
+            bool varyColors,
+            IReadOnlyList<string> themeColors,
+            double centerX,
+            double centerY,
+            double radius)
+        {
+            double startAngle = -Math.PI / 2;
+            for (int index = 0; index < values.Count; index++)
+            {
+                double value = values[index];
+                if (value <= double.Epsilon)
+                {
+                    continue;
+                }
+
+                double endAngle = startAngle + value / total * Math.PI * 2;
+                string color = dataSeries.PointColors.TryGetValue(
+                    index,
+                    out string? pointColor)
+                        ? pointColor
+                        : varyColors
+                            ? GetChartFallbackColor(index, themeColors)
+                            : dataSeries.Color;
+                svg.Append("<path d=\"")
+                    .Append(BuildPieSlicePath(
+                        centerX,
+                        centerY,
+                        radius,
+                        startAngle,
+                        endAngle))
+                    .Append("\" fill=\"")
+                    .Append(Html(color))
+                    .Append("\" stroke=\"#FFFFFF\" stroke-width=\"2\"/>");
+                startAngle = endAngle;
+            }
+        }
+
+        private static string BuildPieSlicePath(
+            double centerX,
+            double centerY,
+            double radius,
+            double startAngle,
+            double endAngle)
+        {
+            double sweep = Math.Max(0, endAngle - startAngle);
+            if (sweep >= Math.PI * 2 - .000001)
+            {
+                return "M " + FormatInvariant(centerX) + " " +
+                    FormatInvariant(centerY - radius) +
+                    " A " + FormatInvariant(radius) + " " +
+                    FormatInvariant(radius) + " 0 1 1 " +
+                    FormatInvariant(centerX) + " " +
+                    FormatInvariant(centerY + radius) +
+                    " A " + FormatInvariant(radius) + " " +
+                    FormatInvariant(radius) + " 0 1 1 " +
+                    FormatInvariant(centerX) + " " +
+                    FormatInvariant(centerY - radius) + " Z";
+            }
+
+            double startX = centerX + Math.Cos(startAngle) * radius;
+            double startY = centerY + Math.Sin(startAngle) * radius;
+            double endX = centerX + Math.Cos(endAngle) * radius;
+            double endY = centerY + Math.Sin(endAngle) * radius;
+            int largeArcFlag = sweep > Math.PI ? 1 : 0;
+            return "M " + FormatInvariant(centerX) + " " +
+                FormatInvariant(centerY) + " L " +
+                FormatInvariant(startX) + " " +
+                FormatInvariant(startY) + " A " +
+                FormatInvariant(radius) + " " + FormatInvariant(radius) +
+                " 0 " + largeArcFlag + " 1 " +
+                FormatInvariant(endX) + " " + FormatInvariant(endY) + " Z";
+        }
+
+        private static string FormatPiePercent(double value, double total)
+        {
+            return (value / total * 100.0).ToString("0.#", CultureInfo.InvariantCulture) + "%";
         }
 
         private static string BuildChartSvg(

@@ -435,16 +435,13 @@ namespace TxtAIEditor.Core.Services
                     }
                     case "tint":
                     {
-                        (double hue, double saturation, double luminance) =
-                            RgbToHsl(red, green, blue);
                         double factor = Math.Clamp(
                             ReadPercentageTransform(transform, 0),
                             0,
                             1);
-                        (red, green, blue) = HslToRgb(
-                            hue,
-                            saturation,
-                            luminance + ((1 - luminance) * factor));
+                        red += (1 - red) * factor;
+                        green += (1 - green) * factor;
+                        blue += (1 - blue) * factor;
                         break;
                     }
                     case "shade":
