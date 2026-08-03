@@ -164,6 +164,53 @@ body { padding: 28px 16px 40px; }
 .ppt-shape p { width: 100%; margin: 0; line-height: 1.15; }
 .ppt-shape p:last-child { margin-bottom: 0; }
 .ppt-shape span { white-space: pre-wrap; }
+.ppt-shape span.ppt-math {
+    white-space: nowrap;
+    text-indent: 0;
+    font-family: "Cambria Math", "Times New Roman", serif;
+}
+.ppt-math-sup, .ppt-math-sub, .ppt-math-subsup {
+    display: inline-flex;
+    align-items: baseline;
+    vertical-align: baseline;
+}
+.ppt-shape span.ppt-math-base,
+.ppt-shape span.ppt-math-exponent,
+.ppt-shape span.ppt-math-subscript {
+    display: inline-block;
+    flex: 0 0 auto;
+    min-width: max-content;
+    white-space: nowrap;
+}
+.ppt-math-exponent {
+    font-size: .62em;
+    line-height: 1;
+    position: relative;
+    top: -.45em;
+    margin-left: .03em;
+}
+.ppt-math-subscript {
+    font-size: .62em;
+    line-height: 1;
+    position: relative;
+    top: .25em;
+    margin-left: .03em;
+}
+.ppt-math-fraction {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    vertical-align: middle;
+    line-height: 1;
+    margin: 0 .08em;
+}
+.ppt-math-numerator {
+    border-bottom: 1px solid currentColor;
+    padding: 0 .08em .02em;
+}
+.ppt-math-denominator {
+    padding: .02em .08em 0;
+}
 .ppt-bullet { display: inline-block; min-width: .75em; text-indent: 0; }
 .ppt-bullet-triangle {
     display: inline-block;

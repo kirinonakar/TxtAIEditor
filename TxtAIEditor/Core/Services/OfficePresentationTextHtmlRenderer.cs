@@ -423,6 +423,16 @@ namespace TxtAIEditor.Core.Services
                 if (element.Name.LocalName == "br" || element.Name.LocalName == "cr")
                 {
                     builder.Append("<br>");
+                    continue;
+                }
+
+                if (element.Descendants().Any(e => e.Name.LocalName == "oMath"))
+                {
+                    string mathHtml = BuildMathHtml(element);
+                    if (!string.IsNullOrEmpty(mathHtml))
+                    {
+                        builder.Append(mathHtml);
+                    }
                 }
             }
 
@@ -434,6 +444,128 @@ namespace TxtAIEditor.Core.Services
             }
 
             return builder.ToString();
+        }
+
+        private static string BuildMathHtml(XElement mathElement)
+        {
+            XElement? mathRoot = mathElement.Name.LocalName == "oMath"
+                ? mathElement
+                : mathElement.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "oMath");
+            if (mathRoot == null)
+            {
+                return string.Empty;
+            }
+
+            string content = BuildMathNodesHtml(mathRoot.Elements());
+            return string.IsNullOrEmpty(content)
+                ? string.Empty
+                : "<span class=\"ppt-math\">" + content + "</span>";
+        }
+
+        private static string BuildMathNodesHtml(IEnumerable<XElement> elements)
+        {
+            var builder = new StringBuilder();
+            foreach (XElement element in elements)
+            {
+                switch (element.Name.LocalName)
+                {
+                    case "t":
+                        builder.Append(Html(NormalizePresentationText(element.Value, null)));
+                        break;
+
+                    case "r":
+                        builder.Append(BuildMathNodesHtml(
+                            element.Elements().Where(child => child.Name.LocalName == "t")));
+                        break;
+
+                    case "sSup":
+                        AppendMathSuperscriptHtml(builder, element);
+                        break;
+
+                    case "sSub":
+                        AppendMathSubscriptHtml(builder, element);
+                        break;
+
+                    case "sSubSup":
+                        AppendMathSubSuperscriptHtml(builder, element);
+                        break;
+
+                    case "f":
+                        AppendMathFractionHtml(builder, element);
+                        break;
+
+                    default:
+                        builder.Append(BuildMathNodesHtml(element.Elements()));
+                        break;
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private static void AppendMathSuperscriptHtml(
+            StringBuilder builder,
+            XElement structure)
+        {
+            XElement? baseElement = structure.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "e");
+            XElement? superscript = structure.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "sup");
+            builder.Append("<span class=\"ppt-math-sup\"><span class=\"ppt-math-base\">")
+                .Append(BuildMathNodesHtml(baseElement?.Elements() ?? Enumerable.Empty<XElement>()))
+                .Append("</span><span class=\"ppt-math-exponent\">")
+                .Append(BuildMathNodesHtml(superscript?.Elements() ?? Enumerable.Empty<XElement>()))
+                .Append("</span></span>");
+        }
+
+        private static void AppendMathSubscriptHtml(
+            StringBuilder builder,
+            XElement structure)
+        {
+            XElement? baseElement = structure.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "e");
+            XElement? subscript = structure.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "sub");
+            builder.Append("<span class=\"ppt-math-sub\"><span class=\"ppt-math-base\">")
+                .Append(BuildMathNodesHtml(baseElement?.Elements() ?? Enumerable.Empty<XElement>()))
+                .Append("</span><span class=\"ppt-math-subscript\">")
+                .Append(BuildMathNodesHtml(subscript?.Elements() ?? Enumerable.Empty<XElement>()))
+                .Append("</span></span>");
+        }
+
+        private static void AppendMathSubSuperscriptHtml(
+            StringBuilder builder,
+            XElement structure)
+        {
+            XElement? baseElement = structure.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "e");
+            XElement? subscript = structure.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "sub");
+            XElement? superscript = structure.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "sup");
+            builder.Append("<span class=\"ppt-math-subsup\"><span class=\"ppt-math-base\">")
+                .Append(BuildMathNodesHtml(baseElement?.Elements() ?? Enumerable.Empty<XElement>()))
+                .Append("</span><span class=\"ppt-math-subscript\">")
+                .Append(BuildMathNodesHtml(subscript?.Elements() ?? Enumerable.Empty<XElement>()))
+                .Append("</span><span class=\"ppt-math-exponent\">")
+                .Append(BuildMathNodesHtml(superscript?.Elements() ?? Enumerable.Empty<XElement>()))
+                .Append("</span></span>");
+        }
+
+        private static void AppendMathFractionHtml(
+            StringBuilder builder,
+            XElement structure)
+        {
+            XElement? numerator = structure.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "num");
+            XElement? denominator = structure.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "den");
+            builder.Append("<span class=\"ppt-math-fraction\"><span class=\"ppt-math-numerator\">")
+                .Append(BuildMathNodesHtml(numerator?.Elements() ?? Enumerable.Empty<XElement>()))
+                .Append("</span><span class=\"ppt-math-denominator\">")
+                .Append(BuildMathNodesHtml(denominator?.Elements() ?? Enumerable.Empty<XElement>()))
+                .Append("</span></span>");
         }
 
         private static IReadOnlyList<long> ReadTableColumnWidths(XElement table)
@@ -1281,11 +1413,24 @@ namespace TxtAIEditor.Core.Services
             }
 
             if (string.Equals(
-                runProperties?.Attribute("u")?.Value,
-                "sng",
-                StringComparison.OrdinalIgnoreCase))
+                    runProperties?.Attribute("u")?.Value,
+                    "sng",
+                    StringComparison.OrdinalIgnoreCase))
             {
                 style.Append("text-decoration:underline;");
+            }
+
+            if (runProperties?.Attribute("baseline")?.Value is string baselineValue &&
+                long.TryParse(
+                    baselineValue,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out long baseline) &&
+                baseline != 0)
+            {
+                style.Append("font-size:70%;vertical-align:")
+                    .Append(FormatInvariant(baseline / 1000.0))
+                    .Append("%;");
             }
 
             string? color = ReadPresentationColor(runProperties, themeColors);
