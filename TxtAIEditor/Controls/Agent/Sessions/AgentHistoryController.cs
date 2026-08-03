@@ -261,11 +261,20 @@ namespace TxtAIEditor.Controls
             bool inPlanningModeTaskDetails = false;
             bool inRetainedThinking = false;
             string? pendingToolResultToolName = null;
+            var pendingToolResultBody = new StringBuilder();
+
+            bool IsPendingToolResultFailed()
+            {
+                // An empty body keeps the previous completed-line behavior.
+                return pendingToolResultBody.Length > 0 &&
+                    !AgentToolHelpers.IsSuccessfulToolResult(pendingToolResultBody.ToString());
+            }
 
             void FlushPendingToolResult(bool failed)
             {
                 string toolName = pendingToolResultToolName ?? string.Empty;
                 pendingToolResultToolName = null;
+                pendingToolResultBody.Clear();
                 if (string.IsNullOrEmpty(toolName))
                 {
                     return;
@@ -281,9 +290,10 @@ namespace TxtAIEditor.Controls
             {
                 if (pendingToolResultToolName != null && IsHistorySectionBoundaryLine(line))
                 {
-                    // The tool result section ended without a readable body; keep the
-                    // previous completed-line behavior for that case.
-                    FlushPendingToolResult(false);
+                    // The tool result section ended here. Decide success from the full
+                    // accumulated body so that ripgrep/rga "no matches" (exit code 1 with
+                    // the [ripgrep_no_matches] marker) is not reported as a failure.
+                    FlushPendingToolResult(IsPendingToolResultFailed());
                 }
 
                 if (inRetainedThinking)
@@ -501,7 +511,7 @@ namespace TxtAIEditor.Controls
                     {
                         if (pendingToolResultToolName != null && !string.IsNullOrWhiteSpace(line))
                         {
-                            FlushPendingToolResult(!AgentToolHelpers.IsSuccessfulToolResult(line));
+                            pendingToolResultBody.AppendLine(line);
                         }
 
                         if (line.Contains(
@@ -552,7 +562,7 @@ namespace TxtAIEditor.Controls
 
             if (pendingToolResultToolName != null)
             {
-                FlushPendingToolResult(false);
+                FlushPendingToolResult(IsPendingToolResultFailed());
             }
 
             return result.ToString().TrimEnd();
