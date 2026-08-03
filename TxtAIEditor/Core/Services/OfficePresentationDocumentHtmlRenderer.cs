@@ -161,7 +161,7 @@ body { padding: 28px 16px 40px; }
     width: 100%;
     transform-origin: top left;
 }
-.ppt-shape p { width: 100%; margin: 0 0 .24em; line-height: inherit; }
+.ppt-shape p { width: 100%; margin: 0; line-height: 1.15; }
 .ppt-shape p:last-child { margin-bottom: 0; }
 .ppt-shape span { white-space: pre-wrap; }
 .ppt-bullet { display: inline-block; min-width: .75em; text-indent: 0; }

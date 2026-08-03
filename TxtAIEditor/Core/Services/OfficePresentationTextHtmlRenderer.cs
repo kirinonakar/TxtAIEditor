@@ -60,7 +60,8 @@ namespace TxtAIEditor.Core.Services
                             textBody,
                             effectiveTextStyle,
                             slideWidth,
-                            baseWidthPx) +
+                            baseWidthPx,
+                            fontScale) +
                             ReadParagraphDefaultRunStyle(
                                 paragraph,
                                 textBody,
@@ -87,7 +88,8 @@ namespace TxtAIEditor.Core.Services
                     textBody,
                     effectiveTextStyle,
                     slideWidth,
-                    baseWidthPx);
+                    baseWidthPx,
+                    fontScale);
                 paragraphStyle += ReadParagraphDefaultRunStyle(
                     paragraph,
                     textBody,
@@ -514,7 +516,8 @@ namespace TxtAIEditor.Core.Services
                     textBody,
                     null,
                     slideWidth,
-                    baseWidthPx);
+                    baseWidthPx,
+                    fontScale);
                 builder.Append("<p");
                 if (!string.IsNullOrWhiteSpace(paragraphStyle))
                 {
@@ -983,7 +986,8 @@ namespace TxtAIEditor.Core.Services
             XElement? textBody,
             XElement? inheritedBodyStyle,
             long slideWidth,
-            double baseWidthPx)
+            double baseWidthPx,
+            double fontScale = 1.0)
         {
             XElement? paragraphProperties = paragraph.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "pPr");
@@ -1043,7 +1047,119 @@ namespace TxtAIEditor.Core.Services
                     .Append("px;");
             }
 
+            AppendParagraphSpacing(
+                style,
+                paragraphProperties,
+                levelProperties,
+                "spcBef",
+                "margin-top",
+                slideWidth,
+                baseWidthPx,
+                fontScale);
+            AppendParagraphSpacing(
+                style,
+                paragraphProperties,
+                levelProperties,
+                "spcAft",
+                "margin-bottom",
+                slideWidth,
+                baseWidthPx,
+                fontScale);
+            AppendParagraphLineSpacing(
+                style,
+                paragraphProperties,
+                levelProperties,
+                slideWidth,
+                baseWidthPx,
+                fontScale);
+
             return style.ToString();
+        }
+
+        private static void AppendParagraphSpacing(
+            StringBuilder style,
+            XElement? paragraphProperties,
+            XElement? levelProperties,
+            string spacingName,
+            string cssProperty,
+            long slideWidth,
+            double baseWidthPx,
+            double fontScale)
+        {
+            XElement? spacing = paragraphProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == spacingName) ??
+                levelProperties?.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == spacingName);
+            if (spacing == null)
+            {
+                return;
+            }
+
+            XElement? percentage = spacing.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "spcPct");
+            if (percentage != null &&
+                TryReadLong(percentage, "val", out long percentageValue))
+            {
+                style.Append(cssProperty)
+                    .Append(':')
+                    .Append(FormatInvariant(percentageValue / 100000.0))
+                    .Append("em;");
+                return;
+            }
+
+            XElement? points = spacing.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "spcPts");
+            if (points != null &&
+                TryReadLong(points, "val", out long pointValue))
+            {
+                double pointSpacing = pointValue / 100.0 * fontScale;
+                style.Append(cssProperty)
+                    .Append(':')
+                    .Append(FormatInvariant(
+                        PointsToPixels(pointSpacing, slideWidth, baseWidthPx)))
+                    .Append("px;");
+            }
+        }
+
+        private static void AppendParagraphLineSpacing(
+            StringBuilder style,
+            XElement? paragraphProperties,
+            XElement? levelProperties,
+            long slideWidth,
+            double baseWidthPx,
+            double fontScale)
+        {
+            XElement? lineSpacing = paragraphProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "lnSpc") ??
+                levelProperties?.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "lnSpc");
+            if (lineSpacing == null)
+            {
+                return;
+            }
+
+            XElement? percentage = lineSpacing.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "spcPct");
+            if (percentage != null &&
+                TryReadLong(percentage, "val", out long percentageValue))
+            {
+                style.Append("line-height:")
+                    .Append(FormatInvariant(percentageValue / 100000.0))
+                    .Append(';');
+                return;
+            }
+
+            XElement? points = lineSpacing.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "spcPts");
+            if (points != null &&
+                TryReadLong(points, "val", out long pointValue))
+            {
+                double pointSpacing = pointValue / 100.0 * fontScale;
+                style.Append("line-height:")
+                    .Append(FormatInvariant(
+                        PointsToPixels(pointSpacing, slideWidth, baseWidthPx)))
+                    .Append("px;");
+            }
         }
 
         private static string ReadRunTextStyle(
