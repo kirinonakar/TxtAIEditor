@@ -316,6 +316,13 @@ namespace TxtAIEditor.Controls
             UpdateRewindSessionButtonEnabled();
         }
 
+        public void SetSessionTitle(string title)
+        {
+            string text = title ?? string.Empty;
+            AgentSessionTitleText.Text = text;
+            ToolTipService.SetToolTip(AgentSessionTitleText, text);
+        }
+
         private void UpdateRewindSessionButtonEnabled()
         {
             if (AgentRewindSessionButton == null)

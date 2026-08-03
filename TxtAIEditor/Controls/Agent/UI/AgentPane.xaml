@@ -90,6 +90,7 @@
     <Grid Padding="15" RowSpacing="6" AllowDrop="True" DragOver="OnAgentGridDragOver" Drop="OnAgentGridDrop">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -234,7 +235,33 @@
                        Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
         </Grid>
 
-        <ScrollViewer Grid.Row="1"
+        <Border Grid.Row="1"
+                Background="{ThemeResource ToolbarBackgroundBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                Padding="10,6"
+                CornerRadius="4">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE8BD;"
+                          FontSize="13"
+                          Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                          VerticalAlignment="Center"/>
+                <TextBlock x:Name="AgentSessionTitleText"
+                           Grid.Column="1"
+                           Text="새 세션"
+                           FontWeight="SemiBold"
+                           FontSize="12"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="2"
                       x:Name="AgentOutputScrollViewer"
                       VerticalScrollBarVisibility="Auto"
                       Background="{ThemeResource AgentOutputBackground}"
@@ -254,7 +281,7 @@
                            KeyDown="OnOutputTextKeyDown"/>
         </ScrollViewer>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
             <ToggleButton x:Name="AgentStreamToTabToggleButton"
                           Width="36"
                           Height="32"
@@ -283,7 +310,7 @@
                     Style="{StaticResource AgentButtonStyle}"/>
         </StackPanel>
 
-        <Border Grid.Row="3" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="6" CornerRadius="4">
+        <Border Grid.Row="4" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="6" CornerRadius="4">
             <Grid RowSpacing="4" ColumnSpacing="8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -456,7 +483,7 @@
         </Border>
 
         <StackPanel x:Name="AgentReviewPanelsHost"
-                    Grid.Row="4"
+                    Grid.Row="5"
                     Spacing="12"
                     Visibility="Collapsed">
             <Border x:Name="AgentDiffConfirmPanel"
@@ -630,7 +657,7 @@
             </Border>
         </StackPanel>
 
-        <Grid Grid.Row="5" ColumnSpacing="8" RowSpacing="0">
+        <Grid Grid.Row="6" ColumnSpacing="8" RowSpacing="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -879,7 +906,7 @@
         </Grid>
 
         <Border x:Name="AgentActivityPanel"
-                Grid.Row="6"
+                Grid.Row="7"
                 Background="{ThemeResource ToolbarBackgroundBrush}"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                 BorderThickness="1"

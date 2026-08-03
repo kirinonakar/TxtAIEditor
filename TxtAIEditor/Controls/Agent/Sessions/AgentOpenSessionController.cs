@@ -170,6 +170,7 @@ namespace TxtAIEditor.Controls
             session.PromptText = _agentPane.Prompt.Text ?? string.Empty;
             UpdateSessionTitle(session, session.PromptText);
             session.UpdatedAt = DateTime.Now;
+            RefreshSessionTitleDisplay();
 
             // TextChanged fires for every keystroke. Rebuilding the open-session menu here
             // clears and recreates its controls and queues more UI-thread work, which makes
@@ -208,6 +209,7 @@ namespace TxtAIEditor.Controls
             }
             session.UpdatedAt = DateTime.Now;
             UpdateSessionTitle(session, session.PromptText);
+            RefreshSessionTitleDisplay();
         }
 
         public void RestoreSession(AgentOpenSessionState session)
@@ -371,20 +373,7 @@ namespace TxtAIEditor.Controls
                         ? session.WorkspaceRoot
                         : CaptureCurrentWorkspaceRoot();
 
-                    string prefix = string.Empty;
-                    if (!string.IsNullOrWhiteSpace(wRoot))
-                    {
-                        try
-                        {
-                            string trimmed = wRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                            string lastDir = Path.GetFileName(trimmed);
-                            if (!string.IsNullOrEmpty(lastDir))
-                            {
-                                prefix = $"[{lastDir}] ";
-                            }
-                        }
-                        catch { }
-                    }
+                    string prefix = BuildWorkspacePrefix(wRoot);
 
                     string rawTitle = string.IsNullOrWhiteSpace(session.Title)
                         ? GetUntitledOpenSessionTitle()
@@ -403,11 +392,18 @@ namespace TxtAIEditor.Controls
                 })
                 .ToList();
 
+            var currentSession = _openSessions.FirstOrDefault(item =>
+                string.Equals(item.Id, currentSessionId, StringComparison.Ordinal));
+            string currentSessionTitle = currentSession != null
+                ? BuildSessionDisplayTitle(currentSession)
+                : string.Empty;
+
             int completedNotificationCount = items.Sum(item => Math.Max(0, item.CompletedNotificationCount));
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
                 _completedNotificationCountChanged?.Invoke(completedNotificationCount);
                 _agentPane.UpdateOpenSessionItems(items, currentSessionId);
+                _agentPane.SetSessionTitle(currentSessionTitle);
             });
         }
 
@@ -435,6 +431,47 @@ namespace TxtAIEditor.Controls
             {
                 session.Title = GetUntitledOpenSessionTitle();
             }
+        }
+
+        private string BuildSessionDisplayTitle(AgentOpenSessionState session)
+        {
+            string wRoot = !string.IsNullOrWhiteSpace(session.WorkspaceRoot)
+                ? session.WorkspaceRoot
+                : CaptureCurrentWorkspaceRoot();
+            string rawTitle = string.IsNullOrWhiteSpace(session.Title)
+                ? GetUntitledOpenSessionTitle()
+                : session.Title;
+            return $"{BuildWorkspacePrefix(wRoot)}{rawTitle}";
+        }
+
+        private static string BuildWorkspacePrefix(string? workspaceRoot)
+        {
+            if (string.IsNullOrWhiteSpace(workspaceRoot))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                string trimmed = workspaceRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string lastDir = Path.GetFileName(trimmed);
+                if (!string.IsNullOrEmpty(lastDir))
+                {
+                    return $"[{lastDir}] ";
+                }
+            }
+            catch { }
+
+            return string.Empty;
+        }
+
+        private void RefreshSessionTitleDisplay()
+        {
+            var session = EnsureSession(_currentSessionIdProvider());
+            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            {
+                _agentPane.SetSessionTitle(BuildSessionDisplayTitle(session));
+            });
         }
 
         public void UpdateActiveSessionBusyState()
