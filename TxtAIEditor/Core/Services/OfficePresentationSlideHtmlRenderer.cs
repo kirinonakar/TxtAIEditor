@@ -60,6 +60,21 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+        private sealed class PresentationDiagramModelStyle
+        {
+            public string Label { get; init; } = string.Empty;
+            public int Index { get; init; }
+        }
+
+        private sealed class PresentationDiagramDrawing
+        {
+            public XDocument Document { get; init; } = null!;
+            public IReadOnlyDictionary<string, PresentationDiagramModelStyle> ModelStyles { get; init; } =
+                new Dictionary<string, PresentationDiagramModelStyle>(StringComparer.OrdinalIgnoreCase);
+            public IReadOnlyDictionary<string, XElement> ColorStyles { get; init; } =
+                new Dictionary<string, XElement>(StringComparer.OrdinalIgnoreCase);
+        }
+
         public static async Task<string?> BuildAsync(
             ZipArchive archive,
             string slidePath,
@@ -122,7 +137,7 @@ namespace TxtAIEditor.Core.Services
                     baseWidthPx,
                     baseHeightPx)
                 .ConfigureAwait(false);
-            IReadOnlyDictionary<string, XDocument> diagramDrawings =
+            IReadOnlyDictionary<string, PresentationDiagramDrawing> diagramDrawings =
                 await LoadDiagramDrawingsAsync(archive, relationships)
                     .ConfigureAwait(false);
             string background = await ReadSlideBackgroundAsync(
@@ -194,7 +209,7 @@ namespace TxtAIEditor.Core.Services
             ZipArchive archive,
             XDocument slide,
             IReadOnlyDictionary<string, string> relationships,
-            IReadOnlyDictionary<string, XDocument> diagramDrawings,
+            IReadOnlyDictionary<string, PresentationDiagramDrawing> diagramDrawings,
             IReadOnlyList<string> themeColors,
             long slideWidth,
             long slideHeight,
@@ -278,12 +293,12 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static async Task<IReadOnlyDictionary<string, XDocument>>
+        private static async Task<IReadOnlyDictionary<string, PresentationDiagramDrawing>>
             LoadDiagramDrawingsAsync(
                 ZipArchive archive,
                 IReadOnlyDictionary<string, string> relationships)
         {
-            var drawings = new Dictionary<string, XDocument>(
+            var drawings = new Dictionary<string, PresentationDiagramDrawing>(
                 StringComparer.OrdinalIgnoreCase);
             foreach (string path in relationships.Values
                 .Where(IsDiagramDrawingPath)
@@ -294,7 +309,23 @@ namespace TxtAIEditor.Core.Services
                     .ConfigureAwait(false);
                 if (drawing != null)
                 {
-                    drawings[path] = drawing;
+                    string drawingNumber = Path.GetFileNameWithoutExtension(path)["drawing".Length..];
+                    XDocument? data = await OfficePresentationPackageReader
+                        .TryLoadXmlEntryAsync(
+                            archive,
+                            "ppt/diagrams/data" + drawingNumber + ".xml")
+                        .ConfigureAwait(false);
+                    XDocument? colors = await OfficePresentationPackageReader
+                        .TryLoadXmlEntryAsync(
+                            archive,
+                            "ppt/diagrams/colors" + drawingNumber + ".xml")
+                        .ConfigureAwait(false);
+                    drawings[path] = new PresentationDiagramDrawing
+                    {
+                        Document = drawing,
+                        ModelStyles = ReadDiagramModelStyles(data),
+                        ColorStyles = ReadDiagramColorStyles(colors)
+                    };
                 }
             }
 
@@ -309,10 +340,10 @@ namespace TxtAIEditor.Core.Services
                 fileName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static XDocument? FindDiagramDrawing(
+        private static PresentationDiagramDrawing? FindDiagramDrawing(
             XElement graphicFrame,
             IReadOnlyDictionary<string, string> relationships,
-            IReadOnlyDictionary<string, XDocument>? diagramDrawings)
+            IReadOnlyDictionary<string, PresentationDiagramDrawing>? diagramDrawings)
         {
             if (diagramDrawings == null || diagramDrawings.Count == 0)
             {
@@ -372,7 +403,7 @@ namespace TxtAIEditor.Core.Services
 
         private static IEnumerable<string> ReadDiagramDrawingElements(
             ZipArchive archive,
-            XDocument diagramDrawing,
+            PresentationDiagramDrawing diagramDrawing,
             IReadOnlyDictionary<string, string> relationships,
             IReadOnlyList<string> themeColors,
             long slideWidth,
@@ -382,12 +413,23 @@ namespace TxtAIEditor.Core.Services
             XDocument? tableStyles,
             PresentationGroupTransform diagramTransform)
         {
-            XElement? shapeTree = diagramDrawing.Descendants()
+            XElement? shapeTree = diagramDrawing.Document.Descendants()
                 .FirstOrDefault(e => e.Name.LocalName == "spTree");
             foreach (XElement element in shapeTree?.Elements().Where(e =>
                 e.Name.LocalName is not "nvGrpSpPr" and not "grpSpPr") ??
                 Enumerable.Empty<XElement>())
             {
+                string? forcedFill = ReadDiagramStyleColor(
+                    element,
+                    diagramDrawing,
+                    themeColors,
+                    "fillClrLst");
+                string? forcedTextColor = ReadDiagramStyleColor(
+                    element,
+                    diagramDrawing,
+                    themeColors,
+                    "txFillClrLst") ??
+                    (themeColors.Count > 1 ? themeColors[1] : null);
                 foreach (string elementHtml in ReadSlideElement(
                     archive,
                     element,
@@ -401,11 +443,98 @@ namespace TxtAIEditor.Core.Services
                     tableStyles,
                     null,
                     null,
-                    diagramTransform))
+                    diagramTransform,
+                    forcedTextColor: forcedTextColor,
+                    forcedFill: forcedFill))
                 {
                     yield return elementHtml;
                 }
             }
+        }
+
+        private static IReadOnlyDictionary<string, PresentationDiagramModelStyle>
+            ReadDiagramModelStyles(XDocument? data)
+        {
+            var styles = new Dictionary<string, PresentationDiagramModelStyle>(
+                StringComparer.OrdinalIgnoreCase);
+            if (data == null)
+            {
+                return styles;
+            }
+
+            foreach (XElement point in data.Descendants()
+                .Where(e => e.Name.LocalName == "pt"))
+            {
+                XElement? propertySet = point.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "prSet");
+                string? modelId = point.Attribute("modelId")?.Value;
+                string? label = propertySet?.Attribute("presStyleLbl")?.Value;
+                if (string.IsNullOrWhiteSpace(modelId) ||
+                    string.IsNullOrWhiteSpace(label))
+                {
+                    continue;
+                }
+
+                int index = propertySet == null
+                    ? 0
+                    : TryReadInt(propertySet, "presStyleIdx");
+                styles[modelId] = new PresentationDiagramModelStyle
+                {
+                    Label = label,
+                    Index = Math.Max(0, index)
+                };
+            }
+
+            return styles;
+        }
+
+        private static IReadOnlyDictionary<string, XElement>
+            ReadDiagramColorStyles(XDocument? colors)
+        {
+            var styles = new Dictionary<string, XElement>(
+                StringComparer.OrdinalIgnoreCase);
+            if (colors == null)
+            {
+                return styles;
+            }
+
+            foreach (XElement styleLabel in colors.Descendants()
+                .Where(e => e.Name.LocalName == "styleLbl"))
+            {
+                string? name = styleLabel.Attribute("name")?.Value;
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    styles[name] = styleLabel;
+                }
+            }
+
+            return styles;
+        }
+
+        private static string? ReadDiagramStyleColor(
+            XElement element,
+            PresentationDiagramDrawing diagramDrawing,
+            IReadOnlyList<string> themeColors,
+            string colorListName)
+        {
+            string? modelId = element.Attribute("modelId")?.Value;
+            if (string.IsNullOrWhiteSpace(modelId) ||
+                !diagramDrawing.ModelStyles.TryGetValue(modelId, out PresentationDiagramModelStyle? modelStyle) ||
+                !diagramDrawing.ColorStyles.TryGetValue(modelStyle.Label, out XElement? colorStyle))
+            {
+                return null;
+            }
+
+            XElement? colorList = colorStyle.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == colorListName);
+            List<XElement> colors = colorList?.Elements().ToList() ?? new List<XElement>();
+            if (colors.Count == 0)
+            {
+                return null;
+            }
+
+            int colorIndex = Math.Min(modelStyle.Index, colors.Count - 1);
+            return ReadPresentationColor(colors[colorIndex], themeColors);
         }
 
         private static IEnumerable<string> ReadSlideElement(
@@ -422,8 +551,9 @@ namespace TxtAIEditor.Core.Services
             XElement? inheritedBodyStyle,
             XElement? inheritedTitleStyle,
             PresentationGroupTransform? groupTransform,
-            IReadOnlyDictionary<string, XDocument>? diagramDrawings = null,
+            IReadOnlyDictionary<string, PresentationDiagramDrawing>? diagramDrawings = null,
             string? forcedTextColor = null,
+            string? forcedFill = null,
             bool skipPlaceholders = false)
         {
             if (skipPlaceholders && TryReadPlaceholderInfo(element, out _, out _))
@@ -456,6 +586,7 @@ namespace TxtAIEditor.Core.Services
                         groupTransform,
                         diagramDrawings,
                         forcedTextColor,
+                        forcedFill,
                         skipPlaceholders))
                     {
                         yield return childHtml;
@@ -494,6 +625,7 @@ namespace TxtAIEditor.Core.Services
                         nextTransform,
                         diagramDrawings,
                         forcedTextColor,
+                        forcedFill,
                         skipPlaceholders))
                     {
                         yield return childHtml;
@@ -610,7 +742,7 @@ namespace TxtAIEditor.Core.Services
 
             if (element.Name.LocalName == "graphicFrame")
             {
-                XDocument? diagramDrawing = FindDiagramDrawing(
+                PresentationDiagramDrawing? diagramDrawing = FindDiagramDrawing(
                     element,
                     relationships,
                     diagramDrawings);
@@ -692,11 +824,15 @@ namespace TxtAIEditor.Core.Services
 
             XElement? shapeProperties = element.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "spPr");
+            XElement? shapeStyle = element.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "style");
             string boxStyle = ReadShapeBoxStyle(
                 shapeProperties,
+                shapeStyle,
                 themeColors,
                 archive,
-                relationships);
+                relationships,
+                forcedFill);
             string boundsStyle = TryReadBounds(
                 element,
                 slideWidth,
@@ -1083,9 +1219,11 @@ namespace TxtAIEditor.Core.Services
 
         private static string ReadShapeBoxStyle(
             XElement? shapeProperties,
+            XElement? shapeStyle,
             IReadOnlyList<string> themeColors,
             ZipArchive archive,
-            IReadOnlyDictionary<string, string> relationships)
+            IReadOnlyDictionary<string, string> relationships,
+            string? forcedFill = null)
         {
             if (shapeProperties == null)
             {
@@ -1099,7 +1237,15 @@ namespace TxtAIEditor.Core.Services
                     "fillRef" or "noFill");
             bool hasShapeNoFill = shapeProperties.Elements()
                 .Any(e => e.Name.LocalName == "noFill");
-            string? fill = ReadPresentationFill(fillElement, themeColors);
+            if (fillElement == null && !hasShapeNoFill)
+            {
+                fillElement = shapeStyle?.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "fillRef");
+            }
+
+            string? fill = !string.IsNullOrWhiteSpace(forcedFill)
+                ? forcedFill
+                : ReadPresentationFill(fillElement, themeColors);
             if (!string.IsNullOrWhiteSpace(fill) && !hasShapeNoFill)
             {
                 style.Append("background:").Append(fill).Append(';');
@@ -1150,6 +1296,8 @@ namespace TxtAIEditor.Core.Services
 
             XElement? line = shapeProperties.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "ln");
+            line ??= shapeStyle?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "lnRef");
             if (line != null &&
                 !line.Descendants().Any(e => e.Name.LocalName == "noFill"))
             {

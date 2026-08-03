@@ -337,63 +337,321 @@ namespace TxtAIEditor.Core.Services
                 return color;
             }
 
-            int red = Convert.ToInt32(color.Substring(1, 2), 16);
-            int green = Convert.ToInt32(color.Substring(3, 2), 16);
-            int blue = Convert.ToInt32(color.Substring(5, 2), 16);
-            double lumMod = ReadPercentageTransform(parent, "lumMod", 100000) / 100000.0;
-            double lumOff = ReadPercentageTransform(parent, "lumOff", 0) / 100000.0;
-            red = ApplyLumTransform(red, lumMod, lumOff);
-            green = ApplyLumTransform(green, lumMod, lumOff);
-            blue = ApplyLumTransform(blue, lumMod, lumOff);
+            double red = Convert.ToInt32(color.Substring(1, 2), 16) / 255.0;
+            double green = Convert.ToInt32(color.Substring(3, 2), 16) / 255.0;
+            double blue = Convert.ToInt32(color.Substring(5, 2), 16) / 255.0;
 
-            int tint = ReadPercentageTransform(parent, "tint", 0);
-            if (tint > 0)
+            foreach (XElement transform in parent.Elements())
             {
-                double tintFactor = Math.Clamp(tint / 100000.0, 0, 1);
-                red = (int)Math.Round(red + ((255 - red) * tintFactor));
-                green = (int)Math.Round(green + ((255 - green) * tintFactor));
-                blue = (int)Math.Round(blue + ((255 - blue) * tintFactor));
+                switch (transform.Name.LocalName)
+                {
+                    case "hue":
+                    {
+                        (double hue, double saturation, double luminance) =
+                            RgbToHsl(red, green, blue);
+                        (red, green, blue) = HslToRgb(
+                            ReadAngleTransform(transform),
+                            saturation,
+                            luminance);
+                        break;
+                    }
+                    case "hueOff":
+                    {
+                        (double hue, double saturation, double luminance) =
+                            RgbToHsl(red, green, blue);
+                        (red, green, blue) = HslToRgb(
+                            NormalizeHue(hue + ReadAngleTransform(transform)),
+                            saturation,
+                            luminance);
+                        break;
+                    }
+                    case "hueMod":
+                    {
+                        (double hue, double saturation, double luminance) =
+                            RgbToHsl(red, green, blue);
+                        (red, green, blue) = HslToRgb(
+                            NormalizeHue(hue * ReadPercentageTransform(transform, 1)),
+                            saturation,
+                            luminance);
+                        break;
+                    }
+                    case "sat":
+                    {
+                        (double hue, _, double luminance) = RgbToHsl(red, green, blue);
+                        (red, green, blue) = HslToRgb(
+                            hue,
+                            ReadPercentageTransform(transform, 0),
+                            luminance);
+                        break;
+                    }
+                    case "satOff":
+                    {
+                        (double hue, double saturation, double luminance) =
+                            RgbToHsl(red, green, blue);
+                        (red, green, blue) = HslToRgb(
+                            hue,
+                            saturation + ReadPercentageTransform(transform, 0),
+                            luminance);
+                        break;
+                    }
+                    case "satMod":
+                    {
+                        (double hue, double saturation, double luminance) =
+                            RgbToHsl(red, green, blue);
+                        (red, green, blue) = HslToRgb(
+                            hue,
+                            saturation * ReadPercentageTransform(transform, 1),
+                            luminance);
+                        break;
+                    }
+                    case "lum":
+                    {
+                        (double hue, double saturation, _) = RgbToHsl(red, green, blue);
+                        (red, green, blue) = HslToRgb(
+                            hue,
+                            saturation,
+                            ReadPercentageTransform(transform, 0));
+                        break;
+                    }
+                    case "lumOff":
+                    {
+                        (double hue, double saturation, double luminance) =
+                            RgbToHsl(red, green, blue);
+                        (red, green, blue) = HslToRgb(
+                            hue,
+                            saturation,
+                            luminance + ReadPercentageTransform(transform, 0));
+                        break;
+                    }
+                    case "lumMod":
+                    {
+                        (double hue, double saturation, double luminance) =
+                            RgbToHsl(red, green, blue);
+                        (red, green, blue) = HslToRgb(
+                            hue,
+                            saturation,
+                            luminance * ReadPercentageTransform(transform, 1));
+                        break;
+                    }
+                    case "tint":
+                    {
+                        (double hue, double saturation, double luminance) =
+                            RgbToHsl(red, green, blue);
+                        double factor = Math.Clamp(
+                            ReadPercentageTransform(transform, 0),
+                            0,
+                            1);
+                        (red, green, blue) = HslToRgb(
+                            hue,
+                            saturation,
+                            luminance + ((1 - luminance) * factor));
+                        break;
+                    }
+                    case "shade":
+                    {
+                        (double hue, double saturation, double luminance) =
+                            RgbToHsl(red, green, blue);
+                        (red, green, blue) = HslToRgb(
+                            hue,
+                            saturation,
+                            luminance * Math.Clamp(
+                                ReadPercentageTransform(transform, 1),
+                                0,
+                                1));
+                        break;
+                    }
+                    case "red":
+                        red = ReadPercentageTransform(transform, 0);
+                        break;
+                    case "redOff":
+                        red += ReadPercentageTransform(transform, 0);
+                        break;
+                    case "redMod":
+                        red *= ReadPercentageTransform(transform, 1);
+                        break;
+                    case "green":
+                        green = ReadPercentageTransform(transform, 0);
+                        break;
+                    case "greenOff":
+                        green += ReadPercentageTransform(transform, 0);
+                        break;
+                    case "greenMod":
+                        green *= ReadPercentageTransform(transform, 1);
+                        break;
+                    case "blue":
+                        blue = ReadPercentageTransform(transform, 0);
+                        break;
+                    case "blueOff":
+                        blue += ReadPercentageTransform(transform, 0);
+                        break;
+                    case "blueMod":
+                        blue *= ReadPercentageTransform(transform, 1);
+                        break;
+                    case "comp":
+                    {
+                        (double hue, double saturation, double luminance) =
+                            RgbToHsl(red, green, blue);
+                        (red, green, blue) = HslToRgb(
+                            NormalizeHue(hue + 180),
+                            saturation,
+                            luminance);
+                        break;
+                    }
+                    case "inv":
+                        red = 1 - red;
+                        green = 1 - green;
+                        blue = 1 - blue;
+                        break;
+                    case "gray":
+                    {
+                        double gray = (red * .299) + (green * .587) + (blue * .114);
+                        red = gray;
+                        green = gray;
+                        blue = gray;
+                        break;
+                    }
+                }
+
+                red = Math.Clamp(red, 0, 1);
+                green = Math.Clamp(green, 0, 1);
+                blue = Math.Clamp(blue, 0, 1);
             }
 
-            int shade = ReadPercentageTransform(parent, "shade", 100000);
-            if (shade < 100000)
-            {
-                double shadeFactor = Math.Clamp(shade / 100000.0, 0, 1);
-                red = (int)Math.Round(red * shadeFactor);
-                green = (int)Math.Round(green * shadeFactor);
-                blue = (int)Math.Round(blue * shadeFactor);
-            }
-
-            return $"#{red:X2}{green:X2}{blue:X2}";
+            return $"#{ToColorByte(red):X2}{ToColorByte(green):X2}{ToColorByte(blue):X2}";
         }
 
         private static int ReadAlphaTransform(XElement parent)
         {
-            int alpha = ReadPercentageTransform(parent, "alpha", 100000);
-            int alphaMod = ReadPercentageTransform(parent, "alphaMod", 100000);
-            int alphaOff = ReadPercentageTransform(parent, "alphaOff", 0);
-            return Math.Clamp(
-                (int)Math.Round(alpha * (alphaMod / 100000.0) + alphaOff),
-                0,
-                100000);
+            double alpha = 1;
+            foreach (XElement transform in parent.Elements())
+            {
+                switch (transform.Name.LocalName)
+                {
+                    case "alpha":
+                        alpha = ReadPercentageTransform(transform, 1);
+                        break;
+                    case "alphaMod":
+                        alpha *= ReadPercentageTransform(transform, 1);
+                        break;
+                    case "alphaOff":
+                        alpha += ReadPercentageTransform(transform, 0);
+                        break;
+                }
+            }
+
+            return Math.Clamp((int)Math.Round(alpha * 100000), 0, 100000);
         }
 
-        private static int ReadPercentageTransform(XElement parent, string localName, int fallback)
+        private static double ReadPercentageTransform(XElement transform, double fallback)
         {
-            XElement? element = parent.Descendants().FirstOrDefault(e => e.Name.LocalName == localName);
-            return element != null &&
-                int.TryParse(
-                    element.Attribute("val")?.Value,
-                    NumberStyles.Integer,
+            return double.TryParse(
+                    transform.Attribute("val")?.Value,
+                    NumberStyles.Float,
                     CultureInfo.InvariantCulture,
-                    out int value)
-                ? value
+                    out double value)
+                ? value / 100000.0
                 : fallback;
         }
 
-        private static int ApplyLumTransform(int value, double lumMod, double lumOff)
+        private static double ReadAngleTransform(XElement transform)
         {
-            return Math.Max(0, Math.Min(255, (int)Math.Round((value * lumMod) + (255 * lumOff))));
+            return NormalizeHue(
+                double.TryParse(
+                    transform.Attribute("val")?.Value,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out double value)
+                    ? value / 60000.0
+                    : 0);
+        }
+
+        private static (double Hue, double Saturation, double Luminance) RgbToHsl(
+            double red,
+            double green,
+            double blue)
+        {
+            double max = Math.Max(red, Math.Max(green, blue));
+            double min = Math.Min(red, Math.Min(green, blue));
+            double delta = max - min;
+            double luminance = (max + min) / 2;
+            if (delta < double.Epsilon)
+            {
+                return (0, 0, luminance);
+            }
+
+            double saturation = luminance > .5
+                ? delta / (2 - max - min)
+                : delta / (max + min);
+            double hue = max == red
+                ? ((green - blue) / delta) % 6
+                : max == green
+                    ? ((blue - red) / delta) + 2
+                    : ((red - green) / delta) + 4;
+            return (NormalizeHue(hue * 60), saturation, luminance);
+        }
+
+        private static (double Red, double Green, double Blue) HslToRgb(
+            double hue,
+            double saturation,
+            double luminance)
+        {
+            hue = NormalizeHue(hue) / 360.0;
+            saturation = Math.Clamp(saturation, 0, 1);
+            luminance = Math.Clamp(luminance, 0, 1);
+            if (saturation < double.Epsilon)
+            {
+                return (luminance, luminance, luminance);
+            }
+
+            double q = luminance < .5
+                ? luminance * (1 + saturation)
+                : luminance + saturation - (luminance * saturation);
+            double p = (2 * luminance) - q;
+            return (
+                HueToRgb(p, q, hue + (1.0 / 3)),
+                HueToRgb(p, q, hue),
+                HueToRgb(p, q, hue - (1.0 / 3)));
+        }
+
+        private static double HueToRgb(double p, double q, double hue)
+        {
+            if (hue < 0)
+            {
+                hue += 1;
+            }
+
+            if (hue > 1)
+            {
+                hue -= 1;
+            }
+
+            if (hue < 1.0 / 6)
+            {
+                return p + ((q - p) * 6 * hue);
+            }
+
+            if (hue < .5)
+            {
+                return q;
+            }
+
+            if (hue < 2.0 / 3)
+            {
+                return p + ((q - p) * ((2.0 / 3) - hue) * 6);
+            }
+
+            return p;
+        }
+
+        private static double NormalizeHue(double hue)
+        {
+            double normalized = hue % 360;
+            return normalized < 0 ? normalized + 360 : normalized;
+        }
+
+        private static int ToColorByte(double value)
+        {
+            return Math.Clamp((int)Math.Round(value * 255), 0, 255);
         }
     }
 }

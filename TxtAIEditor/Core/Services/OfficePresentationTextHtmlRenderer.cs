@@ -1071,6 +1071,8 @@ namespace TxtAIEditor.Core.Services
             double baseWidthPx,
             double fontScale)
         {
+            XElement? paragraphProperties = paragraph.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "pPr");
             IEnumerable<XElement> runProperties = paragraph.Elements()
                 .Where(e => e.Name.LocalName is "r" or "fld")
                 .SelectMany(e => e.Elements())
@@ -1126,7 +1128,9 @@ namespace TxtAIEditor.Core.Services
                     NumberStyles.Integer,
                     CultureInfo.InvariantCulture,
                     out int inheritedSize) &&
-                inheritedSize > sizes.Max())
+                inheritedSize > sizes.Max() &&
+                paragraphProperties?.Elements().Any(e => e.Name.LocalName == "lnSpc") != true &&
+                levelProperties?.Elements().Any(e => e.Name.LocalName == "lnSpc") != true)
             {
                 style.Append("line-height:1.2;");
             }
