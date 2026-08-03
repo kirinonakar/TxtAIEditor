@@ -433,11 +433,19 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public void NotifyWorkspaceChanged()
+        {
+            RefreshSessionTitleDisplay();
+        }
+
         private string BuildSessionDisplayTitle(AgentOpenSessionState session)
         {
-            string wRoot = !string.IsNullOrWhiteSpace(session.WorkspaceRoot)
-                ? session.WorkspaceRoot
-                : CaptureCurrentWorkspaceRoot();
+            string wRoot = CaptureCurrentWorkspaceRoot();
+            if (string.IsNullOrWhiteSpace(wRoot))
+            {
+                wRoot = session.WorkspaceRoot;
+            }
+
             string rawTitle = string.IsNullOrWhiteSpace(session.Title)
                 ? GetUntitledOpenSessionTitle()
                 : session.Title;

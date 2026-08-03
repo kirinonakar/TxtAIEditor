@@ -258,6 +258,11 @@ namespace TxtAIEditor.Controls
             UpdateContextStats();
         }
 
+        public void NotifyWorkspaceChanged()
+        {
+            _openSessionController.NotifyWorkspaceChanged();
+        }
+
         private bool IsCurrentSessionRunning()
         {
             return _openSessionController.IsCurrentSessionRunning();

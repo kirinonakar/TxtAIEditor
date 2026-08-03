@@ -113,6 +113,7 @@ namespace TxtAIEditor.Composition
             Controllers.Editor.CancelActiveSearch();
             UpdateAutoSaveStatus();
             UpdateAllTabWorkspaceIndicators();
+            Controllers.Agents.Composition.Agent.NotifyWorkspaceChanged();
             Controllers.Workspace.QueueGitStatusRefresh();
 
             if (!string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath))
