@@ -161,27 +161,25 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            double totalWork = filesToDownload.Sum(file => (double)file.Size);
-            double completedWork = 0.0;
             for (int i = 0; i < totalFiles; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var (remFile, locFile, fileSize) = filesToDownload[i];
+                var (remFile, locFile, _) = filesToDownload[i];
                 string fileName = Path.GetFileName(remFile);
-                double fileStartPercent = completedWork * 100.0 / totalWork;
+                double lastFilePercent = 0.0;
                 progressCallback?.Invoke(
                     fileName,
                     totalFiles - i,
                     totalFiles,
-                    fileStartPercent);
+                    0.0);
 
                 DirectProgress<double> fileProgress = new(p =>
                 {
                     double boundedFilePercent = Math.Clamp(p, 0.0, 100.0);
-                    double currentOverall =
-                        (completedWork + fileSize * boundedFilePercent / 100.0) *
-                        100.0 /
-                        totalWork;
+                    double displayPercent = Math.Max(
+                        boundedFilePercent,
+                        lastFilePercent);
+                    lastFilePercent = displayPercent;
                     int remainingFiles = boundedFilePercent >= 100.0
                         ? totalFiles - i - 1
                         : totalFiles - i;
@@ -189,11 +187,10 @@ namespace TxtAIEditor.Core.Services
                         fileName,
                         remainingFiles,
                         totalFiles,
-                        Math.Min(99.9, currentOverall));
+                        displayPercent);
                 });
 
                 await DownloadFileToPathAsync(connection, remFile, locFile, fileProgress, cancellationToken);
-                completedWork += fileSize;
             }
 
             progressCallback?.Invoke(

@@ -96,7 +96,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     var fullResponse = new StringBuilder();
                     var reasoningResponse = new StringBuilder();
                     await provider.GenerateCompletionStreamAsync(
-                        settings.LlmEndpoint,
+                        settings.LlmEndpoint ?? string.Empty,
                         apiKey,
                         settings.LlmModel,
                         systemPrompt,
@@ -135,7 +135,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 else
                 {
                     string result = await provider.GenerateCompletionAsync(
-                        settings.LlmEndpoint,
+                        settings.LlmEndpoint ?? string.Empty,
                         apiKey,
                         settings.LlmModel,
                         systemPrompt,

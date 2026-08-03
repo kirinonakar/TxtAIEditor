@@ -179,11 +179,19 @@ namespace TxtAIEditor.Core.Services
             else
             {
                 progressCallback?.Invoke(itemName, 1, 1, 0.0);
-                DirectProgress<double> progress = new(p => progressCallback?.Invoke(
-                    itemName,
-                    p >= 100.0 ? 0 : 1,
-                    1,
-                    p));
+                double lastFilePercent = 0.0;
+                DirectProgress<double> progress = new(p =>
+                {
+                    double displayPercent = Math.Max(
+                        Math.Clamp(p, 0.0, 100.0),
+                        lastFilePercent);
+                    lastFilePercent = displayPercent;
+                    progressCallback?.Invoke(
+                        itemName,
+                        displayPercent >= 100.0 ? 0 : 1,
+                        1,
+                        displayPercent);
+                });
                 await _explorerService.DownloadFileToPathAsync(
                     connection,
                     remotePath,

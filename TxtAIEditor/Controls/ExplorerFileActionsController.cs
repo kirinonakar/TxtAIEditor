@@ -1046,9 +1046,6 @@ namespace TxtAIEditor.Controls
             {
                 var uploadFiles = selectedFiles
                     .Where(file => !string.IsNullOrWhiteSpace(file.Path))
-                    .Select(file => (
-                        File: file,
-                        Size: Math.Max(1L, new FileInfo(file.Path).Length)))
                     .ToList();
                 if (uploadFiles.Count == 0)
                 {
@@ -1056,12 +1053,10 @@ namespace TxtAIEditor.Controls
                 }
 
                 int totalFiles = uploadFiles.Count;
-                double totalWork = uploadFiles.Sum(file => (double)file.Size);
-                double completedWork = 0.0;
                 _statusBar.ShowProgress(
                     FormatRemoteTransferStatus(
                         uploadStatusPrefix,
-                        uploadFiles[0].File.Name,
+                        uploadFiles[0].Name,
                         totalFiles,
                         totalFiles),
                     0,
@@ -1070,10 +1065,11 @@ namespace TxtAIEditor.Controls
                 for (int index = 0; index < totalFiles; index++)
                 {
                     cts.Token.ThrowIfCancellationRequested();
-                    var (file, fileSize) = uploadFiles[index];
+                    var file = uploadFiles[index];
                     string targetVirtualPath = RemotePath.Combine(
                         targetDirectory,
                         file.Name);
+                    double lastFilePercent = 0.0;
                     await _remoteWorkspaceService.UploadLocalFileAsync(
                         file.Path,
                         targetVirtualPath,
@@ -1085,11 +1081,10 @@ namespace TxtAIEditor.Controls
                                     percent,
                                     0.0,
                                     100.0);
-                                double overallPercent =
-                                    (completedWork +
-                                     fileSize * boundedFilePercent / 100.0) *
-                                    100.0 /
-                                    totalWork;
+                                double displayPercent = Math.Max(
+                                    boundedFilePercent,
+                                    lastFilePercent);
+                                lastFilePercent = displayPercent;
                                 int remainingFiles = boundedFilePercent >= 100.0
                                     ? totalFiles - index - 1
                                     : totalFiles - index;
@@ -1099,12 +1094,11 @@ namespace TxtAIEditor.Controls
                                         file.Name,
                                         remainingFiles,
                                         totalFiles),
-                                    overallPercent,
+                                    displayPercent,
                                     () => cts.Cancel());
                             }
                         },
                         cts.Token);
-                    completedWork += fileSize;
                 }
 
                 await _refreshRemoteExplorerAsync();
