@@ -1474,8 +1474,8 @@ namespace TxtAIEditor.Controls
                 return expectedIdx;
             }
 
-            int maxWindow = 200;
-            for (int offset = 1; offset <= maxWindow; offset++)
+            int positionCorrectionLimit = 5;
+            for (int offset = 1; offset <= positionCorrectionLimit; offset++)
             {
                 int up = expectedIdx - offset;
                 if (up >= 0 && up < lines.Count && IsHunkMatch(lines, up, hunk))
@@ -1486,14 +1486,6 @@ namespace TxtAIEditor.Controls
                 if (down >= 0 && down < lines.Count && IsHunkMatch(lines, down, hunk))
                 {
                     return down;
-                }
-            }
-
-            for (int i = 0; i < lines.Count; i++)
-            {
-                if (Math.Abs(i - expectedIdx) > maxWindow && IsHunkMatch(lines, i, hunk))
-                {
-                    return i;
                 }
             }
 
