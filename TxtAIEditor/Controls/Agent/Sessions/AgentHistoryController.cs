@@ -380,7 +380,9 @@ namespace TxtAIEditor.Controls
                         inPlanningModeTaskDetails = false;
                         suppressInstructionMetadataSection = false;
                         afterUserRequest = true;
-                        result.AppendLine(line);
+                        result.AppendLine(line.StartsWith("[User request]", StringComparison.OrdinalIgnoreCase)
+                            ? "[User Prompt]:"
+                            : line);
                         continue;
                     }
 
@@ -498,7 +500,7 @@ namespace TxtAIEditor.Controls
                     {
                         suppressInstructionMetadataSection = false;
                         afterUserRequest = true;
-                        result.AppendLine(line);
+                        result.AppendLine("[User Prompt]:");
                     }
                     else if (line.StartsWith("[Skill application rule]", StringComparison.OrdinalIgnoreCase))
                     {
