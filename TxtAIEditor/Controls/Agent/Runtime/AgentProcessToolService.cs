@@ -42,10 +42,19 @@ namespace TxtAIEditor.Controls
 
             string resolvedRg = ResolveExecutablePath("rg");
             string workspaceRoot = _workspace.ResolveWorkspaceRoot();
+            int effectiveTimeoutMs = timeoutMs <= 0 ? 10000 : timeoutMs;
 
-            string result = await RunProcessAsync(resolvedRg, arguments, workspaceRoot, timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken);
+            string result;
+            if (TrySplitPipeline(arguments, out List<string> segments))
+            {
+                result = await RunPipelineViaPowerShellAsync(resolvedRg, segments, workspaceRoot, effectiveTimeoutMs, cancellationToken);
+            }
+            else
+            {
+                result = await RunProcessAsync(resolvedRg, arguments, workspaceRoot, effectiveTimeoutMs, cancellationToken);
+            }
 
-            if (result.Contains("failed to start") || result.Contains("timed out after"))
+            if (LooksLikeProcessStartFailure(result) || result.Contains("timed out after", StringComparison.OrdinalIgnoreCase))
             {
                 string query = ExtractQueryFromRgArguments(arguments);
                 if (!string.IsNullOrWhiteSpace(query))
@@ -80,10 +89,19 @@ namespace TxtAIEditor.Controls
 
             string resolvedRga = ResolveExecutablePath("rga");
             string workspaceRoot = _workspace.ResolveWorkspaceRoot();
+            int effectiveTimeoutMs = timeoutMs <= 0 ? 10000 : timeoutMs;
 
-            string result = await RunProcessAsync(resolvedRga, arguments, workspaceRoot, timeoutMs <= 0 ? 10000 : timeoutMs, cancellationToken);
+            string result;
+            if (TrySplitPipeline(arguments, out List<string> segments))
+            {
+                result = await RunPipelineViaPowerShellAsync(resolvedRga, segments, workspaceRoot, effectiveTimeoutMs, cancellationToken);
+            }
+            else
+            {
+                result = await RunProcessAsync(resolvedRga, arguments, workspaceRoot, effectiveTimeoutMs, cancellationToken);
+            }
 
-            if (result.Contains("failed to start"))
+            if (LooksLikeProcessStartFailure(result))
             {
                 return $"{result}\nNote: Make sure 'ripgrep-all' (rga) is installed and available in the system PATH.";
             }
@@ -118,14 +136,7 @@ namespace TxtAIEditor.Controls
 
             var profile = TerminalShellProfile.Resolve("PowerShell");
             string shellPath = profile.ExecutablePath;
-            string normalizedCommand = command.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n");
-            string utf8Command = "$utf8NoBom = [System.Text.UTF8Encoding]::new($false); $OutputEncoding = $utf8NoBom; " +
-                "try { [Console]::OutputEncoding = $utf8NoBom; [Console]::InputEncoding = $utf8NoBom } catch {}; " +
-                "try { $PSDefaultParameterValues['*:Encoding'] = 'utf8' } catch {}; " +
-                BuildPowerShell7RedirectPrelude(shellPath) +
-                "$env:PYTHONUTF8 = '1'; $env:PYTHONIOENCODING = 'utf-8'; " +
-                normalizedCommand;
-            string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(utf8Command));
+            string encodedCommand = BuildEncodedPowerShellCommand(shellPath, "$env:PYTHONUTF8 = '1'; $env:PYTHONIOENCODING = 'utf-8'; " + command);
 
             var environmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -507,6 +518,189 @@ namespace TxtAIEditor.Controls
             string cleaned = Regex.Replace(arguments, @"-[a-zA-Z0-9\-]+", "").Trim();
             cleaned = cleaned.Replace("\"", "").Replace("'", "").Trim();
             return cleaned;
+        }
+
+        private static bool LooksLikeProcessStartFailure(string result)
+        {
+            return result.Contains("failed to start", StringComparison.OrdinalIgnoreCase) ||
+                   result.Contains("is not recognized as the name of a cmdlet", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task<string> RunPipelineViaPowerShellAsync(
+            string executablePath,
+            IReadOnlyList<string> segments,
+            string workingDirectory,
+            int timeoutMs,
+            CancellationToken cancellationToken)
+        {
+            string command = BuildPipelineCommand(executablePath, segments);
+
+            if (!IsClearlySafeRgPipeline(segments) && !await _confirmPowerShellAsync(command))
+            {
+                return "run_rg pipeline cancelled by user.";
+            }
+
+            var profile = TerminalShellProfile.Resolve("PowerShell");
+            string shellPath = profile.ExecutablePath;
+            string encodedCommand = BuildEncodedPowerShellCommand(shellPath, command);
+
+            return await RunProcessAsync(
+                shellPath,
+                $"-NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
+                workingDirectory,
+                timeoutMs,
+                cancellationToken,
+                Encoding.UTF8);
+        }
+
+        private static string BuildPipelineCommand(string executablePath, IReadOnlyList<string> segments)
+        {
+            var translatedSegments = new List<string>(segments.Count);
+            translatedSegments.Add(segments[0]);
+            for (int i = 1; i < segments.Count; i++)
+            {
+                translatedSegments.Add(TranslateRgPipelineTail(segments[i]));
+            }
+
+            string escapedPath = executablePath.Replace("'", "''", StringComparison.Ordinal);
+            return $"& '{escapedPath}' {string.Join(" | ", translatedSegments)}";
+        }
+
+        private static string TranslateRgPipelineTail(string segment)
+        {
+            if (string.IsNullOrWhiteSpace(segment))
+            {
+                return segment;
+            }
+
+            segment = Regex.Replace(segment, @"(?i)\bhead\s+(?:-n\s*)?-?(\d+)\b", "Select-Object -First $1");
+            segment = Regex.Replace(segment, @"(?i)\btail\s+(?:-n\s*)?-?(\d+)\b", "Select-Object -Last $1");
+            segment = Regex.Replace(segment, @"(?i)\bhead\s*$", "Select-Object -First 10");
+            segment = Regex.Replace(segment, @"(?i)\btail\s*$", "Select-Object -Last 10");
+            return segment;
+        }
+
+        private static bool TrySplitPipeline(string arguments, out List<string> segments)
+        {
+            segments = new List<string>();
+            var current = new StringBuilder();
+            char? quote = null;
+            int bracketDepth = 0;
+            bool hasPipe = false;
+
+            foreach (char c in arguments)
+            {
+                if (quote.HasValue)
+                {
+                    current.Append(c);
+                    if (c == quote.Value)
+                    {
+                        quote = null;
+                    }
+                    continue;
+                }
+
+                if (c == '"' || c == '\'')
+                {
+                    quote = c;
+                    current.Append(c);
+                    continue;
+                }
+
+                if (c == '[')
+                {
+                    bracketDepth++;
+                    current.Append(c);
+                    continue;
+                }
+
+                if (c == ']' && bracketDepth > 0)
+                {
+                    bracketDepth--;
+                    current.Append(c);
+                    continue;
+                }
+
+                if (c == '|' && bracketDepth == 0)
+                {
+                    hasPipe = true;
+                    segments.Add(current.ToString().Trim());
+                    current.Clear();
+                    continue;
+                }
+
+                current.Append(c);
+            }
+
+            segments.Add(current.ToString().Trim());
+            return hasPipe;
+        }
+
+        private static string BuildEncodedPowerShellCommand(string shellPath, string scriptBody)
+        {
+            string normalizedBody = scriptBody.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n");
+            string utf8Command = "$utf8NoBom = [System.Text.UTF8Encoding]::new($false); $OutputEncoding = $utf8NoBom; " +
+                "try { [Console]::OutputEncoding = $utf8NoBom; [Console]::InputEncoding = $utf8NoBom } catch {}; " +
+                "try { $PSDefaultParameterValues['*:Encoding'] = 'utf8' } catch {}; " +
+                BuildPowerShell7RedirectPrelude(shellPath) +
+                normalizedBody;
+            return Convert.ToBase64String(Encoding.Unicode.GetBytes(utf8Command));
+        }
+
+        private static bool IsClearlySafeRgPipeline(IReadOnlyList<string> segments)
+        {
+            if (segments.Count < 2)
+            {
+                return false;
+            }
+
+            string[] riskyTokens = { ">", ";", "&&", "||", "$(", "@(", "`" };
+            string[] riskyCommands =
+            {
+                "set-content", "add-content", "out-file", "remove-item", "move-item", "rename-item",
+                "copy-item", "new-item", "invoke-expression", "iex", "invoke-webrequest", "iwr",
+                "curl", "start-process", "downloadstring", "schtasks", "icacls", "takeown",
+                "set-acl", "reg ", "tee ", "clip", "scp"
+            };
+
+            for (int i = 1; i < segments.Count; i++)
+            {
+                string stage = segments[i];
+                if (string.IsNullOrWhiteSpace(stage))
+                {
+                    return false;
+                }
+
+                string lower = stage.ToLowerInvariant();
+                if (riskyTokens.Any(token => lower.Contains(token, StringComparison.Ordinal)) ||
+                    riskyCommands.Any(command => lower.Contains(command, StringComparison.Ordinal)))
+                {
+                    return false;
+                }
+
+                string firstToken = stage
+                    .Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)[0]
+                    .TrimStart('&', '\'', '"')
+                    .ToLowerInvariant();
+                if (!IsAllowlistedFilterCommand(firstToken))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsAllowlistedFilterCommand(string command)
+        {
+            string[] allowlist =
+            {
+                "head", "tail", "sort", "sort-object", "select-object", "select", "select-string",
+                "where-object", "where", "findstr", "find", "more", "measure-object", "group-object",
+                "wc", "grep", "egrep", "fgrep", "rg", "rga", "format-table", "format-list",
+                "format-wide", "format-custom", "out-string"
+            };
+            return allowlist.Contains(command, StringComparer.Ordinal);
         }
 
         private static bool IsClearlySafePowerShell(string command)

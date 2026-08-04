@@ -54,7 +54,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine();
             builder.AppendLine("Tool choice and safety:");
             builder.AppendLine("- Prefer internal tools. Use search_text for simple search, run_rg for regex/large search, extract_document for document conversion, and run_rga only for specialized document search.");
-            builder.AppendLine("- Treat list_files/search_text globs as tool arguments, not shell commands. Do not use shell pipe operators (such as | head) inside run_rg/run_rga arguments; use run_powershell if shell piping is required.");
+            builder.AppendLine("- Treat list_files/search_text globs as tool arguments, not shell commands.");
             builder.AppendLine();
             builder.AppendLine("PowerShell:");
             builder.AppendLine("- Use run_powershell for inspection and verification: Get-ChildItem, Get-Content, Select-String, git status/diff/log, and user-approved build/test/package commands.");

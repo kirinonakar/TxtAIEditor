@@ -47,13 +47,13 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "run_rg",
-                    Description = "Run ripgrep search with raw arguments.",
+                    Description = "Run ripgrep search with raw arguments. Supports simple read-only pipelines after '|' (e.g. | head -80, | tail -20, | sort, | Select-String \"needle\").",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            arguments = new { type = "string", description = "Ripgrep arguments, e.g. -n \"pattern\" FolderName" },
+                            arguments = new { type = "string", description = "Ripgrep arguments, e.g. -n \"pattern\" FolderName | head -50" },
                             timeoutMs = new
                             {
                                 type = "integer",
@@ -68,7 +68,7 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "run_rga",
-                    Description = "Run ripgrep-all search for text inside PDFs/documents with raw arguments.",
+                    Description = "Run ripgrep-all search for text inside PDFs/documents with raw arguments. Supports simple read-only pipelines after '|' (e.g. | head -80).",
                     Parameters = new
                     {
                         type = "object",
