@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
@@ -89,6 +90,14 @@ namespace TxtAIEditor.Controls
             ExplorerTreeView.Visibility = isTreeMode ? Visibility.Visible : Visibility.Collapsed;
             ExplorerBackButton.IsEnabled = !isTreeMode;
             ExplorerUpButton.IsEnabled = !isTreeMode;
+
+            if (isTreeMode)
+            {
+                ExplorerTreeView.DispatcherQueue.TryEnqueue(() =>
+                {
+                    ExplorerTreeView.Focus(FocusState.Programmatic);
+                });
+            }
         }
 
         public void ClearFilter()
@@ -155,7 +164,76 @@ namespace TxtAIEditor.Controls
             {
                 e.Handled = true;
                 ForwardClick?.Invoke(this, new RoutedEventArgs());
+                return;
             }
+
+            if (ExplorerTreeView.Visibility != Visibility.Visible ||
+                e.OriginalSource is not DependencyObject source ||
+                !IsDescendantOf(source, ExplorerTreeView))
+            {
+                return;
+            }
+
+            // The built-in chevron handles PointerPressed itself. When the tree has
+            // not received focus yet, some input paths can leave that event unhandled.
+            // Focus the tree for both paths, and only provide a fallback toggle when
+            // WinUI did not handle the chevron press.
+            ExplorerTreeView.Focus(FocusState.Pointer);
+            if (e.Handled || !TryGetTreeExpanderNode(source, out TreeViewNode? node) || node == null)
+            {
+                return;
+            }
+
+            ExplorerTreeView.DispatcherQueue.TryEnqueue(() => node.IsExpanded = !node.IsExpanded);
+        }
+
+        private bool TryGetTreeExpanderNode(DependencyObject source, out TreeViewNode? node)
+        {
+            node = null;
+            TreeViewItem? container = null;
+            bool isExpander = false;
+            DependencyObject? current = source;
+
+            while (current != null)
+            {
+                if (current is FrameworkElement element &&
+                    string.Equals(element.Name, "ExpandCollapseChevron", StringComparison.Ordinal))
+                {
+                    isExpander = true;
+                }
+
+                if (current is TreeViewItem treeViewItem)
+                {
+                    container = treeViewItem;
+                    break;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            if (!isExpander || container == null)
+            {
+                return false;
+            }
+
+            node = ExplorerTreeView.NodeFromContainer(container);
+            return node != null;
+        }
+
+        private static bool IsDescendantOf(DependencyObject source, DependencyObject ancestor)
+        {
+            DependencyObject? current = source;
+            while (current != null)
+            {
+                if (ReferenceEquals(current, ancestor))
+                {
+                    return true;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return false;
         }
         private void OnExplorerUpClick(object sender, RoutedEventArgs e) => UpClick?.Invoke(sender, e);
         private void OnSelectFolderClick(object sender, RoutedEventArgs e) => SelectFolderClick?.Invoke(sender, e);

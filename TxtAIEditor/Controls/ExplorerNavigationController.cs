@@ -782,7 +782,21 @@ namespace TxtAIEditor.Controls
 
         private void OnExplorerTreeExpanding(object? sender, Microsoft.UI.Xaml.Controls.TreeViewExpandingEventArgs e)
         {
-            PopulateTreeNode(e.Node);
+            Microsoft.UI.Xaml.Controls.TreeViewNode node = e.Node;
+            _leftSidebar.DispatcherQueue.TryEnqueue(() =>
+            {
+                if (node.HasUnrealizedChildren)
+                {
+                    PopulateTreeNode(node);
+
+                    // The Expanding event can arrive before the visual container
+                    // reflects the node state. Keep the node open after loading.
+                    if (!node.IsExpanded)
+                    {
+                        node.IsExpanded = true;
+                    }
+                }
+            });
         }
 
         private void OnExplorerTreeItemInvoked(object? sender, Microsoft.UI.Xaml.Controls.TreeViewItemInvokedEventArgs e)
