@@ -159,7 +159,13 @@ namespace TxtAIEditor.Controls
                 Tag = MediaViewerWebViewTag
             };
             AttachViewerShortcutBridge(mediaWebView);
-            _ = LoadMediaSourceAsync(mediaWebView, tab.FilePath, editorBackgroundColor);
+            void LoadMediaViewerWhenReady(object sender, RoutedEventArgs args)
+            {
+                mediaWebView.Loaded -= LoadMediaViewerWhenReady;
+                _ = LoadMediaSourceAsync(mediaWebView, tab.FilePath, editorBackgroundColor);
+            }
+
+            mediaWebView.Loaded += LoadMediaViewerWhenReady;
 
             var mediaHost = new Grid
             {
@@ -581,13 +587,12 @@ video {{
             string background = ToCssColor(backgroundColor);
 
             bool hasArt = !string.IsNullOrWhiteSpace(albumArtDataUri);
-            string placeholderStyle = hasArt ? "style=\"display:none;\"" : string.Empty;
             string imgTag = hasArt
-                ? $@"<img class=""album-art-img"" src=""{albumArtDataUri}"" alt=""Album Art"" draggable=""false"" onerror=""this.style.display='none'; var p=document.getElementById('placeholder'); if(p) p.style.display='flex';"" />"
+                ? $@"<img class=""album-art-img"" src=""{albumArtDataUri}"" alt=""Album Art"" draggable=""false"" style=""display:none;"" onload=""this.style.display='block'; var p=document.getElementById('placeholder'); if(p) p.style.display='none';"" onerror=""this.style.display='none'; var p=document.getElementById('placeholder'); if(p) p.style.display='flex';"" />"
                 : string.Empty;
 
             string albumArtContent = $@"{imgTag}
-<div id=""placeholder"" class=""album-art-placeholder"" {placeholderStyle}>
+<div id=""placeholder"" class=""album-art-placeholder"">
     <svg viewBox=""0 0 24 24"" fill=""none"" stroke=""currentColor"" stroke-width=""1.5"" stroke-linecap=""round"" stroke-linejoin=""round"">
         <circle cx=""12"" cy=""12"" r=""9""></circle>
         <circle cx=""12"" cy=""12"" r=""3""></circle>

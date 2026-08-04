@@ -3032,39 +3032,10 @@ namespace TxtAIEditor.Controls
                 return null;
             }
 
-            // 1. Try Windows Storage API Thumbnail (MusicView mode) with 800ms timeout guard
-            try
-            {
-                var fileTask = StorageFile.GetFileFromPathAsync(filePath).AsTask();
-                if (await Task.WhenAny(fileTask, Task.Delay(800)) == fileTask)
-                {
-                    var file = await fileTask;
-                    var thumbTask = file.GetThumbnailAsync(ThumbnailMode.MusicView, 600, ThumbnailOptions.UseCurrentScale).AsTask();
-                    if (await Task.WhenAny(thumbTask, Task.Delay(800)) == thumbTask)
-                    {
-                        using var thumbnail = await thumbTask;
-                        if (thumbnail != null && thumbnail.Size > 0)
-                        {
-                            using var stream = thumbnail.AsStreamForRead();
-                            using var ms = new MemoryStream();
-                            await stream.CopyToAsync(ms);
-                            byte[] bytes = ms.ToArray();
-                            if (bytes.Length > 100)
-                            {
-                                string rawContentType = thumbnail.ContentType;
-                                string fallbackMime = string.IsNullOrEmpty(rawContentType) || rawContentType.Contains("win-bitmap") ? "image/jpeg" : rawContentType;
-                                string mime = GetImageMimeType(bytes, fallbackMime);
-                                return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
-                            }
-                        }
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            // 2. Try Embedded Tag Picture Parsing (MP3 ID3v2 APIC/PIC, FLAC picture block, M4A/MP4 covr atom)
+            // Prefer deterministic artwork sources before the Windows thumbnail
+            // provider. The provider can finish asynchronously and a short timeout
+            // here caused the first open to miss artwork that appeared after reload.
+            // 1. Try Embedded Tag Picture Parsing (MP3 ID3v2 APIC/PIC, FLAC picture block, M4A/MP4 covr atom)
             try
             {
                 string? embedded = ExtractEmbeddedPicture(filePath);
@@ -3077,7 +3048,7 @@ namespace TxtAIEditor.Controls
             {
             }
 
-            // 3. Try Same-Folder Artwork Image Files
+            // 2. Try Same-Folder Artwork Image Files
             try
             {
                 string? directory = Path.GetDirectoryName(filePath);
@@ -3126,7 +3097,48 @@ namespace TxtAIEditor.Controls
             {
             }
 
+            // 3. Try Windows Storage API Thumbnail (MusicView mode). This is kept
+            // as the final fallback for formats whose artwork is only exposed by
+            // the Windows media property handler.
+            try
+            {
+                return await ReadStorageThumbnailAsync(filePath);
+            }
+            catch
+            {
+            }
+
             return null;
+        }
+
+        private static async Task<string?> ReadStorageThumbnailAsync(string filePath)
+        {
+            var file = await StorageFile.GetFileFromPathAsync(filePath);
+            using var thumbnail = await file.GetThumbnailAsync(
+                ThumbnailMode.MusicView,
+                600,
+                ThumbnailOptions.UseCurrentScale);
+
+            if (thumbnail == null || thumbnail.Size <= 0)
+            {
+                return null;
+            }
+
+            using var stream = thumbnail.AsStreamForRead();
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            byte[] bytes = ms.ToArray();
+            if (bytes.Length <= 100)
+            {
+                return null;
+            }
+
+            string rawContentType = thumbnail.ContentType;
+            string fallbackMime = string.IsNullOrEmpty(rawContentType) || rawContentType.Contains("win-bitmap")
+                ? "image/jpeg"
+                : rawContentType;
+            string mime = GetImageMimeType(bytes, fallbackMime);
+            return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
         }
 
         private static string? ExtractEmbeddedPicture(string filePath)
