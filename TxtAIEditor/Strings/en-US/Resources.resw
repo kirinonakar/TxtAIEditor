@@ -1214,6 +1214,21 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="SettingsAppearanceGroupAozora" xml:space="preserve">
     <value>Aozora Preview Appearance &amp; Colors</value>
   </data>
+  <data name="SettingsAppearanceGroupAgent" xml:space="preserve">
+    <value>Agent Window Fonts</value>
+  </data>
+  <data name="SettingsAgentOutputFontFamily" xml:space="preserve">
+    <value>Agent Output Font</value>
+  </data>
+  <data name="SettingsAgentOutputFontSize" xml:space="preserve">
+    <value>Agent Output Font Size</value>
+  </data>
+  <data name="SettingsAgentPromptFontFamily" xml:space="preserve">
+    <value>User Prompt Font</value>
+  </data>
+  <data name="SettingsAgentPromptFontSize" xml:space="preserve">
+    <value>User Prompt Font Size</value>
+  </data>
   <data name="SettingsShortcuts" xml:space="preserve">
     <value>Shortcuts</value>
   </data>

@@ -5,7 +5,9 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.System;
+using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
 {
@@ -225,6 +227,22 @@ namespace TxtAIEditor.Controls
         private string _runButtonText = string.Empty;
         private string _stopButtonText = string.Empty;
         private string _sendButtonText = string.Empty;
+
+        public void ApplySettings(EditorSettings settings)
+        {
+            AgentOutputText.FontFamily = new FontFamily(
+                string.IsNullOrWhiteSpace(settings.AgentFontFamily)
+                    ? "Segoe UI, Segoe UI Emoji, Segoe UI Symbol"
+                    : settings.AgentFontFamily.Trim());
+            AgentOutputText.FontSize = Math.Clamp(settings.AgentFontSize, 8.0, 36.0);
+
+            AgentPromptInput.FontFamily = new FontFamily(
+                string.IsNullOrWhiteSpace(settings.AgentPromptFontFamily)
+                    ? "Segoe UI, Malgun Gothic"
+                    : settings.AgentPromptFontFamily.Trim());
+            AgentPromptInput.FontSize = Math.Clamp(settings.AgentPromptFontSize, 8.0, 36.0);
+        }
+
         public void Localize(Func<string, string, string> getString)
         {
             _getString = getString;

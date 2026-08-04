@@ -159,6 +159,7 @@ namespace TxtAIEditor.Controls
             }
 
             _editorWorkspace.ApplyTerminalSettings(_settingsService.CurrentSettings);
+            _rightSidebar.AgentPane.ApplySettings(_settingsService.CurrentSettings);
             _syncAgentSettingsAfterLoad();
         }
 

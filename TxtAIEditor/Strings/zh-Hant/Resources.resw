@@ -1214,6 +1214,21 @@
   <data name="SettingsAppearanceGroupAozora" xml:space="preserve">
     <value>Aozora 預覽外觀與色彩</value>
   </data>
+  <data name="SettingsAppearanceGroupAgent" xml:space="preserve">
+    <value>Agent 視窗字型</value>
+  </data>
+  <data name="SettingsAgentOutputFontFamily" xml:space="preserve">
+    <value>Agent 輸出字型</value>
+  </data>
+  <data name="SettingsAgentOutputFontSize" xml:space="preserve">
+    <value>Agent 輸出字級</value>
+  </data>
+  <data name="SettingsAgentPromptFontFamily" xml:space="preserve">
+    <value>用戶提示字型</value>
+  </data>
+  <data name="SettingsAgentPromptFontSize" xml:space="preserve">
+    <value>用戶提示字級</value>
+  </data>
   <data name="SettingsShortcuts" xml:space="preserve">
     <value>快速鍵</value>
   </data>

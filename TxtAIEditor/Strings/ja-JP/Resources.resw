@@ -1214,6 +1214,21 @@
   <data name="SettingsAppearanceGroupAozora" xml:space="preserve">
     <value>Aozora プレビューの外観と色</value>
   </data>
+  <data name="SettingsAppearanceGroupAgent" xml:space="preserve">
+    <value>Agent ウィンドウのフォント</value>
+  </data>
+  <data name="SettingsAgentOutputFontFamily" xml:space="preserve">
+    <value>エージェント出力フォント</value>
+  </data>
+  <data name="SettingsAgentOutputFontSize" xml:space="preserve">
+    <value>エージェント出力の文字サイズ</value>
+  </data>
+  <data name="SettingsAgentPromptFontFamily" xml:space="preserve">
+    <value>ユーザープロンプトのフォント</value>
+  </data>
+  <data name="SettingsAgentPromptFontSize" xml:space="preserve">
+    <value>ユーザープロンプトの文字サイズ</value>
+  </data>
   <data name="SettingsShortcuts" xml:space="preserve">
     <value>ショートカット</value>
   </data>

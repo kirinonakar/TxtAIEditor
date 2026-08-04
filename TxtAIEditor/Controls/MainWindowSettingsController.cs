@@ -199,6 +199,7 @@ namespace TxtAIEditor.Controls
             _topToolbar.WordWrapIsChecked = settings.WordWrap;
             ApplyUiPersonalization(settings);
             _editorWorkspace.ApplyTerminalSettings(settings);
+            _rightSidebar.AgentPane.ApplySettings(settings);
             LocalizeUi();
             ApplyToolbarSettings(settings);
 

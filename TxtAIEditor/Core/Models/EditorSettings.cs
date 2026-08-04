@@ -35,6 +35,10 @@ namespace TxtAIEditor.Core.Models
         public double AozoraPreviewFontSize { get; set; } = 15.0;
         public string AozoraPreviewCustomBackgroundColor { get; set; } = string.Empty;
         public string AozoraPreviewCustomForegroundColor { get; set; } = string.Empty;
+        public string AgentFontFamily { get; set; } = "Segoe UI, Segoe UI Emoji, Segoe UI Symbol";
+        public double AgentFontSize { get; set; } = 13.0;
+        public string AgentPromptFontFamily { get; set; } = "Segoe UI, Malgun Gothic";
+        public double AgentPromptFontSize { get; set; } = 12.0;
         public bool AutoSave { get; set; } = false;
         public bool AutoSaveAllowNonGitFolders { get; set; } = false;
         public string PreviewMode { get; set; } = "Markdown";

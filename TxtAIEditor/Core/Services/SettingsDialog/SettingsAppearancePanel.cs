@@ -30,6 +30,10 @@ namespace TxtAIEditor.Core.Services
         private readonly CheckBox _aozoraFgCheck;
         private readonly ColorPicker _aozoraBgPicker;
         private readonly ColorPicker _aozoraFgPicker;
+        private readonly ComboBox _agentFontFamilyCombo;
+        private readonly Slider _agentSizeSlider;
+        private readonly ComboBox _agentPromptFontFamilyCombo;
+        private readonly Slider _agentPromptSizeSlider;
 
         public SettingsAppearancePanel(
             EditorSettings settings,
@@ -97,12 +101,18 @@ namespace TxtAIEditor.Core.Services
             BindEnabled(_aozoraBgCheck, aozoraBgDropdown);
             BindEnabled(_aozoraFgCheck, aozoraFgDropdown);
 
+            _agentFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AgentFontFamily, fontFamilies);
+            _agentSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.AgentFontSize, StepFrequency = 1 };
+            _agentPromptFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AgentPromptFontFamily, fontFamilies);
+            _agentPromptSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.AgentPromptFontSize, StepFrequency = 1 };
+
             var section = new StackPanel { Spacing = 10, Width = 460, Padding = new Thickness(2, 6, 2, 2) };
             section.Children.Add(CreateGeneralCard(getString));
             section.Children.Add(CreateUiCard(getString));
             section.Children.Add(CreateEditorCard(getString, settings, customBgDropdown, customFgDropdown));
             section.Children.Add(CreatePreviewCard(getString, settings, previewBgDropdown, previewFgDropdown));
             section.Children.Add(CreateAozoraCard(getString, settings, aozoraBgDropdown, aozoraFgDropdown));
+            section.Children.Add(CreateAgentCard(getString, settings));
             Content = section;
         }
 
@@ -289,6 +299,40 @@ namespace TxtAIEditor.Core.Services
                 "\uE8A5");
         }
 
+        private Border CreateAgentCard(Func<string, string, string> getString, EditorSettings settings)
+        {
+            var content = new StackPanel { Spacing = 6 };
+
+            SettingsDialogUi.AddLabel(content, getString("SettingsAgentOutputFontFamily", "에이전트 출력 폰트"));
+            content.Children.Add(_agentFontFamilyCombo);
+
+            var agentSizeLabel = new TextBlock
+            {
+                Text = getString("SettingsAgentOutputFontSize", "에이전트 출력 글자 크기") + $" ({settings.AgentFontSize:0}pt)",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+            content.Children.Add(agentSizeLabel);
+            content.Children.Add(_agentSizeSlider);
+            _agentSizeSlider.ValueChanged += (_, args) => agentSizeLabel.Text = getString("SettingsAgentOutputFontSize", "에이전트 출력 글자 크기") + $" ({args.NewValue:0}pt)";
+
+            SettingsDialogUi.AddLabel(content, getString("SettingsAgentPromptFontFamily", "사용자 프롬프트 폰트"));
+            content.Children.Add(_agentPromptFontFamilyCombo);
+
+            var promptSizeLabel = new TextBlock
+            {
+                Text = getString("SettingsAgentPromptFontSize", "사용자 프롬프트 글자 크기") + $" ({settings.AgentPromptFontSize:0}pt)",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+            content.Children.Add(promptSizeLabel);
+            content.Children.Add(_agentPromptSizeSlider);
+            _agentPromptSizeSlider.ValueChanged += (_, args) => promptSizeLabel.Text = getString("SettingsAgentPromptFontSize", "사용자 프롬프트 글자 크기") + $" ({args.NewValue:0}pt)";
+
+            return CreateCard(
+                getString("SettingsAppearanceGroupAgent", "Agent 창 폰트"),
+                content,
+                "\uE8B9");
+        }
+
         public void ApplyToSettings(EditorSettings settings)
         {
             settings.Language = _languageCombo.SelectedIndex switch
@@ -320,6 +364,10 @@ namespace TxtAIEditor.Core.Services
             settings.AozoraPreviewFontSize = _aozoraSizeSlider.Value;
             settings.AozoraPreviewCustomBackgroundColor = _aozoraBgCheck.IsChecked == true ? SettingsDialogUi.ColorToHex(_aozoraBgPicker.Color) : string.Empty;
             settings.AozoraPreviewCustomForegroundColor = _aozoraFgCheck.IsChecked == true ? SettingsDialogUi.ColorToHex(_aozoraFgPicker.Color) : string.Empty;
+            settings.AgentFontFamily = SettingsDialogUi.GetSelectedComboText(_agentFontFamilyCombo, settings.AgentFontFamily);
+            settings.AgentFontSize = _agentSizeSlider.Value;
+            settings.AgentPromptFontFamily = SettingsDialogUi.GetSelectedComboText(_agentPromptFontFamilyCombo, settings.AgentPromptFontFamily);
+            settings.AgentPromptFontSize = _agentPromptSizeSlider.Value;
         }
 
         private static ComboBox CreateLanguageCombo(EditorSettings settings, Func<string, string, string> getString)

@@ -1214,6 +1214,21 @@
   <data name="SettingsAppearanceGroupAozora" xml:space="preserve">
     <value>Aozora 프리뷰 모양 &amp; 색상</value>
   </data>
+  <data name="SettingsAppearanceGroupAgent" xml:space="preserve">
+    <value>Agent 창 폰트</value>
+  </data>
+  <data name="SettingsAgentOutputFontFamily" xml:space="preserve">
+    <value>에이전트 출력 폰트</value>
+  </data>
+  <data name="SettingsAgentOutputFontSize" xml:space="preserve">
+    <value>에이전트 출력 글자 크기</value>
+  </data>
+  <data name="SettingsAgentPromptFontFamily" xml:space="preserve">
+    <value>사용자 프롬프트 폰트</value>
+  </data>
+  <data name="SettingsAgentPromptFontSize" xml:space="preserve">
+    <value>사용자 프롬프트 글자 크기</value>
+  </data>
   <data name="SettingsShortcuts" xml:space="preserve">
     <value>단축키</value>
   </data>
