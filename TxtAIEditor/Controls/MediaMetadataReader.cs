@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Storage;
@@ -3007,6 +3008,19 @@ namespace TxtAIEditor.Controls
                    data[offset + 3];
         }
 
+        private static string GetImageMimeType(byte[] imgBytes, string fallback = "image/jpeg")
+        {
+            if (imgBytes == null || imgBytes.Length < 4) return fallback;
+
+            if (imgBytes[0] == 0xFF && imgBytes[1] == 0xD8) return "image/jpeg";
+            if (imgBytes[0] == 0x89 && imgBytes[1] == 'P' && imgBytes[2] == 'N' && imgBytes[3] == 'G') return "image/png";
+            if (imgBytes[0] == 'R' && imgBytes[1] == 'I' && imgBytes[2] == 'F' && imgBytes[3] == 'F') return "image/webp";
+            if (imgBytes[0] == 'G' && imgBytes[1] == 'I' && imgBytes[2] == 'F') return "image/gif";
+            if (imgBytes[0] == 'B' && imgBytes[1] == 'M') return "image/bmp";
+
+            return fallback;
+        }
+
         /// <summary>
         /// Attempts to extract album art cover image from the specified audio/media file
         /// returning a base64 data URI (data:image/...;base64,...), or null if no artwork is available.
@@ -3018,21 +3032,31 @@ namespace TxtAIEditor.Controls
                 return null;
             }
 
-            // 1. Try Windows Storage API Thumbnail (MusicView mode)
+            // 1. Try Windows Storage API Thumbnail (MusicView mode) with 800ms timeout guard
             try
             {
-                var file = await StorageFile.GetFileFromPathAsync(filePath);
-                using var thumbnail = await file.GetThumbnailAsync(ThumbnailMode.MusicView, 600, ThumbnailOptions.UseCurrentScale);
-                if (thumbnail != null && thumbnail.Type == ThumbnailType.Image && thumbnail.Size > 0)
+                var fileTask = StorageFile.GetFileFromPathAsync(filePath).AsTask();
+                if (await Task.WhenAny(fileTask, Task.Delay(800)) == fileTask)
                 {
-                    using var stream = thumbnail.AsStreamForRead();
-                    using var ms = new MemoryStream();
-                    await stream.CopyToAsync(ms);
-                    byte[] bytes = ms.ToArray();
-                    if (bytes.Length > 0)
+                    var file = await fileTask;
+                    var thumbTask = file.GetThumbnailAsync(ThumbnailMode.MusicView, 600, ThumbnailOptions.UseCurrentScale).AsTask();
+                    if (await Task.WhenAny(thumbTask, Task.Delay(800)) == thumbTask)
                     {
-                        string contentType = string.IsNullOrEmpty(thumbnail.ContentType) ? "image/jpeg" : thumbnail.ContentType;
-                        return $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
+                        using var thumbnail = await thumbTask;
+                        if (thumbnail != null && thumbnail.Size > 0)
+                        {
+                            using var stream = thumbnail.AsStreamForRead();
+                            using var ms = new MemoryStream();
+                            await stream.CopyToAsync(ms);
+                            byte[] bytes = ms.ToArray();
+                            if (bytes.Length > 100)
+                            {
+                                string rawContentType = thumbnail.ContentType;
+                                string fallbackMime = string.IsNullOrEmpty(rawContentType) || rawContentType.Contains("win-bitmap") ? "image/jpeg" : rawContentType;
+                                string mime = GetImageMimeType(bytes, fallbackMime);
+                                return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+                            }
+                        }
                     }
                 }
             }
@@ -3040,7 +3064,7 @@ namespace TxtAIEditor.Controls
             {
             }
 
-            // 2. Try Embedded Tag Picture Parsing (MP3 ID3v2 APIC / PIC, FLAC METADATA_BLOCK_PICTURE)
+            // 2. Try Embedded Tag Picture Parsing (MP3 ID3v2 APIC/PIC, FLAC picture block, M4A/MP4 covr atom)
             try
             {
                 string? embedded = ExtractEmbeddedPicture(filePath);
@@ -3057,11 +3081,11 @@ namespace TxtAIEditor.Controls
             try
             {
                 string? directory = Path.GetDirectoryName(filePath);
-                if (!string.IsNullOrEmpty(directory))
+                if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
                 {
                     string fileNameNoExt = Path.GetFileNameWithoutExtension(filePath);
-                    string[] candidateNames = { fileNameNoExt, "cover", "folder", "album", "front", "art" };
-                    string[] candidateExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
+                    string[] candidateNames = { fileNameNoExt, "cover", "folder", "album", "front", "art", "artwork", "albumart", "albumartsmall" };
+                    string[] candidateExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".bmp" };
 
                     foreach (var cand in candidateNames)
                     {
@@ -3073,12 +3097,27 @@ namespace TxtAIEditor.Controls
                                 byte[] imgBytes = File.ReadAllBytes(candidatePath);
                                 if (imgBytes.Length > 0)
                                 {
-                                    string mime = ext.Equals(".png", StringComparison.OrdinalIgnoreCase) ? "image/png"
-                                        : ext.Equals(".webp", StringComparison.OrdinalIgnoreCase) ? "image/webp"
-                                        : "image/jpeg";
+                                    string mime = GetImageMimeType(imgBytes, ext == ".png" ? "image/png" : "image/jpeg");
                                     return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
                                 }
                             }
+                        }
+                    }
+
+                    // Fallback: If folder has 1..4 image files, pick the first one as cover art
+                    var imageFiles = Directory.GetFiles(directory)
+                        .Where(f => {
+                            string ext = Path.GetExtension(f).ToLowerInvariant();
+                            return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".webp" || ext == ".bmp";
+                        }).ToArray();
+
+                    if (imageFiles.Length > 0 && imageFiles.Length <= 4)
+                    {
+                        byte[] imgBytes = File.ReadAllBytes(imageFiles[0]);
+                        if (imgBytes.Length > 0)
+                        {
+                            string mime = GetImageMimeType(imgBytes, "image/jpeg");
+                            return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
                         }
                     }
                 }
@@ -3101,7 +3140,72 @@ namespace TxtAIEditor.Controls
             {
                 return ExtractFlacPicture(filePath);
             }
+            else if (extension.Equals(".m4a", StringComparison.OrdinalIgnoreCase) ||
+                     extension.Equals(".m4b", StringComparison.OrdinalIgnoreCase) ||
+                     extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase) ||
+                     extension.Equals(".aac", StringComparison.OrdinalIgnoreCase) ||
+                     extension.Equals(".3gp", StringComparison.OrdinalIgnoreCase))
+            {
+                return ExtractM4aPicture(filePath);
+            }
             return null;
+        }
+
+        private static string? ExtractM4aPicture(string filePath)
+        {
+            try
+            {
+                using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                int maxRead = (int)Math.Min(fs.Length, 12 * 1024 * 1024);
+                byte[] buffer = new byte[maxRead];
+                int read = fs.Read(buffer, 0, maxRead);
+                if (read < 16) return null;
+
+                byte[] covrTag = Encoding.ASCII.GetBytes("covr");
+                int covrIndex = IndexOfBytes(buffer, covrTag, 0, read);
+                if (covrIndex < 0) return null;
+
+                byte[] dataTag = Encoding.ASCII.GetBytes("data");
+                int dataIndex = IndexOfBytes(buffer, dataTag, covrIndex, read - covrIndex);
+                if (dataIndex < 4) return null;
+
+                int boxLen = ReadBigEndianInt32(buffer, dataIndex - 4);
+                int typeFlags = dataIndex + 8 < read ? ReadBigEndianInt32(buffer, dataIndex + 4) : 0;
+                int dataOffset = dataIndex + 12;
+
+                int imgLen = boxLen - 16;
+                if (imgLen > 0 && dataOffset + imgLen <= read)
+                {
+                    byte[] imgBytes = new byte[imgLen];
+                    Buffer.BlockCopy(buffer, dataOffset, imgBytes, 0, imgLen);
+                    string fallbackMime = typeFlags == 14 ? "image/png" : "image/jpeg";
+                    string mime = GetImageMimeType(imgBytes, fallbackMime);
+                    return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
+                }
+            }
+            catch
+            {
+            }
+            return null;
+        }
+
+        private static int IndexOfBytes(byte[] array, byte[] pattern, int startIndex, int count)
+        {
+            int endIndex = Math.Min(array.Length, startIndex + count) - pattern.Length;
+            for (int i = startIndex; i <= endIndex; i++)
+            {
+                bool match = true;
+                for (int j = 0; j < pattern.Length; j++)
+                {
+                    if (array[i + j] != pattern[j])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) return i;
+            }
+            return -1;
         }
 
         private static string? ExtractId3v2Picture(string filePath)
@@ -3133,7 +3237,7 @@ namespace TxtAIEditor.Controls
                     if (frameId == "PIC")
                     {
                         string format = Encoding.ASCII.GetString(tagData, offset + 1, 3).ToLowerInvariant();
-                        string mime = format switch { "png" => "image/png", "jpg" => "image/jpeg", "jpeg" => "image/jpeg", _ => "image/jpeg" };
+                        string fallbackMime = format switch { "png" => "image/png", "jpg" => "image/jpeg", "jpeg" => "image/jpeg", _ => "image/jpeg" };
                         int imgStart = offset + 5;
                         while (imgStart < offset + frameSize && tagData[imgStart] != 0) imgStart++;
                         imgStart++;
@@ -3142,6 +3246,7 @@ namespace TxtAIEditor.Controls
                         {
                             byte[] imgBytes = new byte[imgLen];
                             Buffer.BlockCopy(tagData, imgStart, imgBytes, 0, imgLen);
+                            string mime = GetImageMimeType(imgBytes, fallbackMime);
                             return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
                         }
                     }
@@ -3162,8 +3267,8 @@ namespace TxtAIEditor.Controls
                         byte encoding = tagData[offset];
                         int mimeEnd = offset + 1;
                         while (mimeEnd < offset + frameSize && tagData[mimeEnd] != 0) mimeEnd++;
-                        string mime = Encoding.ASCII.GetString(tagData, offset + 1, mimeEnd - (offset + 1));
-                        if (string.IsNullOrEmpty(mime)) mime = "image/jpeg";
+                        string mimeStr = Encoding.ASCII.GetString(tagData, offset + 1, mimeEnd - (offset + 1));
+                        if (string.IsNullOrEmpty(mimeStr)) mimeStr = "image/jpeg";
 
                         int picTypeOffset = mimeEnd + 1;
                         if (picTypeOffset < offset + frameSize)
@@ -3187,6 +3292,7 @@ namespace TxtAIEditor.Controls
                             {
                                 byte[] imgBytes = new byte[imgLen];
                                 Buffer.BlockCopy(tagData, imgStart, imgBytes, 0, imgLen);
+                                string mime = GetImageMimeType(imgBytes, mimeStr);
                                 return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
                             }
                         }
@@ -3226,7 +3332,7 @@ namespace TxtAIEditor.Controls
                     int mimeLen = ReadBigEndianInt32(pictureData, pos);
                     pos += 4;
                     if (pos + mimeLen > blockLength) break;
-                    string mime = Encoding.ASCII.GetString(pictureData, pos, mimeLen);
+                    string mimeStr = Encoding.ASCII.GetString(pictureData, pos, mimeLen);
                     pos += mimeLen;
 
                     if (pos + 4 > blockLength) break;
@@ -3244,7 +3350,7 @@ namespace TxtAIEditor.Controls
                     {
                         byte[] imgBytes = new byte[dataLen];
                         Buffer.BlockCopy(pictureData, pos, imgBytes, 0, dataLen);
-                        if (string.IsNullOrEmpty(mime)) mime = "image/jpeg";
+                        string mime = GetImageMimeType(imgBytes, string.IsNullOrEmpty(mimeStr) ? "image/jpeg" : mimeStr);
                         return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
                     }
                 }

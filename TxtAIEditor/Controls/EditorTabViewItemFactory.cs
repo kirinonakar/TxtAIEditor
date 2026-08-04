@@ -221,6 +221,8 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
+                var metadataTask = Task.Run(() => MediaMetadataReader.ReadAsync(filePath));
+
                 var env = await WebViewEnvironmentProvider.GetSharedAsync();
                 await webView.EnsureCoreWebView2Async(env);
 
@@ -266,8 +268,8 @@ namespace TxtAIEditor.Controls
                 string html;
                 if (contentKind == ViewerContentKind.Audio)
                 {
-                    string? albumArtDataUri = await MediaMetadataReader.GetAlbumArtAsync(filePath);
-                    var metadata = await MediaMetadataReader.ReadAsync(filePath);
+                    var metadata = await metadataTask;
+                    string? albumArtDataUri = metadata.AlbumArtDataUri;
                     string? trackTitle = metadata.Tags.TryGetValue("Title", out var titleVal) ? titleVal : Path.GetFileNameWithoutExtension(fileName);
                     string? trackArtist = metadata.Tags.TryGetValue("Artist", out var artistVal) ? artistVal : null;
 
@@ -281,11 +283,58 @@ namespace TxtAIEditor.Controls
                 {
                     html = BuildMediaViewerHtml(sourceUrl, backgroundColor, isAudio: false);
                 }
-                webView.NavigateToString(html);
+                await NavigateHtmlSafelyAsync(webView, html);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to load viewer source: {ex.Message}");
+            }
+        }
+
+        private static async Task NavigateHtmlSafelyAsync(WebView2 webView, string html)
+        {
+            var coreWebView = webView.CoreWebView2;
+            if (coreWebView == null)
+            {
+                webView.NavigateToString(html);
+                return;
+            }
+
+            var tcs = new TaskCompletionSource<bool>();
+            Windows.Foundation.TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs>? handler = null;
+
+            handler = (s, e) =>
+            {
+                if (e.IsSuccess)
+                {
+                    tcs.TrySetResult(true);
+                }
+                else
+                {
+                    tcs.TrySetResult(false);
+                }
+            };
+
+            coreWebView.NavigationCompleted += handler;
+            try
+            {
+                coreWebView.NavigateToString(html);
+                var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(1500));
+                bool success = completedTask == tcs.Task && await tcs.Task;
+
+                if (!success)
+                {
+                    await Task.Delay(100);
+                    coreWebView.NavigateToString(html);
+                }
+            }
+            catch
+            {
+                webView.NavigateToString(html);
+            }
+            finally
+            {
+                coreWebView.NavigationCompleted -= handler;
             }
         }
 
@@ -531,9 +580,14 @@ video {{
             string src = WebUtility.HtmlEncode(sourceUrl);
             string background = ToCssColor(backgroundColor);
 
-            string albumArtContent = !string.IsNullOrWhiteSpace(albumArtDataUri)
-                ? $@"<img class=""album-art-img"" src=""{albumArtDataUri}"" alt=""Album Art"" draggable=""false"" />"
-                : @"<div class=""album-art-placeholder"">
+            bool hasArt = !string.IsNullOrWhiteSpace(albumArtDataUri);
+            string placeholderStyle = hasArt ? "style=\"display:none;\"" : string.Empty;
+            string imgTag = hasArt
+                ? $@"<img class=""album-art-img"" src=""{albumArtDataUri}"" alt=""Album Art"" draggable=""false"" onerror=""this.style.display='none'; var p=document.getElementById('placeholder'); if(p) p.style.display='flex';"" />"
+                : string.Empty;
+
+            string albumArtContent = $@"{imgTag}
+<div id=""placeholder"" class=""album-art-placeholder"" {placeholderStyle}>
     <svg viewBox=""0 0 24 24"" fill=""none"" stroke=""currentColor"" stroke-width=""1.5"" stroke-linecap=""round"" stroke-linejoin=""round"">
         <circle cx=""12"" cy=""12"" r=""9""></circle>
         <circle cx=""12"" cy=""12"" r=""3""></circle>
