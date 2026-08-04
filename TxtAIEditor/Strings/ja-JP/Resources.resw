@@ -3655,6 +3655,51 @@
   <data name="StatusImageFormatTooltip" xml:space="preserve">
     <value>クリックして画像情報を表示</value>
   </data>
+  <data name="StatusMediaFormatTooltip" xml:space="preserve">
+    <value>クリックしてメディア情報を見る</value>
+  </data>
+  <data name="MediaNoMetadata" xml:space="preserve">
+    <value>メディアメタデータがありません。</value>
+  </data>
+  <data name="MediaBasicInfoTitle" xml:space="preserve">
+    <value>基本情報</value>
+  </data>
+  <data name="MediaTagsTitle" xml:space="preserve">
+    <value>タグ情報</value>
+  </data>
+  <data name="MediaFormatLabel" xml:space="preserve">
+    <value>形式</value>
+  </data>
+  <data name="MediaDurationLabel" xml:space="preserve">
+    <value>長さ</value>
+  </data>
+  <data name="MediaFileSizeLabel" xml:space="preserve">
+    <value>サイズ</value>
+  </data>
+  <data name="MediaBitrateLabel" xml:space="preserve">
+    <value>ビットレート</value>
+  </data>
+  <data name="MediaVideoCodecLabel" xml:space="preserve">
+    <value>ビデオコーデック</value>
+  </data>
+  <data name="MediaAudioCodecLabel" xml:space="preserve">
+    <value>オーディオコーデック</value>
+  </data>
+  <data name="MediaResolutionLabel" xml:space="preserve">
+    <value>解像度</value>
+  </data>
+  <data name="MediaFrameRateLabel" xml:space="preserve">
+    <value>フレームレート</value>
+  </data>
+  <data name="MediaSampleRateLabel" xml:space="preserve">
+    <value>サンプルレート</value>
+  </data>
+  <data name="MediaChannelsLabel" xml:space="preserve">
+    <value>チャンネル</value>
+  </data>
+  <data name="MediaBitsPerSampleLabel" xml:space="preserve">
+    <value>ビット深度</value>
+  </data>
   <data name="SettingsLlmGroupMain" xml:space="preserve">
     <value>LLMプロバイダー＆モデル</value>
   </data>

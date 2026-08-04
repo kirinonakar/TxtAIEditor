@@ -3655,6 +3655,51 @@
   <data name="StatusImageFormatTooltip" xml:space="preserve">
     <value>按一下以檢視圖像資訊</value>
   </data>
+  <data name="StatusMediaFormatTooltip" xml:space="preserve">
+    <value>按一下以檢視媒體資訊</value>
+  </data>
+  <data name="MediaNoMetadata" xml:space="preserve">
+    <value>沒有媒體中繼資料。</value>
+  </data>
+  <data name="MediaBasicInfoTitle" xml:space="preserve">
+    <value>基本資訊</value>
+  </data>
+  <data name="MediaTagsTitle" xml:space="preserve">
+    <value>標籤資訊</value>
+  </data>
+  <data name="MediaFormatLabel" xml:space="preserve">
+    <value>格式</value>
+  </data>
+  <data name="MediaDurationLabel" xml:space="preserve">
+    <value>長度</value>
+  </data>
+  <data name="MediaFileSizeLabel" xml:space="preserve">
+    <value>大小</value>
+  </data>
+  <data name="MediaBitrateLabel" xml:space="preserve">
+    <value>位元速率</value>
+  </data>
+  <data name="MediaVideoCodecLabel" xml:space="preserve">
+    <value>視訊編解碼器</value>
+  </data>
+  <data name="MediaAudioCodecLabel" xml:space="preserve">
+    <value>音訊編解碼器</value>
+  </data>
+  <data name="MediaResolutionLabel" xml:space="preserve">
+    <value>解析度</value>
+  </data>
+  <data name="MediaFrameRateLabel" xml:space="preserve">
+    <value>幀率</value>
+  </data>
+  <data name="MediaSampleRateLabel" xml:space="preserve">
+    <value>取樣率</value>
+  </data>
+  <data name="MediaChannelsLabel" xml:space="preserve">
+    <value>聲道</value>
+  </data>
+  <data name="MediaBitsPerSampleLabel" xml:space="preserve">
+    <value>位元深度</value>
+  </data>
   <data name="SettingsLlmGroupMain" xml:space="preserve">
     <value>LLM 提供商與模型</value>
   </data>

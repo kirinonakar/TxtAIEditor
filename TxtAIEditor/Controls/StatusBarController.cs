@@ -315,6 +315,9 @@ namespace TxtAIEditor.Controls
                 _statusBar.LanguageText.Text = string.Equals(tab.Language, "audio", StringComparison.OrdinalIgnoreCase)
                     ? "AUDIO"
                     : "VIDEO";
+                ToolTipService.SetToolTip(
+                    _statusBar.LanguageButtonControl,
+                    _getString("StatusMediaFormatTooltip", "클릭하여 미디어 정보 보기"));
                 return;
             }
 
@@ -586,6 +589,12 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (tab.IsMediaViewer)
+            {
+                _ = ShowMediaMetadataFlyoutAsync(tab, sender as Button);
+                return;
+            }
+
             if (tab.IsReadOnlyViewer)
             {
                 return;
@@ -662,6 +671,203 @@ namespace TxtAIEditor.Controls
             CursorResetHelper.ResetToArrow(button);
             metaFlyout.ShowAt(button, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Top });
             CursorResetHelper.ResetToArrow(button);
+        }
+
+        private async Task ShowMediaMetadataFlyoutAsync(OpenedTab tab, Button? button)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            var meta = await MediaMetadataReader.ReadAsync(tab.FilePath);
+
+            if ((!meta.HasAny && meta.FileSizeBytes <= 0) || string.IsNullOrEmpty(meta.Container))
+            {
+                var noMetaFlyout = new Flyout
+                {
+                    Content = new TextBlock
+                    {
+                        Text = _getString("MediaNoMetadata", "미디어 메타데이터가 없습니다."),
+                        FontSize = 12,
+                        TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
+                        MaxWidth = 400
+                    },
+                    Placement = FlyoutPlacementMode.Top
+                };
+                CursorResetHelper.ResetToArrow(button);
+                noMetaFlyout.ShowAt(button, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Top });
+                CursorResetHelper.ResetToArrow(button);
+                return;
+            }
+
+            var contentPanel = BuildMediaMetadataContent(meta);
+
+            var scrollViewer = new ScrollViewer
+            {
+                Content = contentPanel,
+                MaxHeight = 500,
+                MaxWidth = 550,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            };
+
+            var metaFlyout = new Flyout
+            {
+                Content = scrollViewer,
+                Placement = FlyoutPlacementMode.Top
+            };
+
+            CursorResetHelper.ResetToArrow(button);
+            metaFlyout.ShowAt(button, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Top });
+            CursorResetHelper.ResetToArrow(button);
+        }
+
+        private StackPanel BuildMediaMetadataContent(MediaMetadataResult meta)
+        {
+            var panel = new StackPanel { Spacing = 6, MinWidth = 280 };
+            var lines = new List<string>();
+
+            if (!string.IsNullOrEmpty(meta.Container))
+            {
+                lines.Add($"{_getString("MediaFormatLabel", "형식")}: {meta.Container}");
+            }
+
+            if (meta.Duration is { } duration)
+            {
+                lines.Add($"{_getString("MediaDurationLabel", "길이")}: {FormatMediaDuration(duration)}");
+            }
+
+            if (meta.FileSizeBytes > 0)
+            {
+                lines.Add($"{_getString("MediaFileSizeLabel", "크기")}: {FormatFileSize(meta.FileSizeBytes)}");
+            }
+
+            if (meta.VideoCodec != null)
+            {
+                lines.Add($"{_getString("MediaVideoCodecLabel", "비디오 코덱")}: {meta.VideoCodec}");
+            }
+
+            if (meta.AudioCodec != null)
+            {
+                lines.Add($"{_getString("MediaAudioCodecLabel", "오디오 코덱")}: {meta.AudioCodec}");
+            }
+
+            if (meta.Width is { } width && meta.Height is { } height)
+            {
+                lines.Add($"{_getString("MediaResolutionLabel", "해상도")}: {width} x {height}");
+            }
+
+            if (meta.FrameRate is { } frameRate)
+            {
+                lines.Add($"{_getString("MediaFrameRateLabel", "프레임 레이트")}: {frameRate.ToString("0.##", CultureInfo.CurrentCulture)} fps");
+            }
+
+            if (meta.SampleRate is { } sampleRate)
+            {
+                lines.Add($"{_getString("MediaSampleRateLabel", "샘플 레이트")}: {FormatSampleRate(sampleRate)}");
+            }
+
+            if (meta.Channels is { } channels)
+            {
+                lines.Add($"{_getString("MediaChannelsLabel", "채널")}: {channels}");
+            }
+
+            if (meta.BitsPerSample is { } bitsPerSample)
+            {
+                lines.Add($"{_getString("MediaBitsPerSampleLabel", "비트 심도")}: {bitsPerSample} bit");
+            }
+
+            if (meta.Bitrate is { } bitrate)
+            {
+                lines.Add($"{_getString("MediaBitrateLabel", "비트레이트")}: {FormatBitrate(bitrate)}");
+            }
+
+            if (lines.Count > 0)
+            {
+                AddSection(panel, _getString("MediaBasicInfoTitle", "기본 정보"), string.Join(Environment.NewLine, lines));
+            }
+
+            if (meta.Tags.Count > 0)
+            {
+                var sb = new StringBuilder();
+                string[] tagOrder =
+                {
+                    "Title", "Artist", "AlbumArtist", "Album", "Year", "Genre", "Track", "Disc",
+                    "Composer", "Conductor", "Writers", "Producers", "Publisher", "BPM", "Key",
+                    "Mood", "Subtitle", "Comment", "Lyrics", "Directors", "Keywords", "Rating"
+                };
+
+                foreach (string key in tagOrder)
+                {
+                    if (meta.Tags.TryGetValue(key, out string? val))
+                    {
+                        sb.AppendLine($"{key}: {val}");
+                    }
+                }
+
+                foreach (var kvp in meta.Tags)
+                {
+                    if (Array.IndexOf(tagOrder, kvp.Key) < 0)
+                    {
+                        sb.AppendLine($"{kvp.Key}: {kvp.Value}");
+                    }
+                }
+
+                if (sb.Length > 0)
+                {
+                    AddSection(panel, _getString("MediaTagsTitle", "태그 정보"), sb.ToString().TrimEnd());
+                }
+            }
+
+            return panel;
+        }
+
+        private static string FormatMediaDuration(TimeSpan duration)
+        {
+            if (duration.TotalHours >= 1)
+            {
+                return $"{(int)duration.TotalHours}:{duration.Minutes:D2}:{duration.Seconds:D2}";
+            }
+
+            return $"{duration.Minutes}:{duration.Seconds:D2}";
+        }
+
+        private static string FormatFileSize(long bytes)
+        {
+            string[] units = { "B", "KB", "MB", "GB", "TB" };
+            double size = bytes;
+            int unit = 0;
+            while (size >= 1024 && unit < units.Length - 1)
+            {
+                size /= 1024;
+                unit++;
+            }
+
+            string number = unit == 0
+                ? size.ToString("N0", CultureInfo.CurrentCulture)
+                : size.ToString("0.##", CultureInfo.CurrentCulture);
+            return $"{number} {units[unit]} ({bytes:N0} bytes)";
+        }
+
+        private static string FormatBitrate(uint bitsPerSecond)
+        {
+            if (bitsPerSecond >= 1_000_000)
+            {
+                return $"{bitsPerSecond / 1_000_000d:0.##} Mbps";
+            }
+
+            return $"{bitsPerSecond / 1000d:0.#} kbps";
+        }
+
+        private static string FormatSampleRate(uint hertz)
+        {
+            if (hertz >= 1000)
+            {
+                return $"{hertz / 1000d:0.#} kHz";
+            }
+
+            return $"{hertz} Hz";
         }
 
         private StackPanel BuildMetadataContent(ImageMetadataResult meta)
