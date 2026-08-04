@@ -402,7 +402,11 @@ def _capture_figures():
         pass
     return imgs
 
-while True:
+# Windows multiprocessing (for example, torch DataLoader workers) re-runs
+# this script as __mp_main__. Only the actual kernel process may consume the
+# notebook IPC stream; child workers must return to their multiprocessing
+# bootstrap instead of entering this loop.
+while __name__ == '__main__':
     line = sys.stdin.readline()
     if not line:
         break
@@ -585,4 +589,3 @@ while True:
 
     sys.stdout.write(json.dumps(result, ensure_ascii=False) + '\n')
     sys.stdout.flush()
-
