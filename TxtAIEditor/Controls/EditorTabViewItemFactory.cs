@@ -263,12 +263,24 @@ namespace TxtAIEditor.Controls
                     sourceUrl = $"https://{hostName}/{Uri.EscapeDataString(fileName)}";
                 }
 
-                string html = contentKind switch
+                string html;
+                if (contentKind == ViewerContentKind.Audio)
                 {
-                    ViewerContentKind.Image => BuildImageViewerHtml(sourceUrl, backgroundColor),
-                    ViewerContentKind.Audio => BuildMediaViewerHtml(sourceUrl, backgroundColor, isAudio: true),
-                    _ => BuildMediaViewerHtml(sourceUrl, backgroundColor, isAudio: false)
-                };
+                    string? albumArtDataUri = await MediaMetadataReader.GetAlbumArtAsync(filePath);
+                    var metadata = await MediaMetadataReader.ReadAsync(filePath);
+                    string? trackTitle = metadata.Tags.TryGetValue("Title", out var titleVal) ? titleVal : Path.GetFileNameWithoutExtension(fileName);
+                    string? trackArtist = metadata.Tags.TryGetValue("Artist", out var artistVal) ? artistVal : null;
+
+                    html = BuildAudioViewerHtml(sourceUrl, backgroundColor, albumArtDataUri, trackTitle, trackArtist);
+                }
+                else if (contentKind == ViewerContentKind.Image)
+                {
+                    html = BuildImageViewerHtml(sourceUrl, backgroundColor);
+                }
+                else
+                {
+                    html = BuildMediaViewerHtml(sourceUrl, backgroundColor, isAudio: false);
+                }
                 webView.NavigateToString(html);
             }
             catch (Exception ex)
@@ -469,11 +481,13 @@ img {{
 
         private static string BuildMediaViewerHtml(string sourceUrl, Windows.UI.Color backgroundColor, bool isAudio)
         {
+            if (isAudio)
+            {
+                return BuildAudioViewerHtml(sourceUrl, backgroundColor, null, null, null);
+            }
+
             string src = WebUtility.HtmlEncode(sourceUrl);
             string background = ToCssColor(backgroundColor);
-            string mediaElement = isAudio
-                ? $@"<audio controls preload=""metadata"" src=""{src}""></audio>"
-                : $@"<video controls preload=""metadata"" src=""{src}""></video>";
 
             return $@"<!doctype html>
 <html>
@@ -499,13 +513,162 @@ video {{
     object-fit: contain;
     background: #000;
 }}
+</style>
+</head>
+<body>
+<video controls preload=""metadata"" src=""{src}""></video>
+</body>
+</html>";
+        }
+
+        private static string BuildAudioViewerHtml(
+            string sourceUrl,
+            Windows.UI.Color backgroundColor,
+            string? albumArtDataUri,
+            string? trackTitle,
+            string? trackArtist)
+        {
+            string src = WebUtility.HtmlEncode(sourceUrl);
+            string background = ToCssColor(backgroundColor);
+
+            string albumArtContent = !string.IsNullOrWhiteSpace(albumArtDataUri)
+                ? $@"<img class=""album-art-img"" src=""{albumArtDataUri}"" alt=""Album Art"" draggable=""false"" />"
+                : @"<div class=""album-art-placeholder"">
+    <svg viewBox=""0 0 24 24"" fill=""none"" stroke=""currentColor"" stroke-width=""1.5"" stroke-linecap=""round"" stroke-linejoin=""round"">
+        <circle cx=""12"" cy=""12"" r=""9""></circle>
+        <circle cx=""12"" cy=""12"" r=""3""></circle>
+        <path d=""M12 15v-6l3 2""></path>
+    </svg>
+</div>";
+
+            string titleHtml = !string.IsNullOrWhiteSpace(trackTitle)
+                ? $@"<div class=""track-title"">{WebUtility.HtmlEncode(trackTitle)}</div>"
+                : string.Empty;
+
+            string artistHtml = !string.IsNullOrWhiteSpace(trackArtist)
+                ? $@"<div class=""track-artist"">{WebUtility.HtmlEncode(trackArtist)}</div>"
+                : string.Empty;
+
+            string infoBlockHtml = (!string.IsNullOrWhiteSpace(titleHtml) || !string.IsNullOrWhiteSpace(artistHtml))
+                ? $@"<div class=""track-info"">
+    {titleHtml}
+    {artistHtml}
+</div>"
+                : string.Empty;
+
+            return $@"<!doctype html>
+<html>
+<head>
+<meta charset=""utf-8"">
+<style>
+:root {{ --viewer-bg: {background}; }}
+html, body {{
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--viewer-bg);
+    overflow: auto;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color-scheme: light dark;
+}}
+body {{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 32px 24px;
+    box-sizing: border-box;
+}}
+.player-container {{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 520px;
+    gap: 20px;
+}}
+.album-art-card {{
+    width: min(300px, 55vw);
+    height: min(300px, 55vw);
+    aspect-ratio: 1 / 1;
+    border-radius: 20px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    background: rgba(128, 128, 128, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.3s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    flex-shrink: 0;
+}}
+.album-art-card:hover {{
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 22px 44px rgba(0, 0, 0, 0.4), 0 6px 16px rgba(0, 0, 0, 0.2);
+}}
+.album-art-img {{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}}
+.album-art-placeholder {{
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.25) 50%, rgba(236, 72, 153, 0.25) 100%);
+    color: rgba(255, 255, 255, 0.85);
+}}
+.album-art-placeholder svg {{
+    width: 88px;
+    height: 88px;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}}
+.track-info {{
+    text-align: center;
+    width: 100%;
+    padding: 0 8px;
+}}
+.track-title {{
+    font-size: 1.15rem;
+    font-weight: 650;
+    line-height: 1.35;
+    opacity: 0.95;
+    word-break: break-word;
+}}
+.track-artist {{
+    font-size: 0.92rem;
+    font-weight: 400;
+    margin-top: 4px;
+    opacity: 0.7;
+    word-break: break-word;
+}}
 audio {{
-    width: min(720px, calc(100vw - 48px));
+    width: 100%;
+    max-width: 480px;
+    height: 48px;
+    border-radius: 24px;
+    outline: none;
 }}
 </style>
 </head>
 <body>
-{mediaElement}
+<div class=""player-container"">
+    <div class=""album-art-card"">
+        {albumArtContent}
+    </div>
+    {infoBlockHtml}
+    <audio controls preload=""metadata"" src=""{src}""></audio>
+</div>
 </body>
 </html>";
         }

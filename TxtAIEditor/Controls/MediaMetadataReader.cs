@@ -36,6 +36,8 @@ namespace TxtAIEditor.Controls
         public uint? Height { get; set; }
         public double? FrameRate { get; set; }
 
+        public string? AlbumArtDataUri { get; set; }
+
         /// <summary>Canonical tag keys: Title, Artist, Album, Year, Genre, Track, ...</summary>
         public Dictionary<string, string> Tags { get; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -85,6 +87,8 @@ namespace TxtAIEditor.Controls
             // Fill any gaps the property system left behind (codecs, resolution,
             // tags). Fallback parsers only set values that are still missing.
             TryReadContainerFallback(filePath, result);
+
+            result.AlbumArtDataUri = await GetAlbumArtAsync(filePath);
 
             return result;
         }
@@ -3001,6 +3005,257 @@ namespace TxtAIEditor.Controls
                    (data[offset + 1] << 16) |
                    (data[offset + 2] << 8) |
                    data[offset + 3];
+        }
+
+        /// <summary>
+        /// Attempts to extract album art cover image from the specified audio/media file
+        /// returning a base64 data URI (data:image/...;base64,...), or null if no artwork is available.
+        /// </summary>
+        public static async Task<string?> GetAlbumArtAsync(string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            {
+                return null;
+            }
+
+            // 1. Try Windows Storage API Thumbnail (MusicView mode)
+            try
+            {
+                var file = await StorageFile.GetFileFromPathAsync(filePath);
+                using var thumbnail = await file.GetThumbnailAsync(ThumbnailMode.MusicView, 600, ThumbnailOptions.UseCurrentScale);
+                if (thumbnail != null && thumbnail.Type == ThumbnailType.Image && thumbnail.Size > 0)
+                {
+                    using var stream = thumbnail.AsStreamForRead();
+                    using var ms = new MemoryStream();
+                    await stream.CopyToAsync(ms);
+                    byte[] bytes = ms.ToArray();
+                    if (bytes.Length > 0)
+                    {
+                        string contentType = string.IsNullOrEmpty(thumbnail.ContentType) ? "image/jpeg" : thumbnail.ContentType;
+                        return $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            // 2. Try Embedded Tag Picture Parsing (MP3 ID3v2 APIC / PIC, FLAC METADATA_BLOCK_PICTURE)
+            try
+            {
+                string? embedded = ExtractEmbeddedPicture(filePath);
+                if (!string.IsNullOrEmpty(embedded))
+                {
+                    return embedded;
+                }
+            }
+            catch
+            {
+            }
+
+            // 3. Try Same-Folder Artwork Image Files
+            try
+            {
+                string? directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    string fileNameNoExt = Path.GetFileNameWithoutExtension(filePath);
+                    string[] candidateNames = { fileNameNoExt, "cover", "folder", "album", "front", "art" };
+                    string[] candidateExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
+
+                    foreach (var cand in candidateNames)
+                    {
+                        foreach (var ext in candidateExtensions)
+                        {
+                            string candidatePath = Path.Combine(directory, cand + ext);
+                            if (File.Exists(candidatePath))
+                            {
+                                byte[] imgBytes = File.ReadAllBytes(candidatePath);
+                                if (imgBytes.Length > 0)
+                                {
+                                    string mime = ext.Equals(".png", StringComparison.OrdinalIgnoreCase) ? "image/png"
+                                        : ext.Equals(".webp", StringComparison.OrdinalIgnoreCase) ? "image/webp"
+                                        : "image/jpeg";
+                                    return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        }
+
+        private static string? ExtractEmbeddedPicture(string filePath)
+        {
+            string extension = Path.GetExtension(filePath);
+            if (extension.Equals(".mp3", StringComparison.OrdinalIgnoreCase))
+            {
+                return ExtractId3v2Picture(filePath);
+            }
+            else if (extension.Equals(".flac", StringComparison.OrdinalIgnoreCase))
+            {
+                return ExtractFlacPicture(filePath);
+            }
+            return null;
+        }
+
+        private static string? ExtractId3v2Picture(string filePath)
+        {
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (fs.Length < 10) return null;
+
+            byte[] header = new byte[10];
+            if (fs.Read(header, 0, 10) < 10) return null;
+            if (header[0] != 'I' || header[1] != 'D' || header[2] != '3') return null;
+
+            byte majorVersion = header[3];
+            int tagSize = SyncSafeToInt(header, 6);
+            if (tagSize <= 0 || tagSize > fs.Length - 10) return null;
+
+            byte[] tagData = new byte[tagSize];
+            if (fs.Read(tagData, 0, tagSize) < tagSize) return null;
+
+            int offset = 0;
+            while (offset < tagSize - 10)
+            {
+                if (majorVersion == 2)
+                {
+                    string frameId = Encoding.ASCII.GetString(tagData, offset, 3);
+                    int frameSize = (tagData[offset + 3] << 16) | (tagData[offset + 4] << 8) | tagData[offset + 5];
+                    offset += 6;
+                    if (frameSize <= 0 || offset + frameSize > tagSize) break;
+
+                    if (frameId == "PIC")
+                    {
+                        string format = Encoding.ASCII.GetString(tagData, offset + 1, 3).ToLowerInvariant();
+                        string mime = format switch { "png" => "image/png", "jpg" => "image/jpeg", "jpeg" => "image/jpeg", _ => "image/jpeg" };
+                        int imgStart = offset + 5;
+                        while (imgStart < offset + frameSize && tagData[imgStart] != 0) imgStart++;
+                        imgStart++;
+                        int imgLen = (offset + frameSize) - imgStart;
+                        if (imgLen > 0 && imgStart + imgLen <= tagData.Length)
+                        {
+                            byte[] imgBytes = new byte[imgLen];
+                            Buffer.BlockCopy(tagData, imgStart, imgBytes, 0, imgLen);
+                            return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
+                        }
+                    }
+                    offset += frameSize;
+                }
+                else
+                {
+                    if (tagData[offset] == 0) break;
+                    string frameId = Encoding.ASCII.GetString(tagData, offset, 4);
+                    int frameSize = majorVersion == 4
+                        ? SyncSafeToInt(tagData, offset + 4)
+                        : ReadBigEndianInt32(tagData, offset + 4);
+                    offset += 10;
+                    if (frameSize <= 0 || offset + frameSize > tagSize) break;
+
+                    if (frameId == "APIC")
+                    {
+                        byte encoding = tagData[offset];
+                        int mimeEnd = offset + 1;
+                        while (mimeEnd < offset + frameSize && tagData[mimeEnd] != 0) mimeEnd++;
+                        string mime = Encoding.ASCII.GetString(tagData, offset + 1, mimeEnd - (offset + 1));
+                        if (string.IsNullOrEmpty(mime)) mime = "image/jpeg";
+
+                        int picTypeOffset = mimeEnd + 1;
+                        if (picTypeOffset < offset + frameSize)
+                        {
+                            int descStart = picTypeOffset + 1;
+                            int descEnd = descStart;
+                            if (encoding == 1 || encoding == 2)
+                            {
+                                while (descEnd + 1 < offset + frameSize && (tagData[descEnd] != 0 || tagData[descEnd + 1] != 0)) descEnd += 2;
+                                descEnd += 2;
+                            }
+                            else
+                            {
+                                while (descEnd < offset + frameSize && tagData[descEnd] != 0) descEnd++;
+                                descEnd += 1;
+                            }
+
+                            int imgStart = descEnd;
+                            int imgLen = (offset + frameSize) - imgStart;
+                            if (imgLen > 0 && imgStart + imgLen <= tagData.Length)
+                            {
+                                byte[] imgBytes = new byte[imgLen];
+                                Buffer.BlockCopy(tagData, imgStart, imgBytes, 0, imgLen);
+                                return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
+                            }
+                        }
+                    }
+                    offset += frameSize;
+                }
+            }
+            return null;
+        }
+
+        private static string? ExtractFlacPicture(string filePath)
+        {
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (fs.Length < 4) return null;
+
+            byte[] marker = new byte[4];
+            if (fs.Read(marker, 0, 4) < 4) return null;
+            if (marker[0] != 'f' || marker[1] != 'L' || marker[2] != 'a' || marker[3] != 'C') return null;
+
+            while (fs.Position + 4 <= fs.Length)
+            {
+                byte[] blockHeader = new byte[4];
+                if (fs.Read(blockHeader, 0, 4) < 4) break;
+
+                bool isLast = (blockHeader[0] & 0x80) != 0;
+                int blockType = blockHeader[0] & 0x7F;
+                int blockLength = (blockHeader[1] << 16) | (blockHeader[2] << 8) | blockHeader[3];
+
+                if (blockType == 6)
+                {
+                    if (blockLength <= 0 || fs.Position + blockLength > fs.Length) break;
+                    byte[] pictureData = new byte[blockLength];
+                    if (fs.Read(pictureData, 0, blockLength) < blockLength) break;
+
+                    int pos = 4;
+                    if (pos + 4 > blockLength) break;
+                    int mimeLen = ReadBigEndianInt32(pictureData, pos);
+                    pos += 4;
+                    if (pos + mimeLen > blockLength) break;
+                    string mime = Encoding.ASCII.GetString(pictureData, pos, mimeLen);
+                    pos += mimeLen;
+
+                    if (pos + 4 > blockLength) break;
+                    int descLen = ReadBigEndianInt32(pictureData, pos);
+                    pos += 4;
+                    pos += descLen;
+
+                    pos += 16;
+
+                    if (pos + 4 > blockLength) break;
+                    int dataLen = ReadBigEndianInt32(pictureData, pos);
+                    pos += 4;
+
+                    if (dataLen > 0 && pos + dataLen <= blockLength)
+                    {
+                        byte[] imgBytes = new byte[dataLen];
+                        Buffer.BlockCopy(pictureData, pos, imgBytes, 0, dataLen);
+                        if (string.IsNullOrEmpty(mime)) mime = "image/jpeg";
+                        return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
+                    }
+                }
+                else
+                {
+                    fs.Seek(blockLength, SeekOrigin.Current);
+                }
+
+                if (isLast) break;
+            }
+            return null;
         }
     }
 }
