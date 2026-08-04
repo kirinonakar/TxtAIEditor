@@ -278,12 +278,13 @@ namespace TxtAIEditor.Controls
 
         private void ApplyStickyNoteTabActions()
         {
-            bool isStickyNoteMode = StickyNoteBar.Visibility == Visibility.Visible;
-
-            EditorTabView.IsAddTabButtonVisible = !isStickyNoteMode;
-            EditorTabView2.IsAddTabButtonVisible = !isStickyNoteMode;
-            StickyAddTabBtn.Visibility = isStickyNoteMode ? Visibility.Visible : Visibility.Collapsed;
-            StickyAddTab2Btn.Visibility = isStickyNoteMode ? Visibility.Visible : Visibility.Collapsed;
+            // Keep the add action in our topmost action strip. The built-in TabView
+            // button shares the tab-list layout and can become unreachable when a
+            // native WebView-based document viewer is selected.
+            EditorTabView.IsAddTabButtonVisible = false;
+            EditorTabView2.IsAddTabButtonVisible = false;
+            StickyAddTabBtn.Visibility = Visibility.Visible;
+            StickyAddTab2Btn.Visibility = Visibility.Visible;
 
             QueueTabActionSpacerUpdate();
         }
@@ -867,7 +868,11 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private void OnEditorTabViewAddTabClick(TabView sender, object args) => PrimaryAddTabButtonClick?.Invoke(sender, args);
+        private void OnEditorTabViewAddTabClick(TabView sender, object args)
+        {
+            ActiveTabView = sender;
+            PrimaryAddTabButtonClick?.Invoke(sender, args);
+        }
 
         private void OnStickyAddTabClick(object sender, RoutedEventArgs e)
         {
