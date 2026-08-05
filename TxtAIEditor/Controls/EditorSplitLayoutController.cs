@@ -147,6 +147,14 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            // Image/audio/video viewers are single-instance views; never duplicate
+            // them into the split pane. Open a blank tab instead so the pane remains usable.
+            if (activeTab.IsImageViewer || activeTab.IsMediaViewer)
+            {
+                _openBlankTab();
+                return;
+            }
+
             string? path = activeTab.FilePath;
             bool hasSourceSession = _editorSessions.TryGetValue(activeTab.Id, out var sourceSession);
             string content = hasSourceSession ? string.Empty : activeTab.ContentPreview;
