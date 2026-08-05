@@ -51,6 +51,8 @@ namespace TxtAIEditor.Controls
             EditorTabView2.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
             PrimaryTabActions.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
             SecondaryTabActions.SizeChanged += (_, _) => QueueTabActionSpacerUpdate();
+            EditorTabView.TabItemsChanged += (_, _) => OnTabItemsChanged();
+            EditorTabView2.TabItemsChanged += (_, _) => OnTabItemsChanged();
             StickyNoteBar.RegisterPropertyChangedCallback(VisibilityProperty, (_, __) => ApplyStickyNoteTabActions());
             ActiveTabView = EditorTabView;
             Loaded += (_, __) => {
@@ -120,27 +122,15 @@ namespace TxtAIEditor.Controls
         public void RefreshTabLayout()
         {
             QueueTabActionSpacerUpdate();
-
-            if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, RefreshTabLayoutAfterLayout))
-            {
-                _tabActionSpacerUpdateQueued = false;
-                UpdateTabActionSpacers();
-            }
         }
 
-        private void RefreshTabLayoutAfterLayout()
+        private void OnTabItemsChanged()
         {
-            _tabActionSpacerUpdateQueued = false;
-            UpdateTabActionSpacers();
-
-            if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
-            {
-                _tabActionSpacerUpdateQueued = false;
-                UpdateTabActionSpacers();
-            }))
-            {
-                UpdateTabActionSpacers();
-            }
+            // Every tab add/remove/move must take effect immediately: disable the
+            // TabView's item-container transitions so the strip length snaps, and
+            // refresh the reserved action space in the same pass.
+            DisableTabItemTransitions();
+            QueueTabActionSpacerUpdate();
         }
 
         private void UpdateTabActionSpacers()
@@ -352,6 +342,14 @@ namespace TxtAIEditor.Controls
                 {
                     visited++;
                     var current = queue.Dequeue();
+
+                    if (current is FrameworkElement frameworkElement &&
+                        string.Equals(frameworkElement.Name, "TabContentPresenter", StringComparison.Ordinal))
+                    {
+                        // Tab content hosts the document viewer, not the tab strip.
+                        continue;
+                    }
+
                     if (current is UIElement element)
                     {
                         element.Transitions = new TransitionCollection();
@@ -372,8 +370,7 @@ namespace TxtAIEditor.Controls
                         panel.ChildrenTransitions = new TransitionCollection();
                     }
 
-                    if (current is ListViewBase listView &&
-                        current.GetType().Name.Contains("TabViewListView", StringComparison.Ordinal))
+                    if (current is ListViewBase listView)
                     {
                         listView.ItemContainerTransitions = new TransitionCollection();
                     }
