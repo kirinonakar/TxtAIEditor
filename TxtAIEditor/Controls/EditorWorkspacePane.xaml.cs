@@ -375,26 +375,22 @@ namespace TxtAIEditor.Controls
                         listView.ItemContainerTransitions = new TransitionCollection();
                     }
 
-                    int childCount;
-                    try
+                    // Enumerate children by index: the count lookup can fail
+                    // mid-layout for composition-backed elements, which must not
+                    // abort the walk before the tab list is reached.
+                    for (int i = 0; i < 64; i++)
                     {
-                        childCount = VisualTreeHelper.GetChildrenCount(current);
-                    }
-                    catch
-                    {
-                        continue;
-                    }
-
-                    for (int i = 0; i < childCount; i++)
-                    {
+                        DependencyObject child;
                         try
                         {
-                            queue.Enqueue(VisualTreeHelper.GetChild(current, i));
+                            child = VisualTreeHelper.GetChild(current, i);
                         }
                         catch
                         {
-                            // Some WinUI composition-backed elements are not stable to inspect during layout.
+                            break;
                         }
+
+                        queue.Enqueue(child);
                     }
                 }
             }

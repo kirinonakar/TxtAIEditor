@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Models;
@@ -33,6 +34,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _updateWindowTitle;
         private Action<string>? _additionalTabCleanup;
 
+        private readonly DispatcherQueue? _dispatcherQueue;
         public TabCloseController(
             MainWindowViewModel viewModel,
             TabView editorTabView,
@@ -71,6 +73,7 @@ namespace TxtAIEditor.Controls
             _openNewTab = openNewTab;
             _closeReadOnlyViewer = closeReadOnlyViewer;
             _updateWindowTitle = updateWindowTitle;
+            _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         }
 
         public void CloseRequested(TabViewTabCloseRequestedEventArgs args)
@@ -196,8 +199,9 @@ namespace TxtAIEditor.Controls
             _additionalTabCleanup?.Invoke(tab.Id);
             _viewModel.Tabs.Remove(tab);
             _forgetEncryptionPassword(tab);
-            EditorTabViewItemFactory.ReleaseViewerResources(tabItem);
 
+            // Remove the tab from the strip first so the tab bar shrinks in this
+            // frame; the WebView2 teardown below must never delay that layout.
             if (_editorTabView.TabItems.Contains(tabItem))
             {
                 _editorTabView.TabItems.Remove(tabItem);
@@ -207,15 +211,41 @@ namespace TxtAIEditor.Controls
                 _editorTabView2.TabItems.Remove(tabItem);
             }
 
+            WebView2? bridgeWebView = null;
             if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup))
             {
                 _livePreviewController.ForgetEditorTab(tab.Id, bridgeGroup.WebView.CoreWebView2);
-                bridgeGroup.WebView.Close();
+                bridgeWebView = bridgeGroup.WebView;
                 _tabBridges.Remove(tab.Id);
             }
 
             _editorSessions.Remove(tab.Id);
-            _closeReadOnlyViewer(tab.Id);
+
+            // Expensive WebView2 teardown is deferred so it cannot block the frame
+            // that shows the tab bar width change. Tab ids are unique per open, so
+            // the deferred callbacks cannot touch a newly opened tab.
+            if (_dispatcherQueue != null)
+            {
+                _dispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+                {
+                    try
+                    {
+                        EditorTabViewItemFactory.ReleaseViewerResources(tabItem);
+                        bridgeWebView?.Close();
+                        _closeReadOnlyViewer(tab.Id);
+                    }
+                    catch
+                    {
+                        // Teardown must never throw on the UI thread.
+                    }
+                });
+            }
+            else
+            {
+                EditorTabViewItemFactory.ReleaseViewerResources(tabItem);
+                bridgeWebView?.Close();
+                _closeReadOnlyViewer(tab.Id);
+            }
 
             if (_editorTabView.TabItems.Count == 0 && _editorTabView2.TabItems.Count == 0)
             {
