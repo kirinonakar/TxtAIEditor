@@ -5,8 +5,10 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Graphics.Imaging;
 using Windows.Storage;
 using Windows.Storage.FileProperties;
+using Windows.Storage.Streams;
 
 namespace TxtAIEditor.Controls
 {
@@ -58,6 +60,9 @@ namespace TxtAIEditor.Controls
 
     internal static class MediaMetadataReader
     {
+        private const uint AlbumArtMaxDimension = 600;
+        private const int AlbumArtMaxInlineBytes = 512 * 1024;
+
         public static async Task<MediaMetadataResult> ReadAsync(string? filePath)
         {
             var result = new MediaMetadataResult();
@@ -3041,7 +3046,7 @@ namespace TxtAIEditor.Controls
                 string? embedded = ExtractEmbeddedPicture(filePath);
                 if (!string.IsNullOrEmpty(embedded))
                 {
-                    return embedded;
+                    return await NormalizeAlbumArtDataUriAsync(embedded);
                 }
             }
             catch
@@ -3069,7 +3074,7 @@ namespace TxtAIEditor.Controls
                                 if (imgBytes.Length > 0)
                                 {
                                     string mime = GetImageMimeType(imgBytes, ext == ".png" ? "image/png" : "image/jpeg");
-                                    return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
+                                    return await CreateAlbumArtDataUriAsync(imgBytes, mime);
                                 }
                             }
                         }
@@ -3088,7 +3093,7 @@ namespace TxtAIEditor.Controls
                         if (imgBytes.Length > 0)
                         {
                             string mime = GetImageMimeType(imgBytes, "image/jpeg");
-                            return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
+                            return await CreateAlbumArtDataUriAsync(imgBytes, mime);
                         }
                     }
                 }
@@ -3138,7 +3143,118 @@ namespace TxtAIEditor.Controls
                 ? "image/jpeg"
                 : rawContentType;
             string mime = GetImageMimeType(bytes, fallbackMime);
-            return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+            return await CreateAlbumArtDataUriAsync(bytes, mime);
+        }
+
+        private static async Task<string?> NormalizeAlbumArtDataUriAsync(string dataUri)
+        {
+            if (dataUri.Length <= AlbumArtMaxInlineBytes * 2 &&
+                !dataUri.Contains("image/bmp", StringComparison.OrdinalIgnoreCase))
+            {
+                return dataUri;
+            }
+
+            int commaIndex = dataUri.IndexOf(',');
+            if (commaIndex <= "data:".Length)
+            {
+                return null;
+            }
+
+            string header = dataUri[..commaIndex];
+            if (!header.Contains(";base64", StringComparison.OrdinalIgnoreCase))
+            {
+                return dataUri;
+            }
+
+            string mime = header["data:".Length..];
+            int semicolonIndex = mime.IndexOf(';');
+            if (semicolonIndex >= 0)
+            {
+                mime = mime[..semicolonIndex];
+            }
+
+            try
+            {
+                byte[] bytes = Convert.FromBase64String(dataUri[(commaIndex + 1)..]);
+                return await CreateAlbumArtDataUriAsync(bytes, mime);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static async Task<string?> CreateAlbumArtDataUriAsync(byte[] bytes, string fallbackMime)
+        {
+            if (bytes.Length == 0)
+            {
+                return null;
+            }
+
+            string mime = GetImageMimeType(bytes, fallbackMime);
+            bool needsResize = bytes.Length > AlbumArtMaxInlineBytes ||
+                               string.Equals(mime, "image/bmp", StringComparison.OrdinalIgnoreCase);
+            if (!needsResize)
+            {
+                return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+            }
+
+            try
+            {
+                using var input = new InMemoryRandomAccessStream();
+                using (var output = input.GetOutputStreamAt(0))
+                using (var writer = new DataWriter(output))
+                {
+                    writer.WriteBytes(bytes);
+                    await writer.StoreAsync();
+                    await writer.FlushAsync();
+                }
+
+                input.Seek(0);
+                BitmapDecoder decoder = await BitmapDecoder.CreateAsync(input);
+                uint sourceWidth = decoder.PixelWidth;
+                uint sourceHeight = decoder.PixelHeight;
+                if (sourceWidth == 0 || sourceHeight == 0)
+                {
+                    return null;
+                }
+
+                double scale = Math.Min(
+                    1d,
+                    (double)AlbumArtMaxDimension / Math.Max(sourceWidth, sourceHeight));
+                uint targetWidth = Math.Max(1u, (uint)Math.Round(sourceWidth * scale));
+                uint targetHeight = Math.Max(1u, (uint)Math.Round(sourceHeight * scale));
+
+                using SoftwareBitmap bitmap = await decoder.GetSoftwareBitmapAsync(
+                    BitmapPixelFormat.Bgra8,
+                    BitmapAlphaMode.Premultiplied);
+                using var encoded = new InMemoryRandomAccessStream();
+                BitmapEncoder encoder = await BitmapEncoder.CreateAsync(
+                    BitmapEncoder.JpegEncoderId,
+                    encoded);
+                encoder.BitmapTransform.ScaledWidth = targetWidth;
+                encoder.BitmapTransform.ScaledHeight = targetHeight;
+                encoder.BitmapTransform.InterpolationMode = BitmapInterpolationMode.Fant;
+                encoder.SetSoftwareBitmap(bitmap);
+                await encoder.FlushAsync();
+
+                encoded.Seek(0);
+                using var encodedStream = encoded.AsStreamForRead();
+                using var managedStream = new MemoryStream();
+                await encodedStream.CopyToAsync(managedStream);
+                byte[] normalizedBytes = managedStream.ToArray();
+                if (normalizedBytes.Length == 0)
+                {
+                    return null;
+                }
+
+                return $"data:image/jpeg;base64,{Convert.ToBase64String(normalizedBytes)}";
+            }
+            catch
+            {
+                // A broken cover must not prevent the audio page from loading.
+                return null;
+            }
         }
 
         private static string? ExtractEmbeddedPicture(string filePath)
@@ -3189,7 +3305,7 @@ namespace TxtAIEditor.Controls
                 if (imgLen > 0 && dataOffset + imgLen <= read)
                 {
                     byte[] imgBytes = new byte[imgLen];
-                    Buffer.BlockCopy(buffer, dataOffset, imgBytes, 0, imgLen);
+                    System.Buffer.BlockCopy(buffer, dataOffset, imgBytes, 0, imgLen);
                     string fallbackMime = typeFlags == 14 ? "image/png" : "image/jpeg";
                     string mime = GetImageMimeType(imgBytes, fallbackMime);
                     return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
@@ -3257,7 +3373,7 @@ namespace TxtAIEditor.Controls
                         if (imgLen > 0 && imgStart + imgLen <= tagData.Length)
                         {
                             byte[] imgBytes = new byte[imgLen];
-                            Buffer.BlockCopy(tagData, imgStart, imgBytes, 0, imgLen);
+                            System.Buffer.BlockCopy(tagData, imgStart, imgBytes, 0, imgLen);
                             string mime = GetImageMimeType(imgBytes, fallbackMime);
                             return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
                         }
@@ -3303,7 +3419,7 @@ namespace TxtAIEditor.Controls
                             if (imgLen > 0 && imgStart + imgLen <= tagData.Length)
                             {
                                 byte[] imgBytes = new byte[imgLen];
-                                Buffer.BlockCopy(tagData, imgStart, imgBytes, 0, imgLen);
+                                System.Buffer.BlockCopy(tagData, imgStart, imgBytes, 0, imgLen);
                                 string mime = GetImageMimeType(imgBytes, mimeStr);
                                 return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
                             }
@@ -3361,7 +3477,7 @@ namespace TxtAIEditor.Controls
                     if (dataLen > 0 && pos + dataLen <= blockLength)
                     {
                         byte[] imgBytes = new byte[dataLen];
-                        Buffer.BlockCopy(pictureData, pos, imgBytes, 0, dataLen);
+                        System.Buffer.BlockCopy(pictureData, pos, imgBytes, 0, dataLen);
                         string mime = GetImageMimeType(imgBytes, string.IsNullOrEmpty(mimeStr) ? "image/jpeg" : mimeStr);
                         return $"data:{mime};base64,{Convert.ToBase64String(imgBytes)}";
                     }
