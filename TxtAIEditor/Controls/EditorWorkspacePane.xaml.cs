@@ -124,6 +124,39 @@ namespace TxtAIEditor.Controls
             QueueTabActionSpacerUpdate();
         }
 
+        public bool RemoveTabItemImmediately(TabViewItem tabItem)
+        {
+            TabView? ownerTabView = null;
+            if (EditorTabView.TabItems.Contains(tabItem))
+            {
+                ownerTabView = EditorTabView;
+            }
+            else if (EditorTabView2.TabItems.Contains(tabItem))
+            {
+                ownerTabView = EditorTabView2;
+            }
+
+            if (ownerTabView == null)
+            {
+                return false;
+            }
+
+            // The default TabViewListView has AddDelete/Reorder transitions. Turn
+            // them off before mutating the collection so removal cannot leave the
+            // old tab width on screen while the transition is running.
+            DisableTabItemTransitions();
+            ownerTabView.TabItems.Remove(tabItem);
+
+            // TabView's tab column is Auto-sized. The collection change invalidates
+            // it, but WinUI may defer the actual measure/arrange until the next
+            // dispatcher pass. Complete that pass while the close operation is
+            // still on the UI thread, then retain the queued refresh as a final
+            // stabilization for template-driven changes.
+            UpdateTabActionSpacers();
+            ownerTabView.UpdateLayout();
+            return true;
+        }
+
         private void OnTabItemsChanged()
         {
             // Every tab add/remove/move must take effect immediately: disable the

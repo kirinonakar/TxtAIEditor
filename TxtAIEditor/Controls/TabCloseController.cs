@@ -15,6 +15,7 @@ namespace TxtAIEditor.Controls
     public sealed class TabCloseController
     {
         private readonly MainWindowViewModel _viewModel;
+        private readonly EditorWorkspacePane _editorWorkspace;
         private readonly TabView _editorTabView;
         private readonly TabView _editorTabView2;
         private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
@@ -37,6 +38,7 @@ namespace TxtAIEditor.Controls
         private readonly DispatcherQueue? _dispatcherQueue;
         public TabCloseController(
             MainWindowViewModel viewModel,
+            EditorWorkspacePane editorWorkspace,
             TabView editorTabView,
             TabView editorTabView2,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
@@ -56,6 +58,7 @@ namespace TxtAIEditor.Controls
             Action updateWindowTitle)
         {
             _viewModel = viewModel;
+            _editorWorkspace = editorWorkspace;
             _editorTabView = editorTabView;
             _editorTabView2 = editorTabView2;
             _tabBridges = tabBridges;
@@ -200,16 +203,10 @@ namespace TxtAIEditor.Controls
             _viewModel.Tabs.Remove(tab);
             _forgetEncryptionPassword(tab);
 
-            // Remove the tab from the strip first so the tab bar shrinks in this
-            // frame; the WebView2 teardown below must never delay that layout.
-            if (_editorTabView.TabItems.Contains(tabItem))
-            {
-                _editorTabView.TabItems.Remove(tabItem);
-            }
-            else if (_editorTabView2.TabItems.Contains(tabItem))
-            {
-                _editorTabView2.TabItems.Remove(tabItem);
-            }
+            // Remove the tab before any WebView2 teardown. The workspace disables
+            // the native tab transitions before the mutation and forces the
+            // affected TabView layout immediately.
+            _editorWorkspace.RemoveTabItemImmediately(tabItem);
 
             WebView2? bridgeWebView = null;
             if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup))

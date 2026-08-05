@@ -83,6 +83,7 @@ namespace TxtAIEditor.Composition
 
             var tabClose = new TabCloseController(
                 viewModel,
+                ui.EditorWorkspace,
                 ui.EditorTabView,
                 ui.EditorTabView2,
                 tabBridges,
