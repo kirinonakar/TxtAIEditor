@@ -60,6 +60,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 ### 👁️ Real-Time Preview
 *   **Live Renderer:** View Markdown, HTML, Aozora or LaTeX (powered by KaTeX) in a split view or an external browser.
 *   **Inline Live Preview:** Renders Markdown elements (headers, lists, tables, code blocks, images) directly within the editor area. Non-active lines transition into their styled preview form, and automatically revert to raw source text when focused or edited for a seamless WYSIWYG-like experience.
+*   **Print & Save as PDF:** Print the rendered Markdown/HTML/LaTeX preview directly from the preview panel, or save it as a PDF via the system print dialog (e.g., Microsoft Print to PDF). Use the toolbar **Print** button or `Ctrl + P`.
 
 ### 🖼️ Integrated Media & Document Viewer
 *   **Unified Viewer Workflow:** Open and inspect images, office documents, audio, and video files directly from the Explorer or editor tabs alongside your project files.
