@@ -147,9 +147,15 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            // Image/audio/video viewers are single-instance views; never duplicate
-            // them into the split pane. Open a blank tab instead so the pane remains usable.
-            if (activeTab.IsImageViewer || activeTab.IsMediaViewer)
+            // Viewer tabs (image/audio/video, notebook, document, PDF) are single-instance
+            // views; never duplicate them into the split pane. Open a blank tab instead
+            // so the pane remains usable.
+            if (activeTab.IsImageViewer ||
+                activeTab.IsMediaViewer ||
+                activeTab.IsNotebookViewer ||
+                activeTab.IsPdfViewer ||
+                activeTab.IsDocxViewer ||
+                activeTab.IsOfficeDocumentViewer)
             {
                 _openBlankTab();
                 return;
