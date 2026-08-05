@@ -75,7 +75,10 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                openSessionController.SavePromptTitleFromUI();
+                // Do not refresh the session title on every keystroke: rebuilding the
+                // title text for each character (including Korean IME composition)
+                // makes the prompt input feel laggy. The title is updated once when
+                // the prompt is sent (RunAgentAsync -> UpdateSessionTitle).
                 updatePromptTokenEstimate();
             };
             agentPane.Prompt.LostFocus += (_, _) => updateContextStats();
