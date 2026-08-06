@@ -416,6 +416,12 @@
   <data name="SettingsLlmCerebrasInfo" xml:space="preserve">
     <value>Cerebrasは https://api.cerebras.ai/v1/models からモデルリストを取得します。</value>
   </data>
+  <data name="SettingsLlmLoadUpstageModels" xml:space="preserve">
+    <value>Upstageモデルを取得</value>
+  </data>
+  <data name="SettingsLlmUpstageInfo" xml:space="preserve">
+    <value>Upstageは https://api.upstage.ai/v1/models からモデルリストを取得します。</value>
+  </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>Thinking Level</value>
   </data>

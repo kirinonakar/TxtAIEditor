@@ -11,8 +11,8 @@ namespace TxtAIEditor.Controls
             builder.AppendLine("[Agent tool call format error]");
             builder.AppendLine("The previous assistant response was not executed.");
             builder.AppendLine("A tool turn may include brief explanatory text before or after the tool call.");
-            builder.AppendLine("Include exactly one parseable <tool_call>...</tool_call> tag or native function tool call for the action you want executed.");
-            builder.AppendLine("Re-emit the explanation if useful, include the tool_call, or write the final answer with no tool_call tag.");
+            builder.AppendLine("Include one or more parseable <tool_call>...</tool_call> tags, or native function tool calls, for the actions you want executed.");
+            builder.AppendLine("For text tool calls, keep multiple calls in the final contiguous block and make each tag contain one valid JSON call. Re-emit the explanation if useful, include the tool calls, or write the final answer with no tool_call tag.");
             if (!string.IsNullOrWhiteSpace(detail))
             {
                 builder.AppendLine($"Parser detail: {detail}");

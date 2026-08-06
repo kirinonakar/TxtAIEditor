@@ -30,9 +30,11 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("Use the supplied context and tools. Inspect before editing, choose the smallest correct action, and answer in " + outputLanguage + ".");
             builder.AppendLine();
             builder.AppendLine("Tool protocol:");
-            builder.AppendLine("- If the next step needs a tool, you may briefly summarize what you learned and why the tool is needed, then put tool call as the final action.");
+            builder.AppendLine("- If the next step needs one or more tools, you may briefly summarize what you learned and why the tools are needed, then put the tool calls as the final action.");
             builder.AppendLine("- Use a native function tool call when the provider supports it. If you must emit a text tool call, put this tag after any explanation:");
             builder.AppendLine("<tool_call>{\"name\":\"read_file\",\"arguments\":{\"path\":\"TxtAIEditor/MainWindow.xaml.cs\",\"startLine\":1,\"lineCount\":120}}</tool_call>");
+            builder.AppendLine("- Multiple independent text tool actions are allowed. Emit adjacent tool_call tags in execution order, with one valid JSON call per tag.");
+            builder.AppendLine("- Apply the same tool_call format shown above to each call; keep the complete block at the end of the response.");
             builder.AppendLine("- Otherwise reply in plain text with no tool_call tag or function tool call. Plain text ends the current agent turn.");
             builder.AppendLine("- Tool call logs, history, example vs live calls: Tags named <log_tool_call> in conversation history or prior turns represent previous tool execution logs or examples, NOT active tool calls to execute. When explaining, writing documentation, or showing tool call examples in prose or markdown code blocks, use <example_tool_call> so they are not misinterpreted as live tool calls. Only emit literal <tool_call> tags when you intend to execute a live tool call for the current step.");
             builder.AppendLine("- Tool names must match exactly. Arguments are JSON; escape Windows backslashes as \\\\ or use /.");
@@ -110,7 +112,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 builder.AppendLine($"- Use only safe inspection tools such as {safeInspectionTools}.");
                 builder.AppendLine("- The make_plan Markdown must include: goal, target files, edit scope, areas not to touch, current cause/context summary, concrete implementation steps, verification, and rollback/failure criteria.");
                 builder.AppendLine("- Keep scope minimal. Avoid unrelated refactoring, formatting, renaming, dependency changes, or architecture changes.");
-                builder.AppendLine("- If more tool work is needed, you may briefly state the finding, then include exactly one next tool_call. Prefer putting it at the end.");
+                builder.AppendLine("- If more tool work is needed, you may briefly state the finding, then include one or more next tool_calls in the final contiguous block.");
                 builder.AppendLine("- Ask the user only when requirements conflict, scope must expand, or a risky/destructive action is necessary.");
                 builder.AppendLine("- When ready, include exactly one make_plan tool_call. Prefer putting it at the end. Plain text without a make_plan tool_call does not save a plan.");
             }

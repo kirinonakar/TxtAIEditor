@@ -61,6 +61,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 "openai oauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName),
                 "openaioauth" => new OpenAIProvider(_localizationService, isOAuth: true, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName),
                 "cerebras" => new CerebrasProvider(_localizationService, settings.LlmThinkingLevel, providerName),
+                "upstage" => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName),
                 "openrouter" => new OpenRouterProvider(_localizationService, settings.LlmThinkingLevel, providerName),
                 "lm studio" => new LMStudioProvider(_localizationService),
                 "lmstudio" => new LMStudioProvider(_localizationService),

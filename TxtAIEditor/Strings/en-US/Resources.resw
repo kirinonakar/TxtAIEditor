@@ -416,6 +416,12 @@
   <data name="SettingsLlmCerebrasInfo" xml:space="preserve">
     <value>Cerebras loads the list of models from https://api.cerebras.ai/v1/models.</value>
   </data>
+  <data name="SettingsLlmLoadUpstageModels" xml:space="preserve">
+    <value>Load Upstage Models</value>
+  </data>
+  <data name="SettingsLlmUpstageInfo" xml:space="preserve">
+    <value>Upstage loads the list of models from https://api.upstage.ai/v1/models.</value>
+  </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>Thinking Level</value>
   </data>

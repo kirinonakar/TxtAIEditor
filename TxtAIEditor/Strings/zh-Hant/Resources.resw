@@ -416,6 +416,12 @@
   <data name="SettingsLlmCerebrasInfo" xml:space="preserve">
     <value>Cerebras 從 https://api.cerebras.ai/v1/models. 載入模型列表</value>
   </data>
+  <data name="SettingsLlmLoadUpstageModels" xml:space="preserve">
+    <value>加載Upstage型號</value>
+  </data>
+  <data name="SettingsLlmUpstageInfo" xml:space="preserve">
+    <value>Upstage 從 https://api.upstage.ai/v1/models. 載入模型列表</value>
+  </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>思考級別 (Thinking Level)</value>
   </data>

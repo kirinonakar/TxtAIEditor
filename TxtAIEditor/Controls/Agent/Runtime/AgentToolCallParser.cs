@@ -132,11 +132,21 @@ namespace TxtAIEditor.Controls
                 text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
                 text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) >= 0;
 
-            // 1. Prefer the last text tool call, so explanatory examples earlier in the response are ignored.
-            if (TryExtractTrailingToolCallTagPayload(text, out string trailingTagPayload) &&
-                TryParsePayloads(trailingTagPayload, toolCalls))
+            // 1. Prefer the final contiguous block of text tool calls, so explanatory
+            // examples earlier in the response are ignored while multiple live calls
+            // can still be executed in order.
+            if (TryExtractTrailingToolCallTagPayloads(text, out List<string> trailingTagPayloads))
             {
-                return toolCalls.Count > 0;
+                bool anyParsed = false;
+                foreach (string trailingTagPayload in trailingTagPayloads)
+                {
+                    anyParsed |= TryParsePayloads(trailingTagPayload, toolCalls);
+                }
+
+                if (anyParsed)
+                {
+                    return toolCalls.Count > 0;
+                }
             }
 
             if (hasToolCallTagSyntax)
@@ -163,37 +173,82 @@ namespace TxtAIEditor.Controls
             return false;
         }
 
-        private static bool TryExtractTrailingToolCallTagPayload(string text, out string payload)
+        private static bool TryExtractTrailingToolCallTagPayloads(string text, out List<string> payloads)
         {
-            payload = string.Empty;
+            payloads = new List<string>();
             if (string.IsNullOrWhiteSpace(text))
             {
                 return false;
             }
 
             string trimmed = text.Trim();
-            int closeIndex = trimmed.LastIndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase);
-            if (closeIndex >= 0)
+            var matches = new List<(int Start, int End, string Payload)>();
+            int searchIndex = 0;
+            while (searchIndex < trimmed.Length)
             {
-                int openIndex = trimmed.LastIndexOf(ToolCallOpenTag, closeIndex, StringComparison.OrdinalIgnoreCase);
+                int openIndex = trimmed.IndexOf(ToolCallOpenTag, searchIndex, StringComparison.OrdinalIgnoreCase);
                 if (openIndex < 0)
                 {
-                    return false;
+                    break;
                 }
 
                 int payloadStart = openIndex + ToolCallOpenTag.Length;
-                payload = trimmed.Substring(payloadStart, closeIndex - payloadStart).Trim();
-                return !string.IsNullOrWhiteSpace(payload);
+                int closeIndex = trimmed.IndexOf(ToolCallCloseTag, payloadStart, StringComparison.OrdinalIgnoreCase);
+                if (closeIndex < 0)
+                {
+                    break;
+                }
+
+                string payload = trimmed.Substring(payloadStart, closeIndex - payloadStart).Trim();
+                if (!string.IsNullOrWhiteSpace(payload))
+                {
+                    matches.Add((openIndex, closeIndex + ToolCallCloseTag.Length, payload));
+                }
+
+                searchIndex = closeIndex + ToolCallCloseTag.Length;
             }
 
-            int trailingOpenIndex = trimmed.LastIndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase);
-            if (trailingOpenIndex < 0)
+            if (matches.Count > 0)
             {
-                return false;
+                // Only keep the final adjacent block. This preserves the existing
+                // protection against executing tool-call examples in earlier prose.
+                int firstMatch = matches.Count - 1;
+                for (int i = matches.Count - 2; i >= 0; i--)
+                {
+                    int separatorStart = matches[i].End;
+                    int separatorLength = matches[i + 1].Start - separatorStart;
+                    if (separatorLength < 0 ||
+                        !string.IsNullOrWhiteSpace(trimmed.Substring(separatorStart, separatorLength)))
+                    {
+                        break;
+                    }
+
+                    firstMatch = i;
+                }
+
+                for (int i = firstMatch; i < matches.Count; i++)
+                {
+                    payloads.Add(matches[i].Payload);
+                }
+
+                return payloads.Count > 0;
             }
 
-            payload = trimmed.Substring(trailingOpenIndex + ToolCallOpenTag.Length).Trim();
-            return !string.IsNullOrWhiteSpace(payload);
+            // Keep accepting a final unterminated tag while a streamed response is
+            // being finalized; TryParsePayloads will decide whether its contents are
+            // complete enough to execute.
+            int trailingOpenIndex = trimmed.LastIndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase);
+            if (trailingOpenIndex >= 0)
+            {
+                string payload = trimmed.Substring(trailingOpenIndex + ToolCallOpenTag.Length).Trim();
+                if (!string.IsNullOrWhiteSpace(payload))
+                {
+                    payloads.Add(payload);
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool TryParsePayloads(string payload, List<ToolCallInfo> toolCalls)

@@ -416,6 +416,12 @@
   <data name="SettingsLlmCerebrasInfo" xml:space="preserve">
     <value>Cerebras는 https://api.cerebras.ai/v1/models 에서 모델 목록을 불러옵니다.</value>
   </data>
+  <data name="SettingsLlmLoadUpstageModels" xml:space="preserve">
+    <value>Upstage 모델 불러오기</value>
+  </data>
+  <data name="SettingsLlmUpstageInfo" xml:space="preserve">
+    <value>Upstage는 https://api.upstage.ai/v1/models 에서 모델 목록을 불러옵니다.</value>
+  </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>Thinking Level</value>
   </data>

@@ -864,6 +864,13 @@ namespace TxtAIEditor.Core.Services
                 _modelStatusText.Text = _getString("SettingsLlmCerebrasInfo", "Cerebras는 https://api.cerebras.ai/v1/models 에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
             }
+            else if (provider.Equals("Upstage", StringComparison.OrdinalIgnoreCase))
+            {
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadUpstageModels", "Upstage 모델 불러오기"));
+                _refreshModelsButton.Visibility = Visibility.Visible;
+                _modelStatusText.Text = _getString("SettingsLlmUpstageInfo", "Upstage는 https://api.upstage.ai/v1/models 에서 모델 목록을 불러옵니다.");
+                _modelStatusText.Visibility = Visibility.Visible;
+            }
             else if (provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase))
             {
                 ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadOpenCodeGoModels", "OpenCode Go 모델 불러오기"));
@@ -918,6 +925,10 @@ namespace TxtAIEditor.Core.Services
             else if (provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase))
             {
                 ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadCerebrasModels", "Cerebras 모델 불러오기"));
+            }
+            else if (provider.Equals("Upstage", StringComparison.OrdinalIgnoreCase))
+            {
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadUpstageModels", "Upstage 모델 불러오기"));
             }
             else if (provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase))
             {
