@@ -202,10 +202,6 @@ namespace TxtAIEditor.Controls
                 string displayInfo = string.IsNullOrEmpty(thinkingLevel) ? provider : $"{provider}, {thinkingLevel}";
                 string format = _getString("AgentModelFormat", "모델: {0} ({1})");
                 string result = string.Format(format, model, displayInfo);
-                if (settings.LlmAgentVerbose)
-                {
-                    result += " -v";
-                }
                 _agentPane.UpdateModelName(result);
             if (forceClearCache)
             {

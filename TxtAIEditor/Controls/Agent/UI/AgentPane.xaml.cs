@@ -242,6 +242,9 @@ namespace TxtAIEditor.Controls
                     ? "Segoe UI, Malgun Gothic"
                     : settings.AgentPromptFontFamily.Trim());
             AgentPromptInput.FontSize = Math.Clamp(settings.AgentPromptFontSize, 8.0, 36.0);
+
+            HideHtmlCodeBlocks = !settings.LlmAgentVerbose;
+            UpdateVerboseToggle(settings.LlmAgentVerbose);
         }
 
         public void Localize(Func<string, string, string> getString)
