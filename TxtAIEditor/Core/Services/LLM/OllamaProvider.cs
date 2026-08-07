@@ -47,18 +47,18 @@ namespace TxtAIEditor.Core.Services.LLM
             return (context, output > 0 ? output : 0);
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null)
         {
             var sb = new StringBuilder();
             await GenerateCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, chunk =>
             {
                 sb.Append(chunk);
                 return Task.CompletedTask;
-            }, cancellationToken, attachments, null, tools, onUsage);
+            }, cancellationToken, attachments, null, tools, onUsage, onNativeToolCall);
             return sb.ToString();
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -206,7 +206,14 @@ namespace TxtAIEditor.Core.Services.LLM
                                                 toolCalls.ValueKind == JsonValueKind.Array &&
                                                 toolCalls.GetArrayLength() > 0)
                                             {
-                                                hasToolCalls = true;
+                                                if (!hasToolCalls)
+                                                {
+                                                    hasToolCalls = true;
+                                                    if (onNativeToolCall != null)
+                                                    {
+                                                        await onNativeToolCall();
+                                                    }
+                                                }
                                                 var tc = toolCalls[0];
                                                 if (tc.TryGetProperty("function", out var func))
                                                 {

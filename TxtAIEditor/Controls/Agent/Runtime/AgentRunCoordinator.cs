@@ -381,6 +381,7 @@ namespace TxtAIEditor.Controls
                     int printedLength = streamResult.PrintedLength;
                     bool heldPotentialToolCallText = streamResult.HeldPotentialToolCallText;
                     bool visibleTextFlushed = streamResult.VisibleTextFlushed;
+                    bool usedNativeFunctionToolCall = streamResult.UsedNativeFunctionToolCall;
                     string responseForTranscript = streamResult.ResponseWithoutThinking;
                     string retainedThinking = runContext.LlmSettings.LlmRetainThinking
                         ? streamResult.ThinkingText
@@ -847,7 +848,9 @@ namespace TxtAIEditor.Controls
                             addedPartBuilder.AppendLine(retainedThinkingSection);
                             addedPartBuilder.AppendLine();
                         }
-                        addedPartBuilder.AppendLine("[assistant: tool call]");
+                        addedPartBuilder.AppendLine(usedNativeFunctionToolCall
+                            ? "[assistant: tool call] (native function)"
+                            : "[assistant: tool call] (text)");
                         addedPartBuilder.AppendLine(responseForTranscript);
 
                         foreach (var tcRes in toolCallResults)

@@ -27,12 +27,12 @@ namespace TxtAIEditor.Core.Services.LLM
             _tokenUsageTracker = tokenUsageTracker;
         }
 
-        public async Task<string> ExecuteAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null)
+        public async Task<string> ExecuteAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, Func<Task>? onNativeToolCall = null)
         {
-            return await ExecuteAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult);
+            return await ExecuteAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult, onNativeToolCall);
         }
 
-        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null)
+        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, Func<Task>? onNativeToolCall = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string providerName = settings.LlmProvider;
@@ -125,7 +125,8 @@ namespace TxtAIEditor.Core.Services.LLM
                             }
                         },
                         tools,
-                        onProviderUsage
+                        onProviderUsage,
+                        onNativeToolCall
                     );
                     if (observedUsage != null)
                     {
@@ -144,7 +145,8 @@ namespace TxtAIEditor.Core.Services.LLM
                         cancellationToken,
                         attachments,
                         tools,
-                        onProviderUsage
+                        onProviderUsage,
+                        onNativeToolCall
                     );
                     if (observedUsage != null)
                     {
@@ -221,7 +223,8 @@ namespace TxtAIEditor.Core.Services.LLM
                         tools,
                         onUsage,
                         allowVisionFallback: false,
-                        onVisionFallbackResult: null);
+                        onVisionFallbackResult: null,
+                        onNativeToolCall: onNativeToolCall);
                 }
 
                 string errorPrefix = _localizationService.GetString("LlmErrorCommunicationPrefix", "AI 통신 오류가 발생했습니다: ");

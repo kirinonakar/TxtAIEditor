@@ -119,7 +119,8 @@ namespace TxtAIEditor.Core.Services
             Func<LlmTokenUsage, Task>? onUsage = null,
             bool allowVisionFallback = false,
             Func<string, Task<bool>>? onVisionFallbackResult = null,
-            string fixedContext = "")
+            string fixedContext = "",
+            Func<Task>? onNativeToolCall = null)
         {
             return _agentService.RunAgentAsync(
                 instruction,
@@ -137,7 +138,8 @@ namespace TxtAIEditor.Core.Services
                 onUsage,
                 allowVisionFallback,
                 onVisionFallbackResult,
-                fixedContext);
+                fixedContext,
+                onNativeToolCall);
         }
 
         public Task<string> RunAgentAsync(
@@ -157,7 +159,8 @@ namespace TxtAIEditor.Core.Services
             Func<LlmTokenUsage, Task>? onUsage = null,
             bool allowVisionFallback = false,
             Func<string, Task<bool>>? onVisionFallbackResult = null,
-            string fixedContext = "")
+            string fixedContext = "",
+            Func<Task>? onNativeToolCall = null)
         {
             return _agentService.RunAgentAsync(
                 settings,
@@ -176,7 +179,8 @@ namespace TxtAIEditor.Core.Services
                 onUsage,
                 allowVisionFallback,
                 onVisionFallbackResult,
-                fixedContext);
+                fixedContext,
+                onNativeToolCall);
         }
 
         public void ResetTokenUsageStats()

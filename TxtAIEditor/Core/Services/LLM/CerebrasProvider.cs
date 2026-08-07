@@ -41,7 +41,8 @@ namespace TxtAIEditor.Core.Services.LLM
             CancellationToken cancellationToken = default,
             IReadOnlyList<LlmMessageAttachment>? attachments = null,
             IReadOnlyList<LlmTool>? tools = null,
-            Func<LlmTokenUsage, Task>? onUsage = null)
+            Func<LlmTokenUsage, Task>? onUsage = null,
+            Func<Task>? onNativeToolCall = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
@@ -87,6 +88,10 @@ namespace TxtAIEditor.Core.Services.LLM
                                     toolCalls.GetArrayLength() > 0)
                                 {
                                     var firstToolCall = toolCalls[0];
+                                    if (onNativeToolCall != null)
+                                    {
+                                        await onNativeToolCall();
+                                    }
                                     return LlmToolCallTextFormatter.FormatAssistantResponseWithFunctionToolCall(contentText, firstToolCall);
                                 }
 
@@ -131,7 +136,8 @@ namespace TxtAIEditor.Core.Services.LLM
             IReadOnlyList<LlmMessageAttachment>? attachments = null,
             Func<string, Task>? onReasoning = null,
             IReadOnlyList<LlmTool>? tools = null,
-            Func<LlmTokenUsage, Task>? onUsage = null)
+            Func<LlmTokenUsage, Task>? onUsage = null,
+            Func<Task>? onNativeToolCall = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
@@ -201,7 +207,14 @@ namespace TxtAIEditor.Core.Services.LLM
                                                 toolCalls.ValueKind == JsonValueKind.Array &&
                                                 toolCalls.GetArrayLength() > 0)
                                             {
-                                                hasToolCalls = true;
+                                                if (!hasToolCalls)
+                                                {
+                                                    hasToolCalls = true;
+                                                    if (onNativeToolCall != null)
+                                                    {
+                                                        await onNativeToolCall();
+                                                    }
+                                                }
                                                 await AccumulateToolCallAsync(toolAccumulator, toolCalls[0], onChunk);
                                             }
                                             else if (delta.TryGetProperty("content", out var content) &&

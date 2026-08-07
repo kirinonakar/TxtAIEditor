@@ -63,6 +63,7 @@ namespace TxtAIEditor.Controls
             bool heldPotentialToolCallText = false;
             bool? isJsonToolCall = null;
             bool hasToolCall = false;
+            bool nativeFunctionToolCallDetected = false;
             bool suppressStreamingText = planningMode;
 
             bool inThoughtBlock = false;
@@ -451,7 +452,12 @@ namespace TxtAIEditor.Controls
                         runContext.PendingVisionFallbackContext = fallbackContext;
                         return Task.FromResult(false);
                     },
-                    fixedContext: fixedPromptContext);
+                    fixedContext: fixedPromptContext,
+                    onNativeToolCall: () =>
+                    {
+                        nativeFunctionToolCallDetected = true;
+                        return Task.CompletedTask;
+                    });
             }
             catch (ResponseTruncatedException)
             {
@@ -600,7 +606,8 @@ namespace TxtAIEditor.Controls
                 Truncated = truncated,
                 PrintedLength = printedLength,
                 HeldPotentialToolCallText = heldPotentialToolCallText,
-                VisibleTextFlushed = visibleTextFlushed
+                VisibleTextFlushed = visibleTextFlushed,
+                UsedNativeFunctionToolCall = nativeFunctionToolCallDetected
             };
         }
     }
@@ -615,5 +622,6 @@ namespace TxtAIEditor.Controls
         public int PrintedLength { get; init; }
         public bool HeldPotentialToolCallText { get; init; }
         public bool VisibleTextFlushed { get; init; }
+        public bool UsedNativeFunctionToolCall { get; init; }
     }
 }
