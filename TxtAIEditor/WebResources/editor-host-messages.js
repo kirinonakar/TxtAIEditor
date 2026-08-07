@@ -2,6 +2,7 @@ import { findInput, scrollContainer } from './editor-dom.js';
 import {
     applyOptions,
     applyEditResultFromHost,
+    captureScrollAnchor,
     clearMeasuredLineHeights,
     cleanDirtyMarker,
     csvTableMode,
@@ -11,6 +12,7 @@ import {
     post,
     queueRender,
     receiveLineBlock,
+    restoreScrollAnchor,
     searchController,
     selectionController,
     selectionInfo,
@@ -533,6 +535,7 @@ export function createHostMessageHandler({
             state.scrollSyncEnabled = !!msg.enabled;
             break;
         case 'setInlineLivePreview':
+            const livePreviewScrollAnchor = captureScrollAnchor();
             state.inlineLivePreviewEnabled = !!msg.enabled;
             state.livePreviewBaseHref = msg.baseHref || '';
             clearPendingInlineLivePreviewFocus();
@@ -561,7 +564,9 @@ export function createHostMessageHandler({
             clearMeasuredLineHeights();
             document.body.classList.toggle('inline-live-preview-enabled', state.inlineLivePreviewEnabled);
             setupVirtualHeight();
+            restoreScrollAnchor(livePreviewScrollAnchor);
             queueRender(true);
+            requestAnimationFrame(() => restoreScrollAnchor(livePreviewScrollAnchor));
             break;
         case 'syncScroll':
             syncHostScroll(msg.firstLine, msg.offset || 0);
