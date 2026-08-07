@@ -255,13 +255,13 @@ namespace TxtAIEditor.Core.Services.LLM
                         {
                             if (!toolAccumulator.SentStartTag)
                             {
-                                await onChunk($"<log_tool_call>{{\"name\":\"\",\"arguments\":{{}}");
+                                await onChunk($"<tool_call>{{\"name\":\"\",\"arguments\":{{}}");
                             }
                             else if (!toolAccumulator.SentArgumentsHeader)
                             {
                                 await onChunk($"\",\"arguments\":{{}}");
                             }
-                            await onChunk("}</log_tool_call>");
+                            await onChunk("}</tool_call>");
                         }
 
                         if (truncated)
@@ -387,7 +387,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!toolAccumulator.SentStartTag)
                     {
                         toolAccumulator.SentStartTag = true;
-                        await onChunk($"<log_tool_call>{{\"name\":\"{nameChunk}");
+                        await onChunk($"<tool_call>{{\"name\":\"{nameChunk}");
                     }
                     else
                     {
@@ -405,7 +405,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!toolAccumulator.SentStartTag)
                     {
                         toolAccumulator.SentStartTag = true;
-                        await onChunk($"<log_tool_call>{{\"name\":\"\",\"arguments\":");
+                        await onChunk($"<tool_call>{{\"name\":\"\",\"arguments\":");
                         toolAccumulator.SentArgumentsHeader = true;
                     }
                     else if (!toolAccumulator.SentArgumentsHeader)
