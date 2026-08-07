@@ -277,7 +277,7 @@
                           VerticalAlignment="Center"/>
                 <TextBlock x:Name="AgentSessionTitleText"
                            Grid.Column="1"
-                           Text="새 세션"
+                           Text=""
                            FontWeight="SemiBold"
                            FontSize="12"
                            TextWrapping="NoWrap"

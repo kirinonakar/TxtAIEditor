@@ -375,14 +375,10 @@ namespace TxtAIEditor.Controls
 
                     string prefix = BuildWorkspacePrefix(wRoot);
 
-                    string rawTitle = string.IsNullOrWhiteSpace(session.Title)
-                        ? GetUntitledOpenSessionTitle()
-                        : session.Title;
-
                     return new AgentOpenSessionItemViewModel
                     {
                         Id = session.Id,
-                        Title = $"{prefix}{rawTitle}",
+                        Title = BuildDisplayTitle(prefix, session),
                         IsSelected = isSelected,
                         IsRunning = isRunning,
                         CompletedNotificationCount = session.CompletedNotificationCount,
@@ -446,10 +442,26 @@ namespace TxtAIEditor.Controls
                 wRoot = session.WorkspaceRoot;
             }
 
-            string rawTitle = string.IsNullOrWhiteSpace(session.Title)
-                ? GetUntitledOpenSessionTitle()
-                : session.Title;
-            return $"{BuildWorkspacePrefix(wRoot)}{rawTitle}";
+            return BuildDisplayTitle(BuildWorkspacePrefix(wRoot), session);
+        }
+
+        private string BuildDisplayTitle(string prefix, AgentOpenSessionState session)
+        {
+            if (!HasRealSessionTitle(session))
+            {
+                // 아직 제목이 없는 새 세션: 워크스페이스만 표시한다.
+                return string.IsNullOrWhiteSpace(prefix)
+                    ? GetUntitledOpenSessionTitle()
+                    : prefix.TrimEnd();
+            }
+
+            return $"{prefix}{session.Title}";
+        }
+
+        private bool HasRealSessionTitle(AgentOpenSessionState session)
+        {
+            return !string.IsNullOrWhiteSpace(session.Title) &&
+                !string.Equals(session.Title, GetUntitledOpenSessionTitle(), StringComparison.Ordinal);
         }
 
         private static string BuildWorkspacePrefix(string? workspaceRoot)
