@@ -51,7 +51,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
-            var payloadDict = await BuildPayloadAsync(model, systemPrompt, userContent, attachments, tools, stream: false, cancellationToken);
+            var payloadDict = await BuildPayloadAsync(model, systemPrompt, userContent, attachments, tools, cancellationToken);
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
@@ -139,150 +139,25 @@ namespace TxtAIEditor.Core.Services.LLM
             Func<LlmTokenUsage, Task>? onUsage = null,
             Func<Task>? onNativeToolCall = null)
         {
+            // Upstage does not support the streaming response path used by the editor.
+            // Keep the provider interface contract by delivering the complete response
+            // as one chunk after a normal, non-streaming request.
+            string response = await GenerateCompletionAsync(
+                endpoint,
+                apiKey,
+                model,
+                systemPrompt,
+                userContent,
+                cancellationToken,
+                attachments,
+                tools,
+                onUsage,
+                onNativeToolCall);
+
             cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrEmpty(apiKey))
+            if (!string.IsNullOrEmpty(response))
             {
-                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
-            }
-
-            string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
-            var payloadDict = await BuildPayloadAsync(model, systemPrompt, userContent, attachments, tools, stream: true, cancellationToken);
-
-            string jsonPayload = JsonSerializer.Serialize(payloadDict);
-            using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
-            {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", NormalizeBearerCredential(apiKey));
-                request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-
-                using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                {
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                        throw new HttpRequestException(string.Format(_localizationService.GetString("UpstageErrorStreamCallFailed", "Upstage API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
-                    }
-
-                    var toolAccumulator = new StreamToolCallAccumulator();
-                    bool hasToolCalls = false;
-                    bool truncated = false;
-
-                    using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
-                    using (var reader = new System.IO.StreamReader(stream))
-                    {
-                        while (true)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            string? line = await reader.ReadLineAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
-                            if (line == null)
-                            {
-                                break;
-                            }
-
-                            string trimmed = line.Trim();
-                            if (string.IsNullOrEmpty(trimmed) || !trimmed.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-                            {
-                                continue;
-                            }
-
-                            string data = trimmed.Substring(5).Trim();
-                            if (data == "[DONE]")
-                            {
-                                break;
-                            }
-
-                            try
-                            {
-                                using (var doc = JsonDocument.Parse(data))
-                                {
-                                    var root = doc.RootElement;
-                                    await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
-                                    if (root.TryGetProperty("choices", out var choices) &&
-                                        choices.ValueKind == JsonValueKind.Array &&
-                                        choices.GetArrayLength() > 0)
-                                    {
-                                        var firstChoice = choices[0];
-                                        if (firstChoice.TryGetProperty("delta", out var delta))
-                                        {
-                                            if (delta.TryGetProperty("tool_calls", out var toolCalls) &&
-                                                toolCalls.ValueKind == JsonValueKind.Array &&
-                                                toolCalls.GetArrayLength() > 0)
-                                            {
-                                                if (!hasToolCalls)
-                                                {
-                                                    hasToolCalls = true;
-                                                    if (onNativeToolCall != null)
-                                                    {
-                                                        await onNativeToolCall();
-                                                    }
-                                                }
-                                                await AccumulateToolCallAsync(toolAccumulator, toolCalls[0], onChunk);
-                                            }
-                                            else if (delta.TryGetProperty("content", out var content) &&
-                                                     content.ValueKind == JsonValueKind.String)
-                                            {
-                                                string? text = content.GetString();
-                                                if (!string.IsNullOrEmpty(text))
-                                                {
-                                                    cancellationToken.ThrowIfCancellationRequested();
-                                                    await onChunk(text);
-                                                }
-                                            }
-
-                                            if (onReasoning != null)
-                                            {
-                                                string? reasoningText = null;
-                                                if (delta.TryGetProperty("reasoning", out var reasoning) &&
-                                                    reasoning.ValueKind == JsonValueKind.String)
-                                                {
-                                                    reasoningText = reasoning.GetString();
-                                                }
-                                                else if (delta.TryGetProperty("reasoning_content", out var reasoningContent) &&
-                                                         reasoningContent.ValueKind == JsonValueKind.String)
-                                                {
-                                                    reasoningText = reasoningContent.GetString();
-                                                }
-
-                                                if (!string.IsNullOrEmpty(reasoningText))
-                                                {
-                                                    cancellationToken.ThrowIfCancellationRequested();
-                                                    await onReasoning(reasoningText);
-                                                }
-                                            }
-                                        }
-
-                                        if (firstChoice.TryGetProperty("finish_reason", out var finishReason) &&
-                                            finishReason.ValueKind == JsonValueKind.String &&
-                                            finishReason.GetString() == "length")
-                                        {
-                                            truncated = true;
-                                        }
-                                    }
-                                }
-                            }
-                            catch (JsonException)
-                            {
-                            }
-                        }
-
-                        if (hasToolCalls)
-                        {
-                            if (!toolAccumulator.SentStartTag)
-                            {
-                                await onChunk($"<tool_call>{{\"name\":\"\",\"arguments\":{{}}");
-                            }
-                            else if (!toolAccumulator.SentArgumentsHeader)
-                            {
-                                await onChunk($"\",\"arguments\":{{}}");
-                            }
-                            await onChunk("}</tool_call>");
-                        }
-
-                        if (truncated)
-                        {
-                            throw new ResponseTruncatedException();
-                        }
-                    }
-                }
+                await onChunk(response);
             }
         }
 
@@ -292,7 +167,6 @@ namespace TxtAIEditor.Core.Services.LLM
             string userContent,
             IReadOnlyList<LlmMessageAttachment>? attachments,
             IReadOnlyList<LlmTool>? tools,
-            bool stream,
             CancellationToken cancellationToken)
         {
             var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
@@ -314,11 +188,6 @@ namespace TxtAIEditor.Core.Services.LLM
                 },
                 ["temperature"] = 0.5
             };
-
-            if (stream)
-            {
-                payloadDict["stream"] = true;
-            }
 
             if (tools != null && tools.Count > 0)
             {
@@ -382,53 +251,6 @@ namespace TxtAIEditor.Core.Services.LLM
                 "low" or "medium" or "high" => level,
                 _ => null
             };
-        }
-
-        private static async Task AccumulateToolCallAsync(StreamToolCallAccumulator toolAccumulator, JsonElement toolCall, Func<string, Task> onChunk)
-        {
-            if (!toolCall.TryGetProperty("function", out var function))
-            {
-                return;
-            }
-
-            if (function.TryGetProperty("name", out var nameProp))
-            {
-                string nameChunk = nameProp.GetString() ?? string.Empty;
-                if (!string.IsNullOrEmpty(nameChunk))
-                {
-                    toolAccumulator.Name += nameChunk;
-                    if (!toolAccumulator.SentStartTag)
-                    {
-                        toolAccumulator.SentStartTag = true;
-                        await onChunk($"<tool_call>{{\"name\":\"{nameChunk}");
-                    }
-                    else
-                    {
-                        await onChunk(nameChunk);
-                    }
-                }
-            }
-
-            if (function.TryGetProperty("arguments", out var argsProp))
-            {
-                string argsChunk = argsProp.GetString() ?? string.Empty;
-                if (!string.IsNullOrEmpty(argsChunk))
-                {
-                    toolAccumulator.Arguments.Append(argsChunk);
-                    if (!toolAccumulator.SentStartTag)
-                    {
-                        toolAccumulator.SentStartTag = true;
-                        await onChunk($"<tool_call>{{\"name\":\"\",\"arguments\":");
-                        toolAccumulator.SentArgumentsHeader = true;
-                    }
-                    else if (!toolAccumulator.SentArgumentsHeader)
-                    {
-                        toolAccumulator.SentArgumentsHeader = true;
-                        await onChunk($"\",\"arguments\":");
-                    }
-                    await onChunk(argsChunk);
-                }
-            }
         }
 
         private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)
