@@ -222,6 +222,7 @@ namespace TxtAIEditor.Controls
 
             settings.LlmAgentVerbose = verbose;
             _agentPane.HideHtmlCodeBlocks = !verbose;
+            _sessionHistoryCoordinator.RefreshOutputDisplay();
             _ = _settingsService.SaveSettingsAsync(settings);
         }
 

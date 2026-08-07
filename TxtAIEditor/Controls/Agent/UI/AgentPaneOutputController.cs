@@ -99,7 +99,17 @@ namespace TxtAIEditor.Controls
         public bool HideHtmlCodeBlocks
         {
             get => _renderer.HideHtmlCodeBlocks;
-            set => _renderer.HideHtmlCodeBlocks = value;
+            set
+            {
+                if (_renderer.HideHtmlCodeBlocks == value)
+                {
+                    return;
+                }
+
+                FlushAllPendingOutputText();
+                _renderer.HideHtmlCodeBlocks = value;
+                _renderer.UpdateRichText(_rawOutputText);
+            }
         }
 
         public bool IsThinkingActivityActive => _thinkingLineActive;
