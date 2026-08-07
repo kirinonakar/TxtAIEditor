@@ -221,7 +221,14 @@ namespace TxtAIEditor.Controls
             }
 
             string normalizedPath = relativePath.Replace('\\', '/');
-            string normalizedGlob = glob.Replace('\\', '/');
+            // Workspace-relative paths do not start with '/', so treat a leading
+            // slash in the glob as a workspace-root anchor (for example, /*).
+            string normalizedGlob = glob.Replace('\\', '/').TrimStart('/');
+            if (normalizedGlob.Length == 0)
+            {
+                return false;
+            }
+
             string pattern = "^" + Regex.Escape(normalizedGlob)
                 .Replace("\\*\\*/", "(?:.*/)?", StringComparison.Ordinal)
                 .Replace("\\*\\*", ".*", StringComparison.Ordinal)

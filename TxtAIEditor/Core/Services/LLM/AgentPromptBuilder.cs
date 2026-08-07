@@ -40,7 +40,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- Tool names must match exactly. Arguments are JSON; escape Windows backslashes as \\\\ or use /.");
             builder.AppendLine();
             builder.AppendLine("Tools:");
-            builder.AppendLine("- Workspace: list_files {\"glob\":\"**/*.cs\",\"maxResults\":80}; search_text {\"query\":\"needle\",\"glob\":\"**/*\",\"maxResults\":80}; read_file {\"path\":\"relative/path.cs\",\"startLine\":1,\"lineCount\":160}; read_image {\"path\":\"relative/image.png\"}.");
+            builder.AppendLine("- Workspace: list_files {\"glob\":\"/*\",\"maxResults\":80} (workspace-root entries); list_files {\"glob\":\"**/*.cs\",\"maxResults\":80}; search_text {\"query\":\"needle\",\"glob\":\"**/*\",\"maxResults\":80}; read_file {\"path\":\"relative/path.cs\",\"startLine\":1,\"lineCount\":160}; read_image {\"path\":\"relative/image.png\"}.");
             builder.AppendLine("- Skills: skill_use {\"name\":\"skill-name\"}; reads the full SKILL.md for an installed or enabled skill by name or SKILL.md path.");
             builder.AppendLine("- Search/process: run_rg {\"arguments\":\"-n \\\"needle\\\" TxtAIEditor\",\"timeoutMs\":10000}; run_rga {\"arguments\":\"-n \\\"needle\\\" doc.pdf\",\"timeoutMs\":10000}; run_powershell {\"command\":\"Get-ChildItem -LiteralPath 'D:/workspace/test' -Recurse | Select-Object FullName, Length, LastWriteTime\",\"timeoutMs\":10000}.");
             builder.AppendLine("- Documents: extract_document {\"path\":\"doc.pdf\",\"outputPath\":\"optional/doc.txt\",\"maxChars\":5000000}; then read the generated .txt/.csv in targeted ranges. Use for PDF/DOCX/PPTX/XLSX/HWPX; scanned PDFs may need OCR.");
