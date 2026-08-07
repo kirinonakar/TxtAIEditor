@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
         private const int SlowContextStatsDelayMs = 900;
 
         private readonly AgentPane _agentPane;
+        private readonly ISettingsService _settingsService;
         private readonly AgentAttachmentController _attachmentController;
         private readonly AgentPresetController _presetController;
         private readonly AgentSkillController _skillController;
@@ -68,6 +69,7 @@ namespace TxtAIEditor.Controls
             Func<string?, Task>? endStreamIntoActiveEditorAsync = null)
         {
             _agentPane = agentPane;
+            _settingsService = settingsService;
             var runningSessions = new Dictionary<string, AgentRunContext>(StringComparer.Ordinal);
             var toolExecutionSessionGate = new SemaphoreSlim(1, 1);
 
@@ -184,11 +186,13 @@ namespace TxtAIEditor.Controls
             };
 
             _agentPane.HideHtmlCodeBlocks = !settingsService.CurrentSettings.LlmAgentVerbose;
+            _agentPane.UpdateVerboseToggle(settingsService.CurrentSettings.LlmAgentVerbose);
             AgentControllerEventBinder.Wire(
                 agentPane,
                 _runCoordinator.RunAgentAsync,
                 _runCoordinator.StopAgent,
                 prompt => _runCoordinator.QueueFollowUpPrompt(prompt),
+                SetVerboseState,
                 _openSessionController,
                 _sessionRewindController,
                 _sessionHistoryCoordinator,
@@ -206,6 +210,19 @@ namespace TxtAIEditor.Controls
             _openSessionController.UpdateUI();
             UpdateContextStatsImmediate();
             QueueDeferredStartupDataLoad();
+        }
+
+        private void SetVerboseState(bool verbose)
+        {
+            var settings = _settingsService.CurrentSettings;
+            if (settings.LlmAgentVerbose == verbose)
+            {
+                return;
+            }
+
+            settings.LlmAgentVerbose = verbose;
+            _agentPane.HideHtmlCodeBlocks = !verbose;
+            _ = _settingsService.SaveSettingsAsync(settings);
         }
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEditController.SessionEdits;

@@ -3363,6 +3363,12 @@
   <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
     <value>MCP 도구를 실행했습니다</value>
   </data>
+  <data name="AgentVerboseToggleText" xml:space="preserve">
+    <value>verbose</value>
+  </data>
+  <data name="AgentVerboseToggleTooltip" xml:space="preserve">
+    <value>Agent 상세 출력(verbose) 켜기/끄기</value>
+  </data>
   <data name="AgentVerboseToolFailedOnly" xml:space="preserve">
     <value>도구 실행에 실패했습니다</value>
   </data>

@@ -3363,6 +3363,12 @@ Plan: {0}</value>
   <data name="AgentVerboseMcpToolOnly" xml:space="preserve">
     <value>Ran MCP tool</value>
   </data>
+  <data name="AgentVerboseToggleText" xml:space="preserve">
+    <value>verbose</value>
+  </data>
+  <data name="AgentVerboseToggleTooltip" xml:space="preserve">
+    <value>Toggle verbose agent output</value>
+  </data>
   <data name="AgentVerboseToolFailedOnly" xml:space="preserve">
     <value>Tool execution failed</value>
   </data>

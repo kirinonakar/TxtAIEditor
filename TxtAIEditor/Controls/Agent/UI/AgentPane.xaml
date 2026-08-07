@@ -84,6 +84,61 @@
                     </Setter.Value>
                 </Setter>
             </Style>
+            <Style x:Key="AgentGhostToggleButtonStyle" TargetType="ToggleButton">
+                <Setter Property="Foreground" Value="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="6,2"/>
+                <Setter Property="CornerRadius" Value="4"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <ContentPresenter x:Name="Root"
+                                              Background="{TemplateBinding Background}"
+                                              BackgroundSizing="OuterBorderEdge"
+                                              CornerRadius="{TemplateBinding CornerRadius}"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              Padding="{TemplateBinding Padding}"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              Foreground="{TemplateBinding Foreground}">
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal"/>
+                                        <VisualState x:Name="PointerOver">
+                                            <VisualState.Setters>
+                                                <Setter Target="Root.Background" Value="{ThemeResource AgentOverlayButtonBackgroundPointerOver}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Pressed">
+                                            <VisualState.Setters>
+                                                <Setter Target="Root.Background" Value="{ThemeResource AgentOverlayButtonBackgroundPressed}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Disabled">
+                                            <VisualState.Setters>
+                                                <Setter Target="Root.Foreground" Value="{ThemeResource ButtonForegroundDisabled}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                    <VisualStateGroup x:Name="CheckStates">
+                                        <VisualState x:Name="Checked">
+                                            <VisualState.Setters>
+                                                <Setter Target="Root.Background" Value="{ThemeResource AgentOverlayButtonBackgroundPressed}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Unchecked"/>
+                                        <VisualState x:Name="Indeterminate"/>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                            </ContentPresenter>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -318,6 +373,7 @@
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
@@ -903,6 +959,19 @@
                            FontSize="11"
                            Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
             </HyperlinkButton>
+            <ToggleButton x:Name="AgentVerboseToggleButton"
+                          Grid.Row="2"
+                          Grid.Column="3"
+                          HorizontalAlignment="Right"
+                          VerticalAlignment="Center"
+                          Margin="0,1,0,-13"
+                          IsChecked="False"
+                          Click="OnVerboseToggleClick"
+                          ToolTipService.ToolTip="Agent 상세 출력(verbose) 켜기/끄기"
+                          AutomationProperties.Name="Agent 상세 출력(verbose) 켜기/끄기"
+                          Style="{StaticResource AgentGhostToggleButtonStyle}">
+                <TextBlock x:Name="AgentVerboseToggleText" Text="verbose" FontSize="11"/>
+            </ToggleButton>
         </Grid>
 
         <Border x:Name="AgentActivityPanel"
