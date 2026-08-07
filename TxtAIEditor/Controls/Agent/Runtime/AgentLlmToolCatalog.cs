@@ -89,13 +89,17 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "run_powershell",
-                    Description = "Run a PowerShell command on the system.",
+                    Description = "Run a PowerShell script body on the system. Pass complete cmdlet names and omit any powershell.exe -Command wrapper. Examples: Get-ChildItem -LiteralPath 'D:/workspace/test' -Recurse | Select-Object FullName, Length, LastWriteTime; Get-Command -Name '*doc*','*docx*' -ErrorAction SilentlyContinue; git status --short.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            command = new { type = "string", description = "The PowerShell command to run, e.g. git status --short" },
+                            command = new
+                            {
+                                type = "string",
+                                description = "PowerShell script body only, not a powershell.exe -Command wrapper. Use full Verb-Noun cmdlets such as Get-ChildItem and Get-Command; do not pass bare fragments such as -ChildItem or -Command. Example: Get-ChildItem -LiteralPath 'D:/workspace/test' -Recurse | Select-Object FullName, Length, LastWriteTime"
+                            },
                             timeoutMs = new
                             {
                                 type = "integer",
