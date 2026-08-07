@@ -104,37 +104,7 @@
                                               Padding="{TemplateBinding Padding}"
                                               HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-                                              Foreground="{TemplateBinding Foreground}">
-                                <VisualStateManager.VisualStateGroups>
-                                    <VisualStateGroup x:Name="CommonStates">
-                                        <VisualState x:Name="Normal"/>
-                                        <VisualState x:Name="PointerOver">
-                                            <VisualState.Setters>
-                                                <Setter Target="Root.Background" Value="{ThemeResource AgentOverlayButtonBackgroundPointerOver}"/>
-                                            </VisualState.Setters>
-                                        </VisualState>
-                                        <VisualState x:Name="Pressed">
-                                            <VisualState.Setters>
-                                                <Setter Target="Root.Background" Value="{ThemeResource AgentOverlayButtonBackgroundPressed}"/>
-                                            </VisualState.Setters>
-                                        </VisualState>
-                                        <VisualState x:Name="Disabled">
-                                            <VisualState.Setters>
-                                                <Setter Target="Root.Foreground" Value="{ThemeResource ButtonForegroundDisabled}"/>
-                                            </VisualState.Setters>
-                                        </VisualState>
-                                    </VisualStateGroup>
-                                    <VisualStateGroup x:Name="CheckStates">
-                                        <VisualState x:Name="Checked">
-                                            <VisualState.Setters>
-                                                <Setter Target="Root.Background" Value="{ThemeResource AgentOverlayButtonBackgroundPressed}"/>
-                                            </VisualState.Setters>
-                                        </VisualState>
-                                        <VisualState x:Name="Unchecked"/>
-                                        <VisualState x:Name="Indeterminate"/>
-                                    </VisualStateGroup>
-                                </VisualStateManager.VisualStateGroups>
-                            </ContentPresenter>
+                                              Foreground="{TemplateBinding Foreground}"/>
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>
@@ -970,7 +940,7 @@
                           ToolTipService.ToolTip="Agent 상세 출력(verbose) 켜기/끄기"
                           AutomationProperties.Name="Agent 상세 출력(verbose) 켜기/끄기"
                           Style="{StaticResource AgentGhostToggleButtonStyle}">
-                <TextBlock x:Name="AgentVerboseToggleText" Text="verbose" FontSize="11"/>
+                <TextBlock x:Name="AgentVerboseToggleText" Text="simple" FontSize="11"/>
             </ToggleButton>
         </Grid>
 

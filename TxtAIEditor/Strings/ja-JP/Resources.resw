@@ -3330,6 +3330,9 @@
   <data name="AgentVerboseToggleText" xml:space="preserve">
     <value>verbose</value>
   </data>
+  <data name="AgentSimpleToggleText" xml:space="preserve">
+    <value>simple</value>
+  </data>
   <data name="AgentVerboseToggleTooltip" xml:space="preserve">
     <value>Agentの詳細出力 (verbose) の切り替え</value>
   </data>

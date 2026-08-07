@@ -3366,6 +3366,9 @@
   <data name="AgentVerboseToggleText" xml:space="preserve">
     <value>verbose</value>
   </data>
+  <data name="AgentSimpleToggleText" xml:space="preserve">
+    <value>simple</value>
+  </data>
   <data name="AgentVerboseToggleTooltip" xml:space="preserve">
     <value>Agent 상세 출력(verbose) 켜기/끄기</value>
   </data>

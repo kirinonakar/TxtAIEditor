@@ -3366,6 +3366,9 @@ Plan: {0}</value>
   <data name="AgentVerboseToggleText" xml:space="preserve">
     <value>verbose</value>
   </data>
+  <data name="AgentSimpleToggleText" xml:space="preserve">
+    <value>simple</value>
+  </data>
   <data name="AgentVerboseToggleTooltip" xml:space="preserve">
     <value>Toggle verbose agent output</value>
   </data>

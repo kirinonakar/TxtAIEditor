@@ -259,7 +259,7 @@ namespace TxtAIEditor.Controls
             string streamToTabText = getString("AgentStreamToTab", "탭에 스트리밍");
             ToolTipService.SetToolTip(AgentStreamToTabToggleButton, streamToTabText);
             AutomationProperties.SetName(AgentStreamToTabToggleButton, streamToTabText);
-            AgentVerboseToggleText.Text = getString("AgentVerboseToggleText", "verbose");
+            UpdateVerboseToggleText();
             string verboseToggleTooltip = getString("AgentVerboseToggleTooltip", "Agent 상세 출력(verbose) 켜기/끄기");
             ToolTipService.SetToolTip(AgentVerboseToggleButton, verboseToggleTooltip);
             AutomationProperties.SetName(AgentVerboseToggleButton, verboseToggleTooltip);
@@ -767,7 +767,16 @@ private Style? _accentRunButtonStyle;
 
         private void OnVerboseToggleClick(object sender, RoutedEventArgs e)
         {
+            UpdateVerboseToggleText();
             VerboseToggled?.Invoke(sender, AgentVerboseToggleButton.IsChecked == true);
+        }
+
+        private void UpdateVerboseToggleText()
+        {
+            bool isVerbose = AgentVerboseToggleButton.IsChecked == true;
+            string resourceKey = isVerbose ? "AgentVerboseToggleText" : "AgentSimpleToggleText";
+            string fallback = isVerbose ? "verbose" : "simple";
+            AgentVerboseToggleText.Text = _getString?.Invoke(resourceKey, fallback) ?? fallback;
         }
 
         private void OnDiffCancelClick(object sender, RoutedEventArgs e)
@@ -910,6 +919,8 @@ private Style? _accentRunButtonStyle;
             {
                 AgentVerboseToggleButton.IsChecked = verbose;
             }
+
+            UpdateVerboseToggleText();
         }
 
         public void UpdateHistoryItems(List<AgentHistoryItemViewModel> items, string? selectedId)
