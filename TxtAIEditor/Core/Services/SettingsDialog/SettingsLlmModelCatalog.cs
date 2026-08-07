@@ -50,6 +50,7 @@ namespace TxtAIEditor.Core.Services
                 provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Upstage", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OllamaCloud", StringComparison.OrdinalIgnoreCase) ||

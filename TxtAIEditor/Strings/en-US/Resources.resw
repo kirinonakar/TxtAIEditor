@@ -2874,6 +2874,12 @@ Plan: {0}</value>
    <data name="CerebrasErrorStreamCallFailed" xml:space="preserve">
      <value>Cerebras API streaming call failed ({0}): {1}</value>
    </data>
+  <data name="UpstageErrorApiCallFailed" xml:space="preserve">
+    <value>Upstage API call failed ({0}): {1}</value>
+  </data>
+  <data name="UpstageErrorStreamCallFailed" xml:space="preserve">
+    <value>Upstage API streaming call failed ({0}): {1}</value>
+  </data>
    <data name="GeminiErrorApiCallFailed" xml:space="preserve">
      <value>Google Gemini API call failed ({0}): {1}</value>
    </data>

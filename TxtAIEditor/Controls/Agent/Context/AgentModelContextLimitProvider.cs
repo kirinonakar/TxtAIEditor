@@ -99,7 +99,7 @@ namespace TxtAIEditor.Controls
 
             if (provider.Contains("upstage"))
             {
-                if (model.Contains("solar-pro4")) return 131072;
+                if (model.Contains("solar-pro4")) return 1000000;
                 if (model.Contains("solar-pro3")) return 131072;
                 if (model.Contains("solar-pro2")) return 65536;
                 if (model.Contains("solar-mini")) return 32768;

@@ -2874,6 +2874,12 @@
    <data name="CerebrasErrorStreamCallFailed" xml:space="preserve">
      <value>Cerebras API 스트리밍 호출 실패 ({0}): {1}</value>
    </data>
+  <data name="UpstageErrorApiCallFailed" xml:space="preserve">
+    <value>Upstage API 호출 실패 ({0}): {1}</value>
+  </data>
+  <data name="UpstageErrorStreamCallFailed" xml:space="preserve">
+    <value>Upstage API 스트리밍 호출 실패 ({0}): {1}</value>
+  </data>
    <data name="GeminiErrorApiCallFailed" xml:space="preserve">
      <value>Google Gemini API 호출 실패 ({0}): {1}</value>
    </data>

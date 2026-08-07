@@ -83,7 +83,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 { ("cerebras", "gemma-4-31b"), (131000, 40000) },
                 { ("cerebras", "zai-glm-4.7"), (131000, 40000) },
 
-                { ("upstage", "solar-pro4"), (131072, 16384) },
+                { ("upstage", "solar-pro4"), (1000000, 16384) },
                 { ("upstage", "solar-pro3"), (131072, 16384) },
                 { ("upstage", "solar-pro2"), (65536, 8192) },
                 { ("upstage", "solar-mini"), (32768, 8192) },
