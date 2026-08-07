@@ -59,7 +59,7 @@ namespace TxtAIEditor.Controls
                         RegexOptions.IgnoreCase);
                     if (nameMatch.Success)
                     {
-                        string toolName = DecodeLenientJsonString(nameMatch.Groups["name"].Value);
+                        string toolName = NormalizeToolName(DecodeLenientJsonString(nameMatch.Groups["name"].Value));
                         if (!IsValidToolName(toolName))
                         {
                             detail = "The tool_call name is empty or invalid. Reuse the exact enabled tool alias for the intended action and include its required arguments.";
@@ -272,6 +272,7 @@ namespace TxtAIEditor.Controls
 
             int index = 0;
             var list = new List<ToolCallInfo>();
+            bool hasUnparsedToolCall = false;
 
             while (index < trimmedPayload.Length)
             {
@@ -330,8 +331,8 @@ namespace TxtAIEditor.Controls
                     int openBraceIndex = trimmedPayload.IndexOf('{', index);
                     if (openBraceIndex > index)
                     {
-                        string possibleName = trimmedPayload.Substring(index, openBraceIndex - index).Trim();
-                        if (Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$"))
+                        string possibleName = NormalizeToolName(trimmedPayload.Substring(index, openBraceIndex - index));
+                        if (IsValidToolName(possibleName))
                         {
                             if (TryExtractBalancedJsonObject(trimmedPayload, openBraceIndex, out string jsonStr))
                             {
@@ -340,7 +341,10 @@ namespace TxtAIEditor.Controls
                                 {
                                     list.Add(new ToolCallInfo { ToolName = possibleName, Arguments = args });
                                 }
-                                // If bare arguments parse failed, skip and continue
+                                else
+                                {
+                                    hasUnparsedToolCall = true;
+                                }
                             }
                             else
                             {
@@ -371,10 +375,15 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (list.Count > 0)
+            if (list.Count > 0 && !hasUnparsedToolCall)
             {
                 toolCalls.AddRange(list);
                 return true;
+            }
+
+            if (hasUnparsedToolCall)
+            {
+                return false;
             }
 
             // Fallback: try parsing as a single payload
@@ -403,7 +412,7 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            string toolName = DecodeLenientJsonString(nameMatch.Groups["name"].Value);
+            string toolName = NormalizeToolName(DecodeLenientJsonString(nameMatch.Groups["name"].Value));
             if (!IsValidToolName(toolName))
             {
                 return false;
@@ -439,7 +448,7 @@ namespace TxtAIEditor.Controls
                 var root = document.RootElement.Clone();
                 if (root.TryGetProperty("name", out var nameProp))
                 {
-                    toolName = nameProp.GetString() ?? string.Empty;
+                    toolName = NormalizeToolName(nameProp.GetString() ?? string.Empty);
                     if (!IsValidToolName(toolName))
                     {
                         return false;
@@ -468,8 +477,72 @@ namespace TxtAIEditor.Controls
             }
             catch
             {
+                return TryParseLenientArguments(jsonStr, out arguments);
+            }
+        }
+
+        private static bool TryParseLenientArguments(string jsonStr, out JsonElement arguments)
+        {
+            arguments = default;
+            try
+            {
+                var argumentValues = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var property in ExtractLenientStringProperties(jsonStr))
+                {
+                    argumentValues[property.Key] = NormalizeLenientArgumentValue(property.Value);
+                }
+
+                foreach (Match match in Regex.Matches(
+                    jsonStr,
+                    @"""(?<key>[^""\\]*(?:\\.[^""\\]*)*)""\s*:\s*(?<value>-?\d+)",
+                    RegexOptions.Singleline))
+                {
+                    string key = DecodeLenientJsonString(match.Groups["key"].Value);
+                    if (!argumentValues.ContainsKey(key) &&
+                        int.TryParse(match.Groups["value"].Value, out int intValue))
+                    {
+                        argumentValues[key] = intValue;
+                    }
+                }
+
+                foreach (Match match in Regex.Matches(
+                    jsonStr,
+                    @"""(?<key>[^""\\]*(?:\\.[^""\\]*)*)""\s*:\s*(?<value>true|false|null)",
+                    RegexOptions.Singleline | RegexOptions.IgnoreCase))
+                {
+                    string key = DecodeLenientJsonString(match.Groups["key"].Value);
+                    if (argumentValues.ContainsKey(key))
+                    {
+                        continue;
+                    }
+
+                    string value = match.Groups["value"].Value;
+                    argumentValues[key] = value.Equals("null", StringComparison.OrdinalIgnoreCase)
+                        ? null
+                        : bool.Parse(value);
+                }
+
+                if (argumentValues.Count == 0)
+                {
+                    return false;
+                }
+
+                using var document = JsonDocument.Parse(JsonSerializer.Serialize(argumentValues));
+                arguments = document.RootElement.Clone();
+                return true;
+            }
+            catch
+            {
                 return false;
             }
+        }
+
+        private static string NormalizeLenientArgumentValue(string value)
+        {
+            // Models sometimes double-escape quotes while embedding a shell command
+            // in a text tool call. The command should receive the quote itself, not
+            // a literal backslash followed by a quote.
+            return value.Replace("\\\"", "\"", StringComparison.Ordinal);
         }
 
         private static bool TryParsePayload(string payload, out string toolName, out JsonElement arguments)
@@ -496,10 +569,10 @@ namespace TxtAIEditor.Controls
             int openBraceIndex = trimmedPayload.IndexOf('{');
             if (openBraceIndex > 0)
             {
-                string possibleName = trimmedPayload.Substring(0, openBraceIndex).Trim();
+                string possibleName = NormalizeToolName(trimmedPayload.Substring(0, openBraceIndex));
                 if (IsValidToolName(possibleName))
                 {
-                    toolName = possibleName;
+                    toolName = NormalizeToolName(possibleName);
                     string jsonPart = trimmedPayload.Substring(openBraceIndex);
 
                     if (TryExtractBalancedJsonObject(trimmedPayload, openBraceIndex, out string balancedJson))
@@ -531,7 +604,7 @@ namespace TxtAIEditor.Controls
                     var root = document.RootElement.Clone();
                     if (root.TryGetProperty("name", out var nameProp))
                     {
-                        toolName = nameProp.GetString() ?? string.Empty;
+                        toolName = NormalizeToolName(nameProp.GetString() ?? string.Empty);
                         if (!IsValidToolName(toolName))
                         {
                             return false;
@@ -725,7 +798,7 @@ namespace TxtAIEditor.Controls
 
                 string repairedJson = JsonSerializer.Serialize(argumentValues);
                 using var argumentsDocument = JsonDocument.Parse(repairedJson);
-                toolName = DecodeLenientJsonString(name);
+                toolName = NormalizeToolName(DecodeLenientJsonString(name));
                 if (!IsValidToolName(toolName))
                 {
                     return false;
@@ -1159,8 +1232,8 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            string possibleName = payload.Substring(0, openBraceIndex).Trim();
-            return Regex.IsMatch(possibleName, @"^[a-zA-Z0-9_\-]+$");
+            string possibleName = NormalizeToolName(payload.Substring(0, openBraceIndex));
+            return IsValidToolName(possibleName);
         }
 
         private static bool LooksLikeBareToolCallEnvelope(string text)
@@ -1181,7 +1254,7 @@ namespace TxtAIEditor.Controls
                 return document.RootElement.ValueKind == JsonValueKind.Object &&
                     document.RootElement.TryGetProperty("name", out var nameProperty) &&
                     nameProperty.ValueKind == JsonValueKind.String &&
-                    IsValidToolName(nameProperty.GetString() ?? string.Empty);
+                    IsValidToolName(NormalizeToolName(nameProperty.GetString() ?? string.Empty));
             }
             catch
             {
@@ -1220,7 +1293,7 @@ namespace TxtAIEditor.Controls
                 return TryExtractTrailingBareToolCallPayload(trimmed, out payload);
             }
 
-            string possibleName = trimmed.Substring(0, openBraceIndex).Trim();
+            string possibleName = NormalizeToolName(trimmed.Substring(0, openBraceIndex));
             if (!IsValidToolName(possibleName))
             {
                 return TryExtractTrailingBareToolCallPayload(trimmed, out payload);
@@ -1247,7 +1320,7 @@ namespace TxtAIEditor.Controls
             string trimmed = text.Trim();
             foreach (Match match in Regex.Matches(
                 trimmed,
-                @"(?m)^[ \t]*(?<name>[a-zA-Z0-9_\-]+)[ \t]*(?=\{)"))
+                @"(?m)^[ \t]*(?<name>[a-zA-Z0-9_\\-]+)[ \t]*(?=\{)"))
             {
                 int lineStart = match.Index;
                 int nameEnd = match.Index + match.Length;
@@ -1353,7 +1426,7 @@ namespace TxtAIEditor.Controls
                     RegexOptions.IgnoreCase))
                 {
                     foundNameProperty = true;
-                    string toolName = DecodeLenientJsonString(match.Groups["name"].Value);
+                    string toolName = NormalizeToolName(DecodeLenientJsonString(match.Groups["name"].Value));
                     if (IsValidToolName(toolName))
                     {
                         return true;
@@ -1369,7 +1442,7 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            string possibleName = trimmed.Substring(0, openBraceIndex).Trim();
+            string possibleName = NormalizeToolName(trimmed.Substring(0, openBraceIndex));
             return IsValidToolName(possibleName);
         }
 
@@ -1390,8 +1463,15 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            toolName = DecodeLenientJsonString(match.Groups["name"].Value);
+            toolName = NormalizeToolName(DecodeLenientJsonString(match.Groups["name"].Value));
             return true;
+        }
+
+        private static string NormalizeToolName(string toolName)
+        {
+            return (toolName ?? string.Empty)
+                .Trim()
+                .Replace("\\_", "_", StringComparison.Ordinal);
         }
 
         private static bool IsValidToolName(string toolName)
@@ -1467,7 +1547,7 @@ namespace TxtAIEditor.Controls
             bool anyParsed = false;
             foreach (Match match in matches)
             {
-                string toolName = match.Groups["name"].Value;
+                string toolName = NormalizeToolName(match.Groups["name"].Value);
                 string body = match.Groups["body"].Value;
 
                 var paramRegex = new Regex("<parameter\\s+name=[\"']?(?<paramName>[a-zA-Z0-9_\\-]+)[\"']?[^>]*>(?<paramValue>.*?)</parameter>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
