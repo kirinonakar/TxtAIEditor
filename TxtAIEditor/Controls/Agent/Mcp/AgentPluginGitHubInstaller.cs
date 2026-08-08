@@ -255,7 +255,7 @@ namespace TxtAIEditor.Controls
             throw new HttpRequestException("GitHub returned too many redirects.");
         }
 
-        private static async Task ExtractArchiveAsync(
+        internal static async Task ExtractArchiveAsync(
             string archivePath,
             string extractionDirectory,
             CancellationToken cancellationToken)
@@ -318,7 +318,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static string FindExtractedRepositoryRoot(string extractionDirectory)
+        internal static string FindExtractedRepositoryRoot(string extractionDirectory)
         {
             string[] directories = Directory.GetDirectories(extractionDirectory);
             string[] files = Directory.GetFiles(extractionDirectory);
@@ -347,7 +347,7 @@ namespace TxtAIEditor.Controls
             return target;
         }
 
-        private static IReadOnlyList<string> DiscoverPluginRoots(string repositoryRoot, string targetRoot)
+        internal static IReadOnlyList<string> DiscoverPluginRoots(string repositoryRoot, string targetRoot)
         {
             string directManifest = Path.Combine(targetRoot, "plugin.json");
             if (File.Exists(directManifest))

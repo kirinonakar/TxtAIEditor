@@ -44,6 +44,12 @@ namespace TxtAIEditor.Controls
         public bool ComputerUseEnabled { get; set; }
     }
 
+    internal enum AgentPluginImportSourceKind
+    {
+        ZipArchive,
+        Folder
+    }
+
     internal sealed class AgentMcpDialogService
     {
         private readonly AgentPane _agentPane;
@@ -80,6 +86,30 @@ namespace TxtAIEditor.Controls
                 initial,
                 _getString("AgentMcpEditTitle", "MCP 수정"),
                 _getString("AgentMcpEditSaveButton", "저장"));
+        }
+
+        public async Task<AgentPluginImportSourceKind?> ShowAgentPluginImportSourceAsync()
+        {
+            var dialog = new ContentDialog
+            {
+                Title = _getString("AgentPluginImportSourceTitle", "Agent Plugin 가져오기"),
+                Content = CreateInfoText(_getString(
+                    "AgentPluginImportSourceInfo",
+                    "GitHub에서 다운로드한 ZIP 파일이나 압축을 푼 Plugin 폴더를 선택할 수 있습니다.")),
+                PrimaryButtonText = _getString("AgentPluginImportZipButton", "ZIP 파일 선택"),
+                SecondaryButtonText = _getString("AgentPluginImportFolderButton", "폴더 선택"),
+                CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = _agentPane.XamlRoot,
+                RequestedTheme = _agentPane.ActualTheme
+            };
+
+            return await ShowDialogAsync(dialog) switch
+            {
+                ContentDialogResult.Primary => AgentPluginImportSourceKind.ZipArchive,
+                ContentDialogResult.Secondary => AgentPluginImportSourceKind.Folder,
+                _ => null
+            };
         }
 
         public async Task<string?> ShowAgentPluginGitHubInstallAsync()

@@ -3853,6 +3853,10 @@ Plan: {0}</value>
   <data name="AgentPluginImportText" xml:space="preserve">
     <value>Import Agent Plugin</value>
   </data>
+  <data name="AgentPluginImportSourceTitle" xml:space="preserve"><value>Import Agent Plugin</value></data>
+  <data name="AgentPluginImportSourceInfo" xml:space="preserve"><value>Select a ZIP file downloaded from GitHub or an extracted plugin folder.</value></data>
+  <data name="AgentPluginImportZipButton" xml:space="preserve"><value>Select ZIP file</value></data>
+  <data name="AgentPluginImportFolderButton" xml:space="preserve"><value>Select folder</value></data>
   <data name="AgentPluginImportWarningTitle" xml:space="preserve">
     <value>Agent Plugin Import Warnings</value>
   </data>

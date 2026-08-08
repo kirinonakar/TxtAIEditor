@@ -3817,6 +3817,10 @@
   <data name="AgentPluginImportText" xml:space="preserve">
     <value>Agent Plugin をインポート</value>
   </data>
+  <data name="AgentPluginImportSourceTitle" xml:space="preserve"><value>Agent Plugin をインポート</value></data>
+  <data name="AgentPluginImportSourceInfo" xml:space="preserve"><value>GitHub からダウンロードした ZIP ファイル、または展開済みの Plugin フォルダーを選択できます。</value></data>
+  <data name="AgentPluginImportZipButton" xml:space="preserve"><value>ZIP ファイルを選択</value></data>
+  <data name="AgentPluginImportFolderButton" xml:space="preserve"><value>フォルダーを選択</value></data>
   <data name="AgentPluginImportWarningTitle" xml:space="preserve">
     <value>Agent Plugin インポートの警告</value>
   </data>

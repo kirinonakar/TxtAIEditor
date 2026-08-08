@@ -641,14 +641,37 @@ namespace TxtAIEditor.Controls
 
         public async Task ImportAgentPluginAsync()
         {
-            var picker = new FolderPicker
+            AgentPluginImportSourceKind? sourceKind = await _dialogService.ShowAgentPluginImportSourceAsync();
+            if (sourceKind == null)
+            {
+                return;
+            }
+
+            if (sourceKind == AgentPluginImportSourceKind.ZipArchive)
+            {
+                var picker = new FileOpenPicker
+                {
+                    ViewMode = PickerViewMode.List,
+                    SuggestedStartLocation = PickerLocationId.Downloads
+                };
+                picker.FileTypeFilter.Add(".zip");
+                _initializePickerWindow(picker);
+                var file = await picker.PickSingleFileAsync();
+                if (file != null)
+                {
+                    await ImportAgentPluginArchiveAsync(file.Path);
+                }
+
+                return;
+            }
+
+            var folderPicker = new FolderPicker
             {
                 SuggestedStartLocation = PickerLocationId.DocumentsLibrary
             };
-            picker.FileTypeFilter.Add("*");
-            _initializePickerWindow(picker);
-
-            var folder = await picker.PickSingleFolderAsync();
+            folderPicker.FileTypeFilter.Add("*");
+            _initializePickerWindow(folderPicker);
+            var folder = await folderPicker.PickSingleFolderAsync();
             if (folder == null)
             {
                 return;
@@ -657,12 +680,13 @@ namespace TxtAIEditor.Controls
             try
             {
                 AgentPluginLoadResult sourceResult = AgentPluginLoader.Load(folder.Path, _agentPluginDataDirectory);
+                string localSource = "local:" + sourceResult.PluginName.ToLowerInvariant();
+                StopPluginServersBySource(localSource);
                 string installedRoot = AgentPluginLocalInstaller.Install(
                     folder.Path,
                     Path.Combine(_agentPluginsInstallDirectory, "local"),
                     sourceResult.PluginName);
                 AgentPluginLoadResult result = AgentPluginLoader.Load(installedRoot, _agentPluginDataDirectory);
-                string localSource = "local:" + result.PluginName.ToLowerInvariant();
                 ApplyAgentPluginResult(result, localSource);
                 await SaveAsync();
 
@@ -672,6 +696,50 @@ namespace TxtAIEditor.Controls
                         _getString("AgentPluginImportWarningTitle", "Agent Plugin 가져오기 경고"),
                         string.Join(Environment.NewLine, result.Warnings));
                 }
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("AgentPluginImportErrorTitle", "Agent Plugin 가져오기 오류"),
+                    string.Format(
+                        _getString("AgentPluginImportErrorMessage", "Agent Plugin을 가져오는 중 오류가 발생했습니다: {0}"),
+                        ex.Message));
+            }
+        }
+
+        private async Task ImportAgentPluginArchiveAsync(string archivePath)
+        {
+            try
+            {
+                AgentPluginArchiveInstallResult installed = await AgentPluginArchiveInstaller.InstallAsync(
+                    archivePath,
+                    Path.Combine(_agentPluginsInstallDirectory, "local"),
+                    _agentPluginDataDirectory,
+                    StopPluginServersBySource,
+                    CancellationToken.None);
+
+                var warnings = new List<string>();
+                int mcpServerCount = 0;
+                int skillCount = 0;
+                foreach (AgentPluginArchiveInstalledPlugin plugin in installed.Plugins)
+                {
+                    AgentPluginLoadResult loaded = AgentPluginLoader.Load(
+                        plugin.PluginRoot,
+                        _agentPluginDataDirectory);
+                    ApplyAgentPluginResult(loaded, plugin.SourceKey);
+                    warnings.AddRange(loaded.Warnings);
+                    mcpServerCount += loaded.Servers.Count;
+                    skillCount += loaded.Skills.Count;
+                }
+
+                NotifyActivePluginSkills();
+                await SaveAsync();
+                await _dialogService.ShowAgentPluginInstallResultAsync(
+                    installed.DisplayName,
+                    installed.Plugins.Count,
+                    mcpServerCount,
+                    skillCount,
+                    warnings);
             }
             catch (Exception ex)
             {
