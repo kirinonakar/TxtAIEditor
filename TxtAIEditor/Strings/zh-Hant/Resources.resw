@@ -3814,4 +3814,16 @@
   <data name="SettingsToolbarGroupOrder" xml:space="preserve">
     <value>工具列按鈕順序與對齊</value>
   </data>
+  <data name="AgentPluginImportText" xml:space="preserve">
+    <value>匯入 Agent Plugin</value>
+  </data>
+  <data name="AgentPluginImportWarningTitle" xml:space="preserve">
+    <value>Agent Plugin 匯入警告</value>
+  </data>
+  <data name="AgentPluginImportErrorTitle" xml:space="preserve">
+    <value>Agent Plugin 匯入錯誤</value>
+  </data>
+  <data name="AgentPluginImportErrorMessage" xml:space="preserve">
+    <value>匯入 Agent Plugin 時發生錯誤: {0}</value>
+  </data>
 </root>

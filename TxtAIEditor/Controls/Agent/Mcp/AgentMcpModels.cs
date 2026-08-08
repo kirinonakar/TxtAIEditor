@@ -24,6 +24,12 @@ namespace TxtAIEditor.Controls
         public string OAuthScopes { get; set; } = string.Empty;
         public DateTimeOffset OAuthAccessTokenExpiresAt { get; set; }
         public Dictionary<string, string> Headers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public string AgentPluginName { get; set; } = string.Empty;
+        public string AgentPluginServerName { get; set; } = string.Empty;
+        public string AgentPluginRoot { get; set; } = string.Empty;
+        public string AgentPluginDataDirectory { get; set; } = string.Empty;
+
+        public bool IsAgentPlugin => !string.IsNullOrWhiteSpace(AgentPluginName);
     }
 
     public sealed class AgentMcpItem

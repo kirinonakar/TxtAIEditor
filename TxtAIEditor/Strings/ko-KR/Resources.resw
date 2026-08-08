@@ -3850,4 +3850,16 @@
   <data name="SettingsToolbarGroupOrder" xml:space="preserve">
     <value>툴바 버튼 순서 &amp; 정렬</value>
   </data>
+  <data name="AgentPluginImportText" xml:space="preserve">
+    <value>Agent Plugin 가져오기</value>
+  </data>
+  <data name="AgentPluginImportWarningTitle" xml:space="preserve">
+    <value>Agent Plugin 가져오기 경고</value>
+  </data>
+  <data name="AgentPluginImportErrorTitle" xml:space="preserve">
+    <value>Agent Plugin 가져오기 오류</value>
+  </data>
+  <data name="AgentPluginImportErrorMessage" xml:space="preserve">
+    <value>Agent Plugin을 가져오는 중 오류가 발생했습니다: {0}</value>
+  </data>
 </root>

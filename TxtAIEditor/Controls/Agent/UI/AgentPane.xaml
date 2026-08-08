@@ -381,6 +381,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
                                 <Button x:Name="AgentAddMcpButton"
@@ -419,8 +420,18 @@
                                         </StackPanel>
                                     </Button>
                                 </Grid>
-                                <MenuFlyoutSeparator Grid.Row="2"/>
-                                <ScrollViewer Grid.Row="3" MaxHeight="250" VerticalScrollBarVisibility="Auto">
+                                <Button x:Name="AgentImportPluginButton"
+                                        Grid.Row="2"
+                                        HorizontalAlignment="Stretch"
+                                        Click="OnAgentImportPluginClickInPanel"
+                                        Style="{StaticResource AgentButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE8B5;" FontSize="12"/>
+                                        <TextBlock x:Name="AgentImportPluginText" Text="Agent Plugin 가져오기" FontSize="11" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <MenuFlyoutSeparator Grid.Row="3"/>
+                                <ScrollViewer Grid.Row="4" MaxHeight="250" VerticalScrollBarVisibility="Auto">
                                     <StackPanel x:Name="AgentMcpListPanel" Spacing="4"/>
                                 </ScrollViewer>
                             </Grid>

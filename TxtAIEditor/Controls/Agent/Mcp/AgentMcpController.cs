@@ -33,6 +33,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentMcpBrowserUseTool _browserUseTool;
         private readonly AgentMcpRuntime _runtime;
         private readonly string _mcpFilePath;
+        private readonly string _agentPluginDataDirectory;
         private readonly List<AgentMcpServer> _servers = new();
         private readonly HashSet<string> _selectedServerIds = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, ServerStartOperation> _serverStartOperations = new(StringComparer.OrdinalIgnoreCase);
@@ -74,6 +75,7 @@ namespace TxtAIEditor.Controls
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
             _mcpFilePath = Path.Combine(settingsDir, "agent-mcp-servers.json");
+            _agentPluginDataDirectory = Path.Combine(settingsDir, "agent-plugin-data");
         }
 
         public async Task LoadAsync()
@@ -113,15 +115,26 @@ namespace TxtAIEditor.Controls
                                 s.TargetDirectory = s.TargetDirectory?.Trim() ?? string.Empty;
                                 s.Environment = AgentMcpConfigurationService.NormalizeEnvironment(s.Environment);
                                 s.Headers = AgentMcpConfigurationService.NormalizeHeaders(s.Headers);
-                                s.AuthType = NormalizeAuthType(s.AuthType, s.Headers);
-                                migratedPlaintextHeaders |= s.Headers.Values.Any(value => !string.IsNullOrWhiteSpace(value));
+                                s.AgentPluginName = s.AgentPluginName?.Trim() ?? string.Empty;
+                                s.AgentPluginServerName = s.AgentPluginServerName?.Trim() ?? string.Empty;
+                                s.AgentPluginRoot = s.AgentPluginRoot?.Trim() ?? string.Empty;
+                                s.AgentPluginDataDirectory = s.AgentPluginDataDirectory?.Trim() ?? string.Empty;
+                                s.AuthType = s.IsAgentPlugin
+                                    ? AuthTypeNone
+                                    : NormalizeAuthType(s.AuthType, s.Headers);
+                                migratedPlaintextHeaders |= !s.IsAgentPlugin &&
+                                    s.Headers.Values.Any(value => !string.IsNullOrWhiteSpace(value));
                                 migratedPlaintextOAuth |= !string.IsNullOrWhiteSpace(s.OAuthAccessToken) ||
                                     !string.IsNullOrWhiteSpace(s.OAuthRefreshToken) ||
                                     !string.IsNullOrWhiteSpace(s.OAuthClientSecret);
-                                migratedPlaintextEnvironment |= s.Environment.Values.Any(value => !string.IsNullOrEmpty(value));
-                                _credentialStore.MoveInlineHeaderValuesToCredential(s);
+                                migratedPlaintextEnvironment |= !s.IsAgentPlugin &&
+                                    s.Environment.Values.Any(value => !string.IsNullOrEmpty(value));
+                                if (!s.IsAgentPlugin)
+                                {
+                                    _credentialStore.MoveInlineHeaderValuesToCredential(s);
+                                    _credentialStore.MoveInlineEnvironmentValuesToCredential(s);
+                                }
                                 _credentialStore.MoveInlineOAuthSecretsToCredential(s);
-                                _credentialStore.MoveInlineEnvironmentValuesToCredential(s);
                                 return s;
                             }));
                     }
@@ -529,6 +542,87 @@ namespace TxtAIEditor.Controls
                 _showError(
                     _getString("AgentMcpImportErrorTitle", "MCP 가져오기 오류"),
                     string.Format(_getString("AgentMcpImportErrorMessage", "MCP 목록을 가져오는 중 오류가 발생했습니다: {0}"), ex.Message));
+            }
+        }
+
+        public async Task ImportAgentPluginAsync()
+        {
+            var picker = new FolderPicker
+            {
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+            };
+            picker.FileTypeFilter.Add("*");
+            _initializePickerWindow(picker);
+
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder == null)
+            {
+                return;
+            }
+
+            try
+            {
+                AgentPluginLoadResult result = AgentPluginLoader.Load(folder.Path, _agentPluginDataDirectory);
+                var importedNames = result.Servers
+                    .Select(server => server.AgentPluginServerName)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                foreach (AgentMcpServer staleServer in _servers
+                    .Where(server => server.AgentPluginName.Equals(result.PluginName, StringComparison.OrdinalIgnoreCase) &&
+                        !importedNames.Contains(server.AgentPluginServerName))
+                    .ToList())
+                {
+                    _credentialStore.DeleteAllCredentials(staleServer);
+                    _selectedServerIds.Remove(staleServer.Id);
+                    StopServer(staleServer.Id);
+                    _servers.Remove(staleServer);
+                }
+
+                foreach (AgentMcpServer imported in result.Servers)
+                {
+                    AgentMcpServer? existing = _servers.FirstOrDefault(server =>
+                        server.AgentPluginName.Equals(result.PluginName, StringComparison.OrdinalIgnoreCase) &&
+                        server.AgentPluginServerName.Equals(imported.AgentPluginServerName, StringComparison.OrdinalIgnoreCase));
+                    if (existing == null)
+                    {
+                        imported.Name = CreateUniqueServerName(imported.Name);
+                        _servers.Add(imported);
+                        continue;
+                    }
+
+                    existing.Transport = imported.Transport;
+                    existing.Endpoint = imported.Endpoint;
+                    existing.Command = imported.Command;
+                    existing.Arguments = imported.Arguments;
+                    existing.WorkingDirectory = imported.WorkingDirectory;
+                    existing.TargetDirectory = string.Empty;
+                    existing.Environment = imported.Environment;
+                    existing.Headers = imported.Headers;
+                    existing.AuthType = AuthTypeNone;
+                    existing.AgentPluginName = imported.AgentPluginName;
+                    existing.AgentPluginServerName = imported.AgentPluginServerName;
+                    existing.AgentPluginRoot = imported.AgentPluginRoot;
+                    existing.AgentPluginDataDirectory = imported.AgentPluginDataDirectory;
+                    _runtime.RemoveSession(existing.Id);
+                    _serverStatus.Remove(existing.Id);
+                }
+
+                await SaveAsync();
+
+                if (result.Warnings.Count > 0)
+                {
+                    _showError(
+                        _getString("AgentPluginImportWarningTitle", "Agent Plugin 가져오기 경고"),
+                        string.Join(Environment.NewLine, result.Warnings));
+                }
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("AgentPluginImportErrorTitle", "Agent Plugin 가져오기 오류"),
+                    string.Format(
+                        _getString("AgentPluginImportErrorMessage", "Agent Plugin을 가져오는 중 오류가 발생했습니다: {0}"),
+                        ex.Message));
             }
         }
 
@@ -993,6 +1087,10 @@ namespace TxtAIEditor.Controls
                     string connectionDetail = AgentMcpTransportTypes.IsStdio(server.Transport)
                         ? $"stdio: {server.Command} {connectionArguments}".TrimEnd()
                         : server.Endpoint;
+                    if (server.IsAgentPlugin)
+                    {
+                        connectionDetail = $"Agent Plugin · {connectionDetail}";
+                    }
                     if (isMemoryServer && !string.IsNullOrWhiteSpace(server.TargetDirectory))
                     {
                         connectionDetail += $" - memory: {Path.Combine(server.TargetDirectory, "memory.jsonl")}";
@@ -1010,7 +1108,8 @@ namespace TxtAIEditor.Controls
                         Name = server.Name,
                         Endpoint = connectionDetail,
                         Detail = detail,
-                        IsSelected = _selectedServerIds.Contains(server.Id)
+                        IsSelected = _selectedServerIds.Contains(server.Id),
+                        CanEdit = !server.IsAgentPlugin
                     };
                 })
                 .ToList());
@@ -1133,6 +1232,24 @@ namespace TxtAIEditor.Controls
         private AgentMcpServer? FindServer(string name)
         {
             return _servers.FirstOrDefault(server => server.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private string CreateUniqueServerName(string requestedName)
+        {
+            if (_servers.All(server => !server.Name.Equals(requestedName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return requestedName;
+            }
+
+            int suffix = 2;
+            string candidate;
+            do
+            {
+                candidate = $"{requestedName} ({suffix++})";
+            }
+            while (_servers.Any(server => server.Name.Equals(candidate, StringComparison.OrdinalIgnoreCase)));
+
+            return candidate;
         }
 
         private List<AgentMcpServer> GetSelectedServers()

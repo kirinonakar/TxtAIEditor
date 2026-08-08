@@ -20,6 +20,13 @@ namespace TxtAIEditor.Controls
         {
             Timeout = TimeSpan.FromSeconds(30)
         };
+        private static readonly HttpClient AgentPluginHttpClient = new(new HttpClientHandler
+        {
+            AllowAutoRedirect = false
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
 
         private readonly AgentMcpCredentialStore _credentialStore;
         private readonly AgentMcpOAuthService _oauthService;
@@ -267,7 +274,7 @@ namespace TxtAIEditor.Controls
             };
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
-            if (server.AuthType.Equals(AuthTypeApiKey, StringComparison.OrdinalIgnoreCase))
+            if (server.AuthType.Equals(AuthTypeApiKey, StringComparison.OrdinalIgnoreCase) || server.IsAgentPlugin)
             {
                 foreach (var header in server.Headers)
                 {
@@ -292,7 +299,8 @@ namespace TxtAIEditor.Controls
                 request.Headers.TryAddWithoutValidation("Mcp-Session-Id", session.SessionId);
             }
 
-            using HttpResponseMessage response = await HttpClient.SendAsync(request, cancellationToken);
+            HttpClient httpClient = server.IsAgentPlugin ? AgentPluginHttpClient : HttpClient;
+            using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
             if (response.Headers.TryGetValues("Mcp-Session-Id", out var sessionIds))
             {
                 session.SessionId = sessionIds.FirstOrDefault() ?? session.SessionId;
@@ -339,7 +347,7 @@ namespace TxtAIEditor.Controls
         {
             var startInfo = new ProcessStartInfo
             {
-                FileName = ResolveCommand(server.Command),
+                FileName = ResolveCommand(AgentPluginLoader.ResolveRuntimeCommand(server)),
                 UseShellExecute = false,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
@@ -352,7 +360,7 @@ namespace TxtAIEditor.Controls
 
             foreach (string argument in server.Arguments)
             {
-                startInfo.ArgumentList.Add(argument);
+                startInfo.ArgumentList.Add(AgentPluginLoader.ExpandRuntimeVariables(server, argument));
             }
 
             string targetDirectory = string.IsNullOrWhiteSpace(server.TargetDirectory)
@@ -367,6 +375,11 @@ namespace TxtAIEditor.Controls
             string workingDirectory = string.IsNullOrWhiteSpace(server.WorkingDirectory)
                 ? _workspaceRootProvider()
                 : Environment.ExpandEnvironmentVariables(server.WorkingDirectory.Trim().Trim('"'));
+            if (server.IsAgentPlugin)
+            {
+                Directory.CreateDirectory(server.AgentPluginDataDirectory);
+                workingDirectory = AgentPluginLoader.ResolveRuntimeWorkingDirectory(server);
+            }
             if (!string.IsNullOrWhiteSpace(workingDirectory))
             {
                 startInfo.WorkingDirectory = Path.GetFullPath(workingDirectory);
@@ -374,11 +387,17 @@ namespace TxtAIEditor.Controls
 
             foreach (var variable in server.Environment)
             {
-                startInfo.Environment[variable.Key] = _credentialStore.GetEnvironmentSecret(server, variable.Key, variable.Value);
+                string value = _credentialStore.GetEnvironmentSecret(server, variable.Key, variable.Value);
+                startInfo.Environment[variable.Key] = AgentPluginLoader.ExpandRuntimeVariables(server, value);
             }
             if (!string.IsNullOrWhiteSpace(targetDirectory) && isMemoryServer)
             {
                 startInfo.Environment["MEMORY_FILE_PATH"] = Path.Combine(targetDirectory, "memory.jsonl");
+            }
+            if (server.IsAgentPlugin)
+            {
+                startInfo.Environment["PLUGIN_ROOT"] = server.AgentPluginRoot;
+                startInfo.Environment["PLUGIN_DATA"] = server.AgentPluginDataDirectory;
             }
 
             return startInfo;

@@ -3814,4 +3814,16 @@
   <data name="SettingsToolbarGroupOrder" xml:space="preserve">
     <value>ツールバーボタンの順序と配置</value>
   </data>
+  <data name="AgentPluginImportText" xml:space="preserve">
+    <value>Agent Plugin をインポート</value>
+  </data>
+  <data name="AgentPluginImportWarningTitle" xml:space="preserve">
+    <value>Agent Plugin インポートの警告</value>
+  </data>
+  <data name="AgentPluginImportErrorTitle" xml:space="preserve">
+    <value>Agent Plugin インポートエラー</value>
+  </data>
+  <data name="AgentPluginImportErrorMessage" xml:space="preserve">
+    <value>Agent Plugin のインポート中にエラーが発生しました: {0}</value>
+  </data>
 </root>

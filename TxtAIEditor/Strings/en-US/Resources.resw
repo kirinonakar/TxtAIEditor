@@ -3850,4 +3850,16 @@ Plan: {0}</value>
   <data name="SettingsToolbarGroupOrder" xml:space="preserve">
     <value>Toolbar Button Order &amp; Alignment</value>
   </data>
+  <data name="AgentPluginImportText" xml:space="preserve">
+    <value>Import Agent Plugin</value>
+  </data>
+  <data name="AgentPluginImportWarningTitle" xml:space="preserve">
+    <value>Agent Plugin Import Warnings</value>
+  </data>
+  <data name="AgentPluginImportErrorTitle" xml:space="preserve">
+    <value>Agent Plugin Import Error</value>
+  </data>
+  <data name="AgentPluginImportErrorMessage" xml:space="preserve">
+    <value>An error occurred while importing the Agent Plugin: {0}</value>
+  </data>
 </root>

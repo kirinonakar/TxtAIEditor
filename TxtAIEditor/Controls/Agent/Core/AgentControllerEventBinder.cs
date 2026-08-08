@@ -61,6 +61,7 @@ namespace TxtAIEditor.Controls
             agentPane.AgentMcpAddRequested += async (_, _) => await mcpController.AddMcpAsync();
             agentPane.AgentMcpExportRequested += async (_, _) => await mcpController.ExportMcpAsync();
             agentPane.AgentMcpImportRequested += async (_, _) => await mcpController.ImportMcpAsync();
+            agentPane.AgentPluginImportRequested += async (_, _) => await mcpController.ImportAgentPluginAsync();
             agentPane.AgentMcpToggled += async (_, serverName) => await mcpController.ToggleMcpAsync(serverName);
             agentPane.AgentMcpEdited += async (_, serverName) => await mcpController.EditMcpAsync(serverName);
             agentPane.AgentMcpSettingsRequested += async (_, serverName) => await mcpController.ConfigureBuiltInMcpAsync(serverName);
