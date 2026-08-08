@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.UI.Xaml;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using TxtAIEditor.Core.Services;
@@ -266,14 +267,19 @@ namespace TxtAIEditor.Controls
         private void RefreshAttachments()
         {
             var items = _attachments
-                .Select(attachment => new AgentAttachmentItem
+                .Select(attachment =>
                 {
-                    Id = attachment.Id,
-                    DisplayName = attachment.DisplayName,
-                    Detail = attachment.Detail,
-                    TokenText = _displayText.FormatInlineTokenCount(attachment.EstimatedTokens),
-                    RemoveTooltip = _getString("AgentRemoveAttachmentTooltip", "Remove attachment"),
-                    IconGlyph = attachment.IsImage ? "\uEB9F" : "\uE8A5"
+                    string detail = attachment.IsPathOnlyDocument ? string.Empty : attachment.Detail;
+                    return new AgentAttachmentItem
+                    {
+                        Id = attachment.Id,
+                        DisplayName = attachment.DisplayName,
+                        Detail = detail,
+                        DetailVisibility = string.IsNullOrEmpty(detail) ? Visibility.Collapsed : Visibility.Visible,
+                        TokenText = _displayText.FormatInlineTokenCount(attachment.EstimatedTokens),
+                        RemoveTooltip = _getString("AgentRemoveAttachmentTooltip", "Remove attachment"),
+                        IconGlyph = attachment.IsImage ? "\uEB9F" : "\uE8A5"
+                    };
                 })
                 .ToList();
             _agentPane.UpdateAttachments(items);

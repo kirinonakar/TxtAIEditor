@@ -28,6 +28,7 @@ namespace TxtAIEditor.Controls
         public string Id { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public string Detail { get; set; } = string.Empty;
+        public Visibility DetailVisibility { get; set; } = Visibility.Visible;
         public string TokenText { get; set; } = string.Empty;
         public string RemoveTooltip { get; set; } = string.Empty;
         public string IconGlyph { get; set; } = "\uE8A5";

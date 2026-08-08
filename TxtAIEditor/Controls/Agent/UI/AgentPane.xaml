@@ -526,6 +526,7 @@
                                                TextTrimming="CharacterEllipsis"
                                                TextWrapping="NoWrap"/>
                                     <TextBlock Text="{Binding Detail}"
+                                               Visibility="{Binding DetailVisibility}"
                                                FontSize="10"
                                                Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
                                                TextTrimming="CharacterEllipsis"
