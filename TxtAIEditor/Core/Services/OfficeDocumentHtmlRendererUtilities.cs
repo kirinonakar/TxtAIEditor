@@ -205,7 +205,7 @@ body { padding: 28px 16px 44px; }
 @media (max-width: 952px) {
     html, body { overflow-x: auto; }
     body {
-        min-width: 952px;
+        min-width: 0;
         padding: 28px 16px 44px;
     }
     .page {
@@ -220,6 +220,40 @@ body { padding: 28px 16px 44px; }
 <main class="page">
 {{content}}
 </main>
+<script>
+(() => {
+    const page = document.querySelector('.page');
+    if (!page) {
+        return;
+    }
+
+    let resizeFrame = 0;
+    const fitPageToViewport = () => {
+        const viewportWidth = document.documentElement.clientWidth || window.innerWidth || 0;
+        const bodyStyle = getComputedStyle(document.body);
+        const horizontalPadding =
+            (parseFloat(bodyStyle.paddingLeft) || 0) +
+            (parseFloat(bodyStyle.paddingRight) || 0);
+        const availableWidth = Math.max(1, viewportWidth - horizontalPadding);
+        const baseWidth = page.offsetWidth || 1;
+        const scale = Math.min(1, Math.max(0.1, availableWidth / baseWidth));
+
+        page.style.zoom = String(scale);
+    };
+
+    fitPageToViewport();
+    window.addEventListener('resize', () => {
+        if (resizeFrame) {
+            return;
+        }
+
+        resizeFrame = requestAnimationFrame(() => {
+            resizeFrame = 0;
+            fitPageToViewport();
+        });
+    }, { passive: true });
+})();
+</script>
 </body>
 </html>
 """;
