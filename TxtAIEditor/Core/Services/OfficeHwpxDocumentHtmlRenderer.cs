@@ -179,7 +179,8 @@ namespace TxtAIEditor.Core.Services
                             characterStyles,
                             paragraphStyles,
                             borderFillStyles,
-                            table));
+                            table,
+                            block));
                     }
 
                     break;
@@ -549,7 +550,8 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyDictionary<string, string> characterStyles,
             IReadOnlyDictionary<string, string> paragraphStyles,
             IReadOnlyDictionary<string, string> borderFillStyles,
-            XElement table)
+            XElement table,
+            XElement? containingParagraph = null)
         {
             var rows = table.Elements().Where(e => e.Name.LocalName == "tr").ToList();
             if (rows.Count == 0)
@@ -573,7 +575,7 @@ namespace TxtAIEditor.Core.Services
                 "height",
                 out IReadOnlyList<double> rowHeights);
             string wrapperStyle = BuildHwpxTableWrapperStyle(table);
-            string tableStyle = BuildHwpxTableStyle(table);
+            string tableStyle = BuildHwpxTableStyle(table, containingParagraph, paragraphStyles);
             builder.Append("<div class=\"doc-table-wrap hwpx-table-wrap\"");
             AppendStyleAttribute(builder, wrapperStyle);
             builder.Append("><table class=\"doc-table hwpx-table\"");
@@ -865,7 +867,10 @@ namespace TxtAIEditor.Core.Services
             return "margin:" + HwpxPoints(top) + " 0 " + HwpxPoints(bottom);
         }
 
-        private static string BuildHwpxTableStyle(XElement table)
+        private static string BuildHwpxTableStyle(
+            XElement table,
+            XElement? containingParagraph,
+            IReadOnlyDictionary<string, string> paragraphStyles)
         {
             var styles = new List<string>();
             if (TryReadHwpxDimensions(table, "sz", out double width, out double height))
@@ -888,6 +893,14 @@ namespace TxtAIEditor.Core.Services
 
             XElement? position = table.Elements().FirstOrDefault(e => e.Name.LocalName == "pos");
             string horizontalAlignment = GetAttributeValue(position, "horzAlign").ToUpperInvariant();
+            bool treatAsCharacter = GetAttributeValue(position, "treatAsChar") == "1";
+            string paragraphAlignment = GetHwpxHorizontalAlignment(containingParagraph, paragraphStyles);
+            if (treatAsCharacter && !string.IsNullOrWhiteSpace(paragraphAlignment))
+            {
+                horizontalAlignment = paragraphAlignment;
+            }
+
+            double horizontalOffset = ReadHwpxSignedOffset(position, "horzOffset");
             switch (horizontalAlignment)
             {
                 case "CENTER":
@@ -899,12 +912,58 @@ namespace TxtAIEditor.Core.Services
                     styles.Add("margin-right:0");
                     break;
                 default:
-                    styles.Add("margin-left:0");
+                    styles.Add("margin-left:" + HwpxPoints(horizontalOffset));
                     styles.Add("margin-right:auto");
                     break;
             }
 
             return string.Join(';', styles);
+        }
+
+        private static string GetHwpxHorizontalAlignment(
+            XElement? paragraph,
+            IReadOnlyDictionary<string, string> paragraphStyles)
+        {
+            if (paragraph == null)
+            {
+                return string.Empty;
+            }
+
+            string style = GetHwpxParagraphStyle(paragraph, paragraphStyles);
+            if (style.Contains("text-align:center", StringComparison.OrdinalIgnoreCase))
+            {
+                return "CENTER";
+            }
+
+            if (style.Contains("text-align:right", StringComparison.OrdinalIgnoreCase))
+            {
+                return "RIGHT";
+            }
+
+            if (style.Contains("text-align:left", StringComparison.OrdinalIgnoreCase))
+            {
+                return "LEFT";
+            }
+
+            return string.Empty;
+        }
+
+        private static double ReadHwpxSignedOffset(XElement? element, string attributeName)
+        {
+            string value = GetAttributeValue(element, attributeName);
+            if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long offset))
+            {
+                return 0;
+            }
+
+            // HWPX stores position offsets as unsigned XML values even when the
+            // source document uses a negative signed 32-bit offset.
+            if (offset > int.MaxValue && offset <= uint.MaxValue)
+            {
+                offset -= 1L << 32;
+            }
+
+            return offset;
         }
 
         private static string BuildHwpxBoxSpacingStyle(

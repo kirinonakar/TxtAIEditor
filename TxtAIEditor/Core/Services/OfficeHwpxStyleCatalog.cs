@@ -47,7 +47,8 @@ namespace TxtAIEditor.Core.Services
                     "RIGHT" => "text-align:right",
                     "CENTER" => "text-align:center",
                     "JUSTIFY" => "text-align:justify",
-                    "DISTRIBUTE" or "DISTRIBUTE_SPACE" => "text-align:justify;text-align-last:justify",
+                    "DISTRIBUTE" => "text-align:center",
+                    "DISTRIBUTE_SPACE" => "text-align:justify;text-align-last:justify",
                     "LEFT" => "text-align:left",
                     _ => string.Empty
                 };
