@@ -164,9 +164,15 @@ body { padding: 28px 16px 40px; }
 .ppt-shape p { width: 100%; margin: 0; line-height: 1.15; }
 .ppt-shape p:last-child { margin-bottom: 0; }
 .ppt-shape p.ppt-empty-paragraph {
-    height: .32em;
-    min-height: .32em;
-    line-height: .32em !important;
+    /*
+       Empty paragraphs in a PowerPoint text box are real layout rows.  They
+       are commonly used to leave space for a timeline, image, or chart.  Do
+       not collapse them or the following paragraph is pulled over adjacent
+       slide content.
+    */
+    height: auto;
+    min-height: 0;
+    line-height: inherit !important;
     overflow: hidden;
 }
 .ppt-shape span { white-space: pre-wrap; }

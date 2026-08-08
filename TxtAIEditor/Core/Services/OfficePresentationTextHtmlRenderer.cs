@@ -155,7 +155,7 @@ namespace TxtAIEditor.Core.Services
                     .Append('"');
             }
 
-            builder.Append("></p>");
+            builder.Append("><br aria-hidden=\"true\"></p>");
         }
 
         public static string BuildTableHtml(
