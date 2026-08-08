@@ -31,18 +31,19 @@ namespace TxtAIEditor.Core.Services.LLM
             string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:1234/v1" : endpoint.Trim();
             string requestUrl = baseEndpoint.TrimEnd('/') + "/chat/completions";
 
-            var payload = new
+            var payloadDict = new Dictionary<string, object>
             {
-                model = model,
-                messages = new[]
+                ["model"] = model,
+                ["messages"] = new[]
                 {
                     new { role = "system", content = (object)systemPrompt },
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
-                temperature = 0.5
+                ["temperature"] = 0.5
             };
+            AddTools(payloadDict, tools);
 
-            string jsonPayload = JsonSerializer.Serialize(payload);
+            string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
                 if (!string.IsNullOrWhiteSpace(apiKey))
@@ -71,14 +72,28 @@ namespace TxtAIEditor.Core.Services.LLM
                             var firstChoice = choices[0];
                             if (firstChoice.TryGetProperty("message", out var message))
                             {
+                                string? contentText = null;
                                 if (message.TryGetProperty("content", out var content) &&
                                     content.ValueKind == JsonValueKind.String)
                                 {
-                                    string? contentText = content.GetString();
-                                    if (!string.IsNullOrEmpty(contentText))
+                                    contentText = content.GetString();
+                                }
+
+                                if (message.TryGetProperty("tool_calls", out var toolCalls) &&
+                                    toolCalls.ValueKind == JsonValueKind.Array &&
+                                    toolCalls.GetArrayLength() > 0)
+                                {
+                                    var firstToolCall = toolCalls[0];
+                                    if (onNativeToolCall != null)
                                     {
-                                        return contentText;
+                                        await onNativeToolCall();
                                     }
+                                    return LlmToolCallTextFormatter.FormatAssistantResponseWithFunctionToolCall(contentText, firstToolCall);
+                                }
+
+                                if (!string.IsNullOrEmpty(contentText))
+                                {
+                                    return contentText;
                                 }
 
                                 if (message.TryGetProperty("reasoning_content", out var reasoningContent) &&
@@ -118,19 +133,20 @@ namespace TxtAIEditor.Core.Services.LLM
             string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:1234/v1" : endpoint.Trim();
             string requestUrl = baseEndpoint.TrimEnd('/') + "/chat/completions";
 
-            var payload = new
+            var payloadDict = new Dictionary<string, object>
             {
-                model = model,
-                messages = new[]
+                ["model"] = model,
+                ["messages"] = new[]
                 {
                     new { role = "system", content = (object)systemPrompt },
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
-                temperature = 0.5,
-                stream = true
+                ["temperature"] = 0.5,
+                ["stream"] = true
             };
+            AddTools(payloadDict, tools);
 
-            string jsonPayload = JsonSerializer.Serialize(payload);
+            string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
                 if (!string.IsNullOrWhiteSpace(apiKey))
@@ -151,6 +167,9 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
                     using (var reader = new System.IO.StreamReader(stream))
                     {
+                        var toolAccumulator = new StreamToolCallAccumulator();
+                        bool hasToolCalls = false;
+
                         while (true)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -175,7 +194,64 @@ namespace TxtAIEditor.Core.Services.LLM
                                         var firstChoice = choices[0];
                                         if (firstChoice.TryGetProperty("delta", out var delta))
                                         {
-                                            if (delta.TryGetProperty("content", out var content) &&
+                                            if (delta.TryGetProperty("tool_calls", out var toolCalls) &&
+                                                toolCalls.ValueKind == JsonValueKind.Array &&
+                                                toolCalls.GetArrayLength() > 0)
+                                            {
+                                                if (!hasToolCalls)
+                                                {
+                                                    hasToolCalls = true;
+                                                    if (onNativeToolCall != null)
+                                                    {
+                                                        await onNativeToolCall();
+                                                    }
+                                                }
+
+                                                var tc = toolCalls[0];
+                                                if (tc.TryGetProperty("function", out var function))
+                                                {
+                                                    if (function.TryGetProperty("name", out var nameProperty))
+                                                    {
+                                                        string nameChunk = nameProperty.GetString() ?? string.Empty;
+                                                        if (!string.IsNullOrEmpty(nameChunk))
+                                                        {
+                                                            toolAccumulator.Name += nameChunk;
+                                                            if (!toolAccumulator.SentStartTag)
+                                                            {
+                                                                toolAccumulator.SentStartTag = true;
+                                                                await onChunk($"<tool_call>{{\"name\":\"{nameChunk}");
+                                                            }
+                                                            else
+                                                            {
+                                                                await onChunk(nameChunk);
+                                                            }
+                                                        }
+                                                    }
+
+                                                    if (function.TryGetProperty("arguments", out var argumentsProperty))
+                                                    {
+                                                        string argumentsChunk = argumentsProperty.GetString() ?? string.Empty;
+                                                        if (!string.IsNullOrEmpty(argumentsChunk))
+                                                        {
+                                                            toolAccumulator.Arguments.Append(argumentsChunk);
+                                                            if (!toolAccumulator.SentStartTag)
+                                                            {
+                                                                toolAccumulator.SentStartTag = true;
+                                                                await onChunk("<tool_call>{\"name\":\"\",\"arguments\":");
+                                                                toolAccumulator.SentArgumentsHeader = true;
+                                                            }
+                                                            else if (!toolAccumulator.SentArgumentsHeader)
+                                                            {
+                                                                toolAccumulator.SentArgumentsHeader = true;
+                                                                await onChunk("\",\"arguments\":");
+                                                            }
+
+                                                            await onChunk(argumentsChunk);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            else if (delta.TryGetProperty("content", out var content) &&
                                                 content.ValueKind == JsonValueKind.String)
                                             {
                                                 string? text = content.GetString();
@@ -214,9 +290,48 @@ namespace TxtAIEditor.Core.Services.LLM
                             {
                             }
                         }
+
+                        if (hasToolCalls)
+                        {
+                            if (!toolAccumulator.SentStartTag)
+                            {
+                                await onChunk("<tool_call>{\"name\":\"\",\"arguments\":{}");
+                            }
+                            else if (!toolAccumulator.SentArgumentsHeader)
+                            {
+                                await onChunk("\",\"arguments\":{}");
+                            }
+
+                            await onChunk("}</tool_call>");
+                        }
                     }
                 }
             }
+        }
+
+        private static void AddTools(Dictionary<string, object> payloadDict, IReadOnlyList<LlmTool>? tools)
+        {
+            if (tools == null || tools.Count == 0)
+            {
+                return;
+            }
+
+            var toolsList = new List<object>();
+            foreach (var tool in tools)
+            {
+                toolsList.Add(new
+                {
+                    type = "function",
+                    function = new
+                    {
+                        name = tool.Name,
+                        description = tool.Description,
+                        parameters = tool.Parameters
+                    }
+                });
+            }
+
+            payloadDict["tools"] = toolsList;
         }
 
         private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)

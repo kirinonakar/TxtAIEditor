@@ -334,8 +334,9 @@ namespace TxtAIEditor.Controls
             string provider = NormalizeProviderName(settings?.LlmProvider);
             string model = settings?.LlmModel ?? string.Empty;
 
-            // These providers currently ignore the native tools argument; their text tool protocol is already counted in the system prompt.
-            if (provider is "gemini" or "lmstudio" or "ollama")
+            // Gemini uses its own function declaration path here; LM Studio and Ollama
+            // receive the catalog through their OpenAI-compatible tools field.
+            if (provider is "gemini")
             {
                 return false;
             }

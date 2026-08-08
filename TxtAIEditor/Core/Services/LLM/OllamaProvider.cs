@@ -126,7 +126,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     ["include_usage"] = true
                 };
             }
-            if (_isCloud && tools != null && tools.Count > 0)
+            if (tools != null && tools.Count > 0)
             {
                 var toolsList = new List<object>();
                 foreach (var tool in tools)
