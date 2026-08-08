@@ -186,6 +186,18 @@ body { padding: 28px 16px 44px; }
         box-shadow: none;
     }
 }
+@media (max-width: 952px) {
+    html, body { overflow-x: auto; }
+    body {
+        min-width: 952px;
+        padding: 28px 16px 44px;
+    }
+    .page {
+        width: 920px;
+        min-width: 920px;
+        padding: 56px;
+    }
+}
 </style>
 </head>
 <body>
