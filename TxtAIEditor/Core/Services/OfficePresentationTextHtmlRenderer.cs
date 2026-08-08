@@ -53,7 +53,11 @@ namespace TxtAIEditor.Core.Services
                 string text = ReadParagraphText(paragraph);
                 if (string.IsNullOrWhiteSpace(text))
                 {
-                    if (paragraphIndex < paragraphElements.Count)
+                    bool hasFollowingContent = paragraphElements
+                        .Skip(paragraphIndex)
+                        .Any(nextParagraph =>
+                            !string.IsNullOrWhiteSpace(ReadParagraphText(nextParagraph)));
+                    if (hasFollowingContent)
                     {
                         string emptyParagraphStyle = ReadParagraphStyle(
                             paragraph,
@@ -143,7 +147,7 @@ namespace TxtAIEditor.Core.Services
             StringBuilder builder,
             string paragraphStyle)
         {
-            builder.Append("<p");
+            builder.Append("<p class=\"ppt-empty-paragraph\" aria-hidden=\"true\"");
             if (!string.IsNullOrWhiteSpace(paragraphStyle))
             {
                 builder.Append(" style=\"")
@@ -151,7 +155,7 @@ namespace TxtAIEditor.Core.Services
                     .Append('"');
             }
 
-            builder.Append("><br></p>");
+            builder.Append("></p>");
         }
 
         public static string BuildTableHtml(
@@ -943,9 +947,32 @@ namespace TxtAIEditor.Core.Services
 
             XElement? endParagraphRunProperties = paragraph.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "endParaRPr");
-            if (HasRunVisualProperties(endParagraphRunProperties))
+            if (endParagraphRunProperties != null &&
+                HasRunVisualProperties(endParagraphRunProperties))
             {
-                return endParagraphRunProperties;
+                XElement? levelProperties = ReadParagraphLevelProperties(
+                    textBody,
+                    inheritedBodyStyle,
+                    ReadParagraphLevel(paragraph));
+                XElement? inheritedDefaultRunProperties = levelProperties?.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "defRPr");
+                bool hasInheritedFontSize = inheritedDefaultRunProperties?.Attribute("sz") != null;
+                // PowerPoint may store a small editing default in endParaRPr;
+                // it must not override the level's actual text size.
+                if (hasInheritedFontSize &&
+                    endParagraphRunProperties.Attribute("sz") != null)
+                {
+                    XElement adjustedProperties = new XElement(endParagraphRunProperties);
+                    adjustedProperties.Attribute("sz")?.Remove();
+                    if (HasRunVisualProperties(adjustedProperties))
+                    {
+                        return adjustedProperties;
+                    }
+                }
+                else
+                {
+                    return endParagraphRunProperties;
+                }
             }
 
             return ReadParagraphLevelProperties(
@@ -1091,17 +1118,32 @@ namespace TxtAIEditor.Core.Services
                 .Where(size => size > 0)
                 .ToList();
 
-            XElement? endParagraphProperties = paragraph.Elements()
-                .FirstOrDefault(e => e.Name.LocalName == "endParaRPr");
-            if (endParagraphProperties?.Attribute("sz")?.Value is string endSizeValue &&
-                int.TryParse(
-                    endSizeValue,
-                    NumberStyles.Integer,
-                    CultureInfo.InvariantCulture,
-                    out int endSize) &&
-                endSize > 0)
+            XElement? paragraphDefaultRunProperties = paragraphProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "defRPr");
+            XElement? levelProperties = ReadParagraphLevelProperties(
+                textBody,
+                inheritedBodyStyle,
+                ReadParagraphLevel(paragraph));
+            XElement? inheritedDefaultRunProperties = levelProperties?.Elements()
+                .FirstOrDefault(e => e.Name.LocalName == "defRPr");
+            bool hasInheritedFontSize = inheritedDefaultRunProperties?.Attribute("sz") != null;
+            bool hasParagraphFontSize = paragraphDefaultRunProperties?.Attribute("sz") != null;
+            if (sizes.Count == 0 &&
+                !hasInheritedFontSize &&
+                !hasParagraphFontSize)
             {
-                sizes.Add(endSize);
+                string? endSizeValue = paragraph.Elements()
+                    .FirstOrDefault(e => e.Name.LocalName == "endParaRPr")?
+                    .Attribute("sz")?.Value;
+                if (int.TryParse(
+                        endSizeValue,
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out int endSize) &&
+                    endSize > 0)
+                {
+                    sizes.Add(endSize);
+                }
             }
 
             if (sizes.Count == 0)
@@ -1116,12 +1158,6 @@ namespace TxtAIEditor.Core.Services
                     PointsToPixels(points, slideWidth, baseWidthPx) * fontScale) +
                 "px;");
 
-            XElement? levelProperties = ReadParagraphLevelProperties(
-                textBody,
-                inheritedBodyStyle,
-                ReadParagraphLevel(paragraph));
-            XElement? inheritedDefaultRunProperties = levelProperties?.Elements()
-                .FirstOrDefault(e => e.Name.LocalName == "defRPr");
             if (inheritedDefaultRunProperties?.Attribute("sz")?.Value is string inheritedSizeValue &&
                 int.TryParse(
                     inheritedSizeValue,

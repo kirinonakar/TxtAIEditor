@@ -163,6 +163,12 @@ body { padding: 28px 16px 40px; }
 }
 .ppt-shape p { width: 100%; margin: 0; line-height: 1.15; }
 .ppt-shape p:last-child { margin-bottom: 0; }
+.ppt-shape p.ppt-empty-paragraph {
+    height: .32em;
+    min-height: .32em;
+    line-height: .32em !important;
+    overflow: hidden;
+}
 .ppt-shape span { white-space: pre-wrap; }
 .ppt-shape span.ppt-math {
     white-space: nowrap;
@@ -284,7 +290,9 @@ function fitTextBox(box) {
     const scale = Math.min(1, availableWidth / neededWidth, availableHeight / neededHeight);
 
     if (scale < 0.995) {
-        const fitScale = Math.max(0.45, scale * 0.985);
+        // Keep dense presentation text readable. The previous 0.45 floor made
+        // slides with paragraph separators look like thumbnails in the viewer.
+        const fitScale = Math.max(0.82, scale * 0.985);
         text.style.width = `${100 / fitScale}%`;
         text.style.transform = `scale(${fitScale})`;
     }
