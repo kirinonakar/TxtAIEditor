@@ -1313,6 +1313,9 @@
   <data name="ShortcutDescWordWrap" xml:space="preserve">
     <value>Word Wrap 토글</value>
   </data>
+  <data name="ShortcutDescDocumentZoom" xml:space="preserve">
+    <value>문서 뷰어 확대/축소</value>
+  </data>
   <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
     <value>우측 패널 확장</value>
   </data>

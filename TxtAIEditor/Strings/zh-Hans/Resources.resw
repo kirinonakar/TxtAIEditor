@@ -1313,6 +1313,9 @@
   <data name="ShortcutDescWordWrap" xml:space="preserve">
     <value>切换自动换行</value>
   </data>
+  <data name="ShortcutDescDocumentZoom" xml:space="preserve">
+    <value>文档查看器放大/缩小</value>
+  </data>
   <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
     <value>展开右侧面板</value>
   </data>

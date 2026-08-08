@@ -165,7 +165,7 @@ TxtAIEditor is designed for speed and productivity, packing standard IDE shortcu
 | `Ctrl + C` | Copy |
 | `Ctrl + V` | Paste |
 | `Ctrl + X` | Cut |
-| `Ctrl + Mouse Wheel` | Zoom In / Out |
+| `Ctrl + Mouse Wheel` | Zoom In / Out in the document viewer |
 | `Ctrl + Enter` | Send AI Prompt |
 | `Alt + Z` | Toggle Word Wrap |
 | `F3` | Toggle Explorer Tree Mode |

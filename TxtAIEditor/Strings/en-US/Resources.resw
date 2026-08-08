@@ -1313,6 +1313,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ShortcutDescWordWrap" xml:space="preserve">
     <value>Toggle Word Wrap</value>
   </data>
+  <data name="ShortcutDescDocumentZoom" xml:space="preserve">
+    <value>Zoom In / Out in the Document Viewer</value>
+  </data>
   <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
     <value>Expand Right Panel</value>
   </data>
