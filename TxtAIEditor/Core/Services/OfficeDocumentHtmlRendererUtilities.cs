@@ -16,8 +16,20 @@ namespace TxtAIEditor.Core.Services
 {
     internal static class OfficeDocumentHtmlRendererUtilities
     {
-        internal static string BuildDocumentHtml(string title, string content)
+        internal static string BuildDocumentHtml(
+            string title,
+            string content,
+            string? pageWidth = null,
+            string? pagePadding = null)
         {
+            string documentPageWidth = string.IsNullOrWhiteSpace(pageWidth) ? "920px" : pageWidth;
+            string responsivePageWidth = string.IsNullOrWhiteSpace(pageWidth)
+                ? "min(920px, calc(100vw - 32px))"
+                : documentPageWidth;
+            string documentPagePadding = string.IsNullOrWhiteSpace(pagePadding)
+                ? "clamp(24px, 5vw, 56px)"
+                : pagePadding;
+
             return $$"""
 <!doctype html>
 <html lang="ko">
@@ -34,6 +46,9 @@ namespace TxtAIEditor.Core.Services
     --muted: #667085;
     --line: #d8dee8;
     --table-head: #f1f4f8;
+    --document-page-width: {{documentPageWidth}};
+    --document-page-responsive-width: {{responsivePageWidth}};
+    --document-page-padding: {{documentPagePadding}};
 }
 @media (prefers-color-scheme: dark) {
     :root {
@@ -49,10 +64,10 @@ namespace TxtAIEditor.Core.Services
 html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: "Segoe UI", "Malgun Gothic", Arial, sans-serif; }
 body { padding: 28px 16px 44px; }
 .page {
-    width: min(920px, calc(100vw - 32px));
+    width: var(--document-page-responsive-width);
     min-height: calc(100vh - 72px);
     margin: 0 auto;
-    padding: clamp(24px, 5vw, 56px);
+    padding: var(--document-page-padding);
     background: var(--paper);
     border: 1px solid var(--line);
     box-shadow: 0 18px 44px rgba(15, 23, 42, .12);
@@ -86,6 +101,7 @@ body { padding: 28px 16px 44px; }
 .doc-table .doc-paragraph:last-child { margin-bottom: 0; }
 .doc-table.hwpx-table {
     width: auto;
+    max-width: 100%;
     table-layout: fixed;
 }
 .doc-table.hwpx-table td {
@@ -193,9 +209,9 @@ body { padding: 28px 16px 44px; }
         padding: 28px 16px 44px;
     }
     .page {
-        width: 920px;
-        min-width: 920px;
-        padding: 56px;
+        width: var(--document-page-width);
+        min-width: var(--document-page-width);
+        padding: var(--document-page-padding);
     }
 }
 </style>

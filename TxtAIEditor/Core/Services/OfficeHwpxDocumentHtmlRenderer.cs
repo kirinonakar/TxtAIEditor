@@ -97,9 +97,18 @@ namespace TxtAIEditor.Core.Services
             }
 
             var content = new StringBuilder();
+            string? pageWidth = null;
+            string? pagePadding = null;
             foreach (ZipArchiveEntry sectionEntry in sectionEntries)
             {
                 XDocument section = await LoadHwpxSectionXmlAsync(sectionEntry).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(pageWidth) &&
+                    TryReadHwpxPageLayout(section, out string sectionPageWidth, out string sectionPagePadding))
+                {
+                    pageWidth = sectionPageWidth;
+                    pagePadding = sectionPagePadding;
+                }
+
                 AppendHwpxChildrenHtml(
                     content,
                     archive,
@@ -115,7 +124,7 @@ namespace TxtAIEditor.Core.Services
                 return BuildErrorHtml(getString("OfficeViewerNoContent", "No content to display."));
             }
 
-            return BuildDocumentHtml(Path.GetFileName(filePath), content.ToString());
+            return BuildDocumentHtml(Path.GetFileName(filePath), content.ToString(), pageWidth, pagePadding);
         }
 
         private static async Task<XDocument> LoadHwpxSectionXmlAsync(ZipArchiveEntry entry)
@@ -1573,6 +1582,38 @@ namespace TxtAIEditor.Core.Services
                 : Html(color);
         }
 
+        private static bool TryReadHwpxPageLayout(
+            XDocument section,
+            out string pageWidth,
+            out string pagePadding)
+        {
+            pageWidth = string.Empty;
+            pagePadding = string.Empty;
+
+            XElement? pageProperties = section.Descendants()
+                .FirstOrDefault(element => element.Name.LocalName == "pagePr");
+            double width = ReadHwpxDoubleAttribute(pageProperties, "width");
+            if (width <= 0)
+            {
+                return false;
+            }
+
+            pageWidth = HwpxPoints(width);
+            XElement? margin = pageProperties?.Elements()
+                .FirstOrDefault(element => element.Name.LocalName == "margin");
+            if (margin != null)
+            {
+                pagePadding = string.Join(
+                    ' ',
+                    HwpxPoints(ReadHwpxDoubleAttribute(margin, "top")),
+                    HwpxPoints(ReadHwpxDoubleAttribute(margin, "right")),
+                    HwpxPoints(ReadHwpxDoubleAttribute(margin, "bottom")),
+                    HwpxPoints(ReadHwpxDoubleAttribute(margin, "left")));
+            }
+
+            return true;
+        }
+
         private static bool TryReadHwpxSize(XElement element, out double width, out double height)
         {
             return TryReadHwpxDimensions(element, "curSz", out width, out height);
@@ -1658,8 +1699,8 @@ namespace TxtAIEditor.Core.Services
             }
 
             var styles = new List<string>();
-            if (TryReadHwpxSize(element, out double width, out double height) ||
-                TryReadHwpxDimensions(element, "sz", out width, out height))
+            if (TryReadHwpxDimensions(element, "sz", out double width, out double height) ||
+                TryReadHwpxSize(element, out width, out height))
             {
                 styles.Add("width:" + HwpxPoints(width));
                 styles.Add("height:" + HwpxPoints(height));
