@@ -3862,4 +3862,19 @@
   <data name="AgentPluginImportErrorMessage" xml:space="preserve">
     <value>Agent Plugin을 가져오는 중 오류가 발생했습니다: {0}</value>
   </data>
+  <data name="AgentPluginGitHubInstallMenuText" xml:space="preserve"><value>GitHub에서 설치</value></data>
+  <data name="AgentPluginGitHubUrlPlaceholder" xml:space="preserve"><value>https://github.com/owner/repository</value></data>
+  <data name="AgentPluginGitHubUrlLabel" xml:space="preserve"><value>GitHub 저장소 URL</value></data>
+  <data name="AgentPluginGitHubInstallInfo" xml:space="preserve"><value>공개 GitHub 저장소, 태그(#v1.0.0), 또는 /tree/&lt;ref&gt;/&lt;path&gt; 주소를 지원합니다. Plugin을 활성화하면 포함된 MCP와 Skills가 함께 활성화됩니다.</value></data>
+  <data name="AgentPluginGitHubInstallTitle" xml:space="preserve"><value>GitHub에서 Agent Plugin 설치</value></data>
+  <data name="AgentPluginGitHubInstallButton" xml:space="preserve"><value>설치</value></data>
+  <data name="AgentPluginGitHubInstallSuccessFormat" xml:space="preserve"><value>{0} 설치 완료&#xA;Plugin {1}개 · MCP {2}개 · Skill {3}개</value></data>
+  <data name="AgentPluginInstallWarningsLabel" xml:space="preserve"><value>경고:</value></data>
+  <data name="AgentPluginGitHubInstallCompleteTitle" xml:space="preserve"><value>Agent Plugin 설치 완료</value></data>
+  <data name="AgentPluginGitHubInstallErrorTitle" xml:space="preserve"><value>GitHub Agent Plugin 설치 오류</value></data>
+  <data name="AgentPluginGitHubInstallErrorMessage" xml:space="preserve"><value>GitHub에서 Agent Plugin을 설치하는 중 오류가 발생했습니다: {0}</value></data>
+  <data name="AgentPluginComponentSummaryFormat" xml:space="preserve"><value>MCP {0}개 · Skill {1}개</value></data>
+  <data name="AgentPluginChipPrefix" xml:space="preserve"><value>Plugin: </value></data>
+  <data name="AgentPluginRemoveTooltip" xml:space="preserve"><value>Plugin 비활성화</value></data>
+  <data name="DialogOk" xml:space="preserve"><value>확인</value></data>
 </root>

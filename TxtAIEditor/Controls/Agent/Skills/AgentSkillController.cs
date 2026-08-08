@@ -22,6 +22,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _contextChanged;
         private readonly IReadOnlyList<string> _skillDirectories;
         private readonly List<AgentSkill> _skills = new();
+        private readonly Dictionary<string, AgentSkill> _activePluginSkills = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _selectedSkillNames = new(StringComparer.OrdinalIgnoreCase);
         private Task? _loadTask;
         private bool _hasLoaded;
@@ -134,7 +135,7 @@ namespace TxtAIEditor.Controls
                 return "skill_use failed: provide a skill name or SKILL.md path.";
             }
 
-            if (_skills.Count == 0)
+            if (_skills.Count == 0 && _activePluginSkills.Count == 0)
             {
                 await LoadAsync();
             }
@@ -142,7 +143,10 @@ namespace TxtAIEditor.Controls
             AgentSkill? skill = FindSkill(nameOrPath) ?? FindSkillByPath(nameOrPath);
             if (skill == null)
             {
-                string availableSkills = string.Join(", ", _skills.Select(item => item.Name));
+                string availableSkills = string.Join(", ", _skills
+                    .Select(item => item.Name)
+                    .Concat(_activePluginSkills.Keys)
+                    .Distinct(StringComparer.OrdinalIgnoreCase));
                 return string.IsNullOrWhiteSpace(availableSkills)
                     ? $"skill_use failed: skill not found: {nameOrPath}. No installed skills were found."
                     : $"skill_use failed: skill not found: {nameOrPath}. Available skills: {availableSkills}";
@@ -184,7 +188,8 @@ namespace TxtAIEditor.Controls
 
         public bool HasSelectedSkills()
         {
-            return _skills.Any(skill => _selectedSkillNames.Contains(skill.Name));
+            return _activePluginSkills.Count > 0 ||
+                _skills.Any(skill => _selectedSkillNames.Contains(skill.Name));
         }
 
         public void ToggleSkill(string skillName)
@@ -208,16 +213,54 @@ namespace TxtAIEditor.Controls
             UpdateSelectionUI();
         }
 
+        public void SetActivePluginSkills(IEnumerable<AgentPluginSkill> pluginSkills)
+        {
+            _activePluginSkills.Clear();
+            foreach (AgentPluginSkill skill in pluginSkills)
+            {
+                if (string.IsNullOrWhiteSpace(skill.Name) || string.IsNullOrWhiteSpace(skill.SkillFilePath))
+                {
+                    continue;
+                }
+
+                _activePluginSkills[skill.Name] = new AgentSkill
+                {
+                    Name = skill.Name,
+                    Description = skill.Description,
+                    SkillFilePath = skill.SkillFilePath
+                };
+            }
+
+            QueueContextChanged();
+        }
+
         private List<AgentSkill> GetSelectedSkills()
         {
-            return _skills
+            var selected = _skills
                 .Where(skill => _selectedSkillNames.Contains(skill.Name))
                 .ToList();
+            foreach (AgentSkill pluginSkill in _activePluginSkills.Values)
+            {
+                int existingIndex = selected.FindIndex(skill =>
+                    skill.Name.Equals(pluginSkill.Name, StringComparison.OrdinalIgnoreCase));
+                if (existingIndex >= 0)
+                {
+                    selected[existingIndex] = pluginSkill;
+                }
+                else
+                {
+                    selected.Add(pluginSkill);
+                }
+            }
+
+            return selected;
         }
 
         private AgentSkill? FindSkill(string name)
         {
-            return _skills.FirstOrDefault(skill => skill.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            return _activePluginSkills.TryGetValue(name, out AgentSkill? pluginSkill)
+                ? pluginSkill
+                : _skills.FirstOrDefault(skill => skill.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
         }
 
         private AgentSkill? FindSkillByPath(string path)
@@ -228,7 +271,12 @@ namespace TxtAIEditor.Controls
                 return null;
             }
 
-            return _skills.FirstOrDefault(skill =>
+            AgentSkill? pluginSkill = _activePluginSkills.Values.FirstOrDefault(skill =>
+                string.Equals(
+                    NormalizePathForCompare(skill.SkillFilePath),
+                    normalizedPath,
+                    StringComparison.OrdinalIgnoreCase));
+            return pluginSkill ?? _skills.FirstOrDefault(skill =>
                 string.Equals(
                     NormalizePathForCompare(skill.SkillFilePath),
                     normalizedPath,

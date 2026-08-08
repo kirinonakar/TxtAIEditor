@@ -148,7 +148,8 @@ namespace TxtAIEditor.Controls
                 fileModifiedAsync,
                 beforeDialog,
                 afterDialog,
-                callbacks.AddCurrentRunImageToolAttachment);
+                callbacks.AddCurrentRunImageToolAttachment,
+                skillController.SetActivePluginSkills);
             var historyController = new AgentHistoryController(agentPane);
             var sessionEditController = new AgentSessionEditController(
                 agentPane,

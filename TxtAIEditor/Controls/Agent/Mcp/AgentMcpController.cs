@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
         private readonly Action _contextChanged;
+        private readonly Action<IReadOnlyList<AgentPluginSkill>>? _activePluginSkillsChanged;
         private readonly Func<string> _workspaceRootProvider;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
@@ -33,9 +34,14 @@ namespace TxtAIEditor.Controls
         private readonly AgentMcpBrowserUseTool _browserUseTool;
         private readonly AgentMcpRuntime _runtime;
         private readonly string _mcpFilePath;
+        private readonly string _agentPluginsFilePath;
+        private readonly string _legacyAgentPluginsFilePath;
+        private readonly string _agentPluginsInstallDirectory;
         private readonly string _agentPluginDataDirectory;
         private readonly List<AgentMcpServer> _servers = new();
+        private readonly List<AgentPluginPackage> _agentPlugins = new();
         private readonly HashSet<string> _selectedServerIds = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _selectedAgentPluginIds = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, ServerStartOperation> _serverStartOperations = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AgentMcpToolAlias> _toolAliases = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _serverStatus = new(StringComparer.OrdinalIgnoreCase);
@@ -53,7 +59,8 @@ namespace TxtAIEditor.Controls
             Func<string, Task>? fileModifiedAsync,
             Action? beforeDialog,
             Action? afterDialog,
-            Action<TxtAIEditor.Core.Services.LLM.LlmMessageAttachment>? addImageAttachment = null)
+            Action<TxtAIEditor.Core.Services.LLM.LlmMessageAttachment>? addImageAttachment = null,
+            Action<IReadOnlyList<AgentPluginSkill>>? activePluginSkillsChanged = null)
         {
             _agentPane = agentPane;
             _initializePickerWindow = initializePickerWindow;
@@ -65,6 +72,7 @@ namespace TxtAIEditor.Controls
             _oauthService = new AgentMcpOAuthService(_credentialStore, _getString, SaveAsync);
             _runtime = new AgentMcpRuntime(_credentialStore, _oauthService, workspaceRootProvider, _getString);
             _contextChanged = contextChanged;
+            _activePluginSkillsChanged = activePluginSkillsChanged;
             _workspaceRootProvider = workspaceRootProvider;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
@@ -75,7 +83,10 @@ namespace TxtAIEditor.Controls
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
             _mcpFilePath = Path.Combine(settingsDir, "agent-mcp-servers.json");
-            _agentPluginDataDirectory = Path.Combine(settingsDir, "agent-plugin-data");
+            _agentPluginsInstallDirectory = Path.Combine(settingsDir, "plugins");
+            _agentPluginsFilePath = Path.Combine(_agentPluginsInstallDirectory, "installed.json");
+            _legacyAgentPluginsFilePath = Path.Combine(settingsDir, "agent-plugins.json");
+            _agentPluginDataDirectory = Path.Combine(settingsDir, "plugin-data");
         }
 
         public async Task LoadAsync()
@@ -84,6 +95,8 @@ namespace TxtAIEditor.Controls
             bool migratedPlaintextOAuth = false;
             bool migratedPlaintextEnvironment = false;
             bool migratedInlineStdioCommands = false;
+            bool migratedAgentPlugins = false;
+            bool migratedPluginRegistry = false;
             try
             {
                 if (File.Exists(_mcpFilePath))
@@ -116,6 +129,8 @@ namespace TxtAIEditor.Controls
                                 s.Environment = AgentMcpConfigurationService.NormalizeEnvironment(s.Environment);
                                 s.Headers = AgentMcpConfigurationService.NormalizeHeaders(s.Headers);
                                 s.AgentPluginName = s.AgentPluginName?.Trim() ?? string.Empty;
+                                s.AgentPluginId = s.AgentPluginId?.Trim() ?? string.Empty;
+                                s.AgentPluginSource = s.AgentPluginSource?.Trim() ?? string.Empty;
                                 s.AgentPluginServerName = s.AgentPluginServerName?.Trim() ?? string.Empty;
                                 s.AgentPluginRoot = s.AgentPluginRoot?.Trim() ?? string.Empty;
                                 s.AgentPluginDataDirectory = s.AgentPluginDataDirectory?.Trim() ?? string.Empty;
@@ -145,14 +160,87 @@ namespace TxtAIEditor.Controls
                 System.Diagnostics.Debug.WriteLine($"Failed to load MCP servers: {ex.Message}");
             }
 
+            try
+            {
+                _agentPlugins.Clear();
+                string pluginsFilePath = File.Exists(_agentPluginsFilePath)
+                    ? _agentPluginsFilePath
+                    : _legacyAgentPluginsFilePath;
+                migratedPluginRegistry = !pluginsFilePath.Equals(
+                    _agentPluginsFilePath,
+                    StringComparison.OrdinalIgnoreCase) && File.Exists(pluginsFilePath);
+                if (File.Exists(pluginsFilePath))
+                {
+                    string json = await File.ReadAllTextAsync(pluginsFilePath);
+                    var loadedPlugins = JsonSerializer.Deserialize<List<AgentPluginPackage>>(json);
+                    if (loadedPlugins != null)
+                    {
+                        _agentPlugins.AddRange(loadedPlugins.Where(plugin =>
+                            !string.IsNullOrWhiteSpace(plugin.Id) &&
+                            !string.IsNullOrWhiteSpace(plugin.Name) &&
+                            !string.IsNullOrWhiteSpace(plugin.Root)));
+                    }
+                }
+
+                foreach (AgentPluginPackage plugin in _agentPlugins)
+                {
+                    plugin.Name = plugin.Name?.Trim() ?? string.Empty;
+                    plugin.Root = plugin.Root?.Trim() ?? string.Empty;
+                    plugin.Source = plugin.Source?.Trim() ?? string.Empty;
+                    plugin.Skills = plugin.Skills?
+                        .Where(skill => !string.IsNullOrWhiteSpace(skill.Name) && File.Exists(skill.SkillFilePath))
+                        .ToList() ?? new List<AgentPluginSkill>();
+                }
+
+                foreach (IGrouping<string, AgentMcpServer> legacyGroup in _servers
+                    .Where(server => server.IsAgentPlugin && string.IsNullOrWhiteSpace(server.AgentPluginId))
+                    .GroupBy(
+                        server => $"{server.AgentPluginName}|{server.AgentPluginRoot}",
+                        StringComparer.OrdinalIgnoreCase))
+                {
+                    AgentMcpServer first = legacyGroup.First();
+                    var package = new AgentPluginPackage
+                    {
+                        Name = first.AgentPluginName,
+                        Root = first.AgentPluginRoot,
+                        Source = first.AgentPluginSource
+                    };
+                    try
+                    {
+                        AgentPluginLoadResult reloaded = AgentPluginLoader.Load(first.AgentPluginRoot, _agentPluginDataDirectory);
+                        package.Skills = reloaded.Skills.ToList();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to migrate Agent Plugin '{first.AgentPluginName}': {ex.Message}");
+                    }
+
+                    _agentPlugins.Add(package);
+                    migratedAgentPlugins = true;
+                    foreach (AgentMcpServer server in legacyGroup)
+                    {
+                        server.AgentPluginId = package.Id;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load Agent Plugins: {ex.Message}");
+            }
+
             _selectedServerIds.RemoveWhere(id =>
                 !_comfyUiTool.IsServerId(id) &&
                 !_browserUseTool.IsServerId(id) &&
                 _servers.All(server => !server.Id.Equals(id, StringComparison.OrdinalIgnoreCase)));
+            _selectedAgentPluginIds.RemoveWhere(id =>
+                _agentPlugins.All(plugin => !plugin.Id.Equals(id, StringComparison.OrdinalIgnoreCase)));
+            NotifyActivePluginSkills();
             if (migratedPlaintextHeaders ||
                 migratedPlaintextOAuth ||
                 migratedPlaintextEnvironment ||
-                migratedInlineStdioCommands)
+                migratedInlineStdioCommands ||
+                migratedAgentPlugins ||
+                migratedPluginRegistry)
             {
                 await SaveAsync();
                 return;
@@ -282,6 +370,12 @@ namespace TxtAIEditor.Controls
         public async Task EditMcpAsync(string serverName)
         {
             if (_comfyUiTool.IsServerName(serverName))
+            {
+                return;
+            }
+
+            AgentPluginPackage? plugin = FindAgentPluginByMenuName(serverName);
+            if (plugin != null)
             {
                 return;
             }
@@ -562,51 +656,14 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                AgentPluginLoadResult result = AgentPluginLoader.Load(folder.Path, _agentPluginDataDirectory);
-                var importedNames = result.Servers
-                    .Select(server => server.AgentPluginServerName)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-                foreach (AgentMcpServer staleServer in _servers
-                    .Where(server => server.AgentPluginName.Equals(result.PluginName, StringComparison.OrdinalIgnoreCase) &&
-                        !importedNames.Contains(server.AgentPluginServerName))
-                    .ToList())
-                {
-                    _credentialStore.DeleteAllCredentials(staleServer);
-                    _selectedServerIds.Remove(staleServer.Id);
-                    StopServer(staleServer.Id);
-                    _servers.Remove(staleServer);
-                }
-
-                foreach (AgentMcpServer imported in result.Servers)
-                {
-                    AgentMcpServer? existing = _servers.FirstOrDefault(server =>
-                        server.AgentPluginName.Equals(result.PluginName, StringComparison.OrdinalIgnoreCase) &&
-                        server.AgentPluginServerName.Equals(imported.AgentPluginServerName, StringComparison.OrdinalIgnoreCase));
-                    if (existing == null)
-                    {
-                        imported.Name = CreateUniqueServerName(imported.Name);
-                        _servers.Add(imported);
-                        continue;
-                    }
-
-                    existing.Transport = imported.Transport;
-                    existing.Endpoint = imported.Endpoint;
-                    existing.Command = imported.Command;
-                    existing.Arguments = imported.Arguments;
-                    existing.WorkingDirectory = imported.WorkingDirectory;
-                    existing.TargetDirectory = string.Empty;
-                    existing.Environment = imported.Environment;
-                    existing.Headers = imported.Headers;
-                    existing.AuthType = AuthTypeNone;
-                    existing.AgentPluginName = imported.AgentPluginName;
-                    existing.AgentPluginServerName = imported.AgentPluginServerName;
-                    existing.AgentPluginRoot = imported.AgentPluginRoot;
-                    existing.AgentPluginDataDirectory = imported.AgentPluginDataDirectory;
-                    _runtime.RemoveSession(existing.Id);
-                    _serverStatus.Remove(existing.Id);
-                }
-
+                AgentPluginLoadResult sourceResult = AgentPluginLoader.Load(folder.Path, _agentPluginDataDirectory);
+                string installedRoot = AgentPluginLocalInstaller.Install(
+                    folder.Path,
+                    Path.Combine(_agentPluginsInstallDirectory, "local"),
+                    sourceResult.PluginName);
+                AgentPluginLoadResult result = AgentPluginLoader.Load(installedRoot, _agentPluginDataDirectory);
+                string localSource = "local:" + result.PluginName.ToLowerInvariant();
+                ApplyAgentPluginResult(result, localSource);
                 await SaveAsync();
 
                 if (result.Warnings.Count > 0)
@@ -622,6 +679,63 @@ namespace TxtAIEditor.Controls
                     _getString("AgentPluginImportErrorTitle", "Agent Plugin 가져오기 오류"),
                     string.Format(
                         _getString("AgentPluginImportErrorMessage", "Agent Plugin을 가져오는 중 오류가 발생했습니다: {0}"),
+                        ex.Message));
+            }
+        }
+
+        public async Task InstallAgentPluginFromGitHubAsync()
+        {
+            string? sourceUrl = await _dialogService.ShowAgentPluginGitHubInstallAsync();
+            if (string.IsNullOrWhiteSpace(sourceUrl))
+            {
+                return;
+            }
+
+            try
+            {
+                AgentPluginGitHubInstallResult installed = await AgentPluginGitHubInstaller.InstallAsync(
+                    sourceUrl,
+                    Path.Combine(_agentPluginsInstallDirectory, "github"),
+                    StopPluginServersBySource,
+                    CancellationToken.None);
+
+                var installedPackageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var warnings = new List<string>();
+                int mcpServerCount = 0;
+                int skillCount = 0;
+                foreach (string pluginRoot in installed.PluginRoots)
+                {
+                    AgentPluginLoadResult loaded = AgentPluginLoader.Load(pluginRoot, _agentPluginDataDirectory);
+                    AgentPluginPackage package = ApplyAgentPluginResult(loaded, installed.SourceKey);
+                    installedPackageIds.Add(package.Id);
+                    warnings.AddRange(loaded.Warnings);
+                    mcpServerCount += loaded.Servers.Count;
+                    skillCount += loaded.Skills.Count;
+                }
+
+                foreach (AgentPluginPackage stalePackage in _agentPlugins
+                    .Where(plugin => plugin.Source.Equals(installed.SourceKey, StringComparison.OrdinalIgnoreCase) &&
+                        !installedPackageIds.Contains(plugin.Id))
+                    .ToList())
+                {
+                    RemoveAgentPluginPackage(stalePackage);
+                }
+
+                NotifyActivePluginSkills();
+                await SaveAsync();
+                await _dialogService.ShowAgentPluginInstallResultAsync(
+                    installed.DisplayName,
+                    installedPackageIds.Count,
+                    mcpServerCount,
+                    skillCount,
+                    warnings);
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("AgentPluginGitHubInstallErrorTitle", "GitHub Agent Plugin 설치 오류"),
+                    string.Format(
+                        _getString("AgentPluginGitHubInstallErrorMessage", "GitHub에서 Agent Plugin을 설치하는 중 오류가 발생했습니다: {0}"),
                         ex.Message));
             }
         }
@@ -658,6 +772,13 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            AgentPluginPackage? plugin = FindAgentPluginByMenuName(serverName);
+            if (plugin != null)
+            {
+                await ToggleAgentPluginAsync(plugin);
+                return;
+            }
+
             var server = FindServer(serverName);
             if (server == null)
             {
@@ -681,6 +802,14 @@ namespace TxtAIEditor.Controls
         {
             if (_comfyUiTool.IsServerName(serverName) || _browserUseTool.IsServerName(serverName))
             {
+                return;
+            }
+
+            AgentPluginPackage? plugin = FindAgentPluginByMenuName(serverName);
+            if (plugin != null)
+            {
+                RemoveAgentPluginPackage(plugin);
+                await SaveAsync();
                 return;
             }
 
@@ -715,6 +844,15 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            AgentPluginPackage? plugin = FindAgentPluginByMenuName(serverName);
+            if (plugin != null)
+            {
+                DeactivateAgentPlugin(plugin);
+                RebuildAliases();
+                UpdateUI();
+                return;
+            }
+
             var server = FindServer(serverName);
             if (server == null)
             {
@@ -740,7 +878,12 @@ namespace TxtAIEditor.Controls
                 labels.Add(_browserUseTool.ServerName);
             }
 
-            labels.AddRange(GetSelectedServers().Select(server => server.Name));
+            labels.AddRange(_agentPlugins
+                .Where(plugin => _selectedAgentPluginIds.Contains(plugin.Id))
+                .Select(GetAgentPluginMenuName));
+            labels.AddRange(GetSelectedServers()
+                .Where(server => !server.IsAgentPlugin)
+                .Select(server => server.Name));
             return string.Join(", ", labels);
         }
 
@@ -748,6 +891,7 @@ namespace TxtAIEditor.Controls
         {
             return _selectedServerIds.Contains(_comfyUiTool.ServerId) ||
                 _selectedServerIds.Contains(_browserUseTool.ServerId) ||
+                _selectedAgentPluginIds.Count > 0 ||
                 GetSelectedServers().Count > 0;
         }
 
@@ -1074,7 +1218,36 @@ namespace TxtAIEditor.Controls
                 _browserUseTool.CreateMenuItem(_selectedServerIds.Contains(_browserUseTool.ServerId), _getString)
             };
 
+            items.AddRange(_agentPlugins
+                .OrderBy(plugin => plugin.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Select(plugin =>
+                {
+                    List<AgentMcpServer> pluginServers = GetPluginServers(plugin);
+                    string componentSummary = string.Format(
+                        _getString("AgentPluginComponentSummaryFormat", "MCP {0}개 · Skill {1}개"),
+                        pluginServers.Count,
+                        plugin.Skills.Count);
+                    string[] statusMessages = pluginServers
+                        .Select(server => _serverStatus.TryGetValue(server.Id, out string? status) ? status : string.Empty)
+                        .Where(status => !string.IsNullOrWhiteSpace(status))
+                        .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                        .ToArray();
+                    string detail = statusMessages.Length == 0
+                        ? componentSummary
+                        : $"{componentSummary} - {string.Join(", ", statusMessages)}";
+                    return new AgentMcpItem
+                    {
+                        Name = GetAgentPluginMenuName(plugin),
+                        Endpoint = componentSummary,
+                        Detail = detail,
+                        IsSelected = _selectedAgentPluginIds.Contains(plugin.Id),
+                        IsAgentPlugin = true,
+                        CanEdit = false
+                    };
+                }));
+
             items.AddRange(_servers
+                .Where(server => !server.IsAgentPlugin)
                 .OrderBy(server => server.Name, StringComparer.CurrentCultureIgnoreCase)
                 .Select(server =>
                 {
@@ -1087,10 +1260,6 @@ namespace TxtAIEditor.Controls
                     string connectionDetail = AgentMcpTransportTypes.IsStdio(server.Transport)
                         ? $"stdio: {server.Command} {connectionArguments}".TrimEnd()
                         : server.Endpoint;
-                    if (server.IsAgentPlugin)
-                    {
-                        connectionDetail = $"Agent Plugin · {connectionDetail}";
-                    }
                     if (isMemoryServer && !string.IsNullOrWhiteSpace(server.TargetDirectory))
                     {
                         connectionDetail += $" - memory: {Path.Combine(server.TargetDirectory, "memory.jsonl")}";
@@ -1108,8 +1277,7 @@ namespace TxtAIEditor.Controls
                         Name = server.Name,
                         Endpoint = connectionDetail,
                         Detail = detail,
-                        IsSelected = _selectedServerIds.Contains(server.Id),
-                        CanEdit = !server.IsAgentPlugin
+                        IsSelected = _selectedServerIds.Contains(server.Id)
                     };
                 })
                 .ToList());
@@ -1124,7 +1292,12 @@ namespace TxtAIEditor.Controls
                 selectedNames.Add(_browserUseTool.ServerName);
             }
 
-            selectedNames.AddRange(GetSelectedServers().Select(server => server.Name));
+            selectedNames.AddRange(_agentPlugins
+                .Where(plugin => _selectedAgentPluginIds.Contains(plugin.Id))
+                .Select(GetAgentPluginMenuName));
+            selectedNames.AddRange(GetSelectedServers()
+                .Where(server => !server.IsAgentPlugin)
+                .Select(server => server.Name));
 
             void ApplyUI()
             {
@@ -1219,6 +1392,13 @@ namespace TxtAIEditor.Controls
 
                 string json = JsonSerializer.Serialize(_servers, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(_mcpFilePath, json);
+                string? pluginsDirectory = Path.GetDirectoryName(_agentPluginsFilePath);
+                if (pluginsDirectory != null)
+                {
+                    Directory.CreateDirectory(pluginsDirectory);
+                }
+                string pluginsJson = JsonSerializer.Serialize(_agentPlugins, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(_agentPluginsFilePath, pluginsJson);
             }
             catch (Exception ex)
             {
@@ -1227,6 +1407,188 @@ namespace TxtAIEditor.Controls
 
             RebuildAliases();
             UpdateUI();
+        }
+
+        private AgentPluginPackage ApplyAgentPluginResult(AgentPluginLoadResult result, string source)
+        {
+            AgentPluginPackage? package = _agentPlugins.FirstOrDefault(plugin =>
+                plugin.Source.Equals(source, StringComparison.OrdinalIgnoreCase) &&
+                plugin.Name.Equals(result.PluginName, StringComparison.OrdinalIgnoreCase));
+            if (package == null)
+            {
+                package = new AgentPluginPackage
+                {
+                    Name = result.PluginName,
+                    Root = result.PluginRoot,
+                    Source = source
+                };
+                _agentPlugins.Add(package);
+            }
+
+            package.Name = result.PluginName;
+            package.Root = result.PluginRoot;
+            package.Source = source;
+            package.Skills = result.Skills.ToList();
+            string packageDataDirectory = Path.Combine(_agentPluginDataDirectory, package.Id);
+            Directory.CreateDirectory(packageDataDirectory);
+
+            var importedNames = result.Servers
+                .Select(server => server.AgentPluginServerName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (AgentMcpServer staleServer in GetPluginServers(package)
+                .Where(server => !importedNames.Contains(server.AgentPluginServerName))
+                .ToList())
+            {
+                _credentialStore.DeleteAllCredentials(staleServer);
+                _selectedServerIds.Remove(staleServer.Id);
+                StopServer(staleServer.Id);
+                _servers.Remove(staleServer);
+            }
+
+            foreach (AgentMcpServer imported in result.Servers)
+            {
+                imported.AgentPluginDataDirectory = packageDataDirectory;
+                AgentMcpServer? existing = _servers.FirstOrDefault(server =>
+                    server.AgentPluginId.Equals(package.Id, StringComparison.OrdinalIgnoreCase) &&
+                    server.AgentPluginServerName.Equals(imported.AgentPluginServerName, StringComparison.OrdinalIgnoreCase));
+                if (existing == null)
+                {
+                    imported.Name = CreateUniqueServerName(imported.Name);
+                    imported.AgentPluginId = package.Id;
+                    imported.AgentPluginSource = source;
+                    _servers.Add(imported);
+                    if (_selectedAgentPluginIds.Contains(package.Id))
+                    {
+                        _selectedServerIds.Add(imported.Id);
+                    }
+                    continue;
+                }
+
+                existing.Transport = imported.Transport;
+                existing.Endpoint = imported.Endpoint;
+                existing.Command = imported.Command;
+                existing.Arguments = imported.Arguments;
+                existing.WorkingDirectory = imported.WorkingDirectory;
+                existing.TargetDirectory = string.Empty;
+                existing.Environment = imported.Environment;
+                existing.Headers = imported.Headers;
+                existing.AuthType = AuthTypeNone;
+                existing.AgentPluginName = imported.AgentPluginName;
+                existing.AgentPluginId = package.Id;
+                existing.AgentPluginSource = source;
+                existing.AgentPluginServerName = imported.AgentPluginServerName;
+                existing.AgentPluginRoot = imported.AgentPluginRoot;
+                existing.AgentPluginDataDirectory = imported.AgentPluginDataDirectory;
+                _runtime.RemoveSession(existing.Id);
+                _serverStatus.Remove(existing.Id);
+            }
+
+            NotifyActivePluginSkills();
+            return package;
+        }
+
+        private async Task ToggleAgentPluginAsync(AgentPluginPackage plugin)
+        {
+            if (_selectedAgentPluginIds.Contains(plugin.Id))
+            {
+                DeactivateAgentPlugin(plugin);
+                RebuildAliases();
+                UpdateUI();
+                return;
+            }
+
+            _selectedAgentPluginIds.Add(plugin.Id);
+            List<AgentMcpServer> servers = GetPluginServers(plugin);
+            foreach (AgentMcpServer server in servers)
+            {
+                _selectedServerIds.Add(server.Id);
+            }
+
+            NotifyActivePluginSkills();
+            UpdateUI();
+            foreach (AgentMcpServer server in servers)
+            {
+                await StartServerAsync(server, CancellationToken.None);
+            }
+        }
+
+        private void DeactivateAgentPlugin(AgentPluginPackage plugin)
+        {
+            _selectedAgentPluginIds.Remove(plugin.Id);
+            foreach (AgentMcpServer server in GetPluginServers(plugin))
+            {
+                _selectedServerIds.Remove(server.Id);
+                StopServer(server.Id);
+            }
+
+            NotifyActivePluginSkills();
+        }
+
+        private void RemoveAgentPluginPackage(AgentPluginPackage plugin)
+        {
+            DeactivateAgentPlugin(plugin);
+            foreach (AgentMcpServer server in GetPluginServers(plugin).ToList())
+            {
+                _credentialStore.DeleteAllCredentials(server);
+                _servers.Remove(server);
+            }
+
+            _agentPlugins.Remove(plugin);
+            NotifyActivePluginSkills();
+        }
+
+        private void StopPluginServersBySource(string source)
+        {
+            foreach (AgentMcpServer server in _servers.Where(server =>
+                server.AgentPluginSource.Equals(source, StringComparison.OrdinalIgnoreCase)))
+            {
+                StopServer(server.Id);
+            }
+        }
+
+        private void NotifyActivePluginSkills()
+        {
+            if (_activePluginSkillsChanged == null)
+            {
+                return;
+            }
+
+            var activeSkills = new List<AgentPluginSkill>();
+            foreach (AgentPluginPackage plugin in _agentPlugins.Where(plugin =>
+                _selectedAgentPluginIds.Contains(plugin.Id)))
+            {
+                activeSkills.AddRange(plugin.Skills.Select(skill => new AgentPluginSkill
+                {
+                    Name = $"{GetAgentPluginMenuName(plugin)}/{skill.Name}",
+                    Description = skill.Description,
+                    SkillFilePath = skill.SkillFilePath
+                }));
+            }
+
+            _activePluginSkillsChanged(activeSkills);
+        }
+
+        private List<AgentMcpServer> GetPluginServers(AgentPluginPackage plugin)
+        {
+            return _servers
+                .Where(server => server.AgentPluginId.Equals(plugin.Id, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        private AgentPluginPackage? FindAgentPluginByMenuName(string menuName)
+        {
+            return _agentPlugins.FirstOrDefault(plugin =>
+                GetAgentPluginMenuName(plugin).Equals(menuName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string GetAgentPluginMenuName(AgentPluginPackage plugin)
+        {
+            string sourceLabel = plugin.Source.StartsWith("github:", StringComparison.OrdinalIgnoreCase)
+                ? plugin.Source.Substring("github:".Length)
+                : Path.GetFileName(plugin.Root);
+            return string.IsNullOrWhiteSpace(sourceLabel)
+                ? plugin.Name
+                : $"{plugin.Name} [{sourceLabel}]";
         }
 
         private AgentMcpServer? FindServer(string name)

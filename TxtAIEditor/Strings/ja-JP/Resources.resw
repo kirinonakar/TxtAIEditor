@@ -3826,4 +3826,19 @@
   <data name="AgentPluginImportErrorMessage" xml:space="preserve">
     <value>Agent Plugin のインポート中にエラーが発生しました: {0}</value>
   </data>
+  <data name="AgentPluginGitHubInstallMenuText" xml:space="preserve"><value>GitHub からインストール</value></data>
+  <data name="AgentPluginGitHubUrlPlaceholder" xml:space="preserve"><value>https://github.com/owner/repository</value></data>
+  <data name="AgentPluginGitHubUrlLabel" xml:space="preserve"><value>GitHub リポジトリ URL</value></data>
+  <data name="AgentPluginGitHubInstallInfo" xml:space="preserve"><value>公開 GitHub リポジトリ、タグ（#v1.0.0）、/tree/&lt;ref&gt;/&lt;path&gt; URL に対応します。Plugin を有効にすると、含まれる MCP と Skills がすべて同時に有効になります。</value></data>
+  <data name="AgentPluginGitHubInstallTitle" xml:space="preserve"><value>GitHub から Agent Plugin をインストール</value></data>
+  <data name="AgentPluginGitHubInstallButton" xml:space="preserve"><value>インストール</value></data>
+  <data name="AgentPluginGitHubInstallSuccessFormat" xml:space="preserve"><value>{0} をインストールしました&#xA;Plugin {1} 件 · MCP {2} 件 · Skill {3} 件</value></data>
+  <data name="AgentPluginInstallWarningsLabel" xml:space="preserve"><value>警告:</value></data>
+  <data name="AgentPluginGitHubInstallCompleteTitle" xml:space="preserve"><value>Agent Plugin のインストール完了</value></data>
+  <data name="AgentPluginGitHubInstallErrorTitle" xml:space="preserve"><value>GitHub Agent Plugin インストールエラー</value></data>
+  <data name="AgentPluginGitHubInstallErrorMessage" xml:space="preserve"><value>GitHub から Agent Plugin をインストール中にエラーが発生しました: {0}</value></data>
+  <data name="AgentPluginComponentSummaryFormat" xml:space="preserve"><value>MCP {0} 件 · Skill {1} 件</value></data>
+  <data name="AgentPluginChipPrefix" xml:space="preserve"><value>Plugin: </value></data>
+  <data name="AgentPluginRemoveTooltip" xml:space="preserve"><value>Plugin を無効化</value></data>
+  <data name="DialogOk" xml:space="preserve"><value>OK</value></data>
 </root>

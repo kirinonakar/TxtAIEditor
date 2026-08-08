@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -79,6 +80,76 @@ namespace TxtAIEditor.Controls
                 initial,
                 _getString("AgentMcpEditTitle", "MCP 수정"),
                 _getString("AgentMcpEditSaveButton", "저장"));
+        }
+
+        public async Task<string?> ShowAgentPluginGitHubInstallAsync()
+        {
+            var urlBox = CreateTextBox(_getString(
+                "AgentPluginGitHubUrlPlaceholder",
+                "https://github.com/owner/repository"));
+            var stack = new StackPanel { Spacing = 10, Width = 460 };
+            stack.Children.Add(CreateLabel(_getString("AgentPluginGitHubUrlLabel", "GitHub 저장소 URL")));
+            stack.Children.Add(urlBox);
+            stack.Children.Add(CreateInfoText(_getString(
+                "AgentPluginGitHubInstallInfo",
+                "공개 GitHub 저장소, 태그(#v1.0.0), 또는 /tree/<ref>/<path> 주소를 지원합니다. Plugin을 활성화하면 포함된 MCP와 Skills가 함께 활성화됩니다.")));
+
+            var dialog = new ContentDialog
+            {
+                Title = _getString("AgentPluginGitHubInstallTitle", "GitHub에서 Agent Plugin 설치"),
+                Content = stack,
+                PrimaryButtonText = _getString("AgentPluginGitHubInstallButton", "설치"),
+                CloseButtonText = _getString("AgentPresetSaveCancelButton", "취소"),
+                DefaultButton = ContentDialogButton.Primary,
+                IsPrimaryButtonEnabled = false,
+                XamlRoot = _agentPane.XamlRoot,
+                RequestedTheme = _agentPane.ActualTheme
+            };
+            urlBox.TextChanged += (_, _) =>
+                dialog.IsPrimaryButtonEnabled = !string.IsNullOrWhiteSpace(urlBox.Text);
+
+            ContentDialogResult result = await ShowDialogAsync(dialog);
+            return result == ContentDialogResult.Primary
+                ? urlBox.Text?.Trim()
+                : null;
+        }
+
+        public async Task ShowAgentPluginInstallResultAsync(
+            string repository,
+            int pluginCount,
+            int mcpServerCount,
+            int skillCount,
+            IReadOnlyList<string> warnings)
+        {
+            string summary = string.Format(
+                _getString(
+                    "AgentPluginGitHubInstallSuccessFormat",
+                    "{0} 설치 완료\nPlugin {1}개 · MCP {2}개 · Skill {3}개"),
+                repository,
+                pluginCount,
+                mcpServerCount,
+                skillCount);
+            if (warnings.Count > 0)
+            {
+                summary += Environment.NewLine + Environment.NewLine +
+                    _getString("AgentPluginInstallWarningsLabel", "경고:") + Environment.NewLine +
+                    string.Join(Environment.NewLine, warnings);
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = _getString("AgentPluginGitHubInstallCompleteTitle", "Agent Plugin 설치 완료"),
+                Content = new TextBlock
+                {
+                    Text = summary,
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxWidth = 520
+                },
+                CloseButtonText = _getString("DialogOk", "확인"),
+                XamlRoot = _agentPane.XamlRoot,
+                RequestedTheme = _agentPane.ActualTheme
+            };
+            await ShowDialogAsync(dialog);
         }
 
         public async Task<AgentMcpComfyUiSettingsInput?> ShowComfyUiSettingsAsync(AgentMcpComfyUiSettingsInput initial)

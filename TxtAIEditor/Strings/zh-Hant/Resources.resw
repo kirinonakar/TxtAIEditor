@@ -3826,4 +3826,19 @@
   <data name="AgentPluginImportErrorMessage" xml:space="preserve">
     <value>匯入 Agent Plugin 時發生錯誤: {0}</value>
   </data>
+  <data name="AgentPluginGitHubInstallMenuText" xml:space="preserve"><value>從 GitHub 安裝</value></data>
+  <data name="AgentPluginGitHubUrlPlaceholder" xml:space="preserve"><value>https://github.com/owner/repository</value></data>
+  <data name="AgentPluginGitHubUrlLabel" xml:space="preserve"><value>GitHub 儲存庫 URL</value></data>
+  <data name="AgentPluginGitHubInstallInfo" xml:space="preserve"><value>支援公開 GitHub 儲存庫、標籤（#v1.0.0）和 /tree/&lt;ref&gt;/&lt;path&gt; URL。啟用 Plugin 時，其中的所有 MCP 和 Skills 將一併啟用。</value></data>
+  <data name="AgentPluginGitHubInstallTitle" xml:space="preserve"><value>從 GitHub 安裝 Agent Plugin</value></data>
+  <data name="AgentPluginGitHubInstallButton" xml:space="preserve"><value>安裝</value></data>
+  <data name="AgentPluginGitHubInstallSuccessFormat" xml:space="preserve"><value>已安裝 {0}&#xA;Plugin {1} 個 · MCP {2} 個 · Skill {3} 個</value></data>
+  <data name="AgentPluginInstallWarningsLabel" xml:space="preserve"><value>警告：</value></data>
+  <data name="AgentPluginGitHubInstallCompleteTitle" xml:space="preserve"><value>Agent Plugin 安裝完成</value></data>
+  <data name="AgentPluginGitHubInstallErrorTitle" xml:space="preserve"><value>GitHub Agent Plugin 安裝錯誤</value></data>
+  <data name="AgentPluginGitHubInstallErrorMessage" xml:space="preserve"><value>從 GitHub 安裝 Agent Plugin 時發生錯誤：{0}</value></data>
+  <data name="AgentPluginComponentSummaryFormat" xml:space="preserve"><value>MCP {0} 個 · Skill {1} 個</value></data>
+  <data name="AgentPluginChipPrefix" xml:space="preserve"><value>Plugin: </value></data>
+  <data name="AgentPluginRemoveTooltip" xml:space="preserve"><value>停用 Plugin</value></data>
+  <data name="DialogOk" xml:space="preserve"><value>確定</value></data>
 </root>

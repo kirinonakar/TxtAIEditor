@@ -3862,4 +3862,19 @@ Plan: {0}</value>
   <data name="AgentPluginImportErrorMessage" xml:space="preserve">
     <value>An error occurred while importing the Agent Plugin: {0}</value>
   </data>
+  <data name="AgentPluginGitHubInstallMenuText" xml:space="preserve"><value>Install from GitHub</value></data>
+  <data name="AgentPluginGitHubUrlPlaceholder" xml:space="preserve"><value>https://github.com/owner/repository</value></data>
+  <data name="AgentPluginGitHubUrlLabel" xml:space="preserve"><value>GitHub repository URL</value></data>
+  <data name="AgentPluginGitHubInstallInfo" xml:space="preserve"><value>Supports public GitHub repositories, tags (#v1.0.0), and /tree/&lt;ref&gt;/&lt;path&gt; URLs. Enabling a plugin enables all of its MCP servers and Skills together.</value></data>
+  <data name="AgentPluginGitHubInstallTitle" xml:space="preserve"><value>Install Agent Plugin from GitHub</value></data>
+  <data name="AgentPluginGitHubInstallButton" xml:space="preserve"><value>Install</value></data>
+  <data name="AgentPluginGitHubInstallSuccessFormat" xml:space="preserve"><value>{0} installed&#xA;{1} plugin(s) · {2} MCP server(s) · {3} Skill(s)</value></data>
+  <data name="AgentPluginInstallWarningsLabel" xml:space="preserve"><value>Warnings:</value></data>
+  <data name="AgentPluginGitHubInstallCompleteTitle" xml:space="preserve"><value>Agent Plugin Installed</value></data>
+  <data name="AgentPluginGitHubInstallErrorTitle" xml:space="preserve"><value>GitHub Agent Plugin Install Error</value></data>
+  <data name="AgentPluginGitHubInstallErrorMessage" xml:space="preserve"><value>An error occurred while installing the Agent Plugin from GitHub: {0}</value></data>
+  <data name="AgentPluginComponentSummaryFormat" xml:space="preserve"><value>{0} MCP · {1} Skill(s)</value></data>
+  <data name="AgentPluginChipPrefix" xml:space="preserve"><value>Plugin: </value></data>
+  <data name="AgentPluginRemoveTooltip" xml:space="preserve"><value>Disable plugin</value></data>
+  <data name="DialogOk" xml:space="preserve"><value>OK</value></data>
 </root>

@@ -11,6 +11,7 @@ namespace TxtAIEditor.Controls
         string PluginName,
         string PluginRoot,
         IReadOnlyList<AgentMcpServer> Servers,
+        IReadOnlyList<AgentPluginSkill> Skills,
         IReadOnlyList<string> Warnings);
 
     internal static partial class AgentPluginLoader
@@ -45,32 +46,119 @@ namespace TxtAIEditor.Controls
             var warnings = new List<string>();
 
             using JsonDocument manifestDocument = ParseJsonFile(manifestPath, "plugin.json");
-            string pluginName = ValidateManifest(manifestDocument.RootElement, warnings);
+            string pluginName = IsPortableManifest(manifestDocument.RootElement)
+                ? ValidateManifest(manifestDocument.RootElement, warnings)
+                : ValidateCompatibleManifest(manifestDocument.RootElement, warnings);
 
             string mcpPath = Path.Combine(pluginRoot, "mcp.json");
-            if (!File.Exists(mcpPath))
-            {
-                throw new InvalidDataException("mcp.json was not found in the Agent Plugin root.");
-            }
-
-            mcpPath = ResolveContainedFile(pluginRoot, mcpPath, "mcp.json");
             string pluginDataDirectory = Path.GetFullPath(Path.Combine(pluginDataBaseDirectory, pluginName));
             Directory.CreateDirectory(pluginDataDirectory);
-
-            using JsonDocument mcpDocument = ParseJsonFile(mcpPath, "mcp.json");
-            IReadOnlyList<AgentMcpServer> servers = ValidateAndReadMcp(
-                mcpDocument.RootElement,
-                pluginName,
-                pluginRoot,
-                pluginDataDirectory,
-                warnings);
-
-            if (servers.Count == 0)
+            IReadOnlyList<AgentMcpServer> servers = Array.Empty<AgentMcpServer>();
+            if (File.Exists(mcpPath))
             {
-                throw new InvalidDataException("The Agent Plugin has no supported valid MCP server entries.");
+                mcpPath = ResolveContainedFile(pluginRoot, mcpPath, "mcp.json");
+                using JsonDocument mcpDocument = ParseJsonFile(mcpPath, "mcp.json");
+                servers = ValidateAndReadMcp(
+                    mcpDocument.RootElement,
+                    pluginName,
+                    pluginRoot,
+                    pluginDataDirectory,
+                    warnings);
             }
 
-            return new AgentPluginLoadResult(pluginName, pluginRoot, servers, warnings);
+            IReadOnlyList<AgentPluginSkill> skills = DiscoverSkills(pluginRoot, warnings);
+            if (servers.Count == 0 && skills.Count == 0)
+            {
+                throw new InvalidDataException("The Agent Plugin has no supported MCP servers or Skills.");
+            }
+
+            return new AgentPluginLoadResult(pluginName, pluginRoot, servers, skills, warnings);
+        }
+
+        private static bool IsPortableManifest(JsonElement manifest)
+        {
+            return manifest.ValueKind == JsonValueKind.Object &&
+                manifest.TryGetProperty("$schema", out JsonElement schema) &&
+                schema.ValueKind == JsonValueKind.String;
+        }
+
+        private static string ValidateCompatibleManifest(JsonElement manifest, List<string> warnings)
+        {
+            if (manifest.ValueKind != JsonValueKind.Object)
+            {
+                throw new InvalidDataException("plugin.json must contain a JSON object.");
+            }
+
+            string name = ReadRequiredString(manifest, "name", "plugin.json");
+            if (name.Length > 64 || !PluginNameRegex().IsMatch(name))
+            {
+                throw new InvalidDataException("plugin.json contains an invalid plugin name.");
+            }
+
+            return name;
+        }
+
+        private static IReadOnlyList<AgentPluginSkill> DiscoverSkills(string pluginRoot, List<string> warnings)
+        {
+            string skillsDirectory = Path.Combine(pluginRoot, "skills");
+            if (!Directory.Exists(skillsDirectory))
+            {
+                if (File.Exists(skillsDirectory))
+                {
+                    warnings.Add("skills exists but is not a directory.");
+                }
+
+                return Array.Empty<AgentPluginSkill>();
+            }
+
+            var skills = new List<AgentPluginSkill>();
+            foreach (string skillDirectory in Directory.EnumerateDirectories(skillsDirectory))
+            {
+                string skillFile = Path.Combine(skillDirectory, "SKILL.md");
+                if (!File.Exists(skillFile))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    string resolvedSkillFile = ResolveContainedFile(pluginRoot, skillFile, "SKILL.md");
+                    string content = File.ReadAllText(resolvedSkillFile);
+                    skills.Add(new AgentPluginSkill
+                    {
+                        Name = Path.GetFileName(skillDirectory),
+                        Description = ExtractSkillDescription(content),
+                        SkillFilePath = resolvedSkillFile
+                    });
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+                {
+                    warnings.Add($"skills: skipped '{Path.GetFileName(skillDirectory)}': {ex.Message}");
+                }
+            }
+
+            return skills;
+        }
+
+        private static string ExtractSkillDescription(string content)
+        {
+            if (!content.StartsWith("---", StringComparison.Ordinal))
+            {
+                return string.Empty;
+            }
+
+            int closingIndex = content.IndexOf("\n---", 3, StringComparison.Ordinal);
+            if (closingIndex < 0)
+            {
+                return string.Empty;
+            }
+
+            Match match = Regex.Match(
+                content.Substring(3, closingIndex - 3),
+                @"(?im)^\s*description\s*:\s*(?<value>.+?)\s*$");
+            return match.Success
+                ? match.Groups["value"].Value.Trim().Trim('"', '\'')
+                : string.Empty;
         }
 
         internal static string ExpandRuntimeVariables(AgentMcpServer server, string value)

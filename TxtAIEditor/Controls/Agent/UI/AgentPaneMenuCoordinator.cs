@@ -443,9 +443,14 @@ namespace TxtAIEditor.Controls
                 }
 
                 string currentName = mcp.Name;
+                string chipPrefix = mcp.IsAgentPlugin
+                    ? getString("AgentPluginChipPrefix", "Plugin: ")
+                    : mcpPrefix;
                 _agentSelectedPresetPanel.Children.Add(CreateSelectedChip(
-                    mcpPrefix + mcp.Name,
-                    getString("AgentMcpRemoveTooltip", "MCP 선택 해제"),
+                    chipPrefix + mcp.Name,
+                    mcp.IsAgentPlugin
+                        ? getString("AgentPluginRemoveTooltip", "Plugin 비활성화")
+                        : getString("AgentMcpRemoveTooltip", "MCP 선택 해제"),
                     () => _callbacks.AgentMcpRemoved?.Invoke(currentName)));
             }
 

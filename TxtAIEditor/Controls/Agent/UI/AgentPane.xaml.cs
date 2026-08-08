@@ -186,6 +186,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? AgentMcpExportRequested;
         public event RoutedEventHandler? AgentMcpImportRequested;
         public event RoutedEventHandler? AgentPluginImportRequested;
+        public event RoutedEventHandler? AgentPluginGitHubInstallRequested;
         public event EventHandler<string>? AgentMcpToggled;
         public event EventHandler<string>? AgentMcpEdited;
         public event EventHandler<string>? AgentMcpSettingsRequested;
@@ -270,6 +271,7 @@ namespace TxtAIEditor.Controls
             AgentExportMcpText.Text = getString("PresetExportText", "내보내기");
             AgentImportMcpText.Text = getString("PresetImportText", "가져오기");
             AgentImportPluginText.Text = getString("AgentPluginImportText", "Agent Plugin 가져오기");
+            AgentInstallPluginFromGitHubText.Text = getString("AgentPluginGitHubInstallMenuText", "GitHub에서 설치");
             ToolTipService.SetToolTip(AgentAddAttachmentButton, getString("AgentAddAttachmentTooltip", "이미지 또는 파일 추가"));
             ToolTipService.SetToolTip(AgentSkillButton, getString("AgentSkillButtonTooltip", "스킬"));
             AgentSkillFilterTextBox.PlaceholderText = getString("AgentSkillFilterPlaceholder", "스킬 검색...");
@@ -677,6 +679,12 @@ private Style? _accentRunButtonStyle;
         private void OnAgentImportPluginClickInPanel(object sender, RoutedEventArgs e)
         {
             AgentPluginImportRequested?.Invoke(sender, e);
+            AgentMcpFlyout.Hide();
+        }
+
+        private void OnAgentInstallPluginFromGitHubClickInPanel(object sender, RoutedEventArgs e)
+        {
+            AgentPluginGitHubInstallRequested?.Invoke(sender, e);
             AgentMcpFlyout.Hide();
         }
 
