@@ -12,6 +12,13 @@ namespace TxtAIEditor.Core.Services
 {
     internal static class OfficeHwpxStyleCatalog
     {
+        // HWPX stores character spacing as a percentage of the character width.
+        // CSS letter-spacing is a fixed advance added to every glyph, so applying
+        // large negative values directly makes narrow fallback glyphs (digits and
+        // punctuation) collide. Keep normal HWPX spacing, but cap the negative
+        // value used by the HTML viewer at a readable level.
+        private const int MinimumReadableHwpxSpacingPercent = -10;
+
         internal static string GetHwpxParagraphStyle(
             XElement paragraph,
             IReadOnlyDictionary<string, string> paragraphStyles)
@@ -273,9 +280,10 @@ namespace TxtAIEditor.Core.Services
             if (int.TryParse(GetAttributeValue(spacing, "hangul"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int spacingValue) &&
                 spacingValue != 0)
             {
-                double spacingEm = spacingValue / 100.0;
+                int readableSpacingValue = Math.Max(spacingValue, MinimumReadableHwpxSpacingPercent);
+                double spacingEm = readableSpacingValue / 100.0;
                 styles.Add("letter-spacing:" + spacingEm.ToString("0.###", CultureInfo.InvariantCulture) + "em");
-                if (spacingValue < 0)
+                if (readableSpacingValue < 0)
                 {
                     styles.Add("word-spacing:" + (-spacingEm).ToString("0.###", CultureInfo.InvariantCulture) + "em");
                 }
