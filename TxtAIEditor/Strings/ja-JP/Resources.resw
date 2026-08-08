@@ -2682,6 +2682,9 @@
   <data name="AgentSkillButtonTooltip" xml:space="preserve">
     <value>スキル</value>
   </data>
+  <data name="AgentMcpTitle" xml:space="preserve"><value>MCP</value></data>
+  <data name="AgentMcpFilterPlaceholder" xml:space="preserve"><value>MCP を検索...</value></data>
+  <data name="AgentMcpFilterEmptyText" xml:space="preserve"><value>一致する MCP または Plugin はありません</value></data>
   <data name="AgentSkillTitle" xml:space="preserve">
     <value>スキル</value>
   </data>

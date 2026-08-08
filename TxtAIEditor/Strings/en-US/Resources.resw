@@ -2682,6 +2682,9 @@ Plan: {0}</value>
   <data name="AgentSkillButtonTooltip" xml:space="preserve">
     <value>Skills</value>
   </data>
+  <data name="AgentMcpTitle" xml:space="preserve"><value>MCP</value></data>
+  <data name="AgentMcpFilterPlaceholder" xml:space="preserve"><value>Search MCP...</value></data>
+  <data name="AgentMcpFilterEmptyText" xml:space="preserve"><value>No matching MCP servers or plugins</value></data>
   <data name="AgentSkillTitle" xml:space="preserve">
     <value>Skills</value>
   </data>

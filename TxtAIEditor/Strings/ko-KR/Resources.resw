@@ -2682,6 +2682,9 @@
   <data name="AgentSkillButtonTooltip" xml:space="preserve">
     <value>스킬</value>
   </data>
+  <data name="AgentMcpTitle" xml:space="preserve"><value>MCP</value></data>
+  <data name="AgentMcpFilterPlaceholder" xml:space="preserve"><value>MCP 검색...</value></data>
+  <data name="AgentMcpFilterEmptyText" xml:space="preserve"><value>검색 결과 없음</value></data>
   <data name="AgentSkillTitle" xml:space="preserve">
     <value>스킬</value>
   </data>

@@ -45,6 +45,7 @@ namespace TxtAIEditor.Controls
         private string _agentSkillFilter = string.Empty;
         private List<AgentMcpItem> _agentMcpItems = new();
         private HashSet<string> _selectedAgentMcpNames = new(StringComparer.OrdinalIgnoreCase);
+        private string _agentMcpFilter = string.Empty;
         private Func<string, string, string>? _getString;
 
         public AgentPaneMenuCoordinator(
@@ -140,6 +141,12 @@ namespace TxtAIEditor.Controls
             RebuildSelectedAgentPresetChips();
         }
 
+        public void SetAgentMcpFilter(string? filter)
+        {
+            _agentMcpFilter = filter?.Trim() ?? string.Empty;
+            RebuildAgentMcpMenu();
+        }
+
         public void RebuildAgentMcpMenu()
         {
             if (_agentMcpListPanel == null)
@@ -163,8 +170,17 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            int visibleMcpCount = 0;
             foreach (var item in _agentMcpItems)
             {
+                if (_agentMcpFilter.Length > 0 &&
+                    !item.Name.Contains(_agentMcpFilter, StringComparison.OrdinalIgnoreCase) &&
+                    !item.Detail.Contains(_agentMcpFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                visibleMcpCount++;
                 var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -265,6 +281,17 @@ namespace TxtAIEditor.Controls
                 rowGrid.Children.Add(deleteBtn);
 
                 _agentMcpListPanel.Children.Add(rowGrid);
+            }
+
+            if (visibleMcpCount == 0)
+            {
+                _agentMcpListPanel.Children.Add(new TextBlock
+                {
+                    Text = getString("AgentMcpFilterEmptyText", "검색 결과 없음"),
+                    FontSize = 11,
+                    Foreground = CreateMcpEmptyTextBrush(),
+                    Margin = new Thickness(4, 2, 4, 2)
+                });
             }
         }
 

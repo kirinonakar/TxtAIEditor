@@ -267,6 +267,8 @@ namespace TxtAIEditor.Controls
             AutomationProperties.SetName(AgentVerboseToggleButton, verboseToggleTooltip);
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
             ToolTipService.SetToolTip(AgentMcpButton, getString("AgentMcpButtonTooltip", "MCP 서버"));
+            AgentMcpTitleText.Text = getString("AgentMcpTitle", "MCP");
+            AgentMcpFilterTextBox.PlaceholderText = getString("AgentMcpFilterPlaceholder", "MCP 검색...");
             AgentAddMcpText.Text = getString("AgentMcpAddText", "MCP 추가");
             AgentExportMcpText.Text = getString("PresetExportText", "내보내기");
             AgentImportMcpText.Text = getString("PresetImportText", "가져오기");
@@ -692,6 +694,11 @@ private Style? _accentRunButtonStyle;
         {
             AgentMcpFlyoutOpened?.Invoke(this, EventArgs.Empty);
             _menuCoordinator.RebuildAgentMcpMenu();
+        }
+
+        private void OnAgentMcpFilterTextChanged(object sender, TextChangedEventArgs e)
+        {
+            _menuCoordinator.SetAgentMcpFilter(AgentMcpFilterTextBox.Text);
         }
 
         private void OnAgentPresetFlyoutOpened(object sender, object e)
