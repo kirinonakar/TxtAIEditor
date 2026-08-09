@@ -7,11 +7,20 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <StackPanel x:Name="HeaderPanel"
-                Orientation="Horizontal"
-                VerticalAlignment="Center"
-                Opacity="1">
+    <Grid x:Name="HeaderPanel"
+          MinWidth="0"
+          HorizontalAlignment="Stretch"
+          VerticalAlignment="Center"
+          Opacity="1">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
         <FontIcon x:Name="RemoteIcon"
+                  Grid.Column="0"
                   Glyph="&#xE774;"
                   FontSize="12"
                   VerticalAlignment="Center"
@@ -20,6 +29,7 @@
                   Opacity="1"
                   Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
         <FontIcon x:Name="ArchiveIcon"
+                  Grid.Column="1"
                   Glyph="&#xF012;"
                   FontSize="12"
                   VerticalAlignment="Center"
@@ -28,6 +38,7 @@
                   Opacity="1"
                   Foreground="#D67F2F" />
         <FontIcon x:Name="LockIcon"
+                  Grid.Column="2"
                   Glyph="&#xE72E;"
                   FontSize="12"
                   VerticalAlignment="Center"
@@ -36,6 +47,7 @@
                   Opacity="1"
                   RightTapped="OnLockIconRightTapped" />
         <TextBlock x:Name="DirtyIndicator"
+                   Grid.Column="3"
                    Text="&#x25CF;"
                    FontSize="8"
                    VerticalAlignment="Center"
@@ -43,7 +55,12 @@
                    Opacity="0"
                    Foreground="#D83C3C" />
         <TextBlock x:Name="TitleText"
+                   Grid.Column="4"
+                   MinWidth="0"
+                   HorizontalAlignment="Stretch"
                    VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis"
+                   TextWrapping="NoWrap"
                    Opacity="1" />
-    </StackPanel>
+    </Grid>
 </UserControl>

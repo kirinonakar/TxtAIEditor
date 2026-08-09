@@ -200,10 +200,12 @@ export function bindPointerSelectionEvents({
         }
 
         const isUrl = /^https?:\/\/[^\s\)\(\]\[\}\{\>\<\"\']+/i.test(token);
-        const isPath = /^[a-zA-Z]:[\/\\]/.test(token) ||
-                       /^[\/\\]/.test(token) ||
-                       /^\.\.?[\/\\]/.test(token) ||
-                       ((token.includes('/') || token.includes('\\')) && !isUrl);
+        const isBareRootSeparator = token === '/' || token === '\\';
+        const isPath = !isBareRootSeparator &&
+                       (/^[a-zA-Z]:[\/\\]/.test(token) ||
+                        /^[\/\\]/.test(token) ||
+                        /^\.\.?[\/\\]/.test(token) ||
+                        ((token.includes('/') || token.includes('\\')) && !isUrl));
 
         if (!isUrl && !isPath) return null;
 

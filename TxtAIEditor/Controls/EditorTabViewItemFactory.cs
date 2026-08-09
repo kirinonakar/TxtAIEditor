@@ -1010,6 +1010,11 @@ audio {{
 
         private static void ApplyUiFont(TabViewItem tabItem, string? uiFontFamily)
         {
+            // The native close button occupies a separate template column. Stretch
+            // the custom header into the remaining column so its title can trim
+            // instead of drawing over that close-button slot after tabs resize.
+            tabItem.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+
             try
             {
                 if (!string.IsNullOrEmpty(uiFontFamily))
