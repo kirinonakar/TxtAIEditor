@@ -82,7 +82,7 @@ namespace TxtAIEditor.Controls
             var session = _openSessionController.EnsureSession(item.Id);
             session.Title = _titleResolver.Resolve(
                 item,
-                _getString("AgentOpenSessionUntitled", "새 세션"));
+                string.Empty);
             session.PromptText = string.Empty;
             session.OutputText = AgentHistoryFormatter.Format(
                 item.SessionHistoryText,

@@ -127,7 +127,7 @@ namespace TxtAIEditor.Controls
             return new AgentOpenSessionState
             {
                 Id = string.IsNullOrWhiteSpace(sessionId) ? Guid.NewGuid().ToString() : sessionId,
-                Title = GetUntitledOpenSessionTitle(),
+                Title = string.Empty,
                 OutputText = _displayText.OutputPlaceholder,
                 ActivityText = _displayText.ActivityIdle,
                 WorkspaceRoot = CaptureCurrentWorkspaceRoot(),
@@ -423,10 +423,6 @@ namespace TxtAIEditor.Controls
             {
                 session.Title = firstLine;
             }
-            else if (string.IsNullOrWhiteSpace(session.Title))
-            {
-                session.Title = GetUntitledOpenSessionTitle();
-            }
         }
 
         public void NotifyWorkspaceChanged()
@@ -450,9 +446,7 @@ namespace TxtAIEditor.Controls
             if (!HasRealSessionTitle(session))
             {
                 // 아직 제목이 없는 새 세션: 워크스페이스만 표시한다.
-                return string.IsNullOrWhiteSpace(prefix)
-                    ? GetUntitledOpenSessionTitle()
-                    : prefix.TrimEnd();
+                return prefix.TrimEnd();
             }
 
             return $"{prefix}{session.Title}";
@@ -460,8 +454,7 @@ namespace TxtAIEditor.Controls
 
         private bool HasRealSessionTitle(AgentOpenSessionState session)
         {
-            return !string.IsNullOrWhiteSpace(session.Title) &&
-                !string.Equals(session.Title, GetUntitledOpenSessionTitle(), StringComparison.Ordinal);
+            return !string.IsNullOrWhiteSpace(session.Title);
         }
 
         private static string BuildWorkspacePrefix(string? workspaceRoot)
@@ -934,11 +927,6 @@ namespace TxtAIEditor.Controls
             session.ThinkingLineStart = lineStart;
             session.ThinkingLineTimestamp = ExtractThinkingTimestamp(line);
             session.ThinkingLinePrefix = StripTrailingThinkingDots(line);
-        }
-
-        private string GetUntitledOpenSessionTitle()
-        {
-            return _getString("AgentOpenSessionUntitled", "새 세션");
         }
 
         private string NormalizePlaceholderOutput(string text)

@@ -110,7 +110,7 @@ namespace TxtAIEditor.Controls
             AgentSessionRewindSnapshot snapshot)
         {
             session.Title = string.IsNullOrWhiteSpace(snapshot.Title)
-                ? _getString("AgentOpenSessionUntitled", "새 세션")
+                ? string.Empty
                 : snapshot.Title;
             session.PromptText = snapshot.PromptText;
             session.OutputText = string.IsNullOrEmpty(snapshot.OutputText)
