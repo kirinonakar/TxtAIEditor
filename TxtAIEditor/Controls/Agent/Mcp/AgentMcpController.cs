@@ -647,6 +647,12 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (sourceKind == AgentPluginImportSourceKind.GitHub)
+            {
+                await InstallAgentPluginFromGitHubAsync();
+                return;
+            }
+
             if (sourceKind == AgentPluginImportSourceKind.ZipArchive)
             {
                 var picker = new FileOpenPicker

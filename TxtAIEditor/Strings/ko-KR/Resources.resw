@@ -3854,12 +3854,12 @@
     <value>툴바 버튼 순서 &amp; 정렬</value>
   </data>
   <data name="AgentPluginImportText" xml:space="preserve">
-    <value>Agent Plugin 가져오기</value>
+    <value>Agent Plugin 설치</value>
   </data>
-  <data name="AgentPluginImportSourceTitle" xml:space="preserve"><value>Agent Plugin 가져오기</value></data>
-  <data name="AgentPluginImportSourceInfo" xml:space="preserve"><value>GitHub에서 다운로드한 ZIP 파일이나 압축을 푼 Plugin 폴더를 선택할 수 있습니다.</value></data>
-  <data name="AgentPluginImportZipButton" xml:space="preserve"><value>ZIP 파일 선택</value></data>
-  <data name="AgentPluginImportFolderButton" xml:space="preserve"><value>폴더 선택</value></data>
+  <data name="AgentPluginImportSourceTitle" xml:space="preserve"><value>Agent Plugin 설치</value></data>
+  <data name="AgentPluginImportSourceInfo" xml:space="preserve"><value>ZIP 파일, 압축을 푼 Plugin 폴더 또는 GitHub 저장소에서 설치할 수 있습니다.</value></data>
+  <data name="AgentPluginImportZipButton" xml:space="preserve"><value>ZIP 파일에서 설치</value></data>
+  <data name="AgentPluginImportFolderButton" xml:space="preserve"><value>폴더에서 설치</value></data>
   <data name="AgentPluginImportWarningTitle" xml:space="preserve">
     <value>Agent Plugin 가져오기 경고</value>
   </data>

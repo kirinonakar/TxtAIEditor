@@ -3854,12 +3854,12 @@ Plan: {0}</value>
     <value>Toolbar Button Order &amp; Alignment</value>
   </data>
   <data name="AgentPluginImportText" xml:space="preserve">
-    <value>Import Agent Plugin</value>
+    <value>Install Agent Plugin</value>
   </data>
-  <data name="AgentPluginImportSourceTitle" xml:space="preserve"><value>Import Agent Plugin</value></data>
-  <data name="AgentPluginImportSourceInfo" xml:space="preserve"><value>Select a ZIP file downloaded from GitHub or an extracted plugin folder.</value></data>
-  <data name="AgentPluginImportZipButton" xml:space="preserve"><value>Select ZIP file</value></data>
-  <data name="AgentPluginImportFolderButton" xml:space="preserve"><value>Select folder</value></data>
+  <data name="AgentPluginImportSourceTitle" xml:space="preserve"><value>Install Agent Plugin</value></data>
+  <data name="AgentPluginImportSourceInfo" xml:space="preserve"><value>Install from a ZIP file, an extracted plugin folder, or a GitHub repository.</value></data>
+  <data name="AgentPluginImportZipButton" xml:space="preserve"><value>Install from ZIP file</value></data>
+  <data name="AgentPluginImportFolderButton" xml:space="preserve"><value>Install from folder</value></data>
   <data name="AgentPluginImportWarningTitle" xml:space="preserve">
     <value>Agent Plugin Import Warnings</value>
   </data>

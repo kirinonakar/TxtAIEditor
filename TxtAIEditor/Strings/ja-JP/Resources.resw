@@ -3818,12 +3818,12 @@
     <value>ツールバーボタンの順序と配置</value>
   </data>
   <data name="AgentPluginImportText" xml:space="preserve">
-    <value>Agent Plugin をインポート</value>
+    <value>Agent Plugin をインストール</value>
   </data>
-  <data name="AgentPluginImportSourceTitle" xml:space="preserve"><value>Agent Plugin をインポート</value></data>
-  <data name="AgentPluginImportSourceInfo" xml:space="preserve"><value>GitHub からダウンロードした ZIP ファイル、または展開済みの Plugin フォルダーを選択できます。</value></data>
-  <data name="AgentPluginImportZipButton" xml:space="preserve"><value>ZIP ファイルを選択</value></data>
-  <data name="AgentPluginImportFolderButton" xml:space="preserve"><value>フォルダーを選択</value></data>
+  <data name="AgentPluginImportSourceTitle" xml:space="preserve"><value>Agent Plugin をインストール</value></data>
+  <data name="AgentPluginImportSourceInfo" xml:space="preserve"><value>ZIP ファイル、展開済みの Plugin フォルダー、または GitHub リポジトリからインストールできます。</value></data>
+  <data name="AgentPluginImportZipButton" xml:space="preserve"><value>ZIP ファイルからインストール</value></data>
+  <data name="AgentPluginImportFolderButton" xml:space="preserve"><value>フォルダーからインストール</value></data>
   <data name="AgentPluginImportWarningTitle" xml:space="preserve">
     <value>Agent Plugin インポートの警告</value>
   </data>

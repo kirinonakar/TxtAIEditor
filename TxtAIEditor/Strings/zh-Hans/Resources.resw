@@ -3818,12 +3818,12 @@
     <value>工具栏按钮顺序与对齐</value>
   </data>
   <data name="AgentPluginImportText" xml:space="preserve">
-    <value>导入 Agent Plugin</value>
+    <value>安装 Agent Plugin</value>
   </data>
-  <data name="AgentPluginImportSourceTitle" xml:space="preserve"><value>导入 Agent Plugin</value></data>
-  <data name="AgentPluginImportSourceInfo" xml:space="preserve"><value>可以选择从 GitHub 下载的 ZIP 文件或已解压的 Plugin 文件夹。</value></data>
-  <data name="AgentPluginImportZipButton" xml:space="preserve"><value>选择 ZIP 文件</value></data>
-  <data name="AgentPluginImportFolderButton" xml:space="preserve"><value>选择文件夹</value></data>
+  <data name="AgentPluginImportSourceTitle" xml:space="preserve"><value>安装 Agent Plugin</value></data>
+  <data name="AgentPluginImportSourceInfo" xml:space="preserve"><value>可以从 ZIP 文件、已解压的 Plugin 文件夹或 GitHub 仓库安装。</value></data>
+  <data name="AgentPluginImportZipButton" xml:space="preserve"><value>从 ZIP 文件安装</value></data>
+  <data name="AgentPluginImportFolderButton" xml:space="preserve"><value>从文件夹安装</value></data>
   <data name="AgentPluginImportWarningTitle" xml:space="preserve">
     <value>Agent Plugin 导入警告</value>
   </data>
