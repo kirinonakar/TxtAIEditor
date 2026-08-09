@@ -502,7 +502,6 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <FontIcon Grid.Column="0"
                                           Glyph="{Binding IconGlyph}"
@@ -522,12 +521,7 @@
                                                TextTrimming="CharacterEllipsis"
                                                TextWrapping="NoWrap"/>
                                 </StackPanel>
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding TokenText}"
-                                           FontSize="10"
-                                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                                           VerticalAlignment="Center"/>
-                                <Button Grid.Column="3"
+                                <Button Grid.Column="2"
                                         Tag="{Binding}"
                                         Click="OnRemoveAttachmentClick"
                                         Style="{StaticResource AgentOverlayButtonStyle}"
