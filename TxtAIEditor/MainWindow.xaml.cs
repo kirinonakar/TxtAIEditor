@@ -26,6 +26,7 @@ namespace TxtAIEditor
         private TrayIconService? _trayIconService;
         private bool _exitRequestedFromTray;
         private bool _hideToTrayPending;
+        private bool _trayClosePending;
 
         public bool ScrollSyncEnabled
         {
@@ -162,8 +163,17 @@ namespace TxtAIEditor
 
         private async Task CompleteWindowCloseAsync(Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
         {
-            await Operations.HandleAppWindowClosingAsync(args);
-            _exitRequestedFromTray = false;
+            bool isTrayExit = _exitRequestedFromTray;
+            try
+            {
+                await Operations.HandleAppWindowClosingAsync(
+                    args,
+                    saveUiLayoutSettings: !isTrayExit);
+            }
+            finally
+            {
+                _exitRequestedFromTray = false;
+            }
         }
 
         private bool EnsureTrayIcon()
@@ -200,9 +210,24 @@ namespace TxtAIEditor
 
         private void CloseFromTray()
         {
-            _exitRequestedFromTray = true;
+            if (_trayClosePending)
+            {
+                return;
+            }
+
+            _trayClosePending = true;
+            Task saveLayoutTask = Operations.SaveUiLayoutSettingsAsync();
             RestoreAndActivate();
-            Close();
+            if (!DispatcherQueue.TryEnqueue(async () =>
+            {
+                await saveLayoutTask;
+                _trayClosePending = false;
+                _exitRequestedFromTray = true;
+                Close();
+            }))
+            {
+                _trayClosePending = false;
+            }
         }
 
     }

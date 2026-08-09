@@ -146,11 +146,13 @@ namespace TxtAIEditor.Core.Services
             if (!IsRightSidebarVisible) return;
 
             double currentWidth = _previewColumn.Width.Value;
-            double maxAvailable = GetMaxAvailablePreviewWidth();
-            if (currentWidth > maxAvailable)
+            double targetWidth = ClampPreviewWidth(_lastPreviewWidth);
+            if (Math.Abs(currentWidth - targetWidth) > 0.5)
             {
-                _previewColumn.Width = new GridLength(maxAvailable);
-                _lastPreviewWidth = maxAvailable;
+                // A temporary window constraint (for example sticky-note mode)
+                // may shrink the visible column, but it must not replace the
+                // user's preferred width. Restore that width when space returns.
+                _previewColumn.Width = new GridLength(targetWidth);
             }
         }
 

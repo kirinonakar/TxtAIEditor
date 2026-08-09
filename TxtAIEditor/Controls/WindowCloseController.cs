@@ -50,7 +50,9 @@ namespace TxtAIEditor.Controls
             _closeWindow = closeWindow;
         }
 
-        public async Task HandleClosingAsync(AppWindowClosingEventArgs args)
+        public async Task HandleClosingAsync(
+            AppWindowClosingEventArgs args,
+            bool saveUiLayoutSettings = true)
         {
             if (_isClosingConfirmed)
             {
@@ -66,7 +68,10 @@ namespace TxtAIEditor.Controls
             args.Cancel = true;
             var dirtyTabs = _viewModel.Tabs.Where(t => t.IsDirty).ToList();
 
-            await _saveUiLayoutSettingsAsync();
+            if (saveUiLayoutSettings)
+            {
+                await _saveUiLayoutSettingsAsync();
+            }
             if (dirtyTabs.Count == 0)
             {
                 ConfirmClose();

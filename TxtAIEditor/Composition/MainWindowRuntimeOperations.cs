@@ -396,10 +396,14 @@ namespace TxtAIEditor.Composition
             Controllers.Documents.CloseActive(Controllers.Shell.GetCurrentActiveTabView());
         }
 
-        public async Task HandleAppWindowClosingAsync(Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+        public async Task HandleAppWindowClosingAsync(
+            Microsoft.UI.Windowing.AppWindowClosingEventArgs args,
+            bool saveUiLayoutSettings = true)
         {
-            await Controllers.Documents.HandleWindowClosingAsync(args);
+            await Controllers.Documents.HandleWindowClosingAsync(args, saveUiLayoutSettings);
         }
+
+        public Task SaveUiLayoutSettingsAsync() => Controllers.Shell.SaveUiLayoutSettingsAsync();
 
         public EditorSettings CurrentSettings => _commonServices.SettingsService.CurrentSettings;
 

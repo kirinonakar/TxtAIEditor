@@ -118,7 +118,8 @@ namespace TxtAIEditor.Composition
             _controllers.TabMove.MoveRight();
 
         public Task HandleWindowClosingAsync(
-            Microsoft.UI.Windowing.AppWindowClosingEventArgs args) =>
-            _controllers.WindowClose.HandleClosingAsync(args);
+            Microsoft.UI.Windowing.AppWindowClosingEventArgs args,
+            bool saveUiLayoutSettings = true) =>
+            _controllers.WindowClose.HandleClosingAsync(args, saveUiLayoutSettings);
     }
 }
