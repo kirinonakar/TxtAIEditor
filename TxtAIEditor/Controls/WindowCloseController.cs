@@ -20,9 +20,11 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool> _isTerminalVisible;
         private readonly Action _suspendTerminal;
         private readonly Action _resumeTerminal;
+        private readonly Action _reconcileDirtyTabs;
         private readonly Func<OpenedTab, Task<bool>> _saveTabAsync;
         private readonly Action _closeWindow;
         private bool _isClosingConfirmed;
+        private bool _isCloseRequestInProgress;
 
         public WindowCloseController(
             MainWindowViewModel viewModel,
@@ -34,6 +36,7 @@ namespace TxtAIEditor.Controls
             Func<bool> isTerminalVisible,
             Action suspendTerminal,
             Action resumeTerminal,
+            Action reconcileDirtyTabs,
             Func<OpenedTab, Task<bool>> saveTabAsync,
             Action closeWindow)
         {
@@ -46,6 +49,7 @@ namespace TxtAIEditor.Controls
             _isTerminalVisible = isTerminalVisible;
             _suspendTerminal = suspendTerminal;
             _resumeTerminal = resumeTerminal;
+            _reconcileDirtyTabs = reconcileDirtyTabs;
             _saveTabAsync = saveTabAsync;
             _closeWindow = closeWindow;
         }
@@ -59,72 +63,87 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (_unsavedChangesDialogService.IsShowing)
-            {
-                args.Cancel = true;
-                return;
-            }
-
             args.Cancel = true;
-            var dirtyTabs = _viewModel.Tabs.Where(t => t.IsDirty).ToList();
+            await RequestCloseAsync(saveUiLayoutSettings);
+        }
 
-            if (saveUiLayoutSettings)
+        public async Task RequestCloseAsync(bool saveUiLayoutSettings = true)
+        {
+            if (_isClosingConfirmed ||
+                _isCloseRequestInProgress ||
+                _unsavedChangesDialogService.IsShowing)
             {
-                await _saveUiLayoutSettingsAsync();
-            }
-            if (dirtyTabs.Count == 0)
-            {
-                ConfirmClose();
                 return;
             }
 
-            bool terminalWasVisible = _isTerminalVisible();
+            _isCloseRequestInProgress = true;
             try
             {
-                if (terminalWasVisible)
+                if (saveUiLayoutSettings)
                 {
-                    _suspendTerminal();
+                    await _saveUiLayoutSettingsAsync();
                 }
 
-                XamlRoot? xamlRoot = _xamlRootProvider();
-                if (xamlRoot == null)
+                _reconcileDirtyTabs();
+                var dirtyTabs = _viewModel.Tabs.Where(t => t.IsDirty).ToList();
+                if (dirtyTabs.Count == 0)
                 {
+                    ConfirmClose();
                     return;
                 }
 
-                var result = await _unsavedChangesDialogService.ShowAsync(
-                    _getString("UnsavedChangesAppCloseTitle", "저장되지 않은 변경 사항"),
-                    string.Format(_getString("UnsavedChangesAppCloseMessage", "저장되지 않은 탭이 {0}개 있습니다. 종료하기 전에 저장하시겠습니까?"), dirtyTabs.Count),
-                    _getString("UnsavedChangesAppCloseDiscard", "저장하지 않고 종료"),
-                    _getString("UnsavedChangesAppCloseSave", "저장하고 종료"),
-                    _getString("UnsavedChangesCancel", "취소"),
-                    xamlRoot,
-                    _getCurrentElementTheme());
-
-                if (result == UnsavedChangesDialogResult.Discard)
+                bool terminalWasVisible = _isTerminalVisible();
+                try
                 {
-                    ConfirmClose();
-                }
-                else if (result == UnsavedChangesDialogResult.Save)
-                {
-                    foreach (var tab in dirtyTabs)
+                    if (terminalWasVisible)
                     {
-                        bool saved = await _saveTabAsync(tab);
-                        if (!saved)
-                        {
-                            return;
-                        }
+                        _suspendTerminal();
                     }
 
-                    ConfirmClose();
+                    XamlRoot? xamlRoot = _xamlRootProvider();
+                    if (xamlRoot == null)
+                    {
+                        return;
+                    }
+
+                    var result = await _unsavedChangesDialogService.ShowAsync(
+                        _getString("UnsavedChangesAppCloseTitle", "저장되지 않은 변경 사항"),
+                        string.Format(_getString("UnsavedChangesAppCloseMessage", "저장되지 않은 탭이 {0}개 있습니다. 종료하기 전에 저장하시겠습니까?"), dirtyTabs.Count),
+                        _getString("UnsavedChangesAppCloseDiscard", "저장하지 않고 종료"),
+                        _getString("UnsavedChangesAppCloseSave", "저장하고 종료"),
+                        _getString("UnsavedChangesCancel", "취소"),
+                        xamlRoot,
+                        _getCurrentElementTheme());
+
+                    if (result == UnsavedChangesDialogResult.Discard)
+                    {
+                        ConfirmClose();
+                    }
+                    else if (result == UnsavedChangesDialogResult.Save)
+                    {
+                        foreach (var tab in dirtyTabs)
+                        {
+                            bool saved = await _saveTabAsync(tab);
+                            if (!saved)
+                            {
+                                return;
+                            }
+                        }
+
+                        ConfirmClose();
+                    }
+                }
+                finally
+                {
+                    if (terminalWasVisible)
+                    {
+                        _resumeTerminal();
+                    }
                 }
             }
             finally
             {
-                if (terminalWasVisible)
-                {
-                    _resumeTerminal();
-                }
+                _isCloseRequestInProgress = false;
             }
         }
 

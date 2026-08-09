@@ -80,6 +80,11 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            ReconcileAllDirtyStates();
+        }
+
+        public void ReconcileAllDirtyStates()
+        {
             foreach (var tab in _viewModel.Tabs.ToList())
             {
                 if (_editorSessions.ContainsKey(tab.Id))

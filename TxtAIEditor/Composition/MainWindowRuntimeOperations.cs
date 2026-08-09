@@ -405,6 +405,9 @@ namespace TxtAIEditor.Composition
 
         public Task SaveUiLayoutSettingsAsync() => Controllers.Shell.SaveUiLayoutSettingsAsync();
 
+        public Task RequestWindowCloseAsync(bool saveUiLayoutSettings = true) =>
+            Controllers.Documents.RequestWindowCloseAsync(saveUiLayoutSettings);
+
         public EditorSettings CurrentSettings => _commonServices.SettingsService.CurrentSettings;
 
         public ElementTheme GetCurrentElementTheme()

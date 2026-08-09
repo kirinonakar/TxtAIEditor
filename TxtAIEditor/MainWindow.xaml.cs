@@ -223,7 +223,14 @@ namespace TxtAIEditor
                 await saveLayoutTask;
                 _trayClosePending = false;
                 _exitRequestedFromTray = true;
-                Close();
+                try
+                {
+                    await Operations.RequestWindowCloseAsync(saveUiLayoutSettings: false);
+                }
+                finally
+                {
+                    _exitRequestedFromTray = false;
+                }
             }))
             {
                 _trayClosePending = false;

@@ -121,5 +121,8 @@ namespace TxtAIEditor.Composition
             Microsoft.UI.Windowing.AppWindowClosingEventArgs args,
             bool saveUiLayoutSettings = true) =>
             _controllers.WindowClose.HandleClosingAsync(args, saveUiLayoutSettings);
+
+        public Task RequestWindowCloseAsync(bool saveUiLayoutSettings = true) =>
+            _controllers.WindowClose.RequestCloseAsync(saveUiLayoutSettings);
     }
 }

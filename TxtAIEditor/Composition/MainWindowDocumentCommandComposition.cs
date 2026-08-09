@@ -116,6 +116,7 @@ namespace TxtAIEditor.Composition
                 () => ui.EditorWorkspace.IsTerminalVisible,
                 () => ui.TerminalPane.SuspendNativeWindows(),
                 () => ui.TerminalPane.ResumeNativeWindows(),
+                tabDirtyState.ReconcileAllDirtyStates,
                 tabSave.SaveAsync,
                 window.Close);
 
