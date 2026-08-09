@@ -13,6 +13,7 @@ namespace TxtAIEditor.Controls
         public Action<string>? AgentPresetDeleted { get; init; }
         public Action<string>? AgentPresetRemoved { get; init; }
         public Action<string>? AgentSkillToggled { get; init; }
+        public Action<string>? AgentSkillDeleted { get; init; }
         public Action<string>? AgentSkillRemoved { get; init; }
         public Action<string>? AgentMcpToggled { get; init; }
         public Action<string>? AgentMcpEdited { get; init; }
@@ -329,6 +330,10 @@ namespace TxtAIEditor.Controls
                 }
 
                 visibleSkillCount++;
+                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
                 bool isSelected = _selectedAgentSkillNames.Contains(skill.Name);
                 var selectBtn = new Button
                 {
@@ -343,7 +348,24 @@ namespace TxtAIEditor.Controls
                 string currentName = skill.Name;
                 selectBtn.Click += (_, _) => _callbacks.AgentSkillToggled?.Invoke(currentName);
                 _agentSkillButtons[currentName] = selectBtn;
-                _agentSkillListPanel.Children.Add(selectBtn);
+                Grid.SetColumn(selectBtn, 0);
+                rowGrid.Children.Add(selectBtn);
+
+                var deleteBtn = new Button
+                {
+                    Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
+                    Width = 28,
+                    Height = 28,
+                    Padding = new Thickness(0),
+                    Style = buttonStyle,
+                    IsEnabled = skill.CanDelete
+                };
+                ToolTipService.SetToolTip(deleteBtn, getString("AgentSkillDeleteText", "삭제"));
+                deleteBtn.Click += (_, _) => _callbacks.AgentSkillDeleted?.Invoke(currentName);
+                Grid.SetColumn(deleteBtn, 1);
+                rowGrid.Children.Add(deleteBtn);
+
+                _agentSkillListPanel.Children.Add(rowGrid);
             }
 
             if (visibleSkillCount == 0)

@@ -56,6 +56,7 @@ namespace TxtAIEditor.Controls
     {
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public bool CanDelete { get; set; }
     }
 
     public sealed partial class AgentPane : UserControl
@@ -112,6 +113,7 @@ namespace TxtAIEditor.Controls
                     AgentPresetDeleted = name => AgentPresetDeleted?.Invoke(this, name),
                     AgentPresetRemoved = name => AgentPresetRemoved?.Invoke(this, name),
                     AgentSkillToggled = name => AgentSkillToggled?.Invoke(this, name),
+                    AgentSkillDeleted = name => AgentSkillDeleted?.Invoke(this, name),
                     AgentSkillRemoved = name => AgentSkillRemoved?.Invoke(this, name),
                     AgentMcpToggled = name => AgentMcpToggled?.Invoke(this, name),
                     AgentMcpEdited = name => AgentMcpEdited?.Invoke(this, name),
@@ -181,6 +183,7 @@ namespace TxtAIEditor.Controls
         public event EventHandler? AgentSkillFlyoutOpened;
         public event EventHandler? AgentSkillRefreshRequested;
         public event EventHandler<string>? AgentSkillToggled;
+        public event EventHandler<string>? AgentSkillDeleted;
         public event EventHandler<string>? AgentSkillRemoved;
         public event EventHandler? AgentMcpFlyoutOpened;
         public event RoutedEventHandler? AgentMcpAddRequested;

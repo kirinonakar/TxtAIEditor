@@ -213,6 +213,52 @@ namespace TxtAIEditor.Controls
             UpdateSelectionUI();
         }
 
+        public async Task DeleteSkillAsync(string skillName)
+        {
+            AgentSkill? skill = _skills.FirstOrDefault(item =>
+                item.Name.Equals(skillName, StringComparison.OrdinalIgnoreCase));
+            if (skill == null || !AgentSkillDirectories.IsInsideUserSkillsDirectory(skill.SkillFilePath))
+            {
+                return;
+            }
+
+            try
+            {
+                string skillFilePath = Path.GetFullPath(skill.SkillFilePath);
+                if (Path.GetFileName(skillFilePath).Equals("SKILL.md", StringComparison.OrdinalIgnoreCase))
+                {
+                    string? skillDirectory = Path.GetDirectoryName(skillFilePath);
+                    if (!string.IsNullOrWhiteSpace(skillDirectory) &&
+                        AgentSkillDirectories.IsInsideUserSkillsDirectory(skillDirectory))
+                    {
+                        string normalizedSkillDirectory = Path.GetFullPath(skillDirectory)
+                            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        string normalizedUserSkillsDirectory = Path.GetFullPath(AgentSkillDirectories.UserSkillsDirectory)
+                            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        if (normalizedSkillDirectory.Equals(normalizedUserSkillsDirectory, StringComparison.OrdinalIgnoreCase))
+                        {
+                            File.Delete(skillFilePath);
+                        }
+                        else
+                        {
+                            Directory.Delete(skillDirectory, recursive: true);
+                        }
+                    }
+                }
+                else if (File.Exists(skillFilePath))
+                {
+                    File.Delete(skillFilePath);
+                }
+
+                _selectedSkillNames.Remove(skill.Name);
+                await LoadAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to delete agent skill '{skill.SkillFilePath}': {ex.Message}");
+            }
+        }
+
         public void SetActivePluginSkills(IEnumerable<AgentPluginSkill> pluginSkills)
         {
             _activePluginSkills.Clear();
@@ -289,7 +335,8 @@ namespace TxtAIEditor.Controls
                 .Select(skill => new AgentSkillItem
                 {
                     Name = skill.Name,
-                    Description = skill.Description
+                    Description = skill.Description,
+                    CanDelete = AgentSkillDirectories.IsInsideUserSkillsDirectory(skill.SkillFilePath)
                 })
                 .ToList();
             var selectedNames = _selectedSkillNames.ToList();

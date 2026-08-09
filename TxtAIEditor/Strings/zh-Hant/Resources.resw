@@ -2700,6 +2700,9 @@
   <data name="AgentSkillRemoveTooltip" xml:space="preserve">
     <value>取消選擇技能</value>
   </data>
+  <data name="AgentSkillDeleteText" xml:space="preserve">
+    <value>刪除技能</value>
+  </data>
   <data name="AgentSkillRefreshTooltip" xml:space="preserve">
     <value>重新掃描技能目錄</value>
   </data>
