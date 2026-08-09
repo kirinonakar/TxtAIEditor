@@ -293,10 +293,39 @@ namespace TxtAIEditor.Controls
             {
                 _tabActionSpacerUpdateQueued = false;
                 UpdateTabActionSpacers();
+                EnsureSelectedEndTabsVisible();
             }))
             {
                 _tabActionSpacerUpdateQueued = false;
+                EnsureSelectedEndTabsVisible();
             }
+        }
+
+        private void EnsureSelectedEndTabsVisible()
+        {
+            EnsureSelectedEndTabVisible(EditorTabView);
+            EnsureSelectedEndTabVisible(EditorTabView2);
+        }
+
+        private static void EnsureSelectedEndTabVisible(TabView tabView)
+        {
+            if (tabView.Visibility != Visibility.Visible ||
+                tabView.SelectedItem is not TabViewItem selectedTab ||
+                tabView.TabItems.Count == 0 ||
+                !ReferenceEquals(tabView.TabItems[tabView.TabItems.Count - 1], selectedTab))
+            {
+                return;
+            }
+
+            // The overflow buttons appear only after the tab list has been measured.
+            // Settle that layout first, then align the final selected tab with the
+            // right edge of the actual scroll viewport (to the left of the > button).
+            FindTabViewListView(tabView)?.UpdateLayout();
+            selectedTab.StartBringIntoView(new BringIntoViewOptions
+            {
+                AnimationDesired = false,
+                HorizontalAlignmentRatio = 1.0
+            });
         }
 
         private void ApplyStickyNoteTabActions()
