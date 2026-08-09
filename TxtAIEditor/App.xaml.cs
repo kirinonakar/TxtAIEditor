@@ -39,12 +39,6 @@ namespace TxtAIEditor
         private const int ComPostInvokeExitDelayMs = 3000;
         private const string ExplorerCommandClsid = "8D0B4C32-6D84-4B8A-8F3B-7E5408BEF1A1";
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
         [DllImport("ole32.dll")]
         private static extern int CoRegisterClassObject(ref Guid rclsid, IntPtr pUnk, uint dwClsContext, uint flags, out uint lpdwCookie);
 
@@ -57,8 +51,6 @@ namespace TxtAIEditor
         [DllImport("kernel32.dll", ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
-
-        private const int SW_RESTORE = 9;
 
         public App()
         {
@@ -85,13 +77,6 @@ namespace TxtAIEditor
 
             bool createdNew;
             _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out createdNew);
-
-            if (!createdNew)
-            {
-                CleanupWindowlessBackgroundProcesses(TimeSpan.FromSeconds(2));
-                _singleInstanceMutex.Dispose();
-                _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out createdNew);
-            }
 
             if (!createdNew)
             {
@@ -544,9 +529,7 @@ namespace TxtAIEditor
                         try
                         {
                             // Bring window to foreground
-                            var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(mainWindow);
-                            ShowWindow(hWnd, SW_RESTORE);
-                            SetForegroundWindow(hWnd);
+                            mainWindow.RestoreAndActivate();
 
                             foreach (var line in lines)
                             {

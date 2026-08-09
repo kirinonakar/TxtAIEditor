@@ -3851,4 +3851,7 @@
   <data name="AgentPluginChipPrefix" xml:space="preserve"><value>Plugin: </value></data>
   <data name="AgentPluginRemoveTooltip" xml:space="preserve"><value>Plugin を無効化</value></data>
   <data name="DialogOk" xml:space="preserve"><value>OK</value></data>
+  <data name="SettingsKeepInTrayOnClose" xml:space="preserve"><value>ウィンドウを閉じるときにシステム トレイに保持</value></data>
+  <data name="TrayMenuOpen" xml:space="preserve"><value>開く</value></data>
+  <data name="TrayMenuClose" xml:space="preserve"><value>閉じる</value></data>
 </root>

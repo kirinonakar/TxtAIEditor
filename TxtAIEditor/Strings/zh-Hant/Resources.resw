@@ -3851,4 +3851,7 @@
   <data name="AgentPluginChipPrefix" xml:space="preserve"><value>Plugin: </value></data>
   <data name="AgentPluginRemoveTooltip" xml:space="preserve"><value>停用 Plugin</value></data>
   <data name="DialogOk" xml:space="preserve"><value>確定</value></data>
+  <data name="SettingsKeepInTrayOnClose" xml:space="preserve"><value>關閉視窗時保留在系統匣</value></data>
+  <data name="TrayMenuOpen" xml:space="preserve"><value>開啟</value></data>
+  <data name="TrayMenuClose" xml:space="preserve"><value>關閉</value></data>
 </root>

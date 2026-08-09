@@ -25,6 +25,7 @@ namespace TxtAIEditor.Core.Services
         private readonly CheckBox _defaultMarkdownCheck;
         private readonly CheckBox _defaultMarkdownToolbarCheck;
         private readonly CheckBox _startInTreeModeCheck;
+        private readonly CheckBox _keepInTrayOnCloseCheck;
         private readonly TextBox _tabSizeBox;
         private readonly TextBox _homeFolderBox;
         private readonly TextBox _externalViewerPathBox;
@@ -54,6 +55,11 @@ namespace TxtAIEditor.Core.Services
             _defaultMarkdownCheck = new CheckBox { Content = getString("SettingsLivePreview", "실시간 미리보기 기본 활성화"), IsChecked = settings.DefaultMarkdownEnabled };
             _defaultMarkdownToolbarCheck = new CheckBox { Content = getString("SettingsMarkdownToolbar", "기본 마크다운 툴바 활성화"), IsChecked = settings.DefaultMarkdownToolbarEnabled };
             _startInTreeModeCheck = new CheckBox { Content = getString("SettingsStartInTreeMode", "트리 모드로 시작"), IsChecked = settings.StartInTreeMode };
+            _keepInTrayOnCloseCheck = new CheckBox
+            {
+                Content = getString("SettingsKeepInTrayOnClose", "창을 닫을 때 시스템 트레이에 유지"),
+                IsChecked = settings.KeepInTrayOnClose
+            };
             _tabSizeBox = new TextBox { PlaceholderText = "예: 4", Text = settings.TabSize.ToString(), HorizontalAlignment = HorizontalAlignment.Stretch };
             _homeFolderBox = new TextBox { PlaceholderText = getString("SettingsHomeFolderPlaceholder", "C:\\Users\\..."), Text = settings.HomeFolderPath, HorizontalAlignment = HorizontalAlignment.Stretch, IsSpellCheckEnabled = false };
             _externalViewerPathBox = new TextBox { PlaceholderText = getString("SettingsExternalViewerPathPlaceholder", "uviewer 또는 C:\\Program Files\\Viewer\\viewer.exe"), Text = settings.ExternalViewerPath, HorizontalAlignment = HorizontalAlignment.Stretch, IsSpellCheckEnabled = false };
@@ -97,6 +103,7 @@ namespace TxtAIEditor.Core.Services
             settings.RightSidebarVisible = settings.DefaultMarkdownEnabled;
             settings.DefaultMarkdownToolbarEnabled = _defaultMarkdownToolbarCheck.IsChecked == true;
             settings.StartInTreeMode = _startInTreeModeCheck.IsChecked == true;
+            settings.KeepInTrayOnClose = _keepInTrayOnCloseCheck.IsChecked == true;
         }
 
         private static Border CreateCard(string title, UIElement content, string fontIconGlyph)
@@ -167,6 +174,7 @@ namespace TxtAIEditor.Core.Services
             content.Children.Add(_defaultMarkdownToolbarCheck);
             content.Children.Add(_startInTreeModeCheck);
             content.Children.Add(_stripJupyterOutputsOnCommitCheck);
+            content.Children.Add(_keepInTrayOnCloseCheck);
 
             return CreateCard(
                 getString("SettingsEditingGroupMarkdown", "문서 & 미리보기"),

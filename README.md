@@ -56,6 +56,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Mica Backdrop & Themes:** Themes (Light, Dark, Pastel Dark) with a high-fidelity Mica backdrop.
 *   **Multi-Pane Splitters:** Easily adjust sidebars, preview sections, and terminal panes via interactive C# split-controls.
 *   **Always on Top & Sticky Notes:** Pin your editor window or transform to sticky notes directly from the toolbar.
+*   **Optional System Tray Mode:** Enable **Keep in system tray when closing** in **Settings > Editing** to hide the window instead of ending the process. Use the tray icon's right-click menu to reopen the window or fully close TxtAIEditor.
 
 ### 👁️ Real-Time Preview
 *   **Live Renderer:** View Markdown, HTML, Aozora or LaTeX (powered by KaTeX) in a split view or an external browser.

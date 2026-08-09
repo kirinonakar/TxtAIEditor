@@ -3887,4 +3887,7 @@
   <data name="AgentPluginChipPrefix" xml:space="preserve"><value>Plugin: </value></data>
   <data name="AgentPluginRemoveTooltip" xml:space="preserve"><value>Plugin 비활성화</value></data>
   <data name="DialogOk" xml:space="preserve"><value>확인</value></data>
+  <data name="SettingsKeepInTrayOnClose" xml:space="preserve"><value>창을 닫을 때 시스템 트레이에 유지</value></data>
+  <data name="TrayMenuOpen" xml:space="preserve"><value>열기</value></data>
+  <data name="TrayMenuClose" xml:space="preserve"><value>닫기</value></data>
 </root>

@@ -401,6 +401,8 @@ namespace TxtAIEditor.Composition
             await Controllers.Documents.HandleWindowClosingAsync(args);
         }
 
+        public EditorSettings CurrentSettings => _commonServices.SettingsService.CurrentSettings;
+
         public ElementTheme GetCurrentElementTheme()
         {
             if (string.Equals(_commonServices.SettingsService.CurrentSettings.Theme, "Light", StringComparison.OrdinalIgnoreCase))

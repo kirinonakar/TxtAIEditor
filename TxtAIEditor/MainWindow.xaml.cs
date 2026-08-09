@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -22,6 +23,9 @@ namespace TxtAIEditor
             _operations ?? throw new InvalidOperationException("MainWindow runtime operations have not been composed.");
         private readonly MainWindowViewModel _viewModel = new MainWindowViewModel();
         private readonly MainWindowState _state = new MainWindowState();
+        private TrayIconService? _trayIconService;
+        private bool _exitRequestedFromTray;
+        private bool _hideToTrayPending;
 
         public bool ScrollSyncEnabled
         {
@@ -97,6 +101,7 @@ namespace TxtAIEditor
             this.Activated += OnWindowActivated;
             this.Activated += Controllers.Lifecycle.Window.HandleActivationChanged;
             this.Closed += Controllers.Lifecycle.Window.HandleWindowClosed;
+            this.Closed += (_, _) => _trayIconService?.Dispose();
             this.AppWindow.Closing += OnAppWindowClosing;
             Controllers.Lifecycle.Window.StartShortcuts();
 
@@ -124,9 +129,80 @@ namespace TxtAIEditor
 
         internal Task OpenShellPathAsync(string path) => Operations.OpenShellPathAsync(path);
 
-        private async void OnAppWindowClosing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+        private void OnAppWindowClosing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+        {
+            if (!_exitRequestedFromTray &&
+                Operations.CurrentSettings.KeepInTrayOnClose)
+            {
+                args.Cancel = true;
+                if (!_hideToTrayPending && EnsureTrayIcon())
+                {
+                    _hideToTrayPending = true;
+                    if (!DispatcherQueue.TryEnqueue(() =>
+                    {
+                        try
+                        {
+                            AppWindow.Hide();
+                        }
+                        finally
+                        {
+                            _hideToTrayPending = false;
+                        }
+                    }))
+                    {
+                        _hideToTrayPending = false;
+                    }
+                }
+
+                return;
+            }
+
+            _ = CompleteWindowCloseAsync(args);
+        }
+
+        private async Task CompleteWindowCloseAsync(Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
         {
             await Operations.HandleAppWindowClosingAsync(args);
+            _exitRequestedFromTray = false;
+        }
+
+        private bool EnsureTrayIcon()
+        {
+            try
+            {
+                _trayIconService ??= new TrayIconService(
+                    WinRT.Interop.WindowNative.GetWindowHandle(this),
+                    "TxtAIEditor",
+                    GetLocalizedString("TrayMenuOpen", "열기"),
+                    GetLocalizedString("TrayMenuClose", "닫기"),
+                    RestoreAndActivate,
+                    CloseFromTray);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to create tray icon: {ex.Message}");
+                return false;
+            }
+        }
+
+        internal void RestoreAndActivate()
+        {
+            AppWindow.Show();
+            if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter &&
+                presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized)
+            {
+                presenter.Restore();
+            }
+
+            Activate();
+        }
+
+        private void CloseFromTray()
+        {
+            _exitRequestedFromTray = true;
+            RestoreAndActivate();
+            Close();
         }
 
     }
