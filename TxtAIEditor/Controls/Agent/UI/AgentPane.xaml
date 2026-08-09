@@ -513,7 +513,8 @@
                                     <TextBlock Text="{Binding DisplayName}"
                                                FontSize="11"
                                                TextTrimming="CharacterEllipsis"
-                                               TextWrapping="NoWrap"/>
+                                               TextWrapping="NoWrap"
+                                               ToolTipService.ToolTip="{Binding DisplayName}"/>
                                     <TextBlock Text="{Binding Detail}"
                                                Visibility="{Binding DetailVisibility}"
                                                FontSize="10"
@@ -529,6 +530,7 @@
                                 <Button Grid.Column="3"
                                         Tag="{Binding}"
                                         Click="OnRemoveAttachmentClick"
+                                        Style="{StaticResource AgentOverlayButtonStyle}"
                                         Width="24"
                                         Height="24"
                                         Padding="0"
