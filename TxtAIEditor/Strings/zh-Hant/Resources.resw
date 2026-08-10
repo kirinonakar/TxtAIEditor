@@ -3564,6 +3564,9 @@
   <data name="ExplorerTreeModeTooltip" xml:space="preserve">
     <value>樹狀模式 (F3)</value>
   </data>
+  <data name="ExplorerMoreActions" xml:space="preserve">
+    <value>更多操作</value>
+  </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>已執行上下文壓縮。</value>
   </data>

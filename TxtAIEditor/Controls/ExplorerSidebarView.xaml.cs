@@ -112,9 +112,11 @@ namespace TxtAIEditor.Controls
                 ExplorerStatusText.Text = getString("NoFolderSelected", "폴더를 선택하세요.");
             }
 
-            ToolTipService.SetToolTip(ExplorerBackButton, getString("ExplorerBackTooltip", "이전 폴더"));
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerBackButton, getString("ExplorerBackTooltip", "이전 폴더"));
-            ToolTipService.SetToolTip(ExplorerUpButton, getString("ExplorerUpTooltip", "상위 폴더"));
+            string backText = getString("ExplorerBackTooltip", "이전 폴더");
+            ToolTipService.SetToolTip(ExplorerBackButton, backText);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerBackButton, backText);
+            string upText = getString("ExplorerUpTooltip", "상위 폴더");
+            ToolTipService.SetToolTip(ExplorerUpButton, upText);
             var selectFolderText = getString("ExplorerSelectFolder", "폴더 선택...");
             ToolTipService.SetToolTip(ExplorerSelectFolderButton, selectFolderText);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerSelectFolderButton, selectFolderText);
@@ -124,8 +126,10 @@ namespace TxtAIEditor.Controls
             ExplorerCreateFolderMenuItem.Text = getString("ExplorerCreateFolderTooltip", "새 폴더");
             ExplorerCreateFileMenuItem.Text = getString("ExplorerCreateFileTooltip", "새 파일");
             ExplorerCreateNotebookMenuItem.Text = getString("ExplorerCreateNotebookTooltip", "새 노트북");
-            ToolTipService.SetToolTip(ExplorerRefreshButton, getString("ExplorerRefreshTooltip", "새로고침"));
-            ToolTipService.SetToolTip(ExplorerSortButton, getString("ExplorerSortName", "이름순 정렬"));
+            string refreshText = getString("ExplorerRefreshTooltip", "새로고침");
+            ToolTipService.SetToolTip(ExplorerRefreshButton, refreshText);
+            string sortText = getString("ExplorerSortName", "이름순 정렬");
+            ToolTipService.SetToolTip(ExplorerSortButton, sortText);
 
             var remoteExplorerText = getString("RemoteExplorerTitle", "리모트 서버");
             ToolTipService.SetToolTip(ExplorerRemoteButton, remoteExplorerText);
@@ -149,6 +153,45 @@ namespace TxtAIEditor.Controls
             var treeModeText = getString("ExplorerTreeModeTooltip", "트리 모드 (F3)");
             ToolTipService.SetToolTip(ExplorerTreeModeButton, treeModeText);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerTreeModeButton, treeModeText);
+
+            string moreActionsText = getString("ExplorerMoreActions", "더 보기");
+            ToolTipService.SetToolTip(ExplorerNavigationOverflowButton, moreActionsText);
+            ToolTipService.SetToolTip(ExplorerStatusOverflowButton, moreActionsText);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerNavigationOverflowButton, moreActionsText);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerStatusOverflowButton, moreActionsText);
+
+            ExplorerOverflowRefreshMenuItem.Text = refreshText;
+            ExplorerOverflowHomeMenuItem.Text = homeFolderText;
+            ExplorerOverflowSelectFolderMenuItem.Text = selectFolderText;
+            ExplorerOverflowCreateSubItem.Text = createItemText;
+            ExplorerOverflowCreateFolderMenuItem.Text = ExplorerCreateFolderMenuItem.Text;
+            ExplorerOverflowCreateFileMenuItem.Text = ExplorerCreateFileMenuItem.Text;
+            ExplorerOverflowCreateNotebookMenuItem.Text = ExplorerCreateNotebookMenuItem.Text;
+            ExplorerOverflowRemoteMenuItem.Text = remoteExplorerText;
+            ExplorerOverflowOpenInWindowsMenuItem.Text = openInWindowsExplorerText;
+        }
+
+        private void OnExplorerNavigationToolbarSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            bool showAll = e.NewSize.Width >= 205;
+            bool showNavigationActions = e.NewSize.Width >= 177;
+
+            ExplorerRefreshButton.Visibility = showAll || showNavigationActions ? Visibility.Visible : Visibility.Collapsed;
+            ExplorerHomeButton.Visibility = showAll || showNavigationActions ? Visibility.Visible : Visibility.Collapsed;
+            ExplorerSelectFolderButton.Visibility = showAll ? Visibility.Visible : Visibility.Collapsed;
+            ExplorerCreateFolderButton.Visibility = showAll ? Visibility.Visible : Visibility.Collapsed;
+            ExplorerNavigationOverflowButton.Visibility = showAll ? Visibility.Collapsed : Visibility.Visible;
+
+            ExplorerOverflowRefreshMenuItem.Visibility = showNavigationActions ? Visibility.Collapsed : Visibility.Visible;
+            ExplorerOverflowHomeMenuItem.Visibility = showNavigationActions ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void OnExplorerStatusToolbarSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            bool showAll = e.NewSize.Width >= 190;
+            ExplorerRemoteButton.Visibility = showAll ? Visibility.Visible : Visibility.Collapsed;
+            ExplorerOpenInWindowsButton.Visibility = showAll ? Visibility.Visible : Visibility.Collapsed;
+            ExplorerStatusOverflowButton.Visibility = showAll ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void OnExplorerBackClick(object sender, RoutedEventArgs e) => BackClick?.Invoke(sender, e);
@@ -243,6 +286,10 @@ namespace TxtAIEditor.Controls
         private void OnRefreshClick(object sender, RoutedEventArgs e) => RefreshClick?.Invoke(sender, e);
         private void OnSortClick(object sender, RoutedEventArgs e) => SortClick?.Invoke(sender, e);
         private async void OnRemoteFlyoutOpening(object sender, object e) => await RemoteExplorer.RefreshProfilesAsync();
+        private void OnOverflowRemoteClick(object sender, RoutedEventArgs e)
+        {
+            DispatcherQueue.TryEnqueue(() => ExplorerRemoteButton.Flyout?.ShowAt(ExplorerStatusOverflowButton));
+        }
         private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e) => OpenInWindowsExplorerClick?.Invoke(sender, e);
         private void OnExplorerHomeClick(object sender, RoutedEventArgs e) => HomeClick?.Invoke(sender, e);
         private void OnExplorerTreeModeClick(object sender, RoutedEventArgs e) => TreeModeClick?.Invoke(sender, e);

@@ -3600,6 +3600,9 @@
   <data name="ExplorerTreeModeTooltip" xml:space="preserve">
     <value>트리 모드 (F3)</value>
   </data>
+  <data name="ExplorerMoreActions" xml:space="preserve">
+    <value>더 보기</value>
+  </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>context 압축이 시행되었습니다.</value>
   </data>

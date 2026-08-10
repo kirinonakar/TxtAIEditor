@@ -3600,6 +3600,9 @@ Plan: {0}</value>
   <data name="ExplorerTreeModeTooltip" xml:space="preserve">
     <value>Tree mode (F3)</value>
   </data>
+  <data name="ExplorerMoreActions" xml:space="preserve">
+    <value>More actions</value>
+  </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>Context compression was performed.</value>
   </data>

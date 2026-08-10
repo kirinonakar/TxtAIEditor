@@ -3564,6 +3564,9 @@
   <data name="ExplorerTreeModeTooltip" xml:space="preserve">
     <value>ツリーモード (F3)</value>
   </data>
+  <data name="ExplorerMoreActions" xml:space="preserve">
+    <value>その他の操作</value>
+  </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>コンテキストの圧縮が実行されました。</value>
   </data>
