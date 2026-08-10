@@ -608,6 +608,7 @@ namespace TxtAIEditor.Controls
         {
             bool hasChips = _agentSelectedPresetPanel.Children.Count > 0;
             _agentSelectedPresetScrollButtons.Visibility = hasChips ? Visibility.Visible : Visibility.Collapsed;
+            _agentSelectedPresetClearAllButton.Visibility = hasChips ? Visibility.Visible : Visibility.Collapsed;
             if (!hasChips)
             {
                 return;

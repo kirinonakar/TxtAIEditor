@@ -740,38 +740,46 @@
                             Spacing="4"
                             SizeChanged="OnSelectedPresetPanelSizeChanged"/>
             </ScrollViewer>
-            <StackPanel x:Name="AgentSelectedPresetScrollButtons"
-                        Grid.Row="0"
-                        Grid.Column="1"
-                        Orientation="Horizontal"
-                        Spacing="2"
-                        Margin="0,0,0,4"
-                        Visibility="Collapsed">
-                <Button x:Name="AgentSelectedPresetScrollLeftButton"
-                        Content="&lt;"
-                        Width="24"
-                        Height="24"
-                        Padding="0"
-                        FontSize="12"
-                        Click="OnSelectedPresetScrollLeftClick"
-                        Style="{StaticResource AgentButtonStyle}"/>
-                <Button x:Name="AgentSelectedPresetScrollRightButton"
-                        Content="&gt;"
-                        Width="24"
-                        Height="24"
-                        Padding="0"
-                        FontSize="12"
-                        Click="OnSelectedPresetScrollRightClick"
-                        Style="{StaticResource AgentButtonStyle}"/>
+            <Grid Grid.Row="0" Grid.Column="1" HorizontalAlignment="Right">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel x:Name="AgentSelectedPresetScrollButtons"
+                            Grid.Column="0"
+                            Orientation="Horizontal"
+                            Spacing="2"
+                            Margin="0,0,0,4"
+                            Visibility="Collapsed">
+                    <Button x:Name="AgentSelectedPresetScrollLeftButton"
+                            Content="&lt;"
+                            Width="24"
+                            Height="24"
+                            Padding="0"
+                            FontSize="12"
+                            Click="OnSelectedPresetScrollLeftClick"
+                            Style="{StaticResource AgentButtonStyle}"/>
+                    <Button x:Name="AgentSelectedPresetScrollRightButton"
+                            Content="&gt;"
+                            Width="24"
+                            Height="24"
+                            Padding="0"
+                            FontSize="12"
+                            Click="OnSelectedPresetScrollRightClick"
+                            Style="{StaticResource AgentButtonStyle}"/>
+                </StackPanel>
                 <Button x:Name="AgentSelectedPresetClearAllButton"
+                        Grid.Column="1"
                         Content="×"
                         Width="24"
                         Height="24"
                         Padding="0"
                         FontSize="12"
+                        Margin="0,0,0,4"
+                        Visibility="Collapsed"
                         Click="OnSelectedPresetClearAllClick"
                         Style="{StaticResource AgentButtonStyle}"/>
-            </StackPanel>
+            </Grid>
             <Grid Grid.Row="1" Grid.Column="0">
                 <TextBox x:Name="AgentPromptInput"
                          PlaceholderText="Agent에게 맡길 작업 입력..."
