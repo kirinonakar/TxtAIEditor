@@ -265,8 +265,8 @@ namespace TxtAIEditor.Controls
                             endLine = new { type = "integer", description = "End line number to replace" },
                             newText = new { type = "string", description = "New text to insert" },
                             expectedSnippet = new { type = "string", description = "The exact full text expected at the range to verify correctness. If the requested boundaries are off by up to 3 lines, a unique nearby match is used automatically. For any range length, provide either this full-range snippet or expectedStartLines plus expectedEndLines." },
-                            expectedStartLines = new { anyOf = new object[] { new { type = "array", items = new { type = "string" } }, new { type = "string" } }, description = "The exact content at the start of the range when expectedSnippet is not provided. Use at least 1 line for a 1-line range and at least 2 lines otherwise. Pass as a string array or newline-separated string." },
-                            expectedEndLines = new { anyOf = new object[] { new { type = "array", items = new { type = "string" } }, new { type = "string" } }, description = "The exact content at the end of the range when expectedSnippet is not provided. Use at least 1 line for a 1-line range and at least 2 lines otherwise. Pass as a string array or newline-separated string." }
+                            expectedStartLines = new { type = "string", description = "The exact text at the start of the range when expectedSnippet is not provided. Pass it as one string; include newline characters when the boundary spans multiple lines." },
+                            expectedEndLines = new { type = "string", description = "The exact text at the end of the range when expectedSnippet is not provided. Pass it as one string; include newline characters when the boundary spans multiple lines." }
                         },
                         required = new[] { "path", "startLine", "endLine", "newText" }
                     }

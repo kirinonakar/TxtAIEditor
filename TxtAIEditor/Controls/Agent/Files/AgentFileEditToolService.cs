@@ -476,12 +476,10 @@ namespace TxtAIEditor.Controls
             }
             else
             {
-                int minimumBoundaryLineCount = Math.Min(2, lineCount);
-
-                if (expectedStartLines == null || expectedStartLines.Count < minimumBoundaryLineCount)
+                if (expectedStartLines == null || expectedStartLines.Count == 0)
                 {
                     return WithFailureContext(
-                        $"replace_range failed: expectedStartLines is required and must have at least {minimumBoundaryLineCount} element(s).");
+                        "replace_range failed: expectedStartLines is required and must contain boundary text.");
                 }
                 int startCheckCount = Math.Min(expectedStartLines.Count, lines.Length - (startLine - 1));
                 for (int i = 0; i < startCheckCount; i++)
@@ -494,10 +492,10 @@ namespace TxtAIEditor.Controls
                     }
                 }
 
-                if (expectedEndLines == null || expectedEndLines.Count < minimumBoundaryLineCount)
+                if (expectedEndLines == null || expectedEndLines.Count == 0)
                 {
                     return WithFailureContext(
-                        $"replace_range failed: expectedEndLines is required and must have at least {minimumBoundaryLineCount} element(s).");
+                        "replace_range failed: expectedEndLines is required and must contain boundary text.");
                 }
                 int expectedEndStartIndex = endLine - expectedEndLines.Count;
                 for (int i = 0; i < expectedEndLines.Count; i++)
