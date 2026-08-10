@@ -725,60 +725,66 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <ScrollViewer x:Name="AgentSelectedPresetScrollViewer"
-                          Grid.Row="0" Grid.Column="0"
-                          Margin="0,0,0,4"
-                          HorizontalScrollMode="Auto"
-                          VerticalScrollMode="Disabled"
-                          HorizontalScrollBarVisibility="Hidden"
-                          VerticalScrollBarVisibility="Disabled"
-                          ViewChanged="OnSelectedPresetScrollViewerViewChanged"
-                          SizeChanged="OnSelectedPresetScrollViewerSizeChanged"
-                          Visibility="Collapsed">
-                <StackPanel x:Name="AgentSelectedPresetPanel"
-                            Orientation="Horizontal"
-                            Spacing="4"
-                            SizeChanged="OnSelectedPresetPanelSizeChanged"/>
-            </ScrollViewer>
-            <Grid Grid.Row="0" Grid.Column="1" HorizontalAlignment="Right">
+            <Grid Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel x:Name="AgentSelectedPresetScrollButtons"
-                            Grid.Column="0"
-                            Orientation="Horizontal"
-                            Spacing="2"
+                <ScrollViewer x:Name="AgentSelectedPresetScrollViewer"
+                              Grid.Column="0"
+                              Margin="0,0,0,4"
+                              HorizontalScrollMode="Auto"
+                              VerticalScrollMode="Disabled"
+                              HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollBarVisibility="Disabled"
+                              ViewChanged="OnSelectedPresetScrollViewerViewChanged"
+                              SizeChanged="OnSelectedPresetScrollViewerSizeChanged"
+                              Visibility="Collapsed">
+                    <StackPanel x:Name="AgentSelectedPresetPanel"
+                                Orientation="Horizontal"
+                                Spacing="4"
+                                SizeChanged="OnSelectedPresetPanelSizeChanged"/>
+                </ScrollViewer>
+                <Grid Grid.Column="1" HorizontalAlignment="Right">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel x:Name="AgentSelectedPresetScrollButtons"
+                                Grid.Column="0"
+                                Orientation="Horizontal"
+                                Spacing="2"
+                                Margin="0,0,0,4"
+                                Visibility="Collapsed">
+                        <Button x:Name="AgentSelectedPresetScrollLeftButton"
+                                Content="&lt;"
+                                Width="24"
+                                Height="24"
+                                Padding="0"
+                                FontSize="12"
+                                Click="OnSelectedPresetScrollLeftClick"
+                                Style="{StaticResource AgentButtonStyle}"/>
+                        <Button x:Name="AgentSelectedPresetScrollRightButton"
+                                Content="&gt;"
+                                Width="24"
+                                Height="24"
+                                Padding="0"
+                                FontSize="12"
+                                Click="OnSelectedPresetScrollRightClick"
+                                Style="{StaticResource AgentButtonStyle}"/>
+                    </StackPanel>
+                    <Button x:Name="AgentSelectedPresetClearAllButton"
+                            Grid.Column="1"
+                            Content="×"
+                            Width="24"
+                            Height="24"
+                            Padding="0"
+                            FontSize="12"
                             Margin="0,0,0,4"
-                            Visibility="Collapsed">
-                    <Button x:Name="AgentSelectedPresetScrollLeftButton"
-                            Content="&lt;"
-                            Width="24"
-                            Height="24"
-                            Padding="0"
-                            FontSize="12"
-                            Click="OnSelectedPresetScrollLeftClick"
+                            Visibility="Collapsed"
+                            Click="OnSelectedPresetClearAllClick"
                             Style="{StaticResource AgentButtonStyle}"/>
-                    <Button x:Name="AgentSelectedPresetScrollRightButton"
-                            Content="&gt;"
-                            Width="24"
-                            Height="24"
-                            Padding="0"
-                            FontSize="12"
-                            Click="OnSelectedPresetScrollRightClick"
-                            Style="{StaticResource AgentButtonStyle}"/>
-                </StackPanel>
-                <Button x:Name="AgentSelectedPresetClearAllButton"
-                        Grid.Column="1"
-                        Content="×"
-                        Width="24"
-                        Height="24"
-                        Padding="0"
-                        FontSize="12"
-                        Margin="0,0,0,4"
-                        Visibility="Collapsed"
-                        Click="OnSelectedPresetClearAllClick"
-                        Style="{StaticResource AgentButtonStyle}"/>
+                </Grid>
             </Grid>
             <Grid Grid.Row="1" Grid.Column="0">
                 <TextBox x:Name="AgentPromptInput"
