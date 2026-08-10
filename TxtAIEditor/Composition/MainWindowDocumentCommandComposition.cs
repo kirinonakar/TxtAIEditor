@@ -118,6 +118,7 @@ namespace TxtAIEditor.Composition
                 () => ui.TerminalPane.ResumeNativeWindows(),
                 tabDirtyState.ReconcileAllDirtyStates,
                 tabSave.SaveAsync,
+                tabClose.CloseAllTabs,
                 window.Close);
 
             return new MainWindowDocumentCommandControllers(

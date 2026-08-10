@@ -197,7 +197,34 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public void CloseAllTabs()
+        {
+            var tabItems = _editorTabView.TabItems
+                .Cast<TabViewItem>()
+                .Concat(_editorTabView2.TabItems.Cast<TabViewItem>())
+                .ToList();
+
+            foreach (var tabItem in tabItems)
+            {
+                if (tabItem.Tag is not string tabId)
+                {
+                    continue;
+                }
+
+                OpenedTab? tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
+                if (tab != null)
+                {
+                    CloseAndCleanup(tab, tabItem, openReplacementTab: false);
+                }
+            }
+        }
+
         public void CloseAndCleanup(OpenedTab tab, TabViewItem tabItem)
+        {
+            CloseAndCleanup(tab, tabItem, openReplacementTab: true);
+        }
+
+        private void CloseAndCleanup(OpenedTab tab, TabViewItem tabItem, bool openReplacementTab)
         {
             _additionalTabCleanup?.Invoke(tab.Id);
             _viewModel.Tabs.Remove(tab);
@@ -244,7 +271,9 @@ namespace TxtAIEditor.Controls
                 _closeReadOnlyViewer(tab.Id);
             }
 
-            if (_editorTabView.TabItems.Count == 0 && _editorTabView2.TabItems.Count == 0)
+            if (openReplacementTab &&
+                _editorTabView.TabItems.Count == 0 &&
+                _editorTabView2.TabItems.Count == 0)
             {
                 _openNewTab();
             }

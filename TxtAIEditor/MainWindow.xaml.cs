@@ -151,7 +151,8 @@ namespace TxtAIEditor
         private void OnAppWindowClosing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
         {
             if (!_exitRequestedFromTray &&
-                Operations.CurrentSettings.KeepInTrayOnClose)
+                Operations.CurrentSettings.KeepInTrayOnClose &&
+                (Application.Current as App)?.IsLastWindow(this) == true)
             {
                 args.Cancel = true;
                 if (!_hideToTrayPending && EnsureTrayIcon())

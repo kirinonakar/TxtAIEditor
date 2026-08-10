@@ -128,6 +128,11 @@ namespace TxtAIEditor
             _window ??= window;
         }
 
+        internal bool IsLastWindow(MainWindow window)
+        {
+            return _windows.Count == 1 && ReferenceEquals(_windows[0], window);
+        }
+
         internal void HandleWindowClosed(MainWindow window)
         {
             _windows.Remove(window);

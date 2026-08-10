@@ -22,6 +22,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _resumeTerminal;
         private readonly Action _reconcileDirtyTabs;
         private readonly Func<OpenedTab, Task<bool>> _saveTabAsync;
+        private readonly Action _closeAllTabs;
         private readonly Action _closeWindow;
         private bool _isClosingConfirmed;
         private bool _isCloseRequestInProgress;
@@ -38,6 +39,7 @@ namespace TxtAIEditor.Controls
             Action resumeTerminal,
             Action reconcileDirtyTabs,
             Func<OpenedTab, Task<bool>> saveTabAsync,
+            Action closeAllTabs,
             Action closeWindow)
         {
             _viewModel = viewModel;
@@ -51,6 +53,7 @@ namespace TxtAIEditor.Controls
             _resumeTerminal = resumeTerminal;
             _reconcileDirtyTabs = reconcileDirtyTabs;
             _saveTabAsync = saveTabAsync;
+            _closeAllTabs = closeAllTabs;
             _closeWindow = closeWindow;
         }
 
@@ -150,7 +153,14 @@ namespace TxtAIEditor.Controls
         private void ConfirmClose()
         {
             _isClosingConfirmed = true;
-            _closeWindow();
+            try
+            {
+                _closeAllTabs();
+            }
+            finally
+            {
+                _closeWindow();
+            }
         }
     }
 }

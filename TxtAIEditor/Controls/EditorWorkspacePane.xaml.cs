@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 
 namespace TxtAIEditor.Controls
@@ -940,6 +941,17 @@ namespace TxtAIEditor.Controls
         private void OnEditorTabViewTabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args) =>
             PrimaryTabCloseRequested?.Invoke(sender, args);
 
+        private static void SetTabDragOperation(TabViewTabDragStartingEventArgs args)
+        {
+            // TabView reports the tear-out through TabDroppedOutside. Declare a
+            // move operation up front so the system drag UI does not show the
+            // no-drop cursor while the tab is outside this window.
+            args.Data.RequestedOperation = DataPackageOperation.Move;
+        }
+
+        private void OnEditorTabViewTabDragStarting(TabView sender, TabViewTabDragStartingEventArgs args) =>
+            SetTabDragOperation(args);
+
         private void OnEditorTabViewTabDroppedOutside(TabView sender, TabViewTabDroppedOutsideEventArgs args)
         {
             ActiveTabView = sender;
@@ -966,6 +978,9 @@ namespace TxtAIEditor.Controls
             ActiveTabView = sender;
             SecondaryTabCloseRequested?.Invoke(sender, args);
         }
+
+        private void OnEditorTabView2TabDragStarting(TabView sender, TabViewTabDragStartingEventArgs args) =>
+            SetTabDragOperation(args);
 
         private void OnEditorTabView2TabDroppedOutside(TabView sender, TabViewTabDroppedOutsideEventArgs args)
         {

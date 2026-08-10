@@ -185,7 +185,6 @@ namespace TxtAIEditor.Core.Services
 
             try
             {
-                AppendMenu(menu, MfString, OpenMenuCommand, _openText);
                 var windowActions = new Dictionary<uint, Action>();
                 uint commandId = WindowMenuCommandBase;
                 foreach (var window in _getWindows())
@@ -205,6 +204,7 @@ namespace TxtAIEditor.Core.Services
                     }
                 }
 
+                AppendMenu(menu, MfString, OpenMenuCommand, _openText);
                 AppendMenu(menu, MfString, CloseMenuCommand, _closeText);
                 GetCursorPos(out Point cursorPosition);
                 SetForegroundWindow(_windowHandle);

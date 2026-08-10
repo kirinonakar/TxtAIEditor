@@ -33,8 +33,10 @@
                          VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                          CanDragTabs="True"
                          CanReorderTabs="False"
+                         AllowDropTabs="True"
                          AddTabButtonClick="OnEditorTabViewAddTabClick"
                          TabCloseRequested="OnEditorTabViewTabCloseRequested"
+                         TabDragStarting="OnEditorTabViewTabDragStarting"
                          TabDroppedOutside="OnEditorTabViewTabDroppedOutside"
                          SelectionChanged="OnEditorTabViewSelectionChanged"
                          GotFocus="OnTabViewGotFocus">
@@ -122,8 +124,10 @@
                          Visibility="Collapsed"
                          CanDragTabs="True"
                          CanReorderTabs="False"
+                         AllowDropTabs="True"
                          AddTabButtonClick="OnEditorTabView2AddTabClick"
                          TabCloseRequested="OnEditorTabView2TabCloseRequested"
+                         TabDragStarting="OnEditorTabView2TabDragStarting"
                          TabDroppedOutside="OnEditorTabView2TabDroppedOutside"
                          SelectionChanged="OnEditorTabView2SelectionChanged"
                          GotFocus="OnTabViewGotFocus">
