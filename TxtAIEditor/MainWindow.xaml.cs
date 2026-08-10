@@ -224,10 +224,15 @@ namespace TxtAIEditor
             }
 
             _trayClosePending = true;
-            Task saveLayoutTask = Operations.SaveUiLayoutSettingsAsync();
-            RestoreAndActivate();
             try
             {
+                bool hasUnsavedChanges = Operations.HasUnsavedChanges();
+                Task saveLayoutTask = Operations.SaveUiLayoutSettingsAsync();
+                if (hasUnsavedChanges)
+                {
+                    RestoreAndActivate();
+                }
+
                 await saveLayoutTask;
                 _exitRequestedFromTray = true;
                 await Operations.RequestWindowCloseAsync(saveUiLayoutSettings: false);

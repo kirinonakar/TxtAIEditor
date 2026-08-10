@@ -417,6 +417,8 @@ namespace TxtAIEditor.Composition
 
         public Task SaveUiLayoutSettingsAsync() => Controllers.Shell.SaveUiLayoutSettingsAsync();
 
+        public bool HasUnsavedChanges() => Controllers.Documents.HasUnsavedChanges();
+
         public Task RequestWindowCloseAsync(bool saveUiLayoutSettings = true) =>
             Controllers.Documents.RequestWindowCloseAsync(saveUiLayoutSettings);
 

@@ -70,6 +70,12 @@ namespace TxtAIEditor.Controls
             await RequestCloseAsync(saveUiLayoutSettings);
         }
 
+        public bool HasUnsavedChanges()
+        {
+            _reconcileDirtyTabs();
+            return _viewModel.Tabs.Any(tab => tab.IsDirty);
+        }
+
         public async Task RequestCloseAsync(bool saveUiLayoutSettings = true)
         {
             if (_isClosingConfirmed ||
