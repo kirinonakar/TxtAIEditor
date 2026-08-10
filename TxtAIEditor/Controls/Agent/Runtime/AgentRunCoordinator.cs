@@ -776,7 +776,11 @@ namespace TxtAIEditor.Controls
                                 {
                                     _sessionEditController.Replace(runContext.SessionEdits, runContext.SessionId);
                                 });
-                                toolResult = await _toolExecutionController.ExecuteAsync(currentToolName, currentArguments, cancellationToken);
+                                toolResult = await _toolExecutionController.ExecuteAsync(
+                                    currentToolName,
+                                    currentArguments,
+                                    runContext.LlmSettings.LlmAgentVerbose,
+                                    cancellationToken);
                                 runContext.SessionEdits = _sessionEditController.SessionEdits.ToList();
                                 _openSessionController.EnsureSession(runContext.SessionId).SessionEdits = runContext.SessionEdits.ToList();
                                 if (!_runOutputController.IsSessionVisible(runContext.SessionId))
@@ -872,6 +876,7 @@ namespace TxtAIEditor.Controls
                     
                     foreach (var tcRes in toolCallResults)
                     {
+                        bool toolSucceeded = IsSuccessfulToolResult(tcRes.Result);
                         string displayResult = _toolExecutionController.FormatDisplayResult(
                             tcRes.NormalizedName,
                             tcRes.Args,
@@ -879,9 +884,23 @@ namespace TxtAIEditor.Controls
                             false,
                             runContext.LlmSettings.LlmAgentVerbose);
 
-                        string outputHeader = _getString("AgentToolRunning", "도구 실행 중");
-                        await _runOutputController.AppendRunOutputLineAsync(runContext, $"{outputHeader}: {tcRes.Name}");
-                        await _runOutputController.AppendRunOutputTextAsync(runContext, displayResult.TrimEnd() + Environment.NewLine);
+                        if (!runContext.LlmSettings.LlmAgentVerbose &&
+                            toolSucceeded &&
+                            string.IsNullOrWhiteSpace(displayResult))
+                        {
+                            continue;
+                        }
+
+                        if (runContext.LlmSettings.LlmAgentVerbose || !toolSucceeded)
+                        {
+                            string outputHeader = _getString("AgentToolRunning", "도구 실행 중");
+                            await _runOutputController.AppendRunOutputLineAsync(runContext, $"{outputHeader}: {tcRes.Name}");
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(displayResult))
+                        {
+                            await _runOutputController.AppendRunOutputTextAsync(runContext, displayResult.TrimEnd() + Environment.NewLine);
+                        }
                     }
 
                     var makePlanRes = toolCallResults.FirstOrDefault(tc => tc.NormalizedName == "make_plan" && IsSuccessfulToolResult(tc.Result));

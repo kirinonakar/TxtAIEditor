@@ -51,7 +51,11 @@ namespace TxtAIEditor.Controls
             _getString = getString;
         }
 
-        public async Task<string> ExecuteAsync(string toolName, JsonElement arguments, CancellationToken cancellationToken)
+        public async Task<string> ExecuteAsync(
+            string toolName,
+            JsonElement arguments,
+            bool verbose,
+            CancellationToken cancellationToken)
         {
             try
             {
@@ -59,7 +63,7 @@ namespace TxtAIEditor.Controls
                 string normalizedToolName = NormalizeToolName(toolName);
                 bool isMcpTool = _mcpController.TryGetToolAlias(normalizedToolName, out _);
 
-                _appendActivity(GetToolStartMessage(normalizedToolName, arguments));
+                _appendActivity(GetToolStartMessage(normalizedToolName, arguments, verbose));
 
                 string result;
                 if (normalizedToolName == "replace_in_file")
@@ -188,7 +192,22 @@ namespace TxtAIEditor.Controls
                 ? toolResult
                 : HideEditFailureContext(toolResult);
 
-            if (normalizedToolName == "read_file")
+            bool successful = IsSuccessfulToolResult(toolResult);
+
+            if (!verbose && !successful)
+            {
+                if (normalizedToolName == "web_search_exa" &&
+                    toolResult.Contains(
+                        McpToolRateLimitException.ExaFreeMcpRateLimitMarker,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return BuildExaRateLimitDisplayResult(toolResult);
+                }
+
+                return _getString("AgentVerboseToolFailedOnly", "도구 실행에 실패했습니다");
+            }
+
+            if (verbose && normalizedToolName == "read_file")
             {
                 string path = GetStringArgument(arguments, "path");
                 string? skillName = TryGetSkillNameFromPath(path);
@@ -197,13 +216,13 @@ namespace TxtAIEditor.Controls
                     return string.Format(_getString("AgentVerboseReadSkillOnly", "{0} 스킬을 참고합니다."), skillName);
                 }
             }
-            else if (normalizedToolName == "skill_use")
+            else if (verbose && normalizedToolName == "skill_use")
             {
                 string skillName = _skillController.GetSkillDisplayName(
                     GetFirstStringArgument(arguments, "name", "skill", "skillName", "skill_name", "path", "filePath", "file_path"));
                 return string.Format(_getString("AgentVerboseReadSkillOnly", "{0} 스킬을 참고합니다."), skillName);
             }
-            else if (normalizedToolName == "run_powershell")
+            else if (verbose && normalizedToolName == "run_powershell")
             {
                 string command = GetStringArgument(arguments, "command");
                 string? path = TryGetPathFromGetContent(command);
@@ -217,15 +236,6 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (!verbose &&
-                normalizedToolName == "web_search_exa" &&
-                toolResult.Contains(
-                    McpToolRateLimitException.ExaFreeMcpRateLimitMarker,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return BuildExaRateLimitDisplayResult(toolResult);
-            }
-
             if (_mcpController.TryGetToolAlias(normalizedToolName, out _))
             {
                 if (verbose)
@@ -233,14 +243,7 @@ namespace TxtAIEditor.Controls
                     return displayToolResult;
                 }
 
-                return IsSuccessfulToolResult(toolResult)
-                    ? _getString("AgentVerboseMcpToolOnly", "MCP 도구를 실행했습니다")
-                    : _getString("AgentVerboseToolFailedOnly", "도구 실행에 실패했습니다");
-            }
-
-            if (!verbose && !IsSuccessfulToolResult(toolResult))
-            {
-                return _getString("AgentVerboseToolFailedOnly", "도구 실행에 실패했습니다");
+                return string.Empty;
             }
 
             if (verbose)
@@ -248,106 +251,7 @@ namespace TxtAIEditor.Controls
                 return displayToolResult;
             }
 
-            if (normalizedToolName == "read_file")
-            {
-                return _getString("AgentVerboseReadFileOnly", "파일을 읽었습니다");
-            }
-
-            if (normalizedToolName == "run_powershell" && !verbose)
-            {
-                string command = GetStringArgument(arguments, "command");
-                string? path = TryGetPathFromGetContent(command);
-                if (path != null)
-                {
-                    return _getString("AgentVerboseReadFileOnly", "파일을 읽었습니다");
-                }
-                return _getString("AgentVerboseRunPowerShellOnly", "PowerShell 명령을 실행했습니다");
-            }
-
-            if (normalizedToolName == "extract_document")
-            {
-                return _getString("AgentVerboseExtractDocumentOnly", "문서 텍스트 추출을 완료했습니다");
-            }
-
-            if (normalizedToolName == "append_to_file")
-            {
-                return _getString("AgentVerboseAppendFileOnly", "파일에 내용을 덧붙였습니다");
-            }
-
-            if (normalizedToolName == "search_replace")
-            {
-                return _getString("AgentVerboseSearchReplaceOnly", "검색/치환을 완료했습니다");
-            }
-
-            if (normalizedToolName == "merge_files")
-            {
-                return _getString("AgentVerboseMergeFilesOnly", "파일들을 합쳤습니다");
-            }
-
-            if (normalizedToolName == "split_file")
-            {
-                return _getString("AgentVerboseSplitFileOnly", "파일을 분리했습니다");
-            }
-
-            if (normalizedToolName == "list_files")
-            {
-                return _getString("AgentVerboseListFilesOnly", "폴더를 읽었습니다");
-            }
-
-            if (normalizedToolName == "search_text")
-            {
-                return _getString("AgentVerboseSearchTextOnly", "텍스트 검색을 완료했습니다");
-            }
-
-            if (normalizedToolName == "run_rg")
-            {
-                return _getString("AgentVerboseRunRgOnly", "Ripgrep 검색을 완료했습니다");
-            }
-
-            if (normalizedToolName == "run_rga")
-            {
-                return _getString("AgentVerboseRunRgaOnly", "Ripgrep All 검색을 완료했습니다");
-            }
-
-            if (normalizedToolName == "web_search_exa")
-            {
-                return _getString("AgentVerboseWebSearchOnly", "웹 검색을 완료했습니다");
-            }
-
-            if (normalizedToolName == "web_fetch" || normalizedToolName == "web_fetch_exa")
-            {
-                return _getString("AgentVerboseWebFetchOnly", "웹페이지를 읽었습니다");
-            }
-
-            if (normalizedToolName == "open_file")
-            {
-                string resourceKey = toolResult.StartsWith("open_file activated_existing:", StringComparison.OrdinalIgnoreCase)
-                    ? "AgentVerboseOpenFileExistingOnly"
-                    : "AgentVerboseOpenFileOnly";
-                string fallback = toolResult.StartsWith("open_file activated_existing:", StringComparison.OrdinalIgnoreCase)
-                    ? "이미 열려 있던 파일을 활성화했습니다"
-                    : "파일을 열었습니다";
-                return _getString(resourceKey, fallback);
-            }
-
-            if (normalizedToolName == "make_plan")
-            {
-                return toolResult.StartsWith("make_plan saved:", StringComparison.OrdinalIgnoreCase)
-                    ? _getString("AgentVerboseMakePlanOnly", "계획서를 저장하고 열었습니다.")
-                    : toolResult;
-            }
-
-            if (normalizedToolName == "save_tab")
-            {
-                return _getString("AgentVerboseSaveTabOnly", "탭을 저장했습니다");
-            }
-
-            if (normalizedToolName == "edit_tab")
-            {
-                return _getString("AgentVerboseEditTabOnly", "탭 내용을 수정했습니다");
-            }
-
-            return displayToolResult;
+            return string.Empty;
         }
 
         private string BuildExaRateLimitDisplayResult(string toolResult)
@@ -394,7 +298,32 @@ namespace TxtAIEditor.Controls
             return imageResult.TranscriptText;
         }
 
-        private string GetToolStartMessage(string toolName, JsonElement arguments)
+        private string GetToolStartMessage(string toolName, JsonElement arguments, bool verbose)
+        {
+            string detailedMessage = GetDetailedToolStartMessage(toolName, arguments);
+            if (verbose)
+            {
+                return detailedMessage;
+            }
+
+            string invocation = toolName;
+            int separatorIndex = detailedMessage.IndexOf(':');
+            if (separatorIndex >= 0 && separatorIndex + 1 < detailedMessage.Length)
+            {
+                string detail = detailedMessage[(separatorIndex + 1)..].Trim();
+                if (!string.IsNullOrWhiteSpace(detail) &&
+                    !string.Equals(detail, toolName, StringComparison.OrdinalIgnoreCase))
+                {
+                    invocation = $"{toolName}: {detail}";
+                }
+            }
+
+            return string.Format(
+                _getString("AgentActivityUnknownToolFormat", "도구 실행 중: {0}"),
+                invocation);
+        }
+
+        private string GetDetailedToolStartMessage(string toolName, JsonElement arguments)
         {
             if (_mcpController.TryGetToolAlias(toolName, out var mcpAlias))
             {
