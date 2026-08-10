@@ -1223,6 +1223,15 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="SettingsAppearanceGroupAgent" xml:space="preserve">
     <value>Agent Window Fonts</value>
   </data>
+  <data name="SettingsRightPanelWidthGroup" xml:space="preserve">
+    <value>Right Panel Width</value>
+  </data>
+  <data name="SettingsRightPanelWidthNormal" xml:space="preserve">
+    <value>Normal Right Panel Width</value>
+  </data>
+  <data name="SettingsRightPanelWidthExpanded" xml:space="preserve">
+    <value>Right Panel Width When Preview Expanded</value>
+  </data>
   <data name="SettingsAgentOutputFontFamily" xml:space="preserve">
     <value>Agent Output Font</value>
   </data>
@@ -3392,6 +3401,9 @@ Plan: {0}</value>
   </data>
   <data name="AgentSelectedChipsScrollRightTooltip" xml:space="preserve">
     <value>Scroll selected chips right</value>
+  </data>
+  <data name="AgentSelectedChipsClearAllTooltip" xml:space="preserve">
+    <value>Clear all selected chips</value>
   </data>
   <data name="AgentOpenSessionsTooltip" xml:space="preserve">
     <value>Open sessions</value>

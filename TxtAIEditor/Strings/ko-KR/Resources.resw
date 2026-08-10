@@ -1223,6 +1223,15 @@
   <data name="SettingsAppearanceGroupAgent" xml:space="preserve">
     <value>Agent 창 폰트</value>
   </data>
+  <data name="SettingsRightPanelWidthGroup" xml:space="preserve">
+    <value>우측 패널 너비</value>
+  </data>
+  <data name="SettingsRightPanelWidthNormal" xml:space="preserve">
+    <value>기본 우측 패널 너비</value>
+  </data>
+  <data name="SettingsRightPanelWidthExpanded" xml:space="preserve">
+    <value>프리뷰 늘리기 시 우측 패널 너비</value>
+  </data>
   <data name="SettingsAgentOutputFontFamily" xml:space="preserve">
     <value>에이전트 출력 폰트</value>
   </data>
@@ -3392,6 +3401,9 @@
   </data>
   <data name="AgentSelectedChipsScrollRightTooltip" xml:space="preserve">
     <value>선택 칩 오른쪽으로 스크롤</value>
+  </data>
+  <data name="AgentSelectedChipsClearAllTooltip" xml:space="preserve">
+    <value>모든 선택 칩 삭제</value>
   </data>
   <data name="AgentOpenSessionsTooltip" xml:space="preserve">
     <value>열린 세션</value>

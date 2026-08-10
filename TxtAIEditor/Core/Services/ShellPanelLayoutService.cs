@@ -9,8 +9,11 @@ namespace TxtAIEditor.Core.Services
     {
         private const double ExplorerPanelMinWidth = 150;
         private const double PreviewPanelMinWidth = 150;
-        private const double NormalPreviewWidth = 400;
-        private const double ExpandedPreviewWidth = 800;
+        private const double DefaultNormalPreviewWidth = 400;
+        private const double DefaultExpandedPreviewWidth = 800;
+
+        private double _normalPreviewWidth = DefaultNormalPreviewWidth;
+        private double _expandedPreviewWidth = DefaultExpandedPreviewWidth;
 
         private readonly Grid _mainWorkGrid;
         private readonly ColumnDefinition _explorerColumn;
@@ -76,6 +79,12 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
+
+        public void SetPreviewToggleWidths(double normalWidth, double expandedWidth)
+        {
+            _normalPreviewWidth = Math.Max(PreviewPanelMinWidth, normalWidth);
+            _expandedPreviewWidth = Math.Max(_normalPreviewWidth, expandedWidth);
+        }
         public void ApplyLeftSidebarVisibility(bool show)
         {
             _explorerColumn.MinWidth = ExplorerPanelMinWidth;
@@ -130,7 +139,7 @@ namespace TxtAIEditor.Core.Services
         private double GetMaxAvailablePreviewWidth()
         {
             double totalWidth = _mainWorkGrid.ActualWidth;
-            if (totalWidth <= 0) return ExpandedPreviewWidth;
+            if (totalWidth <= 0) return _expandedPreviewWidth;
 
             double explorerWidth = IsLeftSidebarVisible ? _explorerColumn.ActualWidth : 0;
             double leftSplitterWidth = IsLeftSidebarVisible ? 12 : 0;
@@ -161,7 +170,7 @@ namespace TxtAIEditor.Core.Services
             if (!IsRightSidebarVisible) return;
 
             _isPreviewExpanded = !_isPreviewExpanded;
-            double targetWidth = _isPreviewExpanded ? ExpandedPreviewWidth : NormalPreviewWidth;
+            double targetWidth = _isPreviewExpanded ? _expandedPreviewWidth : _normalPreviewWidth;
 
             double maxAvailable = GetMaxAvailablePreviewWidth();
             if (targetWidth > maxAvailable)

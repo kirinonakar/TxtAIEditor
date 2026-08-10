@@ -1223,6 +1223,15 @@
   <data name="SettingsAppearanceGroupAgent" xml:space="preserve">
     <value>Agent ウィンドウのフォント</value>
   </data>
+  <data name="SettingsRightPanelWidthGroup" xml:space="preserve">
+    <value>右パネル幅</value>
+  </data>
+  <data name="SettingsRightPanelWidthNormal" xml:space="preserve">
+    <value>通常の右パネル幅</value>
+  </data>
+  <data name="SettingsRightPanelWidthExpanded" xml:space="preserve">
+    <value>プレビュー拡大時の右パネル幅</value>
+  </data>
   <data name="SettingsAgentOutputFontFamily" xml:space="preserve">
     <value>エージェント出力フォント</value>
   </data>
@@ -3356,6 +3365,9 @@
   </data>
   <data name="AgentSelectedChipsScrollRightTooltip" xml:space="preserve">
     <value>選択チップを右へスクロール</value>
+  </data>
+  <data name="AgentSelectedChipsClearAllTooltip" xml:space="preserve">
+    <value>選択チップをすべて削除</value>
   </data>
   <data name="AgentOpenSessionsTooltip" xml:space="preserve">
     <value>開いているセッション</value>

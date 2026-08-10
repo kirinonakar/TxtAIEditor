@@ -34,6 +34,8 @@ namespace TxtAIEditor.Core.Services
         private readonly Slider _agentSizeSlider;
         private readonly ComboBox _agentPromptFontFamilyCombo;
         private readonly Slider _agentPromptSizeSlider;
+        private readonly Slider _rightPanelNormalWidthSlider;
+        private readonly Slider _rightPanelExpandedWidthSlider;
 
         public SettingsAppearancePanel(
             EditorSettings settings,
@@ -105,6 +107,8 @@ namespace TxtAIEditor.Core.Services
             _agentSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.AgentFontSize, StepFrequency = 1 };
             _agentPromptFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AgentPromptFontFamily, fontFamilies);
             _agentPromptSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.AgentPromptFontSize, StepFrequency = 1 };
+            _rightPanelNormalWidthSlider = new Slider { Minimum = 150, Maximum = 1200, Value = settings.RightSidebarNormalWidth, StepFrequency = 10 };
+            _rightPanelExpandedWidthSlider = new Slider { Minimum = 150, Maximum = 1200, Value = settings.RightSidebarExpandedWidth, StepFrequency = 10 };
 
             var section = new StackPanel { Spacing = 10, Width = 460, Padding = new Thickness(2, 6, 2, 2) };
             section.Children.Add(CreateGeneralCard(getString));
@@ -113,6 +117,7 @@ namespace TxtAIEditor.Core.Services
             section.Children.Add(CreatePreviewCard(getString, settings, previewBgDropdown, previewFgDropdown));
             section.Children.Add(CreateAozoraCard(getString, settings, aozoraBgDropdown, aozoraFgDropdown));
             section.Children.Add(CreateAgentCard(getString, settings));
+            section.Children.Add(CreateRightPanelWidthCard(getString, settings));
             Content = section;
         }
 
@@ -333,6 +338,34 @@ namespace TxtAIEditor.Core.Services
                 "\uE8B9");
         }
 
+        private Border CreateRightPanelWidthCard(Func<string, string, string> getString, EditorSettings settings)
+        {
+            var content = new StackPanel { Spacing = 6 };
+
+            var normalWidthLabel = new TextBlock
+            {
+                Text = getString("SettingsRightPanelWidthNormal", "기본 우측 패널 너비") + $" ({settings.RightSidebarNormalWidth:0}px)",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+            content.Children.Add(normalWidthLabel);
+            content.Children.Add(_rightPanelNormalWidthSlider);
+            _rightPanelNormalWidthSlider.ValueChanged += (_, args) => normalWidthLabel.Text = getString("SettingsRightPanelWidthNormal", "기본 우측 패널 너비") + $" ({args.NewValue:0}px)";
+
+            var expandedWidthLabel = new TextBlock
+            {
+                Text = getString("SettingsRightPanelWidthExpanded", "프리뷰 늘리기 시 우측 패널 너비") + $" ({settings.RightSidebarExpandedWidth:0}px)",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+            content.Children.Add(expandedWidthLabel);
+            content.Children.Add(_rightPanelExpandedWidthSlider);
+            _rightPanelExpandedWidthSlider.ValueChanged += (_, args) => expandedWidthLabel.Text = getString("SettingsRightPanelWidthExpanded", "프리뷰 늘리기 시 우측 패널 너비") + $" ({args.NewValue:0}px)";
+
+            return CreateCard(
+                getString("SettingsRightPanelWidthGroup", "우측 패널 너비"),
+                content,
+                "\uE8A5");
+        }
+
         public void ApplyToSettings(EditorSettings settings)
         {
             settings.Language = _languageCombo.SelectedIndex switch
@@ -368,6 +401,8 @@ namespace TxtAIEditor.Core.Services
             settings.AgentFontSize = _agentSizeSlider.Value;
             settings.AgentPromptFontFamily = SettingsDialogUi.GetSelectedComboText(_agentPromptFontFamilyCombo, settings.AgentPromptFontFamily);
             settings.AgentPromptFontSize = _agentPromptSizeSlider.Value;
+            settings.RightSidebarNormalWidth = _rightPanelNormalWidthSlider.Value;
+            settings.RightSidebarExpandedWidth = _rightPanelExpandedWidthSlider.Value;
         }
 
         private static ComboBox CreateLanguageCombo(EditorSettings settings, Func<string, string, string> getString)

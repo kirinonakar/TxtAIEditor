@@ -67,6 +67,9 @@ namespace TxtAIEditor.Composition
             void ApplySavedPanelWidths(EditorSettings settings) =>
                 shellModule.ApplySavedPanelWidths(settings);
 
+            void ApplyPreviewToggleWidths(EditorSettings settings) =>
+                shellModule.ApplyPreviewToggleWidths(settings);
+
             void TogglePreviewWidth() =>
                 shellModule.TogglePreviewWidth();
 
@@ -321,6 +324,7 @@ namespace TxtAIEditor.Composition
                     ApplyLeftSidebarVisibility,
                     ApplyPreviewVisibility,
                     ApplySavedPanelWidths,
+                    ApplyPreviewToggleWidths,
                     lifecycleFacade.LocalizeUi,
                     agentFacade.SyncAgentSettingsAfterLoad,
                     workspaceModule.RefreshGitStatusUiAsync,

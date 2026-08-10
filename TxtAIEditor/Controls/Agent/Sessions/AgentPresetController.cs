@@ -373,6 +373,12 @@ namespace TxtAIEditor.Controls
             UpdateUI();
         }
 
+        public void ClearSelectedPresets()
+        {
+            _selectedPresetNames.Clear();
+            UpdateUI();
+        }
+
         private List<AgentPreset> GetSelectedPresets()
         {
             return _presets

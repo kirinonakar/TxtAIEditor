@@ -20,6 +20,7 @@ namespace TxtAIEditor.Controls
         public Action<string>? AgentMcpSettingsRequested { get; init; }
         public Action<string>? AgentMcpDeleted { get; init; }
         public Action<string>? AgentMcpRemoved { get; init; }
+        public Action? AgentSelectedChipsCleared { get; init; }
     }
 
     internal sealed class AgentPaneMenuCoordinator
@@ -37,6 +38,7 @@ namespace TxtAIEditor.Controls
         private readonly StackPanel _agentSelectedPresetScrollButtons;
         private readonly Button _agentSelectedPresetScrollLeftButton;
         private readonly Button _agentSelectedPresetScrollRightButton;
+        private readonly Button _agentSelectedPresetClearAllButton;
         private readonly AgentPaneMenuCallbacks _callbacks;
         private readonly Dictionary<string, Button> _agentSkillButtons = new(StringComparer.OrdinalIgnoreCase);
         private List<string> _agentPresetNames = new();
@@ -61,6 +63,7 @@ namespace TxtAIEditor.Controls
             StackPanel agentSelectedPresetScrollButtons,
             Button agentSelectedPresetScrollLeftButton,
             Button agentSelectedPresetScrollRightButton,
+            Button agentSelectedPresetClearAllButton,
             AgentPaneMenuCallbacks callbacks)
         {
             _resourceOwner = resourceOwner;
@@ -74,6 +77,7 @@ namespace TxtAIEditor.Controls
             _agentSelectedPresetScrollButtons = agentSelectedPresetScrollButtons;
             _agentSelectedPresetScrollLeftButton = agentSelectedPresetScrollLeftButton;
             _agentSelectedPresetScrollRightButton = agentSelectedPresetScrollRightButton;
+            _agentSelectedPresetClearAllButton = agentSelectedPresetClearAllButton;
             _callbacks = callbacks;
         }
 
@@ -545,6 +549,11 @@ namespace TxtAIEditor.Controls
             ScrollSelectedChips(SelectedChipScrollStep);
         }
 
+        public void OnSelectedPresetClearAllClick()
+        {
+            _callbacks.AgentSelectedChipsCleared?.Invoke();
+        }
+
         private Brush CreateMcpEmptyTextBrush()
         {
             return CreateMcpSecondaryTextBrush();
@@ -597,12 +606,16 @@ namespace TxtAIEditor.Controls
 
         private void UpdateSelectedChipScrollButtons()
         {
-            bool hasOverflow =
-                _agentSelectedPresetScrollViewer.Visibility == Visibility.Visible &&
-                _agentSelectedPresetPanel.Children.Count > 0 &&
-                _agentSelectedPresetScrollViewer.ScrollableWidth > 0.5;
+            bool hasChips = _agentSelectedPresetPanel.Children.Count > 0;
+            _agentSelectedPresetScrollButtons.Visibility = hasChips ? Visibility.Visible : Visibility.Collapsed;
+            if (!hasChips)
+            {
+                return;
+            }
 
-            _agentSelectedPresetScrollButtons.Visibility = hasOverflow ? Visibility.Visible : Visibility.Collapsed;
+            bool hasOverflow = _agentSelectedPresetScrollViewer.ScrollableWidth > 0.5;
+            _agentSelectedPresetScrollLeftButton.Visibility = hasOverflow ? Visibility.Visible : Visibility.Collapsed;
+            _agentSelectedPresetScrollRightButton.Visibility = hasOverflow ? Visibility.Visible : Visibility.Collapsed;
             if (!hasOverflow)
             {
                 return;

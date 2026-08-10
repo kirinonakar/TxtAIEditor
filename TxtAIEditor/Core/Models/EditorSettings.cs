@@ -49,6 +49,8 @@ namespace TxtAIEditor.Core.Models
         public string RightSidebarSelectedTab { get; set; } = "LivePreview";
         public double LeftSidebarWidth { get; set; } = 260;
         public double RightSidebarWidth { get; set; } = 400;
+        public double RightSidebarNormalWidth { get; set; } = 400;
+        public double RightSidebarExpandedWidth { get; set; } = 800;
         public bool ScrollSyncEnabled { get; set; } = true;
         public bool DefaultMarkdownEnabled { get; set; } = true;
         public bool DefaultMarkdownToolbarEnabled { get; set; } = true;

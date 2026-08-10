@@ -72,6 +72,12 @@ namespace TxtAIEditor.Controls
             agentPane.AgentSkillDeleted += async (_, skillName) => await skillController.DeleteSkillAsync(skillName);
             agentPane.AgentSkillRefreshRequested += async (_, _) => await skillController.LoadAsync();
             agentPane.AgentSkillRemoved += (_, skillName) => skillController.RemoveSelectedSkill(skillName);
+            agentPane.AgentSelectedChipsCleared += (_, _) =>
+            {
+                presetController.ClearSelectedPresets();
+                mcpController.ClearSelectedMcps();
+                skillController.ClearSelectedSkills();
+            };
             agentPane.Prompt.TextChanged += (_, _) =>
             {
                 if (agentPane.IsProgrammaticPromptClear)

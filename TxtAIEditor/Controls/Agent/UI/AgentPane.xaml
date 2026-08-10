@@ -763,6 +763,14 @@
                         FontSize="12"
                         Click="OnSelectedPresetScrollRightClick"
                         Style="{StaticResource AgentButtonStyle}"/>
+                <Button x:Name="AgentSelectedPresetClearAllButton"
+                        Content="×"
+                        Width="24"
+                        Height="24"
+                        Padding="0"
+                        FontSize="12"
+                        Click="OnSelectedPresetClearAllClick"
+                        Style="{StaticResource AgentButtonStyle}"/>
             </StackPanel>
             <Grid Grid.Row="1" Grid.Column="0">
                 <TextBox x:Name="AgentPromptInput"

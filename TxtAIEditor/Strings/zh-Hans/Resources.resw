@@ -1223,6 +1223,15 @@
   <data name="SettingsAppearanceGroupAgent" xml:space="preserve">
     <value>Agent 窗口字体</value>
   </data>
+  <data name="SettingsRightPanelWidthGroup" xml:space="preserve">
+    <value>右侧面板宽度</value>
+  </data>
+  <data name="SettingsRightPanelWidthNormal" xml:space="preserve">
+    <value>默认右侧面板宽度</value>
+  </data>
+  <data name="SettingsRightPanelWidthExpanded" xml:space="preserve">
+    <value>预览放大时的右侧面板宽度</value>
+  </data>
   <data name="SettingsAgentOutputFontFamily" xml:space="preserve">
     <value>Agent 输出字体</value>
   </data>
@@ -3356,6 +3365,9 @@
   </data>
   <data name="AgentSelectedChipsScrollRightTooltip" xml:space="preserve">
     <value>向右滚动选定的筹码</value>
+  </data>
+  <data name="AgentSelectedChipsClearAllTooltip" xml:space="preserve">
+    <value>清除所有选中的标签</value>
   </data>
   <data name="AgentOpenSessionsTooltip" xml:space="preserve">
     <value>公开会议</value>

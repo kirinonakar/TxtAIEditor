@@ -939,6 +939,25 @@ namespace TxtAIEditor.Controls
             UpdateUI();
         }
 
+        public void ClearSelectedMcps()
+        {
+            foreach (AgentPluginPackage plugin in _agentPlugins
+                .Where(plugin => _selectedAgentPluginIds.Contains(plugin.Id))
+                .ToList())
+            {
+                DeactivateAgentPlugin(plugin);
+            }
+
+            foreach (AgentMcpServer server in GetSelectedServers().ToList())
+            {
+                StopServer(server.Id);
+            }
+
+            _selectedServerIds.Clear();
+            RebuildAliases();
+            UpdateUI();
+        }
+
         public string GetSelectedMcpLabel()
         {
             var labels = new List<string>();

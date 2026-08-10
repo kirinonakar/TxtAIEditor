@@ -213,6 +213,12 @@ namespace TxtAIEditor.Controls
             UpdateSelectionUI();
         }
 
+        public void ClearSelectedSkills()
+        {
+            _selectedSkillNames.Clear();
+            UpdateSelectionUI();
+        }
+
         public async Task DeleteSkillAsync(string skillName)
         {
             AgentSkill? skill = _skills.FirstOrDefault(item =>

@@ -106,10 +106,18 @@ namespace TxtAIEditor.Composition
                 captureWindowPlacement: !stickyNoteModeActive);
         }
 
-        public void ApplySavedPanelWidths(EditorSettings settings) =>
+        public void ApplySavedPanelWidths(EditorSettings settings)
+        {
+            ApplyPreviewToggleWidths(settings);
             Composition.ShellPanelLayout.ApplySavedPanelWidths(
                 settings.LeftSidebarWidth,
                 settings.RightSidebarWidth);
+        }
+
+        public void ApplyPreviewToggleWidths(EditorSettings settings) =>
+            Composition.ShellPanelLayout.SetPreviewToggleWidths(
+                settings.RightSidebarNormalWidth,
+                settings.RightSidebarExpandedWidth);
 
         public void TogglePreviewWidth() =>
             Composition.ShellPanelLayout.TogglePreviewWidth();

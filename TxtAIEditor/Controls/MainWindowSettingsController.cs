@@ -49,6 +49,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _suspendTerminal;
         private readonly Action _resumeTerminal;
         private readonly Action<bool> _applyPreviewVisibility;
+        private readonly Action<EditorSettings> _applyPreviewToggleWidths;
         private readonly Action _updateAutoSaveStatus;
         private readonly Action _cleanupBeforeRestart;
         private readonly Action _refreshEditorWorkspaceSplitters;
@@ -89,6 +90,7 @@ namespace TxtAIEditor.Controls
             Action suspendTerminal,
             Action resumeTerminal,
             Action<bool> applyPreviewVisibility,
+            Action<EditorSettings> applyPreviewToggleWidths,
             Action updateAutoSaveStatus,
             Action cleanupBeforeRestart,
             Action refreshEditorWorkspaceSplitters,
@@ -128,6 +130,7 @@ namespace TxtAIEditor.Controls
             _suspendTerminal = suspendTerminal;
             _resumeTerminal = resumeTerminal;
             _applyPreviewVisibility = applyPreviewVisibility;
+            _applyPreviewToggleWidths = applyPreviewToggleWidths;
             _updateAutoSaveStatus = updateAutoSaveStatus;
             _cleanupBeforeRestart = cleanupBeforeRestart;
             _refreshEditorWorkspaceSplitters = refreshEditorWorkspaceSplitters;
@@ -193,6 +196,7 @@ namespace TxtAIEditor.Controls
             _agentCommands.ApplyRuntimeSettings();
             ApplyResourceLanguage();
             _applyPreviewVisibility(settings.DefaultMarkdownEnabled);
+            _applyPreviewToggleWidths(settings);
             _topToolbar.MarkdownToolbarIsChecked = settings.DefaultMarkdownToolbarEnabled;
             _markdownToolbar.Visibility = settings.DefaultMarkdownToolbarEnabled ? Visibility.Visible : Visibility.Collapsed;
             _updateAutoSaveStatus();

@@ -106,6 +106,7 @@ namespace TxtAIEditor.Controls
                 AgentSelectedPresetScrollButtons,
                 AgentSelectedPresetScrollLeftButton,
                 AgentSelectedPresetScrollRightButton,
+                AgentSelectedPresetClearAllButton,
                 new AgentPaneMenuCallbacks
                 {
                     AgentPresetToggled = name => AgentPresetToggled?.Invoke(this, name),
@@ -119,7 +120,8 @@ namespace TxtAIEditor.Controls
                     AgentMcpEdited = name => AgentMcpEdited?.Invoke(this, name),
                     AgentMcpSettingsRequested = name => AgentMcpSettingsRequested?.Invoke(this, name),
                     AgentMcpDeleted = name => AgentMcpDeleted?.Invoke(this, name),
-                    AgentMcpRemoved = name => AgentMcpRemoved?.Invoke(this, name)
+                    AgentMcpRemoved = name => AgentMcpRemoved?.Invoke(this, name),
+                    AgentSelectedChipsCleared = () => AgentSelectedChipsCleared?.Invoke(this, EventArgs.Empty)
                 });
             _outputController = new AgentPaneOutputController(
                 AgentOutputText,
@@ -195,6 +197,7 @@ namespace TxtAIEditor.Controls
         public event EventHandler<string>? AgentMcpSettingsRequested;
         public event EventHandler<string>? AgentMcpDeleted;
         public event EventHandler<string>? AgentMcpRemoved;
+        public event EventHandler? AgentSelectedChipsCleared;
         public event RoutedEventHandler? DiffApproved;
         public event RoutedEventHandler? DiffCancelled;
         public event EventHandler<AgentFileEditPreview>? FileRevertRequested;
@@ -308,6 +311,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(AgentInsertNewTabOutputButton, getString("AgentInsertNewTabOutputTooltip", "Agent 응답을 새 탭에 입력 (선택한 경우 선택부위만)"));
             ToolTipService.SetToolTip(AgentSelectedPresetScrollLeftButton, getString("AgentSelectedChipsScrollLeftTooltip", "선택 칩 왼쪽으로 스크롤"));
             ToolTipService.SetToolTip(AgentSelectedPresetScrollRightButton, getString("AgentSelectedChipsScrollRightTooltip", "선택 칩 오른쪽으로 스크롤"));
+            ToolTipService.SetToolTip(AgentSelectedPresetClearAllButton, getString("AgentSelectedChipsClearAllTooltip", "모든 선택 칩 삭제"));
 
             AgentDiffApproveButton.Content = getString("AgentDiffApplyButton", "승인");
             AgentDiffCancelButton.Content = getString("AgentDiffCancelButton", "취소");
@@ -861,6 +865,11 @@ private Style? _accentRunButtonStyle;
         private void OnSelectedPresetScrollRightClick(object sender, RoutedEventArgs e)
         {
             _menuCoordinator.OnSelectedPresetScrollRightClick();
+        }
+
+        private void OnSelectedPresetClearAllClick(object sender, RoutedEventArgs e)
+        {
+            _menuCoordinator.OnSelectedPresetClearAllClick();
         }
 
         public void ShowDiffConfirm(string header, string description)
