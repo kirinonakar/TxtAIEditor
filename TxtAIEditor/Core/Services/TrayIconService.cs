@@ -22,6 +22,7 @@ namespace TxtAIEditor.Core.Services
         private const uint WmContextMenu = 0x007B;
         private const uint WmLButtonDoubleClick = 0x0203;
         private const uint WmRButtonUp = 0x0205;
+        private const uint WmNull = 0x0000;
         private const uint MfString = 0x00000000;
         private const uint TpmRightButton = 0x0002;
         private const uint TpmReturnCommand = 0x0100;
@@ -207,16 +208,33 @@ namespace TxtAIEditor.Core.Services
                 AppendMenu(menu, MfString, OpenMenuCommand, _openText);
                 AppendMenu(menu, MfString, CloseMenuCommand, _closeText);
                 GetCursorPos(out Point cursorPosition);
+                IntPtr previousForegroundWindow = GetForegroundWindow();
                 SetForegroundWindow(_windowHandle);
 
-                uint command = TrackPopupMenu(
-                    menu,
-                    TpmRightButton | TpmReturnCommand,
-                    cursorPosition.X,
-                    cursorPosition.Y,
-                    0,
-                    _windowHandle,
-                    IntPtr.Zero);
+                uint command;
+                try
+                {
+                    command = TrackPopupMenu(
+                        menu,
+                        TpmRightButton | TpmReturnCommand,
+                        cursorPosition.X,
+                        cursorPosition.Y,
+                        0,
+                        _windowHandle,
+                        IntPtr.Zero);
+                }
+                finally
+                {
+                    // TrackPopupMenu requires the owner window to be foreground,
+                    // but opening the tray menu must not leave an editor window
+                    // activated after the menu is dismissed.
+                    PostMessage(_windowHandle, WmNull, IntPtr.Zero, IntPtr.Zero);
+                    if (previousForegroundWindow != IntPtr.Zero &&
+                        previousForegroundWindow != _windowHandle)
+                    {
+                        SetForegroundWindow(previousForegroundWindow);
+                    }
+                }
 
                 if (command == OpenMenuCommand)
                 {
@@ -347,6 +365,17 @@ namespace TxtAIEditor.Core.Services
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool SetForegroundWindow(IntPtr windowHandle);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool PostMessage(
+            IntPtr windowHandle,
+            uint message,
+            IntPtr wParam,
+            IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
     }
 
     internal sealed record TrayWindowItem(string Title, Action Activate);
