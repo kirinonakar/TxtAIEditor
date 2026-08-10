@@ -112,6 +112,7 @@ namespace TxtAIEditor
             RegisterWindow(mainWindow);
             await mainWindow.PrepareForInitialActivationAsync();
             mainWindow.Activate();
+            UpdateTrayIconVisibility();
 
             _ = Task.Run(FileAssociationService.RegisterUnpackagedFileAssociations);
         }
@@ -207,7 +208,9 @@ namespace TxtAIEditor
 
         internal void UpdateTrayIconVisibility()
         {
-            bool shouldShow = _windows.Count > 1 || _windows.Any(window => window.IsHiddenToTray);
+            bool shouldShow = _windows.Count > 1 ||
+                _windows.Any(window => window.IsHiddenToTray) ||
+                _windows.Any(window => window.KeepInTrayOnCloseEnabled);
             if (!shouldShow)
             {
                 _trayIconService?.Dispose();

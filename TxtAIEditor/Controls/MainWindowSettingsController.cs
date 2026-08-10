@@ -220,6 +220,7 @@ namespace TxtAIEditor.Controls
                 _tabDirtyStateController.RefreshAllDirtyLineMarkers();
             }
             _livePreviewController.RenderActiveTab();
+            (Application.Current as App)?.UpdateTrayIconVisibility();
             return false;
         }
 

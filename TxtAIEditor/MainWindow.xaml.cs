@@ -33,6 +33,8 @@ namespace TxtAIEditor
 
         internal bool IsHiddenToTray { get; private set; }
 
+        internal bool KeepInTrayOnCloseEnabled => Operations.CurrentSettings.KeepInTrayOnClose;
+
         public bool ScrollSyncEnabled
         {
             get => Operations.ScrollSyncEnabled;
