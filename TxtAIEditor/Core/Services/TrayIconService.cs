@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -26,12 +27,14 @@ namespace TxtAIEditor.Core.Services
         private const uint TpmReturnCommand = 0x0100;
         private const uint OpenMenuCommand = 1;
         private const uint CloseMenuCommand = 2;
+        private const uint WindowMenuCommandBase = 100;
         private const nuint SubclassId = 0x54524159;
 
         private readonly IntPtr _windowHandle;
         private readonly string _toolTip;
         private readonly string _openText;
         private readonly string _closeText;
+        private readonly Func<IReadOnlyList<TrayWindowItem>> _getWindows;
         private readonly Action _openRequested;
         private readonly Action _closeRequested;
         private readonly SubclassProc _subclassProc;
@@ -44,6 +47,7 @@ namespace TxtAIEditor.Core.Services
             string toolTip,
             string openText,
             string closeText,
+            Func<IReadOnlyList<TrayWindowItem>> getWindows,
             Action openRequested,
             Action closeRequested)
         {
@@ -51,6 +55,7 @@ namespace TxtAIEditor.Core.Services
             _toolTip = toolTip;
             _openText = openText;
             _closeText = closeText;
+            _getWindows = getWindows;
             _openRequested = openRequested;
             _closeRequested = closeRequested;
             _subclassProc = WindowSubclassProc;
@@ -181,6 +186,25 @@ namespace TxtAIEditor.Core.Services
             try
             {
                 AppendMenu(menu, MfString, OpenMenuCommand, _openText);
+                var windowActions = new Dictionary<uint, Action>();
+                uint commandId = WindowMenuCommandBase;
+                foreach (var window in _getWindows())
+                {
+                    if (commandId == uint.MaxValue)
+                    {
+                        break;
+                    }
+
+                    string title = string.IsNullOrWhiteSpace(window.Title)
+                        ? "TxtAIEditor"
+                        : window.Title;
+                    if (AppendMenu(menu, MfString, commandId, title))
+                    {
+                        windowActions[commandId] = window.Activate;
+                        commandId++;
+                    }
+                }
+
                 AppendMenu(menu, MfString, CloseMenuCommand, _closeText);
                 GetCursorPos(out Point cursorPosition);
                 SetForegroundWindow(_windowHandle);
@@ -197,6 +221,10 @@ namespace TxtAIEditor.Core.Services
                 if (command == OpenMenuCommand)
                 {
                     _openRequested();
+                }
+                else if (windowActions.TryGetValue(command, out Action? activateWindow))
+                {
+                    activateWindow();
                 }
                 else if (command == CloseMenuCommand)
                 {
@@ -320,4 +348,6 @@ namespace TxtAIEditor.Core.Services
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool SetForegroundWindow(IntPtr windowHandle);
     }
+
+    internal sealed record TrayWindowItem(string Title, Action Activate);
 }

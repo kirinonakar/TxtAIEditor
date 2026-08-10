@@ -30,6 +30,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<TabViewItem, TabView?> _tabViewResolver;
         private readonly Func<string, Task>? _openNotebookSourceAsync;
         private readonly Func<string, Task>? _openNotebookViewerAsync;
+        private readonly Func<OpenedTab, Task>? _openInNewWindowAsync;
 
         public TabContextMenuController(
             FavoritesRecentController favoritesRecentController,
@@ -48,7 +49,8 @@ namespace TxtAIEditor.Controls
             Action<string>? runFileInTerminal,
             Func<TabViewItem, TabView?> tabViewResolver,
             Func<string, Task>? openNotebookSourceAsync = null,
-            Func<string, Task>? openNotebookViewerAsync = null)
+            Func<string, Task>? openNotebookViewerAsync = null,
+            Func<OpenedTab, Task>? openInNewWindowAsync = null)
         {
             _favoritesRecentController = favoritesRecentController;
             _getString = getString;
@@ -67,6 +69,7 @@ namespace TxtAIEditor.Controls
             _tabViewResolver = tabViewResolver;
             _openNotebookSourceAsync = openNotebookSourceAsync;
             _openNotebookViewerAsync = openNotebookViewerAsync;
+            _openInNewWindowAsync = openInNewWindowAsync;
         }
 
         public MenuFlyout CreateContextFlyout(OpenedTab tab, TabViewItem tabItem, TabView targetTabView)
@@ -74,6 +77,22 @@ namespace TxtAIEditor.Controls
             var menu = new MenuFlyout();
             string? fileActionPath = GetFileActionPath(tab);
             bool hasActionPath = !string.IsNullOrEmpty(fileActionPath) || !string.IsNullOrWhiteSpace(tab.RemotePath);
+
+            var openInNewWindowItem = new MenuFlyoutItem
+            {
+                Text = _getString("TabMenuOpenInNewWindow", "새 창에서 열기"),
+                Icon = new FontIcon { Glyph = "\uE8A7" },
+                IsEnabled = _openInNewWindowAsync != null
+            };
+            openInNewWindowItem.Click += async (_, __) =>
+            {
+                if (_openInNewWindowAsync != null)
+                {
+                    await _openInNewWindowAsync(tab);
+                }
+            };
+            menu.Items.Add(openInNewWindowItem);
+            menu.Items.Add(new MenuFlyoutSeparator());
 
             var copyFileNameItem = new MenuFlyoutItem { Text = _getString("TabMenuCopyFileName", "파일이름 복사"), Icon = new SymbolIcon(Symbol.Copy) };
             copyFileNameItem.IsEnabled = hasActionPath;

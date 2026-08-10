@@ -113,7 +113,7 @@ namespace TxtAIEditor.Controls
             _showErrorMessage = showErrorMessage;
         }
 
-        public async Task InitializeAsync()
+        public async Task InitializeAsync(bool openStartupTargets = true)
         {
             try
             {
@@ -123,7 +123,10 @@ namespace TxtAIEditor.Controls
                 LoadRecentFilesForStartup();
                 ApplyInitialShellState();
 
-                await OpenStartupTargetsAsync(startupPaths);
+                if (openStartupTargets)
+                {
+                    await OpenStartupTargetsAsync(startupPaths);
+                }
                 QueueDeferredUserContentIndexes();
 
                 if (!string.IsNullOrEmpty(_getCurrentRepoPath()))

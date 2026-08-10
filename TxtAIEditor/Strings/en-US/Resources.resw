@@ -1550,6 +1550,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="TextColorApplyButton" xml:space="preserve">
     <value>Apply</value>
   </data>
+  <data name="TabMenuOpenInNewWindow" xml:space="preserve">
+    <value>Open in New Window</value>
+  </data>
   <data name="TabMenuCopyFileName" xml:space="preserve">
     <value>Copy File Name</value>
   </data>

@@ -31,8 +31,11 @@
                 <TabView x:Name="EditorTabView"
                          Background="{ThemeResource EditorSurfaceBackgroundBrush}"
                          VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+                         CanDragTabs="True"
+                         CanReorderTabs="False"
                          AddTabButtonClick="OnEditorTabViewAddTabClick"
                          TabCloseRequested="OnEditorTabViewTabCloseRequested"
+                         TabDroppedOutside="OnEditorTabViewTabDroppedOutside"
                          SelectionChanged="OnEditorTabViewSelectionChanged"
                          GotFocus="OnTabViewGotFocus">
                     <TabView.TabStripHeader>
@@ -117,8 +120,11 @@
                          Background="{ThemeResource EditorSurfaceBackgroundBrush}"
                          VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                          Visibility="Collapsed"
+                         CanDragTabs="True"
+                         CanReorderTabs="False"
                          AddTabButtonClick="OnEditorTabView2AddTabClick"
                          TabCloseRequested="OnEditorTabView2TabCloseRequested"
+                         TabDroppedOutside="OnEditorTabView2TabDroppedOutside"
                          SelectionChanged="OnEditorTabView2SelectionChanged"
                          GotFocus="OnTabViewGotFocus">
                     <TabView.TabItems>

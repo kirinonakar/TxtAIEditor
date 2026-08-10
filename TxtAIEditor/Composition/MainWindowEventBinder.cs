@@ -14,7 +14,8 @@ namespace TxtAIEditor.Composition
             MainWindowDocumentModule documents,
             MainWindowToolbarCommandController toolbarCommand,
             Action openNewTab,
-            Func<Task> saveUiLayoutSettingsAsync)
+            Func<Task> saveUiLayoutSettingsAsync,
+            Func<TabViewTabDroppedOutsideEventArgs, Task> openTabInNewWindowAsync)
         {
             ui.LeftSidebar.SearchQueryInputKeyDown += async (_, e) =>
             {
@@ -50,6 +51,8 @@ namespace TxtAIEditor.Composition
 
             ui.EditorWorkspace.PrimaryAddTabButtonClick += (_, _) => openNewTab();
             ui.EditorWorkspace.PrimaryTabCloseRequested += (_, args) => documents.CloseRequested(args);
+            ui.EditorWorkspace.PrimaryTabDroppedOutside += async (_, args) => await openTabInNewWindowAsync(args);
+            ui.EditorWorkspace.SecondaryTabDroppedOutside += async (_, args) => await openTabInNewWindowAsync(args);
             ui.EditorWorkspace.MoveTabLeftClick += (_, _) => documents.MoveActiveTabLeft();
             ui.EditorWorkspace.MoveTabRightClick += (_, _) => documents.MoveActiveTabRight();
             ui.EditorWorkspace.TerminalPanelHeightChanged += async (_, _) => await saveUiLayoutSettingsAsync();

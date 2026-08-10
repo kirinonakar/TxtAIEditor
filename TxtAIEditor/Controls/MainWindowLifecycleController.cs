@@ -69,18 +69,7 @@ namespace TxtAIEditor.Controls
         {
             CleanupCore(suppressErrors: true);
 
-            try
-            {
-                if (Application.Current is App app)
-                {
-                    app.CleanupAppResources();
-                }
-                else
-                {
-                    Environment.Exit(0);
-                }
-            }
-            catch
+            if (Application.Current is not App)
             {
                 Environment.Exit(0);
             }

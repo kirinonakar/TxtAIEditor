@@ -206,6 +206,198 @@ namespace TxtAIEditor.Controls
             return tab;
         }
 
+        public async Task<bool> PrepareForTransferAsync(OpenedTab tab)
+        {
+            if (FindTabItem(tab.Id) == null)
+            {
+                return false;
+            }
+
+            // A viewer in Hex mode owns a temporary Hex WebView and a private
+            // restoration record. Restore the original viewer before moving it so
+            // the destination can register a fresh viewer with its own controllers.
+            if (_viewerHexViewStates.ContainsKey(tab.Id))
+            {
+                await SetHexViewModeAsync(tab, enabled: false);
+                if (_viewerHexViewStates.ContainsKey(tab.Id))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public bool TryDetachForTransfer(OpenedTab tab, out EditorTabTransfer? transfer)
+        {
+            transfer = null;
+            TabViewItem? tabItem = FindTabItem(tab.Id);
+            if (tabItem == null || _viewerHexViewStates.ContainsKey(tab.Id))
+            {
+                return false;
+            }
+
+            _editorSessions.TryGetValue(tab.Id, out EditorDocumentSession? session);
+            object? viewModeState = null;
+            if (_hexViewStates.Remove(tab.Id, out HexViewState? hexViewState))
+            {
+                viewModeState = hexViewState;
+            }
+
+            if (tabItem.Header is TabHeaderControl tabHeader)
+            {
+                tabHeader.Detach();
+            }
+
+            _viewModel.Tabs.Remove(tab);
+            _editorWorkspace.RemoveTabItemImmediately(tabItem);
+
+            if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup))
+            {
+                try
+                {
+                    bridgeGroup.WebView.Close();
+                }
+                catch
+                {
+                }
+
+                _tabBridges.Remove(tab.Id);
+            }
+
+            _editorSessions.Remove(tab.Id);
+            _viewModeTransitionVersions.Remove(tab.Id);
+            if (tab.IsPdfViewer)
+            {
+                _pdfViewerController.Close(tab.Id);
+            }
+            else if (tab.IsOfficeDocumentViewer)
+            {
+                _officeDocumentViewerController.Close(tab.Id);
+            }
+            else if (tab.IsNotebookViewer)
+            {
+                _notebookViewerController.Close(tab.Id);
+            }
+
+            try
+            {
+                EditorTabViewItemFactory.ReleaseViewerResources(tabItem);
+            }
+            catch
+            {
+            }
+
+            transfer = new EditorTabTransfer(tab, session, viewModeState);
+            _updateWindowTitle();
+            return true;
+        }
+
+        public void AdoptTransferredTab(EditorTabTransfer transfer)
+        {
+            OpenedTab tab = transfer.Tab;
+            var settings = _settingsService.CurrentSettings;
+            var editorBgColor = WebViewAppearanceService.ResolveEditorBackgroundColor(settings);
+            _applyEditorSurfaceBackground(settings);
+            TabView targetTabView = _getCurrentActiveTabView();
+
+            if (tab.IsImageViewer)
+            {
+                AddOpenTab(tab);
+                var tabItem = _editorTabViewItemFactory.CreateImageViewer(
+                    tab,
+                    editorBgColor,
+                    settings.UiFontFamily,
+                    _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                    _tabEncryptionController.ShowMenu,
+                    (item, args) => _showTabContextMenu(tab, item, targetTabView, item, args),
+                    _getCurrentFolderPath());
+                AddTabItemToWorkspace(targetTabView, tabItem, editorBgColor, queueSurfaceRefresh: false);
+                UpdateTabStatus(tab, updateLanguageUi: true);
+                return;
+            }
+
+            if (tab.IsMediaViewer)
+            {
+                AddOpenTab(tab);
+                var tabItem = _editorTabViewItemFactory.CreateMediaViewer(
+                    tab,
+                    editorBgColor,
+                    settings.UiFontFamily,
+                    _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                    _tabEncryptionController.ShowMenu,
+                    (item, args) => _showTabContextMenu(tab, item, targetTabView, item, args),
+                    _getCurrentFolderPath());
+                AddTabItemToWorkspace(targetTabView, tabItem, editorBgColor, queueSurfaceRefresh: false);
+                UpdateTabStatus(tab, updateLanguageUi: true);
+                return;
+            }
+
+            if (tab.IsPdfViewer)
+            {
+                AddOpenTab(tab);
+                var tabParts = _editorTabViewItemFactory.CreatePdfViewer(
+                    tab,
+                    editorBgColor,
+                    settings.UiFontFamily,
+                    _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                    _tabEncryptionController.ShowMenu,
+                    (item, args) => _showTabContextMenu(tab, item, targetTabView, item, args),
+                    _getCurrentFolderPath());
+                _pdfViewerController.Register(tab, tabParts.WebView, tabParts.FindControl!);
+                AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: false);
+                UpdateTabStatus(tab, updateLanguageUi: true);
+                return;
+            }
+
+            if (tab.IsOfficeDocumentViewer)
+            {
+                AddOpenTab(tab);
+                var tabParts = _editorTabViewItemFactory.CreateOfficeDocumentViewer(
+                    tab,
+                    editorBgColor,
+                    settings.UiFontFamily,
+                    _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                    _tabEncryptionController.ShowMenu,
+                    (item, args) => _showTabContextMenu(tab, item, targetTabView, item, args),
+                    _getCurrentFolderPath());
+                _officeDocumentViewerController.Register(tab, tabParts.WebView);
+                AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: false);
+                UpdateTabStatus(tab, updateLanguageUi: true);
+                return;
+            }
+
+            if (tab.IsNotebookViewer)
+            {
+                AddOpenTab(tab);
+                var tabParts = _editorTabViewItemFactory.CreateNotebookViewer(
+                    tab,
+                    editorBgColor,
+                    settings.UiFontFamily,
+                    _getLocalizedString("EncryptedTabTooltip", "암호화됨"),
+                    _tabEncryptionController.ShowMenu,
+                    (item, args) => _showTabContextMenu(tab, item, targetTabView, item, args),
+                    _getCurrentFolderPath());
+                _notebookViewerController.Register(tab, tabParts.WebView);
+                AddTabItemToWorkspace(targetTabView, tabParts.TabItem, editorBgColor, queueSurfaceRefresh: false);
+                UpdateTabStatus(tab, updateLanguageUi: true);
+                return;
+            }
+
+            EditorDocumentSession session = transfer.Session ??
+                new EditorDocumentSession(tab, TextModelFactory.FromText(tab.ContentPreview));
+            if (transfer.ViewModeState is HexViewState hexViewState)
+            {
+                _hexViewStates[tab.Id] = hexViewState;
+            }
+
+            OpenEditorDocumentTab(
+                tab,
+                session,
+                isReadOnly: tab.IsReadOnlyViewer,
+                updateLanguageUi: true);
+        }
+
         private void ShareExistingFileDocument(
             OpenedTab tab,
             EditorDocumentSession session)

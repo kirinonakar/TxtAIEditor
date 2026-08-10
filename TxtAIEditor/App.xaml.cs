@@ -1,10 +1,13 @@
 using Microsoft.UI.Xaml;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using TxtAIEditor.Controls;
+using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
 using Windows.ApplicationModel.Activation;
 
@@ -16,7 +19,11 @@ namespace TxtAIEditor
         private static readonly string AppTempDir = Path.Combine(Path.GetTempPath(), "TxtAIEditor");
         private static readonly string IpcDir = Path.Combine(AppTempDir, "IPC");
         public static Window? MainWindow { get; private set; }
+        private readonly List<MainWindow> _windows = new List<MainWindow>();
         private Window? _window;
+        private TrayIconService? _trayIconService;
+        private MainWindow? _trayOwnerWindow;
+        private bool _trayExitInProgress;
         private static Mutex? _singleInstanceMutex;
         private FileSystemWatcher? _ipcWatcher;
         private uint _comCookie;
@@ -102,13 +109,266 @@ namespace TxtAIEditor
             StartIpcWatcher();
 
             var mainWindow = new MainWindow();
-            MainWindow = mainWindow;
-            _window = mainWindow;
-            _window.Closed += (_, _) => CleanupAppResources();
+            RegisterWindow(mainWindow);
             await mainWindow.PrepareForInitialActivationAsync();
-            _window.Activate();
+            mainWindow.Activate();
 
             _ = Task.Run(FileAssociationService.RegisterUnpackagedFileAssociations);
+        }
+
+        private void RegisterWindow(MainWindow window)
+        {
+            if (_windows.Contains(window))
+            {
+                return;
+            }
+
+            _windows.Add(window);
+            MainWindow ??= window;
+            _window ??= window;
+        }
+
+        internal void HandleWindowClosed(MainWindow window)
+        {
+            _windows.Remove(window);
+            if (ReferenceEquals(MainWindow, window))
+            {
+                MainWindow = _windows.FirstOrDefault();
+            }
+
+            if (ReferenceEquals(_window, window))
+            {
+                _window = _windows.FirstOrDefault();
+            }
+
+            if (ReferenceEquals(_trayOwnerWindow, window))
+            {
+                _trayIconService?.Dispose();
+                _trayIconService = null;
+                _trayOwnerWindow = null;
+            }
+
+            UpdateTrayIconVisibility();
+
+            if (_windows.Count == 0)
+            {
+                CleanupAppResources();
+            }
+        }
+
+        internal bool EnsureTrayIcon(MainWindow requestedOwner)
+        {
+            try
+            {
+                MainWindow? owner = _trayOwnerWindow != null && _windows.Contains(_trayOwnerWindow)
+                    ? _trayOwnerWindow
+                    : requestedOwner;
+                if (!_windows.Contains(owner))
+                {
+                    owner = _windows.FirstOrDefault();
+                }
+
+                if (owner == null)
+                {
+                    return false;
+                }
+
+                if (_trayIconService != null && ReferenceEquals(_trayOwnerWindow, owner))
+                {
+                    return true;
+                }
+
+                _trayIconService?.Dispose();
+                _trayOwnerWindow = owner;
+                _trayIconService = new TrayIconService(
+                    WinRT.Interop.WindowNative.GetWindowHandle(owner),
+                    "TxtAIEditor",
+                    owner.GetLocalizedString("TrayMenuOpen", "열기"),
+                    owner.GetLocalizedString("TrayMenuClose", "닫기"),
+                    GetTrayWindowItems,
+                    RestoreAnyWindow,
+                    () => _ = RequestCloseAllFromTrayAsync());
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to create tray icon: {ex.Message}");
+                _trayIconService?.Dispose();
+                _trayIconService = null;
+                _trayOwnerWindow = null;
+                return false;
+            }
+        }
+
+        internal void UpdateTrayIconVisibility()
+        {
+            bool shouldShow = _windows.Count > 1 || _windows.Any(window => window.IsHiddenToTray);
+            if (!shouldShow)
+            {
+                _trayIconService?.Dispose();
+                _trayIconService = null;
+                _trayOwnerWindow = null;
+                return;
+            }
+
+            MainWindow? owner = _windows.FirstOrDefault();
+            if (owner != null)
+            {
+                EnsureTrayIcon(owner);
+            }
+        }
+
+        private IReadOnlyList<TrayWindowItem> GetTrayWindowItems()
+        {
+            var items = new List<TrayWindowItem>(_windows.Count);
+            foreach (MainWindow window in _windows.ToArray())
+            {
+                MainWindow target = window;
+                items.Add(new TrayWindowItem(
+                    target.GetWindowDisplayName(),
+                    () => target.DispatcherQueue.TryEnqueue(target.RestoreAndActivate)));
+            }
+
+            return items;
+        }
+
+        private void RestoreAnyWindow()
+        {
+            MainWindow? window = _windows.FirstOrDefault();
+            window?.RestoreAndActivate();
+        }
+
+        private async Task RequestCloseAllFromTrayAsync()
+        {
+            if (_trayExitInProgress)
+            {
+                return;
+            }
+
+            _trayExitInProgress = true;
+            try
+            {
+                foreach (MainWindow window in _windows.ToArray())
+                {
+                    await window.RequestCloseFromTrayAsync();
+                }
+            }
+            finally
+            {
+                _trayExitInProgress = false;
+            }
+        }
+
+        internal async Task OpenTabInNewWindowAsync(MainWindow sourceWindow, OpenedTab tab)
+        {
+            if (!_windows.Contains(sourceWindow) || !await sourceWindow.PrepareTabForTransferAsync(tab))
+            {
+                return;
+            }
+
+            MainWindow? targetWindow = await CreateSecondaryWindowAsync();
+            if (targetWindow == null)
+            {
+                return;
+            }
+
+            if (!sourceWindow.TryDetachTabForTransfer(tab, out EditorTabTransfer? transfer) || transfer == null)
+            {
+                targetWindow.Close();
+                return;
+            }
+
+            try
+            {
+                targetWindow.AdoptTransferredTab(transfer);
+                string? workingFolderPath = GetTabWorkingFolder(tab);
+                if (!string.IsNullOrWhiteSpace(workingFolderPath))
+                {
+                    try
+                    {
+                        await targetWindow.NavigateExplorerToFolderAsync(workingFolderPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to set new window working folder: {ex.Message}");
+                    }
+                }
+
+                targetWindow.RestoreAndActivate();
+                sourceWindow.EnsureAtLeastOneTab();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to move tab to a new window: {ex.Message}");
+                try
+                {
+                    sourceWindow.AdoptTransferredTab(transfer);
+                    sourceWindow.EnsureAtLeastOneTab();
+                }
+                catch (Exception restoreException)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to restore moved tab: {restoreException.Message}");
+                }
+
+                targetWindow.Close();
+            }
+        }
+
+        private static string? GetTabWorkingFolder(OpenedTab tab)
+        {
+            if (RemotePath.IsRemote(tab.RemotePath))
+            {
+                return RemotePath.GetParent(tab.RemotePath!);
+            }
+
+            if (RemotePath.IsRemote(tab.FilePath))
+            {
+                return RemotePath.GetParent(tab.FilePath!);
+            }
+
+            if (string.IsNullOrWhiteSpace(tab.FilePath))
+            {
+                return null;
+            }
+
+            try
+            {
+                string? directory = Path.GetDirectoryName(Path.GetFullPath(tab.FilePath));
+                return !string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory)
+                    ? directory
+                    : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private async Task<MainWindow?> CreateSecondaryWindowAsync()
+        {
+            var window = new MainWindow(isSecondaryWindow: true);
+            RegisterWindow(window);
+            try
+            {
+                await window.PrepareForInitialActivationAsync();
+                window.Activate();
+                await window.WaitForStartupAsync();
+                UpdateTrayIconVisibility();
+                return window;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to initialize secondary window: {ex.Message}");
+                try
+                {
+                    window.Close();
+                }
+                catch
+                {
+                }
+
+                return null;
+            }
         }
 
         private static void CleanupWindowlessBackgroundProcesses(TimeSpan minimumAge)
@@ -414,6 +674,10 @@ namespace TxtAIEditor
             {
                 return;
             }
+
+            _trayIconService?.Dispose();
+            _trayIconService = null;
+            _trayOwnerWindow = null;
 
             if (_ipcWatcher != null)
             {

@@ -57,7 +57,8 @@ namespace TxtAIEditor.Composition
         Action<OpenedTab, TabViewItem, TabView> CloseLeftTabs,
         Action<OpenedTab, TabViewItem, TabView> CloseOtherTabs,
         Func<string, Task> OpenNotebookSourceTabAsync,
-        Func<string, Task> OpenNotebookViewerTabAsync);
+        Func<string, Task> OpenNotebookViewerTabAsync,
+        Func<OpenedTab, Task> OpenTabInNewWindowAsync);
 
     internal sealed record MainWindowInteractionControllers(
         ExplorerFileActionsController ExplorerFileActions,
@@ -180,7 +181,8 @@ namespace TxtAIEditor.Composition
                 terminalPanel.RunFileInTerminal,
                 tabNavigation.GetTabViewForItem,
                 callbacks.OpenNotebookSourceTabAsync,
-                callbacks.OpenNotebookViewerTabAsync);
+                callbacks.OpenNotebookViewerTabAsync,
+                callbacks.OpenTabInNewWindowAsync);
 
             var fileOpenDrop = new FileOpenDropController(
                 ui.DragOverlay,

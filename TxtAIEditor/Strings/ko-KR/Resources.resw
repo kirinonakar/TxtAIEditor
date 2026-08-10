@@ -1550,6 +1550,9 @@
   <data name="TextColorApplyButton" xml:space="preserve">
     <value>적용</value>
   </data>
+  <data name="TabMenuOpenInNewWindow" xml:space="preserve">
+    <value>새 창에서 열기</value>
+  </data>
   <data name="TabMenuCopyFileName" xml:space="preserve">
     <value>파일이름 복사</value>
   </data>

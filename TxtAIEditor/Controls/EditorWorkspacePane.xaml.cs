@@ -64,9 +64,11 @@ namespace TxtAIEditor.Controls
 
         public event TypedEventHandler<TabView, object>? PrimaryAddTabButtonClick;
         public event TypedEventHandler<TabView, TabViewTabCloseRequestedEventArgs>? PrimaryTabCloseRequested;
+        public event TypedEventHandler<TabView, TabViewTabDroppedOutsideEventArgs>? PrimaryTabDroppedOutside;
         public event SelectionChangedEventHandler? PrimarySelectionChanged;
         public event TypedEventHandler<TabView, object>? SecondaryAddTabButtonClick;
         public event TypedEventHandler<TabView, TabViewTabCloseRequestedEventArgs>? SecondaryTabCloseRequested;
+        public event TypedEventHandler<TabView, TabViewTabDroppedOutsideEventArgs>? SecondaryTabDroppedOutside;
         public event SelectionChangedEventHandler? SecondarySelectionChanged;
         public event RoutedEventHandler? TabViewGotFocus;
         public event RoutedEventHandler? MoveTabLeftClick;
@@ -938,6 +940,12 @@ namespace TxtAIEditor.Controls
         private void OnEditorTabViewTabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args) =>
             PrimaryTabCloseRequested?.Invoke(sender, args);
 
+        private void OnEditorTabViewTabDroppedOutside(TabView sender, TabViewTabDroppedOutsideEventArgs args)
+        {
+            ActiveTabView = sender;
+            PrimaryTabDroppedOutside?.Invoke(sender, args);
+        }
+
         private void OnEditorTabViewSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             ActiveTabView = EditorTabView;
@@ -957,6 +965,12 @@ namespace TxtAIEditor.Controls
         {
             ActiveTabView = sender;
             SecondaryTabCloseRequested?.Invoke(sender, args);
+        }
+
+        private void OnEditorTabView2TabDroppedOutside(TabView sender, TabViewTabDroppedOutsideEventArgs args)
+        {
+            ActiveTabView = sender;
+            SecondaryTabDroppedOutside?.Invoke(sender, args);
         }
 
         private void OnEditorTabView2SelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -29,6 +29,16 @@ namespace TxtAIEditor.Controls
         public event EventHandler<TabEncryptionMenuRequestedEventArgs>? EncryptionMenuRequested;
         public OpenedTab? OpenedTab => _tab;
 
+        public void Detach()
+        {
+            if (_tab != null)
+            {
+                _tab.PropertyChanged -= OnTabPropertyChanged;
+                _tab = null;
+            }
+
+        }
+
         public void Configure(OpenedTab tab, string encryptedTooltip, string? workspaceFolderPath = null)
         {
             if (_tab != null)
@@ -208,6 +218,7 @@ namespace TxtAIEditor.Controls
                 this,
                 new TabEncryptionMenuRequestedEventArgs(_tab, LockIcon, args));
         }
+
     }
 
     public sealed class TabEncryptionMenuRequestedEventArgs : EventArgs

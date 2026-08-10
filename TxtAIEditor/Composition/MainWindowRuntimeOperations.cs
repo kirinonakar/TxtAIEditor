@@ -90,11 +90,11 @@ namespace TxtAIEditor.Composition
             }
         }
 
-        public async Task InitializeStartupAsync()
+        public async Task InitializeStartupAsync(bool openStartupTargets = true)
         {
             try
             {
-                await Controllers.Lifecycle.Startup.InitializeAsync();
+                await Controllers.Lifecycle.Startup.InitializeAsync(openStartupTargets);
             }
             finally
             {
@@ -121,6 +121,9 @@ namespace TxtAIEditor.Composition
                 Controllers.Workspace.AddRecentFolder(folderPath);
             }
         }
+
+        public Task NavigateExplorerToFolderAsync(string folderPath, bool revealInLeftPanel = true) =>
+            Controllers.Workspace.NavigateExplorerToFolderAsync(folderPath, revealInLeftPanel);
 
         public void SetCurrentRepoPath(string repoPath)
         {
@@ -170,6 +173,15 @@ namespace TxtAIEditor.Composition
         public OpenedTab OpenGeneratedTab(string content) => OpenNewTab(null, content);
 
         public OpenedTab OpenEmptyTab() => OpenNewTab();
+
+        public Task<bool> PrepareTabForTransferAsync(OpenedTab tab) =>
+            Controllers.Editor.PrepareTabForTransferAsync(tab);
+
+        public bool TryDetachTabForTransfer(OpenedTab tab, out EditorTabTransfer? transfer) =>
+            Controllers.Editor.TryDetachTabForTransfer(tab, out transfer);
+
+        public void AdoptTransferredTab(EditorTabTransfer transfer) =>
+            Controllers.Editor.AdoptTransferredTab(transfer);
 
         public OpenedTab OpenPdfTab(string filePath) => Controllers.Editor.OpenPdfTab(filePath);
 

@@ -228,6 +228,15 @@ namespace TxtAIEditor.Composition
                 isEncrypted,
                 encryptionPassword);
 
+        public Task<bool> PrepareTabForTransferAsync(OpenedTab tab) =>
+            Runtime.EditorTabOpen.PrepareForTransferAsync(tab);
+
+        public bool TryDetachTabForTransfer(OpenedTab tab, out EditorTabTransfer? transfer) =>
+            Runtime.EditorTabOpen.TryDetachForTransfer(tab, out transfer);
+
+        public void AdoptTransferredTab(EditorTabTransfer transfer) =>
+            Runtime.EditorTabOpen.AdoptTransferredTab(transfer);
+
         public OpenedTab OpenPdfTab(string filePath) =>
             Runtime.EditorTabOpen.OpenPdfTab(filePath);
 

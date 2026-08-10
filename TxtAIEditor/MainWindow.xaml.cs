@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
+using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
 using TxtAIEditor.Composition;
 using TxtAIEditor.Controls;
@@ -23,10 +24,14 @@ namespace TxtAIEditor
             _operations ?? throw new InvalidOperationException("MainWindow runtime operations have not been composed.");
         private readonly MainWindowViewModel _viewModel = new MainWindowViewModel();
         private readonly MainWindowState _state = new MainWindowState();
-        private TrayIconService? _trayIconService;
+        private readonly bool _isSecondaryWindow;
+        private readonly TaskCompletionSource<bool> _startupCompletionSource =
+            new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private bool _exitRequestedFromTray;
         private bool _hideToTrayPending;
         private bool _trayClosePending;
+
+        internal bool IsHiddenToTray { get; private set; }
 
         public bool ScrollSyncEnabled
         {
@@ -66,8 +71,9 @@ namespace TxtAIEditor
                 Content as FrameworkElement ?? RootGrid);
         }
 
-        public MainWindow()
+        public MainWindow(bool isSecondaryWindow = false)
         {
+            _isSecondaryWindow = isSecondaryWindow;
             this.InitializeComponent();
             WindowPlacementService.SetWindowIcon(AppWindow);
 
@@ -102,7 +108,7 @@ namespace TxtAIEditor
             this.Activated += OnWindowActivated;
             this.Activated += Controllers.Lifecycle.Window.HandleActivationChanged;
             this.Closed += Controllers.Lifecycle.Window.HandleWindowClosed;
-            this.Closed += (_, _) => _trayIconService?.Dispose();
+            this.Closed += (_, _) => (Application.Current as App)?.HandleWindowClosed(this);
             this.AppWindow.Closing += OnAppWindowClosing;
             Controllers.Lifecycle.Window.StartShortcuts();
 
@@ -110,14 +116,23 @@ namespace TxtAIEditor
 
         public Task PrepareForInitialActivationAsync() => Operations.PrepareForInitialActivationAsync();
 
+        internal Task WaitForStartupAsync() => _startupCompletionSource.Task;
+
         private async void OnWindowActivated(object sender, WindowActivatedEventArgs e)
         {
             this.Activated -= OnWindowActivated;
             AppBadgeNotificationService.Initialize(WinRT.Interop.WindowNative.GetWindowHandle(this));
-            await Operations.InitializeStartupAsync();
+            try
+            {
+                await Operations.InitializeStartupAsync(openStartupTargets: !_isSecondaryWindow);
+            }
+            finally
+            {
+                _startupCompletionSource.TrySetResult(true);
+            }
         }
 
-        private string GetLocalizedString(string key, string fallback)
+        internal string GetLocalizedString(string key, string fallback)
         {
             return _localizationService.GetString(key, fallback);
         }
@@ -129,6 +144,9 @@ namespace TxtAIEditor
         internal Task<AgentOpenFileResult> LoadFileIntoTabForAgentAsync(string filePath) => Operations.LoadFileIntoTabForAgentAsync(filePath);
 
         internal Task OpenShellPathAsync(string path) => Operations.OpenShellPathAsync(path);
+
+        internal Task NavigateExplorerToFolderAsync(string folderPath) =>
+            Operations.NavigateExplorerToFolderAsync(folderPath, revealInLeftPanel: true);
 
         private void OnAppWindowClosing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
         {
@@ -144,6 +162,8 @@ namespace TxtAIEditor
                         try
                         {
                             AppWindow.Hide();
+                            IsHiddenToTray = true;
+                            (Application.Current as App)?.UpdateTrayIconVisibility();
                         }
                         finally
                         {
@@ -178,26 +198,12 @@ namespace TxtAIEditor
 
         private bool EnsureTrayIcon()
         {
-            try
-            {
-                _trayIconService ??= new TrayIconService(
-                    WinRT.Interop.WindowNative.GetWindowHandle(this),
-                    "TxtAIEditor",
-                    GetLocalizedString("TrayMenuOpen", "열기"),
-                    GetLocalizedString("TrayMenuClose", "닫기"),
-                    RestoreAndActivate,
-                    CloseFromTray);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to create tray icon: {ex.Message}");
-                return false;
-            }
+            return (Application.Current as App)?.EnsureTrayIcon(this) == true;
         }
 
         internal void RestoreAndActivate()
         {
+            IsHiddenToTray = false;
             AppWindow.Show();
             if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter &&
                 presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized)
@@ -206,9 +212,10 @@ namespace TxtAIEditor
             }
 
             Activate();
+            (Application.Current as App)?.UpdateTrayIconVisibility();
         }
 
-        private void CloseFromTray()
+        internal async Task RequestCloseFromTrayAsync()
         {
             if (_trayClosePending)
             {
@@ -218,23 +225,60 @@ namespace TxtAIEditor
             _trayClosePending = true;
             Task saveLayoutTask = Operations.SaveUiLayoutSettingsAsync();
             RestoreAndActivate();
-            if (!DispatcherQueue.TryEnqueue(async () =>
+            try
             {
                 await saveLayoutTask;
-                _trayClosePending = false;
                 _exitRequestedFromTray = true;
-                try
-                {
-                    await Operations.RequestWindowCloseAsync(saveUiLayoutSettings: false);
-                }
-                finally
-                {
-                    _exitRequestedFromTray = false;
-                }
-            }))
+                await Operations.RequestWindowCloseAsync(saveUiLayoutSettings: false);
+            }
+            finally
             {
                 _trayClosePending = false;
+                _exitRequestedFromTray = false;
             }
+        }
+
+        internal Task<bool> PrepareTabForTransferAsync(OpenedTab tab) =>
+            Operations.PrepareTabForTransferAsync(tab);
+
+        internal bool TryDetachTabForTransfer(OpenedTab tab, out EditorTabTransfer? transfer) =>
+            Operations.TryDetachTabForTransfer(tab, out transfer);
+
+        internal void AdoptTransferredTab(EditorTabTransfer transfer) =>
+            Operations.AdoptTransferredTab(transfer);
+
+        internal Task OpenTabInNewWindowAsync(OpenedTab tab) =>
+            (Application.Current as App)?.OpenTabInNewWindowAsync(this, tab) ?? Task.CompletedTask;
+
+        internal Task OpenTabItemInNewWindowAsync(TabViewItem tabItem)
+        {
+            if (tabItem.Tag is not string tabId)
+            {
+                return Task.CompletedTask;
+            }
+
+            foreach (OpenedTab tab in _viewModel.Tabs)
+            {
+                if (string.Equals(tab.Id, tabId, StringComparison.Ordinal))
+                {
+                    return OpenTabInNewWindowAsync(tab);
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        internal void EnsureAtLeastOneTab()
+        {
+            if (_viewModel.Tabs.Count == 0)
+            {
+                Operations.OpenEmptyTab();
+            }
+        }
+
+        internal string GetWindowDisplayName()
+        {
+            return string.IsNullOrWhiteSpace(Title) ? "TxtAIEditor" : Title;
         }
 
     }

@@ -1550,6 +1550,9 @@
   <data name="TextColorApplyButton" xml:space="preserve">
     <value>申請</value>
   </data>
+  <data name="TabMenuOpenInNewWindow" xml:space="preserve">
+    <value>在新視窗中開啟</value>
+  </data>
   <data name="TabMenuCopyFileName" xml:space="preserve">
     <value>複製檔案名稱</value>
   </data>

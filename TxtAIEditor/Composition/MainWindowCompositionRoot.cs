@@ -226,7 +226,8 @@ namespace TxtAIEditor.Composition
                     (_, tabItem, tabView) => documentModule.CloseLeftTabs(tabItem, tabView),
                     (_, tabItem, tabView) => documentModule.CloseOtherTabs(tabItem, tabView),
                     previewFacade.OpenNotebookSourceTabAsync,
-                    previewFacade.OpenNotebookViewerTabAsync));
+                    previewFacade.OpenNotebookViewerTabAsync,
+                    tab => window.OpenTabInNewWindowAsync(tab)));
             var fileOpenDropController = interactionControllers.FileOpenDrop;
             var rootKeyboardShortcutController = interactionControllers.RootKeyboardShortcut;
             var terminalPanelController = interactionControllers.TerminalPanel;
@@ -340,7 +341,8 @@ namespace TxtAIEditor.Composition
                 documentModule,
                 toolbarCommandController,
                 () => documentFacade.OpenEmptyTab(),
-                shellModule.SaveUiLayoutSettingsAsync);
+                shellModule.SaveUiLayoutSettingsAsync,
+                args => window.OpenTabItemInNewWindowAsync(args.Tab));
 
             shellModule.BindInteractions(interactionControllers);
             return new MainWindowControllers(
