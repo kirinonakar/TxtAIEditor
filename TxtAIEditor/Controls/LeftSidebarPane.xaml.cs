@@ -31,6 +31,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ExplorerTreeModeClick { add => ExplorerView.TreeModeClick += value; remove => ExplorerView.TreeModeClick -= value; }
         public event EventHandler<TreeViewExpandingEventArgs>? ExplorerTreeExpanding { add => ExplorerView.TreeExpanding += value; remove => ExplorerView.TreeExpanding -= value; }
         public event EventHandler<TreeViewItemInvokedEventArgs>? ExplorerTreeItemInvoked { add => ExplorerView.TreeItemInvoked += value; remove => ExplorerView.TreeItemInvoked -= value; }
+        public event Action<int>? ExplorerTreeSelectionCountChanged { add => ExplorerView.TreeSelectionCountChanged += value; remove => ExplorerView.TreeSelectionCountChanged -= value; }
         public event DragEventHandler? ExplorerTreeDragOver { add => ExplorerView.TreeDragOver += value; remove => ExplorerView.TreeDragOver -= value; }
         public event DragEventHandler? ExplorerTreeDrop { add => ExplorerView.TreeDrop += value; remove => ExplorerView.TreeDrop -= value; }
         public event ItemClickEventHandler? FileListViewItemClick { add => ExplorerView.FileItemClick += value; remove => ExplorerView.FileItemClick -= value; }

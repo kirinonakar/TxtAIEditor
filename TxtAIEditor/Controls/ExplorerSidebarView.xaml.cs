@@ -14,6 +14,7 @@ namespace TxtAIEditor.Controls
         private TreeViewNode? _treeSelectionAnchor;
         private TreeViewNode? _treeKeyboardFocusNode;
         private bool _isApplyingTreeSelection;
+        private bool _isTreeSelectionCountUpdateQueued;
 
         public ExplorerSidebarView()
         {
@@ -67,6 +68,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? TreeModeClick;
         public event EventHandler<TreeViewExpandingEventArgs>? TreeExpanding;
         public event EventHandler<TreeViewItemInvokedEventArgs>? TreeItemInvoked;
+        public event Action<int>? TreeSelectionCountChanged;
         public event DragEventHandler? TreeDragOver;
         public event DragEventHandler? TreeDrop;
         public event ItemClickEventHandler? FileItemClick;
@@ -130,6 +132,8 @@ namespace TxtAIEditor.Controls
             {
                 _isApplyingTreeSelection = false;
             }
+
+            NotifyTreeSelectionCountChanged();
         }
 
         public void ClearFilter()
@@ -350,6 +354,8 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            QueueTreeSelectionCountChanged();
+
             // Do not inspect SelectedNodes here. WinUI can raise this event while
             // it is detaching selected nodes from RootNodes, and re-entering the
             // selection projection at that point can fail inside Microsoft.UI.Xaml.
@@ -444,6 +450,7 @@ namespace TxtAIEditor.Controls
 
             _treeSelectionAnchor = node;
             _treeKeyboardFocusNode = node;
+            NotifyTreeSelectionCountChanged();
         }
 
         private void ApplyTreeRangeSelection(
@@ -503,6 +510,7 @@ namespace TxtAIEditor.Controls
             }
 
             _treeSelectionAnchor = selectionAnchor;
+            NotifyTreeSelectionCountChanged();
         }
 
         private static bool IsTreeRangeSelectableNode(TreeViewNode node)
@@ -541,6 +549,44 @@ namespace TxtAIEditor.Controls
             {
                 _isApplyingTreeSelection = false;
             }
+
+            NotifyTreeSelectionCountChanged();
+        }
+
+        private void QueueTreeSelectionCountChanged()
+        {
+            if (_isTreeSelectionCountUpdateQueued)
+            {
+                return;
+            }
+
+            _isTreeSelectionCountUpdateQueued = true;
+            bool enqueued = ExplorerTreeView.DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                () =>
+                {
+                    _isTreeSelectionCountUpdateQueued = false;
+                    NotifyTreeSelectionCountChanged();
+                });
+
+            if (!enqueued)
+            {
+                _isTreeSelectionCountUpdateQueued = false;
+            }
+        }
+
+        private void NotifyTreeSelectionCountChanged()
+        {
+            int selectedCount = 0;
+            foreach (TreeViewNode node in ExplorerTreeView.SelectedNodes)
+            {
+                if (IsTreeRangeSelectableNode(node))
+                {
+                    selectedCount++;
+                }
+            }
+
+            TreeSelectionCountChanged?.Invoke(selectedCount);
         }
 
         private TreeViewNode GetSelectionAnchor(TreeViewNode fallback)

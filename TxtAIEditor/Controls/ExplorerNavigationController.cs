@@ -690,26 +690,15 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExplorerTreeItemInvoked += OnExplorerTreeItemInvoked;
             _leftSidebar.FileListViewItemClick += OnFileListViewItemClick;
             _leftSidebar.FileList.SelectionChanged += (_, _) => UpdateExplorerSelectionStatus();
-            _leftSidebar.ExplorerTree.SelectionChanged += OnExplorerTreeSelectionChanged;
+            _leftSidebar.ExplorerTreeSelectionCountChanged += OnExplorerTreeSelectionCountChanged;
             _leftSidebar.ExplorerFilterTextChanged += OnExplorerFilterTextChanged;
             _leftSidebar.ExplorerHideUnwantedChanged += OnHideUnwantedChanged;
             _leftSidebar.ExplorerBreadcrumb.SegmentClicked += OnExplorerBreadcrumbItemClicked;
         }
 
-        private void OnExplorerTreeSelectionChanged(
-            Microsoft.UI.Xaml.Controls.TreeView sender,
-            Microsoft.UI.Xaml.Controls.TreeViewSelectionChangedEventArgs args)
+        private void OnExplorerTreeSelectionCountChanged(int selectedCount)
         {
-            // Reading SelectedItems/SelectedNodes from this callback can re-enter
-            // WinUI while RootNodes is being replaced. Track the count from the
-            // stable event payload instead.
-            _treeSelectionCount += args.AddedItems.Count;
-            _treeSelectionCount -= args.RemovedItems.Count;
-            if (_treeSelectionCount < 0)
-            {
-                _treeSelectionCount = 0;
-            }
-
+            _treeSelectionCount = Math.Max(0, selectedCount);
             UpdateExplorerSelectionStatus();
         }
 
