@@ -31,6 +31,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, Task>? _openNotebookSourceAsync;
         private readonly Func<string, Task>? _openNotebookViewerAsync;
         private readonly Func<OpenedTab, Task>? _openInNewWindowAsync;
+        private readonly Func<string, XamlRoot?, ElementTheme, Task>? _convertImageAsync;
 
         public TabContextMenuController(
             FavoritesRecentController favoritesRecentController,
@@ -50,7 +51,8 @@ namespace TxtAIEditor.Controls
             Func<TabViewItem, TabView?> tabViewResolver,
             Func<string, Task>? openNotebookSourceAsync = null,
             Func<string, Task>? openNotebookViewerAsync = null,
-            Func<OpenedTab, Task>? openInNewWindowAsync = null)
+            Func<OpenedTab, Task>? openInNewWindowAsync = null,
+            Func<string, XamlRoot?, ElementTheme, Task>? convertImageAsync = null)
         {
             _favoritesRecentController = favoritesRecentController;
             _getString = getString;
@@ -70,6 +72,7 @@ namespace TxtAIEditor.Controls
             _openNotebookSourceAsync = openNotebookSourceAsync;
             _openNotebookViewerAsync = openNotebookViewerAsync;
             _openInNewWindowAsync = openInNewWindowAsync;
+            _convertImageAsync = convertImageAsync;
         }
 
         public MenuFlyout CreateContextFlyout(OpenedTab tab, TabViewItem tabItem, TabView targetTabView)
@@ -137,6 +140,30 @@ namespace TxtAIEditor.Controls
             reloadItem.IsEnabled = hasActionPath;
             reloadItem.Click += async (_, __) => await _reloadTabAsync(tab, tabItem);
             menu.Items.Add(reloadItem);
+
+            if (tab.IsImageViewer && !string.IsNullOrWhiteSpace(fileActionPath))
+            {
+                var convertImageItem = new MenuFlyoutItem
+                {
+                    Text = _getString("TabMenuImageConvert", "이미지 변환"),
+                    Icon = new FontIcon { Glyph = "\uE91B" },
+                    IsEnabled = _convertImageAsync != null &&
+                                !tab.IsRemoteFile &&
+                                !tab.IsArchiveEntry &&
+                                File.Exists(fileActionPath)
+                };
+                convertImageItem.Click += async (_, __) =>
+                {
+                    string? path = GetFileActionPath(tab);
+                    if (_convertImageAsync != null &&
+                        !string.IsNullOrWhiteSpace(path) &&
+                        File.Exists(path))
+                    {
+                        await _convertImageAsync(path, tabItem.XamlRoot, tabItem.ActualTheme);
+                    }
+                };
+                menu.Items.Add(convertImageItem);
+            }
 
             var hexViewItem = new ToggleMenuFlyoutItem
             {

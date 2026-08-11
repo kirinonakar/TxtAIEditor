@@ -3872,4 +3872,34 @@
   <data name="SettingsKeepInTrayOnClose" xml:space="preserve"><value>ウィンドウを閉じるときにシステム トレイに保持</value></data>
   <data name="TrayMenuOpen" xml:space="preserve"><value>開く</value></data>
   <data name="TrayMenuClose" xml:space="preserve"><value>閉じる</value></data>
+  <data name="TabMenuImageConvert" xml:space="preserve"><value>画像を変換</value></data>
+  <data name="ImageConvertDialogTitle" xml:space="preserve"><value>画像変換 - {0}</value></data>
+  <data name="ImageConvertSourceInfo" xml:space="preserve"><value>元のファイル: {0}&#xA;サイズ: {1} × {2}px · フレーム: {3}</value></data>
+  <data name="ImageConvertFormat" xml:space="preserve"><value>出力形式</value></data>
+  <data name="ImageConvertFormatPng" xml:space="preserve"><value>PNG</value></data>
+  <data name="ImageConvertFormatJpg" xml:space="preserve"><value>JPG</value></data>
+  <data name="ImageConvertQuality" xml:space="preserve"><value>JPG 品質 (1-100)</value></data>
+  <data name="ImageConvertResize" xml:space="preserve"><value>サイズ変更</value></data>
+  <data name="ImageConvertWidth" xml:space="preserve"><value>幅 (px)</value></data>
+  <data name="ImageConvertHeight" xml:space="preserve"><value>高さ (px)</value></data>
+  <data name="ImageConvertKeepAspect" xml:space="preserve"><value>アスペクト比を維持</value></data>
+  <data name="ImageConvertInterpolation" xml:space="preserve"><value>補間</value></data>
+  <data name="ImageConvertInterpolationFant" xml:space="preserve"><value>Fant (高品質)</value></data>
+  <data name="ImageConvertInterpolationCubic" xml:space="preserve"><value>Cubic (バイキュービック)</value></data>
+  <data name="ImageConvertInterpolationLinear" xml:space="preserve"><value>Linear (バイリニア)</value></data>
+  <data name="ImageConvertInterpolationNearest" xml:space="preserve"><value>Nearest neighbor (最近傍)</value></data>
+  <data name="ImageConvertExtractFrames" xml:space="preserve"><value>アニメーションの各フレームを抽出 ({0})</value></data>
+  <data name="ImageConvertAnimatedHint" xml:space="preserve"><value>選択すると各フレームを個別のファイルとして保存します。選択しない場合は最初のフレームのみ変換します。</value></data>
+  <data name="ImageConvertOutputSuffixHint" xml:space="preserve"><value>出力ファイルは同じフォルダーに _convert 接尾辞を付けて保存されます。</value></data>
+  <data name="ImageConvertInvalidSize" xml:space="preserve"><value>幅と高さは1以上の整数ピクセル値で指定してください。</value></data>
+  <data name="ImageConvertInvalidQuality" xml:space="preserve"><value>JPG 品質は1から100までの整数で指定してください。</value></data>
+  <data name="ImageConvertConvertButton" xml:space="preserve"><value>変換</value></data>
+  <data name="ImageConvertCancelButton" xml:space="preserve"><value>キャンセル</value></data>
+  <data name="ImageConvertCloseButton" xml:space="preserve"><value>OK</value></data>
+  <data name="ImageConvertOverwriteTitle" xml:space="preserve"><value>出力ファイルを上書き</value></data>
+  <data name="ImageConvertOverwriteMessage" xml:space="preserve"><value>出力ファイルが {0} 個すでに存在します。上書きしますか？&#xA;例: {1}</value></data>
+  <data name="ImageConvertOverwriteButton" xml:space="preserve"><value>上書き</value></data>
+  <data name="ImageConvertSuccessTitle" xml:space="preserve"><value>画像変換完了</value></data>
+  <data name="ImageConvertSuccessMessage" xml:space="preserve"><value>画像変換が完了しました。&#xA;{0} 個のファイルを保存しました&#xA;例: {1}</value></data>
+  <data name="ImageConvertErrorTitle" xml:space="preserve"><value>画像変換エラー</value></data>
 </root>

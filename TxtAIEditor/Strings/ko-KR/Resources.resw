@@ -3908,4 +3908,34 @@
   <data name="SettingsKeepInTrayOnClose" xml:space="preserve"><value>창을 닫을 때 시스템 트레이에 유지</value></data>
   <data name="TrayMenuOpen" xml:space="preserve"><value>열기</value></data>
   <data name="TrayMenuClose" xml:space="preserve"><value>닫기</value></data>
+  <data name="TabMenuImageConvert" xml:space="preserve"><value>이미지 변환</value></data>
+  <data name="ImageConvertDialogTitle" xml:space="preserve"><value>이미지 변환 - {0}</value></data>
+  <data name="ImageConvertSourceInfo" xml:space="preserve"><value>원본: {0}&#xA;크기: {1} × {2}px · 프레임: {3}</value></data>
+  <data name="ImageConvertFormat" xml:space="preserve"><value>출력 형식</value></data>
+  <data name="ImageConvertFormatPng" xml:space="preserve"><value>PNG</value></data>
+  <data name="ImageConvertFormatJpg" xml:space="preserve"><value>JPG</value></data>
+  <data name="ImageConvertQuality" xml:space="preserve"><value>JPG 화질 (1-100)</value></data>
+  <data name="ImageConvertResize" xml:space="preserve"><value>크기 조정</value></data>
+  <data name="ImageConvertWidth" xml:space="preserve"><value>너비 (px)</value></data>
+  <data name="ImageConvertHeight" xml:space="preserve"><value>높이 (px)</value></data>
+  <data name="ImageConvertKeepAspect" xml:space="preserve"><value>비율 유지</value></data>
+  <data name="ImageConvertInterpolation" xml:space="preserve"><value>인터폴레이션</value></data>
+  <data name="ImageConvertInterpolationFant" xml:space="preserve"><value>Fant (고품질)</value></data>
+  <data name="ImageConvertInterpolationCubic" xml:space="preserve"><value>Cubic (바이큐빅)</value></data>
+  <data name="ImageConvertInterpolationLinear" xml:space="preserve"><value>Linear (바이리니어)</value></data>
+  <data name="ImageConvertInterpolationNearest" xml:space="preserve"><value>Nearest Neighbor (최근접)</value></data>
+  <data name="ImageConvertExtractFrames" xml:space="preserve"><value>애니메이션 프레임별로 추출 ({0}개)</value></data>
+  <data name="ImageConvertAnimatedHint" xml:space="preserve"><value>선택하면 각 프레임을 별도 파일로 저장합니다. 선택하지 않으면 첫 프레임만 변환합니다.</value></data>
+  <data name="ImageConvertOutputSuffixHint" xml:space="preserve"><value>출력 파일은 원본과 같은 폴더에 _convert 접미사를 붙여 저장합니다.</value></data>
+  <data name="ImageConvertInvalidSize" xml:space="preserve"><value>너비와 높이는 1 이상의 정수 픽셀 값이어야 합니다.</value></data>
+  <data name="ImageConvertInvalidQuality" xml:space="preserve"><value>JPG 화질은 1에서 100 사이의 정수여야 합니다.</value></data>
+  <data name="ImageConvertConvertButton" xml:space="preserve"><value>변환</value></data>
+  <data name="ImageConvertCancelButton" xml:space="preserve"><value>취소</value></data>
+  <data name="ImageConvertCloseButton" xml:space="preserve"><value>확인</value></data>
+  <data name="ImageConvertOverwriteTitle" xml:space="preserve"><value>출력 파일 덮어쓰기</value></data>
+  <data name="ImageConvertOverwriteMessage" xml:space="preserve"><value>출력 파일 {0}개가 이미 존재합니다. 덮어쓰시겠습니까?&#xA;예: {1}</value></data>
+  <data name="ImageConvertOverwriteButton" xml:space="preserve"><value>덮어쓰기</value></data>
+  <data name="ImageConvertSuccessTitle" xml:space="preserve"><value>이미지 변환 완료</value></data>
+  <data name="ImageConvertSuccessMessage" xml:space="preserve"><value>이미지 변환이 완료되었습니다.&#xA;{0}개 파일 저장&#xA;예: {1}</value></data>
+  <data name="ImageConvertErrorTitle" xml:space="preserve"><value>이미지 변환 오류</value></data>
 </root>

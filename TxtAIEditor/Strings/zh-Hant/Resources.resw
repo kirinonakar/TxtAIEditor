@@ -3872,4 +3872,34 @@
   <data name="SettingsKeepInTrayOnClose" xml:space="preserve"><value>關閉視窗時保留在系統匣</value></data>
   <data name="TrayMenuOpen" xml:space="preserve"><value>開啟</value></data>
   <data name="TrayMenuClose" xml:space="preserve"><value>關閉</value></data>
+  <data name="TabMenuImageConvert" xml:space="preserve"><value>轉換圖片</value></data>
+  <data name="ImageConvertDialogTitle" xml:space="preserve"><value>圖片轉換 - {0}</value></data>
+  <data name="ImageConvertSourceInfo" xml:space="preserve"><value>來源：{0}&#xA;大小：{1} × {2}px · 幀數：{3}</value></data>
+  <data name="ImageConvertFormat" xml:space="preserve"><value>輸出格式</value></data>
+  <data name="ImageConvertFormatPng" xml:space="preserve"><value>PNG</value></data>
+  <data name="ImageConvertFormatJpg" xml:space="preserve"><value>JPG</value></data>
+  <data name="ImageConvertQuality" xml:space="preserve"><value>JPG 品質（1-100）</value></data>
+  <data name="ImageConvertResize" xml:space="preserve"><value>調整大小</value></data>
+  <data name="ImageConvertWidth" xml:space="preserve"><value>寬度（px）</value></data>
+  <data name="ImageConvertHeight" xml:space="preserve"><value>高度（px）</value></data>
+  <data name="ImageConvertKeepAspect" xml:space="preserve"><value>保持長寬比</value></data>
+  <data name="ImageConvertInterpolation" xml:space="preserve"><value>插值</value></data>
+  <data name="ImageConvertInterpolationFant" xml:space="preserve"><value>Fant（高品質）</value></data>
+  <data name="ImageConvertInterpolationCubic" xml:space="preserve"><value>Cubic（雙三次）</value></data>
+  <data name="ImageConvertInterpolationLinear" xml:space="preserve"><value>Linear（雙線性）</value></data>
+  <data name="ImageConvertInterpolationNearest" xml:space="preserve"><value>Nearest Neighbor（最近鄰）</value></data>
+  <data name="ImageConvertExtractFrames" xml:space="preserve"><value>擷取動畫幀（{0}）</value></data>
+  <data name="ImageConvertAnimatedHint" xml:space="preserve"><value>選取後會將每個幀儲存為個別檔案。未選取時只會轉換第一個幀。</value></data>
+  <data name="ImageConvertOutputSuffixHint" xml:space="preserve"><value>輸出檔案會儲存在相同資料夾，並加上 _convert 後綴。</value></data>
+  <data name="ImageConvertInvalidSize" xml:space="preserve"><value>寬度和高度必須是大於等於 1 的整數像素值。</value></data>
+  <data name="ImageConvertInvalidQuality" xml:space="preserve"><value>JPG 品質必須是 1 到 100 之間的整數。</value></data>
+  <data name="ImageConvertConvertButton" xml:space="preserve"><value>轉換</value></data>
+  <data name="ImageConvertCancelButton" xml:space="preserve"><value>取消</value></data>
+  <data name="ImageConvertCloseButton" xml:space="preserve"><value>確定</value></data>
+  <data name="ImageConvertOverwriteTitle" xml:space="preserve"><value>覆寫輸出檔案</value></data>
+  <data name="ImageConvertOverwriteMessage" xml:space="preserve"><value>已有 {0} 個輸出檔案。是否覆寫？&#xA;範例：{1}</value></data>
+  <data name="ImageConvertOverwriteButton" xml:space="preserve"><value>覆寫</value></data>
+  <data name="ImageConvertSuccessTitle" xml:space="preserve"><value>圖片轉換完成</value></data>
+  <data name="ImageConvertSuccessMessage" xml:space="preserve"><value>圖片轉換已完成。&#xA;已儲存 {0} 個檔案&#xA;範例：{1}</value></data>
+  <data name="ImageConvertErrorTitle" xml:space="preserve"><value>圖片轉換錯誤</value></data>
 </root>

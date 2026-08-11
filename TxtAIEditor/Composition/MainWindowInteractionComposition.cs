@@ -164,6 +164,10 @@ namespace TxtAIEditor.Composition
                 callbacks.NavigateExplorerToFolderAndRevealAsync,
                 workspaceServices.RemoteWorkspaceService);
 
+            var imageConversion = new ImageConversionController(
+                callbacks.GetLocalizedString,
+                callbacks.GetCurrentElementTheme);
+
             var tabContextMenu = new TabContextMenuController(
                 favoritesRecent,
                 callbacks.GetLocalizedString,
@@ -182,7 +186,8 @@ namespace TxtAIEditor.Composition
                 tabNavigation.GetTabViewForItem,
                 callbacks.OpenNotebookSourceTabAsync,
                 callbacks.OpenNotebookViewerTabAsync,
-                callbacks.OpenTabInNewWindowAsync);
+                callbacks.OpenTabInNewWindowAsync,
+                imageConversion.ShowAsync);
 
             var fileOpenDrop = new FileOpenDropController(
                 ui.DragOverlay,

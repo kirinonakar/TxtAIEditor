@@ -3908,4 +3908,34 @@ Plan: {0}</value>
   <data name="SettingsKeepInTrayOnClose" xml:space="preserve"><value>Keep in system tray when closing</value></data>
   <data name="TrayMenuOpen" xml:space="preserve"><value>Open</value></data>
   <data name="TrayMenuClose" xml:space="preserve"><value>Close</value></data>
+  <data name="TabMenuImageConvert" xml:space="preserve"><value>Image Convert</value></data>
+  <data name="ImageConvertDialogTitle" xml:space="preserve"><value>Image Conversion - {0}</value></data>
+  <data name="ImageConvertSourceInfo" xml:space="preserve"><value>Source: {0}&#xA;Size: {1} × {2}px · Frames: {3}</value></data>
+  <data name="ImageConvertFormat" xml:space="preserve"><value>Output format</value></data>
+  <data name="ImageConvertFormatPng" xml:space="preserve"><value>PNG</value></data>
+  <data name="ImageConvertFormatJpg" xml:space="preserve"><value>JPG</value></data>
+  <data name="ImageConvertQuality" xml:space="preserve"><value>JPG quality (1-100)</value></data>
+  <data name="ImageConvertResize" xml:space="preserve"><value>Resize</value></data>
+  <data name="ImageConvertWidth" xml:space="preserve"><value>Width (px)</value></data>
+  <data name="ImageConvertHeight" xml:space="preserve"><value>Height (px)</value></data>
+  <data name="ImageConvertKeepAspect" xml:space="preserve"><value>Keep aspect ratio</value></data>
+  <data name="ImageConvertInterpolation" xml:space="preserve"><value>Interpolation</value></data>
+  <data name="ImageConvertInterpolationFant" xml:space="preserve"><value>Fant (high quality)</value></data>
+  <data name="ImageConvertInterpolationCubic" xml:space="preserve"><value>Cubic (bicubic)</value></data>
+  <data name="ImageConvertInterpolationLinear" xml:space="preserve"><value>Linear (bilinear)</value></data>
+  <data name="ImageConvertInterpolationNearest" xml:space="preserve"><value>Nearest neighbor</value></data>
+  <data name="ImageConvertExtractFrames" xml:space="preserve"><value>Extract animation frames ({0})</value></data>
+  <data name="ImageConvertAnimatedHint" xml:space="preserve"><value>When selected, each frame is saved as a separate file. Otherwise, only the first frame is converted.</value></data>
+  <data name="ImageConvertOutputSuffixHint" xml:space="preserve"><value>Output files are saved in the same folder with the _convert suffix.</value></data>
+  <data name="ImageConvertInvalidSize" xml:space="preserve"><value>Width and height must be integer pixel values of 1 or greater.</value></data>
+  <data name="ImageConvertInvalidQuality" xml:space="preserve"><value>JPG quality must be an integer between 1 and 100.</value></data>
+  <data name="ImageConvertConvertButton" xml:space="preserve"><value>Convert</value></data>
+  <data name="ImageConvertCancelButton" xml:space="preserve"><value>Cancel</value></data>
+  <data name="ImageConvertCloseButton" xml:space="preserve"><value>OK</value></data>
+  <data name="ImageConvertOverwriteTitle" xml:space="preserve"><value>Overwrite output files</value></data>
+  <data name="ImageConvertOverwriteMessage" xml:space="preserve"><value>{0} output file(s) already exist. Overwrite them?&#xA;Example: {1}</value></data>
+  <data name="ImageConvertOverwriteButton" xml:space="preserve"><value>Overwrite</value></data>
+  <data name="ImageConvertSuccessTitle" xml:space="preserve"><value>Image conversion complete</value></data>
+  <data name="ImageConvertSuccessMessage" xml:space="preserve"><value>Image conversion completed.&#xA;Saved {0} file(s)&#xA;Example: {1}</value></data>
+  <data name="ImageConvertErrorTitle" xml:space="preserve"><value>Image conversion error</value></data>
 </root>
