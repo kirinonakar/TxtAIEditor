@@ -1440,45 +1440,63 @@ namespace TxtAIEditor.Controls
             string downloadStatusPrefix = _getString("RemoteDownloadingStatus", "다운로드 중...");
             bool isCompleted = false;
             int totalItems = selectedItems.Count;
+            double[] itemProgress = new double[totalItems];
+            object progressSync = new();
 
             try
             {
-                for (int index = 0; index < totalItems; index++)
+                Task[] downloadTasks = selectedItems.Select(async (item, index) =>
                 {
                     cts.Token.ThrowIfCancellationRequested();
-                    ExplorerItem item = selectedItems[index];
-                    _statusBar.ShowProgress(
-                        FormatRemoteTransferStatus(
-                            downloadStatusPrefix,
-                            item.Name,
-                            totalItems - index,
-                            totalItems),
-                        0,
-                        () => cts.Cancel());
-
-                    await _remoteWorkspaceService.DownloadRemoteItemToFolderAsync(
-                        item.Path,
-                        item.IsFolder,
-                        targetLocalDirectory,
-                        (currentFile, remainingFiles, totalFiles, percent) =>
-                        {
-                            if (!isCompleted && !cts.IsCancellationRequested)
+                    try
+                    {
+                        await _remoteWorkspaceService.DownloadRemoteItemToFolderAsync(
+                            item.Path,
+                            item.IsFolder,
+                            targetLocalDirectory,
+                            (currentFile, remainingFiles, totalFiles, percent) =>
                             {
-                                int remainingItems = percent >= 100.0
-                                    ? totalItems - index - 1
-                                    : totalItems - index;
+                                if (isCompleted || cts.IsCancellationRequested)
+                                {
+                                    return;
+                                }
+
+                                double boundedPercent = Math.Clamp(percent, 0.0, 100.0);
+                                double currentItemProgress = totalFiles <= 0
+                                    ? 100.0
+                                    : (totalFiles - remainingFiles +
+                                        (boundedPercent >= 100.0 ? 0.0 : boundedPercent / 100.0)) /
+                                        totalFiles * 100.0;
+                                double overallProgress;
+                                int remainingItems;
+                                lock (progressSync)
+                                {
+                                    itemProgress[index] = Math.Max(
+                                        itemProgress[index],
+                                        Math.Clamp(currentItemProgress, 0.0, 100.0));
+                                    overallProgress = itemProgress.Average();
+                                    remainingItems = itemProgress.Count(value => value < 100.0);
+                                }
+
                                 _statusBar.ShowProgress(
                                     FormatRemoteTransferStatus(
                                         downloadStatusPrefix,
                                         string.IsNullOrWhiteSpace(currentFile) ? item.Name : currentFile,
                                         remainingItems,
                                         totalItems),
-                                    percent,
+                                    overallProgress,
                                     () => cts.Cancel());
-                            }
-                        },
-                        cts.Token);
-                }
+                            },
+                            cts.Token);
+                    }
+                    catch
+                    {
+                        cts.Cancel();
+                        throw;
+                    }
+                }).ToArray();
+
+                await Task.WhenAll(downloadTasks);
             }
             catch (OperationCanceledException)
             {
@@ -1540,6 +1558,8 @@ namespace TxtAIEditor.Controls
                 }
 
                 int totalFiles = uploadFiles.Count;
+                double[] fileProgress = new double[totalFiles];
+                object progressSync = new();
                 _statusBar.ShowProgress(
                     FormatRemoteTransferStatus(
                         uploadStatusPrefix,
@@ -1549,44 +1569,54 @@ namespace TxtAIEditor.Controls
                     0,
                     () => cts.Cancel());
 
-                for (int index = 0; index < totalFiles; index++)
+                Task[] uploadTasks = uploadFiles.Select(async (file, index) =>
                 {
                     cts.Token.ThrowIfCancellationRequested();
-                    var file = uploadFiles[index];
                     string targetVirtualPath = RemotePath.Combine(
                         targetDirectory,
                         file.Name);
-                    double lastFilePercent = 0.0;
-                    await _remoteWorkspaceService.UploadLocalFileAsync(
-                        file.Path,
-                        targetVirtualPath,
-                        percent =>
-                        {
-                            if (!isCompleted && !cts.IsCancellationRequested)
+                    try
+                    {
+                        await _remoteWorkspaceService.UploadLocalFileAsync(
+                            file.Path,
+                            targetVirtualPath,
+                            percent =>
                             {
-                                double boundedFilePercent = Math.Clamp(
-                                    percent,
-                                    0.0,
-                                    100.0);
-                                double displayPercent = Math.Max(
-                                    boundedFilePercent,
-                                    lastFilePercent);
-                                lastFilePercent = displayPercent;
-                                int remainingFiles = boundedFilePercent >= 100.0
-                                    ? totalFiles - index - 1
-                                    : totalFiles - index;
+                                if (isCompleted || cts.IsCancellationRequested)
+                                {
+                                    return;
+                                }
+
+                                double overallProgress;
+                                int remainingFiles;
+                                lock (progressSync)
+                                {
+                                    fileProgress[index] = Math.Max(
+                                        fileProgress[index],
+                                        Math.Clamp(percent, 0.0, 100.0));
+                                    overallProgress = fileProgress.Average();
+                                    remainingFiles = fileProgress.Count(value => value < 100.0);
+                                }
+
                                 _statusBar.ShowProgress(
                                     FormatRemoteTransferStatus(
                                         uploadStatusPrefix,
                                         file.Name,
                                         remainingFiles,
                                         totalFiles),
-                                    displayPercent,
+                                    overallProgress,
                                     () => cts.Cancel());
-                            }
-                        },
-                        cts.Token);
-                }
+                            },
+                            cts.Token);
+                    }
+                    catch
+                    {
+                        cts.Cancel();
+                        throw;
+                    }
+                }).ToArray();
+
+                await Task.WhenAll(uploadTasks);
 
                 await _refreshRemoteExplorerAsync();
             }

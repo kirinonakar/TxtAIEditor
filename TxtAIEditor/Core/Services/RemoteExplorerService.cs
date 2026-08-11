@@ -18,6 +18,11 @@ namespace TxtAIEditor.Core.Services
 {
     public sealed class RemoteExplorerService
     {
+        private const int MaxConcurrentFileTransfers = 3;
+        private readonly SemaphoreSlim _fileTransferSemaphore = new(
+            MaxConcurrentFileTransfers,
+            MaxConcurrentFileTransfers);
+
         public async Task<IReadOnlyList<RemoteDirectoryEntry>> ListDirectoryAsync(
             RemoteConnectionSettings connection,
             string path,
@@ -47,27 +52,35 @@ namespace TxtAIEditor.Core.Services
             string localPath = CreateCachePath(connection.Profile.Id, entry);
             Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
 
-            switch (connection.Profile.ServerType)
+            await _fileTransferSemaphore.WaitAsync(cancellationToken);
+            try
             {
-                case RemoteServerType.Ssh:
-                    await DownloadScpAsync(connection, entry.FullPath, localPath, cancellationToken);
-                    break;
-                case RemoteServerType.Sftp:
-                    await DownloadSftpAsync(connection, entry.FullPath, localPath, cancellationToken);
-                    break;
-                case RemoteServerType.Ftps:
-                    await DownloadFtpsAsync(connection, entry.FullPath, localPath, cancellationToken);
-                    break;
-                case RemoteServerType.WebDav:
-                    await DownloadWebDavAsync(connection, entry.FullPath, localPath, cancellationToken);
-                    break;
-                case RemoteServerType.Wsl:
-                    await CopyWslFileAsync(
-                        GetWslFileSystemPath(connection, entry.FullPath),
-                        localPath,
-                        overwrite: true,
-                        cancellationToken);
-                    break;
+                switch (connection.Profile.ServerType)
+                {
+                    case RemoteServerType.Ssh:
+                        await DownloadScpAsync(connection, entry.FullPath, localPath, cancellationToken);
+                        break;
+                    case RemoteServerType.Sftp:
+                        await DownloadSftpAsync(connection, entry.FullPath, localPath, cancellationToken);
+                        break;
+                    case RemoteServerType.Ftps:
+                        await DownloadFtpsAsync(connection, entry.FullPath, localPath, cancellationToken);
+                        break;
+                    case RemoteServerType.WebDav:
+                        await DownloadWebDavAsync(connection, entry.FullPath, localPath, cancellationToken);
+                        break;
+                    case RemoteServerType.Wsl:
+                        await CopyWslFileAsync(
+                            GetWslFileSystemPath(connection, entry.FullPath),
+                            localPath,
+                            overwrite: true,
+                            cancellationToken);
+                        break;
+                }
+            }
+            finally
+            {
+                _fileTransferSemaphore.Release();
             }
 
             return localPath;
@@ -82,27 +95,35 @@ namespace TxtAIEditor.Core.Services
         {
             Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
 
-            switch (connection.Profile.ServerType)
+            await _fileTransferSemaphore.WaitAsync(cancellationToken);
+            try
             {
-                case RemoteServerType.Ssh:
-                    await DownloadScpWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
-                    break;
-                case RemoteServerType.Sftp:
-                    await DownloadSftpWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
-                    break;
-                case RemoteServerType.Ftps:
-                    await DownloadFtpsWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
-                    break;
-                case RemoteServerType.WebDav:
-                    await DownloadWebDavWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
-                    break;
-                case RemoteServerType.Wsl:
-                    await CopyWslFileWithProgressAsync(
-                        GetWslFileSystemPath(connection, remotePath),
-                        localPath,
-                        progress,
-                        cancellationToken);
-                    break;
+                switch (connection.Profile.ServerType)
+                {
+                    case RemoteServerType.Ssh:
+                        await DownloadScpWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
+                        break;
+                    case RemoteServerType.Sftp:
+                        await DownloadSftpWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
+                        break;
+                    case RemoteServerType.Ftps:
+                        await DownloadFtpsWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
+                        break;
+                    case RemoteServerType.WebDav:
+                        await DownloadWebDavWithProgressAsync(connection, remotePath, localPath, progress, cancellationToken);
+                        break;
+                    case RemoteServerType.Wsl:
+                        await CopyWslFileWithProgressAsync(
+                            GetWslFileSystemPath(connection, remotePath),
+                            localPath,
+                            progress,
+                            cancellationToken);
+                        break;
+                }
+            }
+            finally
+            {
+                _fileTransferSemaphore.Release();
             }
         }
 
@@ -161,15 +182,15 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            for (int i = 0; i < totalFiles; i++)
+            int completedFiles = 0;
+            Task[] downloadTasks = filesToDownload.Select(async file =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var (remFile, locFile, _) = filesToDownload[i];
+                var (remFile, locFile, _) = file;
                 string fileName = Path.GetFileName(remFile);
                 double lastFilePercent = 0.0;
                 progressCallback?.Invoke(
                     fileName,
-                    totalFiles - i,
+                    totalFiles - Volatile.Read(ref completedFiles),
                     totalFiles,
                     0.0);
 
@@ -180,18 +201,23 @@ namespace TxtAIEditor.Core.Services
                         boundedFilePercent,
                         lastFilePercent);
                     lastFilePercent = displayPercent;
-                    int remainingFiles = boundedFilePercent >= 100.0
-                        ? totalFiles - i - 1
-                        : totalFiles - i;
                     progressCallback?.Invoke(
                         fileName,
-                        remainingFiles,
+                        totalFiles - Volatile.Read(ref completedFiles),
                         totalFiles,
                         displayPercent);
                 });
 
                 await DownloadFileToPathAsync(connection, remFile, locFile, fileProgress, cancellationToken);
-            }
+                int completed = Interlocked.Increment(ref completedFiles);
+                progressCallback?.Invoke(
+                    fileName,
+                    totalFiles - completed,
+                    totalFiles,
+                    100.0);
+            }).ToArray();
+
+            await Task.WhenAll(downloadTasks);
 
             progressCallback?.Invoke(
                 Path.GetFileName(targetLocalFolderPath),
@@ -221,69 +247,77 @@ namespace TxtAIEditor.Core.Services
             IProgress<double>? progress,
             CancellationToken cancellationToken)
         {
-            progress?.Report(0.0);
-            switch (connection.Profile.ServerType)
+            await _fileTransferSemaphore.WaitAsync(cancellationToken);
+            try
             {
-                case RemoteServerType.Ssh:
-                    await UploadScpWithProgressAsync(
-                        connection,
-                        localPath,
-                        remotePath,
-                        progress,
-                        cancellationToken);
-                    break;
-                case RemoteServerType.Sftp:
-                    await RunSftpAsync(connection, client =>
-                    {
-                        using FileStream input = new(localPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                        ulong totalSize = (ulong)Math.Max(1, input.Length);
-                        client.UploadFile(
-                            input,
-                            remotePath,
-                            canOverride: true,
-                            uploaded => progress?.Report((double)uploaded * 100.0 / totalSize));
-                    }, cancellationToken);
-                    break;
-                case RemoteServerType.Ftps:
-                    await RunFtpsAsync(connection, client =>
-                    {
-                        Action<FtpProgress>? ftpProgress = progress != null
-                            ? value => progress.Report(value.Progress)
-                            : null;
-                        FtpStatus status = client.UploadFile(
+                progress?.Report(0.0);
+                switch (connection.Profile.ServerType)
+                {
+                    case RemoteServerType.Ssh:
+                        await UploadScpWithProgressAsync(
+                            connection,
                             localPath,
                             remotePath,
-                            FtpRemoteExists.Overwrite,
-                            createRemoteDir: false,
-                            FtpVerify.None,
-                            ftpProgress);
-                        if (status != FtpStatus.Success)
+                            progress,
+                            cancellationToken);
+                        break;
+                    case RemoteServerType.Sftp:
+                        await RunSftpAsync(connection, client =>
                         {
-                            throw new IOException($"FTPS upload failed: {status}");
+                            using FileStream input = new(localPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                            ulong totalSize = (ulong)Math.Max(1, input.Length);
+                            client.UploadFile(
+                                input,
+                                remotePath,
+                                canOverride: true,
+                                uploaded => progress?.Report((double)uploaded * 100.0 / totalSize));
+                        }, cancellationToken);
+                        break;
+                    case RemoteServerType.Ftps:
+                        await RunFtpsAsync(connection, client =>
+                        {
+                            Action<FtpProgress>? ftpProgress = progress != null
+                                ? value => progress.Report(value.Progress)
+                                : null;
+                            FtpStatus status = client.UploadFile(
+                                localPath,
+                                remotePath,
+                                FtpRemoteExists.Overwrite,
+                                createRemoteDir: false,
+                                FtpVerify.None,
+                                ftpProgress);
+                            if (status != FtpStatus.Success)
+                            {
+                                throw new IOException($"FTPS upload failed: {status}");
+                            }
+                        }, cancellationToken);
+                        break;
+                    case RemoteServerType.WebDav:
+                        using (HttpClient client = CreateWebDavClient(connection))
+                        await using (FileStream input = new(localPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                        using (ProgressHttpContent content = new(input, progress))
+                        using (HttpResponseMessage response = await client.PutAsync(
+                            BuildWebDavUri(connection, remotePath),
+                            content,
+                            cancellationToken))
+                        {
+                            response.EnsureSuccessStatusCode();
                         }
-                    }, cancellationToken);
-                    break;
-                case RemoteServerType.WebDav:
-                    using (HttpClient client = CreateWebDavClient(connection))
-                    await using (FileStream input = new(localPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-                    using (ProgressHttpContent content = new(input, progress))
-                    using (HttpResponseMessage response = await client.PutAsync(
-                        BuildWebDavUri(connection, remotePath),
-                        content,
-                        cancellationToken))
-                    {
-                        response.EnsureSuccessStatusCode();
-                    }
-                    break;
-                case RemoteServerType.Wsl:
-                    await CopyWslFileWithProgressAsync(
-                        localPath,
-                        GetWslFileSystemPath(connection, remotePath),
-                        progress,
-                        cancellationToken);
-                    break;
+                        break;
+                    case RemoteServerType.Wsl:
+                        await CopyWslFileWithProgressAsync(
+                            localPath,
+                            GetWslFileSystemPath(connection, remotePath),
+                            progress,
+                            cancellationToken);
+                        break;
+                }
+                progress?.Report(100.0);
             }
-            progress?.Report(100.0);
+            finally
+            {
+                _fileTransferSemaphore.Release();
+            }
         }
 
         public async Task CreateDirectoryAsync(
