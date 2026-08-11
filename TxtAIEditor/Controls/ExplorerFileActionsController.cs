@@ -639,19 +639,20 @@ namespace TxtAIEditor.Controls
 
             bool canDelete = selectedItems.Count > 0 && selectedItems.All(CanDeleteItem);
 
-            bool canTransferRemote = hasSingleItem && IsRemoteExplorerItem(item);
-            SetMenuVisibility(flyout, 15, canConvertImages || canTransferRemote);
+            bool canDownloadRemote = selectedItems.Count > 0 && selectedItems.All(IsRemoteExplorerItem);
+            bool canUploadRemote = hasSingleItem && canDownloadRemote;
+            SetMenuVisibility(flyout, 15, canConvertImages || canDownloadRemote);
             if (flyout.Items.Count > 16 && flyout.Items[16] is MenuFlyoutItem downloadRemoteItem)
             {
-                downloadRemoteItem.Visibility = canTransferRemote ? Visibility.Visible : Visibility.Collapsed;
+                downloadRemoteItem.Visibility = canDownloadRemote ? Visibility.Visible : Visibility.Collapsed;
             }
 
             if (flyout.Items.Count > 17 && flyout.Items[17] is MenuFlyoutItem uploadRemoteItem)
             {
-                uploadRemoteItem.Visibility = canTransferRemote ? Visibility.Visible : Visibility.Collapsed;
+                uploadRemoteItem.Visibility = canUploadRemote ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            SetMenuVisibility(flyout, 18, canTransferRemote);
+            SetMenuVisibility(flyout, 18, canDownloadRemote);
 
             if (flyout.Items.Count > 19 && flyout.Items[19] is MenuFlyoutItem copyFileNameItem)
             {
@@ -1415,8 +1416,10 @@ namespace TxtAIEditor.Controls
 
         private async void OnDownloadRemoteItemClick(object sender, RoutedEventArgs e)
         {
-            ExplorerItem? item = GetExplorerItem(sender);
-            if (item == null || !IsRemoteExplorerItem(item))
+            IReadOnlyList<ExplorerItem> selectedItems = GetSelectedExplorerItems(sender)
+                .Where(IsRemoteExplorerItem)
+                .ToList();
+            if (selectedItems.Count == 0)
             {
                 return;
             }
@@ -1436,33 +1439,46 @@ namespace TxtAIEditor.Controls
 
             string downloadStatusPrefix = _getString("RemoteDownloadingStatus", "다운로드 중...");
             bool isCompleted = false;
+            int totalItems = selectedItems.Count;
 
             try
             {
-                _statusBar.ShowProgress(
-                    $"{downloadStatusPrefix} ({item.Name})",
-                    0,
-                    () => cts.Cancel());
+                for (int index = 0; index < totalItems; index++)
+                {
+                    cts.Token.ThrowIfCancellationRequested();
+                    ExplorerItem item = selectedItems[index];
+                    _statusBar.ShowProgress(
+                        FormatRemoteTransferStatus(
+                            downloadStatusPrefix,
+                            item.Name,
+                            totalItems - index,
+                            totalItems),
+                        0,
+                        () => cts.Cancel());
 
-                await _remoteWorkspaceService.DownloadRemoteItemToFolderAsync(
-                    item.Path,
-                    item.IsFolder,
-                    targetLocalDirectory,
-                    (currentFile, remainingFiles, totalFiles, percent) =>
-                    {
-                        if (!isCompleted && !cts.IsCancellationRequested)
+                    await _remoteWorkspaceService.DownloadRemoteItemToFolderAsync(
+                        item.Path,
+                        item.IsFolder,
+                        targetLocalDirectory,
+                        (currentFile, remainingFiles, totalFiles, percent) =>
                         {
-                            _statusBar.ShowProgress(
-                                FormatRemoteTransferStatus(
-                                    downloadStatusPrefix,
-                                    currentFile,
-                                    remainingFiles,
-                                    totalFiles),
-                                percent,
-                                () => cts.Cancel());
-                        }
-                    },
-                    cts.Token);
+                            if (!isCompleted && !cts.IsCancellationRequested)
+                            {
+                                int remainingItems = percent >= 100.0
+                                    ? totalItems - index - 1
+                                    : totalItems - index;
+                                _statusBar.ShowProgress(
+                                    FormatRemoteTransferStatus(
+                                        downloadStatusPrefix,
+                                        string.IsNullOrWhiteSpace(currentFile) ? item.Name : currentFile,
+                                        remainingItems,
+                                        totalItems),
+                                    percent,
+                                    () => cts.Cancel());
+                            }
+                        },
+                        cts.Token);
+                }
             }
             catch (OperationCanceledException)
             {
