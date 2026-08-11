@@ -321,6 +321,7 @@
                                                                 <FontIcon Glyph="&#xE122;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
+                                                        <MenuFlyoutSeparator/>
                                                         <MenuFlyoutItem x:Name="ExplorerExtractArchiveToFolderMenuItem" Text="폴더에 풀기" Click="OnExtractArchiveToFolderClick" Tag="{Binding}">
                                                             <MenuFlyoutItem.Icon>
                                                                 <FontIcon Glyph="&#xE896;" FontSize="12"/>
@@ -336,11 +337,13 @@
                                                                 <FontIcon Glyph="&#xE7B8;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
+                                                        <MenuFlyoutSeparator/>
                                                         <MenuFlyoutItem Text="" Click="OnImageConversionClick" Tag="{Binding}">
                                                             <MenuFlyoutItem.Icon>
                                                                 <FontIcon Glyph="&#xE91B;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
+                                                        <MenuFlyoutSeparator/>
                                                         <MenuFlyoutItem x:Name="ExplorerDownloadRemoteMenuItem" Visibility="Collapsed" Text="다운로드" Click="OnDownloadRemoteItemClick" Tag="{Binding}">
                                                             <MenuFlyoutItem.Icon>
                                                                 <FontIcon Glyph="&#xE896;" FontSize="12"/>
@@ -412,6 +415,7 @@
                                                                 <FontIcon Glyph="&#xE163;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
+                                                        <MenuFlyoutSeparator/>
                                                         <MenuFlyoutItem Text="폴더에 풀기" Click="OnExtractArchiveToFolderClick" Tag="{Binding Content}">
                                                             <MenuFlyoutItem.Icon>
                                                                 <FontIcon Glyph="&#xE896;" FontSize="12"/>
@@ -427,11 +431,13 @@
                                                                 <FontIcon Glyph="&#xE7B8;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
+                                                        <MenuFlyoutSeparator/>
                                                         <MenuFlyoutItem Text="" Click="OnImageConversionClick" Tag="{Binding Content}">
                                                             <MenuFlyoutItem.Icon>
                                                                 <FontIcon Glyph="&#xE91B;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
+                                                        <MenuFlyoutSeparator/>
                                                         <MenuFlyoutItem x:Name="ExplorerTreeDownloadRemoteMenuItem" Visibility="Collapsed" Text="다운로드" Click="OnDownloadRemoteItemClick" Tag="{Binding Content}">
                                                             <MenuFlyoutItem.Icon>
                                                                 <FontIcon Glyph="&#xE896;" FontSize="12"/>

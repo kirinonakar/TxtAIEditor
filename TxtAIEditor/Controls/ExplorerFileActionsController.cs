@@ -552,17 +552,17 @@ namespace TxtAIEditor.Controls
             SetMenuText(flyout, 6, "ExplorerInsertMarkdownImage", "마크다운 삽입");
             SetMenuText(flyout, 7, "OpenExternalViewerTooltip", "외부 뷰어로 열기");
             SetMenuText(flyout, 8, "OpenWithDefaultProgramTooltip", "기본 프로그램으로 열기");
-            SetMenuText(flyout, 9, "ExplorerExtractArchiveToFolder", "폴더에 풀기");
-            SetMenuText(flyout, 10, "ExplorerCompressFolderToZip", "ZIP으로 압축하기");
-            SetMenuText(flyout, 11, "ExplorerCompressFolderToSevenZip", "7z로 압축하기");
-            SetMenuText(flyout, 12, "ExplorerConvertImage", "이미지 변환");
-            SetMenuText(flyout, 13, "ExplorerDownload", "다운로드");
-            SetMenuText(flyout, 14, "ExplorerUpload", "업로드");
-            SetMenuText(flyout, 16, "ExplorerCopyFileName", "파일이름 복사");
-            SetMenuText(flyout, 17, "ExplorerCopyFilePath", "경로 복사");
-            SetMenuText(flyout, 18, "ExplorerCopyFolderPath", "폴더 경로 복사");
-            SetMenuText(flyout, 20, "ExplorerRename", "이름 바꾸기");
-            SetMenuText(flyout, 21, "ExplorerDelete", "삭제");
+            SetMenuText(flyout, 10, "ExplorerExtractArchiveToFolder", "폴더에 풀기");
+            SetMenuText(flyout, 11, "ExplorerCompressFolderToZip", "ZIP으로 압축하기");
+            SetMenuText(flyout, 12, "ExplorerCompressFolderToSevenZip", "7z로 압축하기");
+            SetMenuText(flyout, 14, "ExplorerConvertImage", "이미지 변환");
+            SetMenuText(flyout, 16, "ExplorerDownload", "다운로드");
+            SetMenuText(flyout, 17, "ExplorerUpload", "업로드");
+            SetMenuText(flyout, 19, "ExplorerCopyFileName", "파일이름 복사");
+            SetMenuText(flyout, 20, "ExplorerCopyFilePath", "경로 복사");
+            SetMenuText(flyout, 21, "ExplorerCopyFolderPath", "폴더 경로 복사");
+            SetMenuText(flyout, 23, "ExplorerRename", "이름 바꾸기");
+            SetMenuText(flyout, 24, "ExplorerDelete", "삭제");
         }
 
         private void ConfigureContextFlyout(
@@ -610,7 +610,7 @@ namespace TxtAIEditor.Controls
             }
 
             bool canExtractArchive = hasSingleItem && IsSupportedArchiveFile(item);
-            if (flyout.Items.Count > 9 && flyout.Items[9] is MenuFlyoutItem extractArchiveItem)
+            if (flyout.Items.Count > 10 && flyout.Items[10] is MenuFlyoutItem extractArchiveItem)
             {
                 extractArchiveItem.Visibility = canExtractArchive ? Visibility.Visible : Visibility.Collapsed;
                 if (canExtractArchive && item != null)
@@ -622,59 +622,63 @@ namespace TxtAIEditor.Controls
             }
 
             bool canCompress = selectedItems.Count > 0 && selectedItems.All(CanCompressItem);
-            if (flyout.Items.Count > 10 && flyout.Items[10] is MenuFlyoutItem compressToZipItem)
+            SetMenuVisibility(flyout, 9, canExtractArchive || canCompress);
+            if (flyout.Items.Count > 11 && flyout.Items[11] is MenuFlyoutItem compressToZipItem)
             {
                 compressToZipItem.Visibility = canCompress ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 11 && flyout.Items[11] is MenuFlyoutItem compressToSevenZipItem)
+            if (flyout.Items.Count > 12 && flyout.Items[12] is MenuFlyoutItem compressToSevenZipItem)
             {
                 compressToSevenZipItem.Visibility = canCompress ? Visibility.Visible : Visibility.Collapsed;
             }
 
             bool canConvertImages = selectedItems.Count > 0 && selectedItems.All(CanConvertImageItem);
-            SetMenuVisibility(flyout, 12, canConvertImages);
+            SetMenuVisibility(flyout, 13, canExtractArchive || canCompress);
+            SetMenuVisibility(flyout, 14, canConvertImages);
 
             bool canDelete = selectedItems.Count > 0 && selectedItems.All(CanDeleteItem);
 
-            bool canDownloadRemote = hasSingleItem && item != null && item.IsRemote;
-            if (flyout.Items.Count > 13 && flyout.Items[13] is MenuFlyoutItem downloadRemoteItem)
+            bool canTransferRemote = hasSingleItem && IsRemoteExplorerItem(item);
+            SetMenuVisibility(flyout, 15, canConvertImages || canTransferRemote);
+            if (flyout.Items.Count > 16 && flyout.Items[16] is MenuFlyoutItem downloadRemoteItem)
             {
-                downloadRemoteItem.Visibility = canDownloadRemote ? Visibility.Visible : Visibility.Collapsed;
+                downloadRemoteItem.Visibility = canTransferRemote ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 14 && flyout.Items[14] is MenuFlyoutItem uploadRemoteItem)
+            if (flyout.Items.Count > 17 && flyout.Items[17] is MenuFlyoutItem uploadRemoteItem)
             {
-                uploadRemoteItem.Visibility = canDownloadRemote ? Visibility.Visible : Visibility.Collapsed;
+                uploadRemoteItem.Visibility = canTransferRemote ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 16 && flyout.Items[16] is MenuFlyoutItem copyFileNameItem)
+            SetMenuVisibility(flyout, 18, canTransferRemote);
+
+            if (flyout.Items.Count > 19 && flyout.Items[19] is MenuFlyoutItem copyFileNameItem)
             {
                 copyFileNameItem.Visibility = hasSingleItem ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 17 && flyout.Items[17] is MenuFlyoutItem copyFilePathItem)
+            if (flyout.Items.Count > 20 && flyout.Items[20] is MenuFlyoutItem copyFilePathItem)
             {
                 copyFilePathItem.Visibility = hasSingleItem ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 18 && flyout.Items[18] is MenuFlyoutItem copyFolderPathItem)
+            if (flyout.Items.Count > 21 && flyout.Items[21] is MenuFlyoutItem copyFolderPathItem)
             {
                 copyFolderPathItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 20 && flyout.Items[20] is MenuFlyoutItem renameItem)
+            if (flyout.Items.Count > 23 && flyout.Items[23] is MenuFlyoutItem renameItem)
             {
                 renameItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 21 && flyout.Items[21] is MenuFlyoutItem deleteItem)
+            if (flyout.Items.Count > 24 && flyout.Items[24] is MenuFlyoutItem deleteItem)
             {
                 deleteItem.Visibility = canDelete ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            SetMenuVisibility(flyout, 15, hasSingleItem);
-            SetMenuVisibility(flyout, 19, hasSingleItem || canDelete);
+            SetMenuVisibility(flyout, 22, hasSingleItem || canDelete);
         }
 
         private void SetMenuText(MenuFlyout flyout, int index, string key, string fallback)
@@ -924,6 +928,11 @@ namespace TxtAIEditor.Controls
                    !item.IsArchiveEntry &&
                    !string.IsNullOrWhiteSpace(item.Path) &&
                    (item.IsFolder ? Directory.Exists(item.Path) : File.Exists(item.Path));
+        }
+
+        private static bool IsRemoteExplorerItem(ExplorerItem? item)
+        {
+            return item != null && item.IsRemote && RemotePath.IsRemote(item.Path);
         }
 
         private static bool CanDeleteItem(ExplorerItem item)
@@ -1360,7 +1369,7 @@ namespace TxtAIEditor.Controls
         private async void OnDownloadRemoteItemClick(object sender, RoutedEventArgs e)
         {
             ExplorerItem? item = GetExplorerItem(sender);
-            if (item == null || !item.IsRemote)
+            if (item == null || !IsRemoteExplorerItem(item))
             {
                 return;
             }
@@ -1427,7 +1436,7 @@ namespace TxtAIEditor.Controls
         private async void OnUploadRemoteItemClick(object sender, RoutedEventArgs e)
         {
             ExplorerItem? item = GetExplorerItem(sender);
-            if (item == null || !item.IsRemote)
+            if (item == null || !IsRemoteExplorerItem(item))
             {
                 return;
             }

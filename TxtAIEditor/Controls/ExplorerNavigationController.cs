@@ -46,6 +46,7 @@ namespace TxtAIEditor.Controls
         private bool _isBackNavigation;
         private bool _isForwardNavigation;
         private string _explorerStatusBaseText = string.Empty;
+        private int _treeSelectionCount;
 
         public enum ExplorerSortMode
         {
@@ -132,6 +133,7 @@ namespace TxtAIEditor.Controls
             }
 
             IsTreeMode = enableTreeMode;
+            _treeSelectionCount = 0;
             ClearExplorerFilterState();
             _leftSidebar.SetExplorerTreeMode(IsTreeMode);
             UpdateBackButtonState();
@@ -152,6 +154,7 @@ namespace TxtAIEditor.Controls
 
             if (string.IsNullOrWhiteSpace(CurrentFolderPath) || !Directory.Exists(CurrentFolderPath))
             {
+                _treeSelectionCount = 0;
                 _leftSidebar.ExplorerTree.RootNodes.Clear();
                 return;
             }
@@ -689,10 +692,24 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExplorerTreeItemInvoked += OnExplorerTreeItemInvoked;
             _leftSidebar.FileListViewItemClick += OnFileListViewItemClick;
             _leftSidebar.FileList.SelectionChanged += (_, _) => UpdateExplorerSelectionStatus();
-            _leftSidebar.ExplorerTree.SelectionChanged += (_, _) => UpdateExplorerSelectionStatus();
+            _leftSidebar.ExplorerTree.SelectionChanged += OnExplorerTreeSelectionChanged;
             _leftSidebar.ExplorerFilterTextChanged += OnExplorerFilterTextChanged;
             _leftSidebar.ExplorerHideUnwantedChanged += OnHideUnwantedChanged;
             _leftSidebar.ExplorerBreadcrumb.SegmentClicked += OnExplorerBreadcrumbItemClicked;
+        }
+
+        private void OnExplorerTreeSelectionChanged(
+            Microsoft.UI.Xaml.Controls.TreeView sender,
+            Microsoft.UI.Xaml.Controls.TreeViewSelectionChangedEventArgs args)
+        {
+            _treeSelectionCount += args.AddedItems.Count;
+            _treeSelectionCount -= args.RemovedItems.Count;
+            if (_treeSelectionCount < 0)
+            {
+                _treeSelectionCount = 0;
+            }
+
+            UpdateExplorerSelectionStatus();
         }
 
         private async void OnSelectFolderClick(object sender, RoutedEventArgs e)
@@ -894,6 +911,7 @@ namespace TxtAIEditor.Controls
                 HasUnrealizedChildren = true
             };
 
+            _treeSelectionCount = 0;
             _leftSidebar.ExplorerTree.RootNodes.Clear();
             _leftSidebar.ExplorerTree.RootNodes.Add(rootNode);
             PopulateTreeNode(rootNode);
@@ -946,6 +964,7 @@ namespace TxtAIEditor.Controls
             };
 
             _viewModel.ExplorerItems.Clear();
+            _treeSelectionCount = 0;
             _leftSidebar.ExplorerTree.RootNodes.Clear();
             _leftSidebar.ExplorerTree.RootNodes.Add(rootNode);
             await PopulateRemoteTreeNodeAsync(rootNode, rootItem);
@@ -1652,7 +1671,7 @@ namespace TxtAIEditor.Controls
         private void UpdateExplorerSelectionStatus()
         {
             int selectedCount = IsTreeMode
-                ? _leftSidebar.ExplorerTree.SelectedItems.Count
+                ? _treeSelectionCount
                 : _leftSidebar.FileList.SelectedItems.Count;
             if (selectedCount <= 0)
             {
