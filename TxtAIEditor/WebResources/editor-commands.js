@@ -20,6 +20,7 @@ import {
     measureRenderedRows,
     orderedRange,
     post,
+    preserveCompressedScrollMapping,
     preserveScrollTop,
     queueRender,
     readClipboardText,
@@ -33,6 +34,7 @@ import {
     shiftCachedLines,
     state,
     syncCustomSelectionClass,
+    usesCompressedScroll,
     visualScrollDeltaToScrollTopDelta,
     viewportController,
     writeClipboardText
@@ -365,12 +367,17 @@ function captureSplitScrollAnchor(element, caretOffset) {
     const caretHeight = Math.max(1, Number(caretRect.height || rowHeight));
     const caretViewportTop = caretRect.top - containerRect.top;
     const caretViewportBottom = caretRect.bottom - containerRect.top;
-    const bottomGuard = 3 * rowHeight;
+    const compressedScroll = usesCompressedScroll();
+    // In compressed mode a visual row is represented by only a few scrollTop
+    // pixels. Applying the normal three-row guard therefore makes every Enter
+    // nudge the viewport even while the new caret still fits below. Wait for
+    // the caret to reach the real viewport edge in that mode.
+    const bottomGuard = compressedScroll ? 0 : 3 * rowHeight;
     const guardBottom = Math.max(caretHeight, scrollContainer.clientHeight - bottomGuard);
 
     // Enter must behave like ArrowDown: while there is room below, the caret
-    // moves down by one visual row without scrolling.  Only when that next row
-    // would cross the three-line bottom guard do we keep the caret pinned there.
+    // moves down by one visual row without scrolling. Normal scrolling retains
+    // its three-line guard; compressed scrolling uses the actual viewport edge.
     // The previous implementation called focusLine() before the inserted row was
     // measured, so the virtual lineTop estimate could over-scroll and make the
     // caret jump 6-7 rows upward; repeated Enter then accumulated that error.
@@ -416,7 +423,7 @@ function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, toke
             // feeding that difference back into scrollTop causes a small upward
             // drift that does not happen when splitting an empty line.
             const preservedScrollTop = clampScrollTop(anchor.scrollTop);
-            if (Math.abs(scrollContainer.scrollTop - preservedScrollTop) > 0.5) {
+            if (scrollContainer.scrollTop !== preservedScrollTop) {
                 scrollContainer.scrollTop = preservedScrollTop;
             }
         }
@@ -505,6 +512,7 @@ function splitCurrentLine(element, options = {}) {
     const splitScrollAnchor = useElementCaret
         ? captureSplitScrollAnchor(element, caret)
         : null;
+    const shouldPreserveSplitScrollTop = !!splitScrollAnchor && !splitScrollAnchor.shouldAdjustScroll;
     const virtualScrollAnchor = captureScrollAnchor();
 
     const before = text.slice(0, caret);
@@ -542,8 +550,18 @@ function splitCurrentLine(element, options = {}) {
     selectionController.selection = null;
     clearCustomSelectionVisuals();
     syncCustomSelectionClass();
+    if (shouldPreserveSplitScrollTop && usesCompressedScroll()) {
+        preserveCompressedScrollMapping(virtualScrollAnchor, splitScrollAnchor.scrollTop);
+    }
     setupVirtualHeight();
-    restoreScrollAnchor(virtualScrollAnchor);
+    if (shouldPreserveSplitScrollTop) {
+        // Adding a line changes the logical-line ratio used by compressed
+        // scrolling. Restoring that ratio moves scrollTop upward; keeping the
+        // physical value is the intended behavior while the next row fits.
+        scrollContainer.scrollTop = clampScrollTop(splitScrollAnchor.scrollTop);
+    } else {
+        restoreScrollAnchor(virtualScrollAnchor);
+    }
     post({ type: 'splitLine', lineNumber, before, after: indentedAfter });
     post({ type: 'contentChanged' });
     markLineBoundaryTransition(nextLineNumber, nextCaretColumn);
@@ -562,7 +580,7 @@ function splitCurrentLine(element, options = {}) {
         setCaret(immediateTarget, nextCaretColumn);
     }
 
-    if (splitScrollAnchor && !splitScrollAnchor.shouldAdjustScroll) {
+    if (shouldPreserveSplitScrollTop) {
         scrollContainer.scrollTop = clampScrollTop(splitScrollAnchor.scrollTop);
     }
 

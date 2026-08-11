@@ -60,6 +60,7 @@ const modeCoordinator = new EditorModeCoordinator({
     hexMode: hexEditorMode,
     csvMode: csvTableMode
 });
+let compressedScrollMappingAnchor = null;
 
 const state = {
     lineCount: 1,
@@ -489,6 +490,7 @@ function applyOptions(msg) {
 }
 
 function setupModel(lineCount) {
+    compressedScrollMappingAnchor = null;
     state.lineCount = Math.max(1, Number(lineCount || 1));
     csvTableMode.virtualLineCount = 0;
     state.cache.clear();
@@ -786,7 +788,7 @@ function lineTop(lineNumber) {
         const metrics = compressedScrollMetrics();
         if (metrics.maxScrollTop <= 0 || metrics.maxFirstLine <= 1) return 0;
         const line = Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(Number(lineNumber || 1))));
-        return ((line - 1) / (metrics.maxFirstLine - 1)) * metrics.maxScrollTop;
+        return compressedScrollTopForLinePosition(line - 1, metrics);
     }
 
     let top = (Math.max(1, lineNumber) - 1) * viewportController.lineHeight;
@@ -823,8 +825,8 @@ function lineAt(scrollTop) {
     if (usesCompressedScroll()) {
         const metrics = compressedScrollMetrics();
         if (metrics.maxScrollTop <= 0 || metrics.maxFirstLine <= 1) return 1;
-        const ratio = Math.max(0, Math.min(1, Number(scrollTop || 0) / metrics.maxScrollTop));
-        return Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(ratio * (metrics.maxFirstLine - 1)) + 1));
+        const linePosition = compressedLinePositionAtScrollTop(scrollTop, metrics);
+        return Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(linePosition) + 1));
     }
 
     if (!usesMeasuredLineHeights() || !viewportController.hasMeasuredLineHeights) {
@@ -896,20 +898,95 @@ function compressedScrollMetrics() {
     return { lineCount, maxFirstLine, maxScrollTop, visibleRows, viewHeight };
 }
 
+function activeCompressedScrollMapping(metrics) {
+    const anchor = compressedScrollMappingAnchor;
+    if (!anchor || !metrics) return null;
+    if (anchor.lineCount !== metrics.lineCount ||
+        Math.abs(anchor.maxScrollTop - metrics.maxScrollTop) > 0.5 ||
+        Math.abs(anchor.viewHeight - metrics.viewHeight) > 0.5) {
+        return null;
+    }
+
+    const maxLinePosition = Math.max(0, metrics.maxFirstLine - 1);
+    const linePosition = Math.max(0, Math.min(maxLinePosition, Number(anchor.linePosition || 0)));
+    const scrollTop = Math.max(0, Math.min(metrics.maxScrollTop, Number(anchor.scrollTop || 0)));
+    if (linePosition <= 0 || linePosition >= maxLinePosition ||
+        scrollTop <= 0 || scrollTop >= metrics.maxScrollTop) {
+        return null;
+    }
+
+    return { linePosition, scrollTop, maxLinePosition };
+}
+
+function compressedLinePositionAtScrollTop(scrollTop, metrics = compressedScrollMetrics()) {
+    const maxLinePosition = Math.max(0, metrics.maxFirstLine - 1);
+    if (metrics.maxScrollTop <= 0 || maxLinePosition <= 0) return 0;
+
+    const targetScrollTop = Math.max(0, Math.min(metrics.maxScrollTop, Number(scrollTop || 0)));
+    const mapping = activeCompressedScrollMapping(metrics);
+    if (!mapping) {
+        return (targetScrollTop / metrics.maxScrollTop) * maxLinePosition;
+    }
+
+    if (targetScrollTop <= mapping.scrollTop) {
+        return (targetScrollTop / mapping.scrollTop) * mapping.linePosition;
+    }
+
+    const remainingScroll = metrics.maxScrollTop - mapping.scrollTop;
+    const remainingLines = mapping.maxLinePosition - mapping.linePosition;
+    return mapping.linePosition +
+        ((targetScrollTop - mapping.scrollTop) / Math.max(0.0001, remainingScroll)) * remainingLines;
+}
+
+function compressedScrollTopForLinePosition(linePosition, metrics = compressedScrollMetrics()) {
+    const maxLinePosition = Math.max(0, metrics.maxFirstLine - 1);
+    if (metrics.maxScrollTop <= 0 || maxLinePosition <= 0) return 0;
+
+    const targetLinePosition = Math.max(0, Math.min(maxLinePosition, Number(linePosition || 0)));
+    const mapping = activeCompressedScrollMapping(metrics);
+    if (!mapping) {
+        return (targetLinePosition / maxLinePosition) * metrics.maxScrollTop;
+    }
+
+    if (targetLinePosition <= mapping.linePosition) {
+        return (targetLinePosition / mapping.linePosition) * mapping.scrollTop;
+    }
+
+    const remainingLines = mapping.maxLinePosition - mapping.linePosition;
+    const remainingScroll = metrics.maxScrollTop - mapping.scrollTop;
+    return mapping.scrollTop +
+        ((targetLinePosition - mapping.linePosition) / Math.max(0.0001, remainingLines)) * remainingScroll;
+}
+
+function preserveCompressedScrollMapping(anchor, scrollTop = scrollContainer.scrollTop) {
+    if (!anchor || !usesCompressedScroll()) {
+        compressedScrollMappingAnchor = null;
+        return false;
+    }
+
+    const metrics = compressedScrollMetrics();
+    const line = Math.min(metrics.maxFirstLine, Math.max(1, Number(anchor.line || 1)));
+    const ratio = Math.max(0, Math.min(1, Number(anchor.ratio || 0)));
+    compressedScrollMappingAnchor = {
+        linePosition: (line - 1) + ratio,
+        scrollTop: Math.max(0, Math.min(metrics.maxScrollTop, Number(scrollTop || 0))),
+        lineCount: metrics.lineCount,
+        maxScrollTop: metrics.maxScrollTop,
+        viewHeight: metrics.viewHeight
+    };
+    return true;
+}
+
 function viewportTopForLine(startLine) {
     if (!usesCompressedScroll()) {
         return lineTop(startLine);
     }
 
     const metrics = compressedScrollMetrics();
-    const firstVisible = lineAt(scrollContainer.scrollTop);
-    const firstVisibleTop = lineTop(firstVisible);
-    const nextVisibleTop = firstVisible < metrics.maxFirstLine
-        ? lineTop(firstVisible + 1)
-        : firstVisibleTop + viewportController.lineHeight;
-    const virtualLineSpan = Math.max(0.0001, nextVisibleTop - firstVisibleTop);
-    const scrollOffset = Math.max(0, scrollContainer.scrollTop - firstVisibleTop);
-    const physicalOffset = Math.max(0, Math.min(1, scrollOffset / virtualLineSpan)) * viewportController.lineHeight;
+    const linePosition = compressedLinePositionAtScrollTop(scrollContainer.scrollTop, metrics);
+    const firstVisible = Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(linePosition) + 1));
+    const physicalOffset = Math.max(0, Math.min(1, linePosition - Math.floor(linePosition))) *
+        viewportController.lineHeight;
     return scrollContainer.scrollTop -
         physicalOffset -
         ((firstVisible - Math.max(1, Number(startLine || 1))) * viewportController.lineHeight);
@@ -1015,10 +1092,31 @@ function compressedScrollScale() {
 }
 
 function visualScrollDeltaToScrollTopDelta(delta) {
-    return Number(delta || 0) / compressedScrollScale();
+    const visualDelta = Number(delta || 0);
+    if (!usesCompressedScroll()) return visualDelta;
+
+    const metrics = compressedScrollMetrics();
+    const mapping = activeCompressedScrollMapping(metrics);
+    if (!mapping) return visualDelta / compressedScrollScale();
+
+    const linePosition = compressedLinePositionAtScrollTop(scrollContainer.scrollTop, metrics);
+    const physicalPixelsPerLine = linePosition <= mapping.linePosition
+        ? mapping.scrollTop / mapping.linePosition
+        : (metrics.maxScrollTop - mapping.scrollTop) /
+            Math.max(0.0001, mapping.maxLinePosition - mapping.linePosition);
+    return (visualDelta / viewportController.lineHeight) * physicalPixelsPerLine;
 }
 
 function captureScrollAnchor(scrollTop = scrollContainer.scrollTop) {
+    if (usesCompressedScroll()) {
+        const linePosition = compressedLinePositionAtScrollTop(scrollTop);
+        const wholeLinePosition = Math.floor(linePosition);
+        return {
+            line: wholeLinePosition + 1,
+            ratio: linePosition - wholeLinePosition
+        };
+    }
+
     const line = lineAt(scrollTop);
     const top = lineTop(line);
     const nextTop = line < effectiveLineCount()
@@ -1611,6 +1709,7 @@ export {
     orderedRange,
     post,
     prefetchAround,
+    preserveCompressedScrollMapping,
     preserveScrollTop,
     queueColumnTextInputFallback,
     queueRender,
