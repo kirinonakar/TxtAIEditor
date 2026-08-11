@@ -122,6 +122,9 @@
   <data name="ExplorerItemCountPlural" xml:space="preserve">
     <value>{0:N0} 項目</value>
   </data>
+  <data name="ExplorerSelectedItemCountFormat" xml:space="preserve">
+    <value>{0}（已選取 {1:N0} 個）</value>
+  </data>
   <data name="FavoritesHeader" xml:space="preserve">
     <value>收藏夾列表</value>
   </data>
@@ -1996,6 +1999,9 @@
   </data>
   <data name="DeleteConfirmMessage" xml:space="preserve">
     <value>將“{0}”移至回收站？</value>
+  </data>
+  <data name="DeleteConfirmMultipleMessage" xml:space="preserve">
+    <value>要刪除選取的 {0} 個項目嗎？</value>
   </data>
   <data name="DeleteConfirmOK" xml:space="preserve">
     <value>刪除</value>

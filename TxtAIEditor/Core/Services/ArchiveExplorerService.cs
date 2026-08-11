@@ -554,7 +554,7 @@ namespace TxtAIEditor.Core.Services
                     throw new InvalidOperationException("The output archive cannot be inside a source folder.");
                 }
 
-                AddArchiveSourceEntry(
+                string sourceRootEntryPath = AddArchiveSourceEntry(
                     entries,
                     entryNames,
                     new ArchiveSourceEntry(
@@ -569,7 +569,7 @@ namespace TxtAIEditor.Core.Services
                         entryNames,
                         new ArchiveSourceEntry(
                             CombineArchiveEntryPath(
-                                sourceDirectory.Name,
+                                sourceRootEntryPath,
                                 GetArchiveEntryPath(fullSourcePath, directoryPath)),
                             directoryPath,
                             IsDirectory: true));
@@ -582,7 +582,7 @@ namespace TxtAIEditor.Core.Services
                         entryNames,
                         new ArchiveSourceEntry(
                             CombineArchiveEntryPath(
-                                sourceDirectory.Name,
+                                sourceRootEntryPath,
                                 GetArchiveEntryPath(fullSourcePath, filePath)),
                             filePath,
                             IsDirectory: false));
@@ -617,18 +617,53 @@ namespace TxtAIEditor.Core.Services
             return fullOutputPath;
         }
 
-        private static void AddArchiveSourceEntry(
+        private static string AddArchiveSourceEntry(
             List<ArchiveSourceEntry> entries,
             HashSet<string> entryNames,
             ArchiveSourceEntry entry)
         {
             string normalizedEntryPath = NormalizeEntryPath(entry.EntryPath);
-            if (string.IsNullOrWhiteSpace(normalizedEntryPath) || !entryNames.Add(normalizedEntryPath))
+            if (string.IsNullOrWhiteSpace(normalizedEntryPath))
             {
-                throw new IOException($"Duplicate archive entry: {normalizedEntryPath}");
+                throw new IOException("Archive entry name is empty.");
             }
 
-            entries.Add(entry with { EntryPath = normalizedEntryPath });
+            string uniqueEntryPath = GetUniqueArchiveEntryPath(normalizedEntryPath, entry.IsDirectory, entryNames);
+            entryNames.Add(uniqueEntryPath);
+            entries.Add(entry with { EntryPath = uniqueEntryPath });
+            return uniqueEntryPath;
+        }
+
+        private static string GetUniqueArchiveEntryPath(
+            string entryPath,
+            bool isDirectory,
+            HashSet<string> entryNames)
+        {
+            if (!entryNames.Contains(entryPath))
+            {
+                return entryPath;
+            }
+
+            string parentPath = GetParentEntryPath(entryPath);
+            string entryName = Path.GetFileName(entryPath.Replace('/', Path.DirectorySeparatorChar));
+            string extension = isDirectory ? string.Empty : Path.GetExtension(entryName);
+            string nameWithoutExtension = isDirectory
+                ? entryName
+                : Path.GetFileNameWithoutExtension(entryName);
+            if (string.IsNullOrWhiteSpace(nameWithoutExtension))
+            {
+                nameWithoutExtension = entryName;
+            }
+
+            for (int suffix = 2; ; suffix++)
+            {
+                string candidateName = nameWithoutExtension + "_" + suffix + extension;
+                string candidatePath = CombineArchiveEntryPath(parentPath, candidateName);
+                if (!entryNames.Contains(candidatePath))
+                {
+                    return candidatePath;
+                }
+            }
         }
 
         private static string CombineArchiveEntryPath(string parentPath, string childPath)

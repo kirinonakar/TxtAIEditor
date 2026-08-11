@@ -45,6 +45,7 @@ namespace TxtAIEditor.Controls
         private readonly Stack<ExplorerHistoryEntry> _forwardHistory = new();
         private bool _isBackNavigation;
         private bool _isForwardNavigation;
+        private string _explorerStatusBaseText = string.Empty;
 
         public enum ExplorerSortMode
         {
@@ -103,6 +104,7 @@ namespace TxtAIEditor.Controls
             _loadArchiveEntryIntoTabAsync = loadArchiveEntryIntoTabAsync;
             _localizationService = localizationService;
             _homeFolderPathProvider = homeFolderPathProvider;
+            _explorerStatusBaseText = _leftSidebar.ExplorerStatus.Text;
 
             WireEvents();
             _remoteWorkspaceService.FileUploaded += (_, _) =>
@@ -226,7 +228,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 _viewModel.ExplorerItems.ReplaceAll(items);
-                _leftSidebar.ExplorerStatus.Text = FormatExplorerItemCount(items.Count);
+                SetExplorerStatusText(FormatExplorerItemCount(items.Count));
 
                 if (updateGitStatus)
                 {
@@ -312,15 +314,15 @@ namespace TxtAIEditor.Controls
                     _viewModel.ExplorerItems.Add(item);
                 }
 
-                _leftSidebar.ExplorerStatus.Text = FormatExplorerItemCount(_viewModel.ExplorerItems.Count);
+                SetExplorerStatusText(FormatExplorerItemCount(_viewModel.ExplorerItems.Count));
                 UpdateExplorerBreadcrumb();
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed reading archive: {ex.Message}");
                 string title = _localizationService.GetString("ArchiveOpenFailedTitle", "압축 파일 열기 실패");
-                _leftSidebar.ExplorerStatus.Text =
-                    $"{GetArchiveDisplayPath(archivePath)}\n{title}: {ex.Message}";
+                SetExplorerStatusText(
+                    $"{GetArchiveDisplayPath(archivePath)}\n{title}: {ex.Message}");
             }
         }
 
@@ -473,9 +475,9 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _leftSidebar.ExplorerStatus.Text = string.Format(
+                SetExplorerStatusText(string.Format(
                     _localizationService.GetString("RemoteOperationFailedFormat", "작업 실패: {0}"),
-                    ex.Message);
+                    ex.Message));
             }
         }
 
@@ -509,8 +511,8 @@ namespace TxtAIEditor.Controls
             var cancellationToken = _remoteCancellation.Token;
             RemoteConnectionSettings connection = _remoteWorkspaceService.ActiveConnection;
             string loadingText = _localizationService.GetString("RemoteLoadingDirectory", "폴더를 불러오는 중...");
-            _leftSidebar.ExplorerStatus.Text =
-                $"{connection.Profile.Name} · {connection.Profile.ProtocolLabel}\n{loadingText}";
+            SetExplorerStatusText(
+                $"{connection.Profile.Name} · {connection.Profile.ProtocolLabel}\n{loadingText}");
 
             try
             {
@@ -566,16 +568,16 @@ namespace TxtAIEditor.Controls
                 }
 
                 SetCurrentFolderPath(_remoteWorkspaceService.ActiveDirectoryVirtualPath);
-                _leftSidebar.ExplorerStatus.Text = FormatExplorerItemCount(_viewModel.ExplorerItems.Count);
+                SetExplorerStatusText(FormatExplorerItemCount(_viewModel.ExplorerItems.Count));
             }
             catch (OperationCanceledException)
             {
             }
             catch (Exception ex)
             {
-                _leftSidebar.ExplorerStatus.Text = string.Format(
+                SetExplorerStatusText(string.Format(
                     _localizationService.GetString("RemoteOperationFailedFormat", "작업 실패: {0}"),
-                    ex.Message);
+                    ex.Message));
             }
         }
 
@@ -596,7 +598,7 @@ namespace TxtAIEditor.Controls
                 _viewModel.ExplorerItems.Add(item);
             }
 
-            _leftSidebar.ExplorerStatus.Text = FormatExplorerFilterResult(matched.Count);
+            SetExplorerStatusText(FormatExplorerFilterResult(matched.Count));
         }
 
         public void RefreshCurrentFolder()
@@ -686,6 +688,8 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExplorerTreeExpanding += OnExplorerTreeExpanding;
             _leftSidebar.ExplorerTreeItemInvoked += OnExplorerTreeItemInvoked;
             _leftSidebar.FileListViewItemClick += OnFileListViewItemClick;
+            _leftSidebar.FileList.SelectionChanged += (_, _) => UpdateExplorerSelectionStatus();
+            _leftSidebar.ExplorerTree.SelectionChanged += (_, _) => UpdateExplorerSelectionStatus();
             _leftSidebar.ExplorerFilterTextChanged += OnExplorerFilterTextChanged;
             _leftSidebar.ExplorerHideUnwantedChanged += OnHideUnwantedChanged;
             _leftSidebar.ExplorerBreadcrumb.SegmentClicked += OnExplorerBreadcrumbItemClicked;
@@ -718,9 +722,9 @@ namespace TxtAIEditor.Controls
         {
             if (!_remoteWorkspaceService.Activate(e.Profile))
             {
-                _leftSidebar.ExplorerStatus.Text = _localizationService.GetString(
+                SetExplorerStatusText(_localizationService.GetString(
                     "RemoteCredentialMissing",
-                    "Windows 자격 증명 관리자에서 서버 주소 또는 비밀번호를 찾을 수 없습니다.");
+                    "Windows 자격 증명 관리자에서 서버 주소 또는 비밀번호를 찾을 수 없습니다."));
                 return;
             }
 
@@ -895,7 +899,7 @@ namespace TxtAIEditor.Controls
             PopulateTreeNode(rootNode);
             rootNode.IsExpanded = true;
 
-            _leftSidebar.ExplorerStatus.Text = FormatExplorerItemCount(rootNode.Children.Count);
+            SetExplorerStatusText(FormatExplorerItemCount(rootNode.Children.Count));
             _ = UpdateGitStatusesAsync();
         }
 
@@ -947,7 +951,7 @@ namespace TxtAIEditor.Controls
             await PopulateRemoteTreeNodeAsync(rootNode, rootItem);
             rootNode.IsExpanded = true;
             SetCurrentFolderPath(_remoteWorkspaceService.ActiveDirectoryVirtualPath);
-            _leftSidebar.ExplorerStatus.Text = FormatExplorerItemCount(rootNode.Children.Count);
+            SetExplorerStatusText(FormatExplorerItemCount(rootNode.Children.Count));
         }
 
         private void PopulateTreeNode(
@@ -1050,9 +1054,9 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _leftSidebar.ExplorerStatus.Text = string.Format(
+                SetExplorerStatusText(string.Format(
                     _localizationService.GetString("RemoteOperationFailedFormat", "작업 실패: {0}"),
-                    ex.Message);
+                    ex.Message));
             }
             finally
             {
@@ -1120,9 +1124,9 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                _leftSidebar.ExplorerStatus.Text = string.Format(
+                SetExplorerStatusText(string.Format(
                     _localizationService.GetString("RemoteOperationFailedFormat", "작업 실패: {0}"),
-                    ex.Message);
+                    ex.Message));
             }
         }
 
@@ -1639,6 +1643,32 @@ namespace TxtAIEditor.Controls
             return string.Format(format, itemCount);
         }
 
+        private void SetExplorerStatusText(string text)
+        {
+            _explorerStatusBaseText = text;
+            UpdateExplorerSelectionStatus();
+        }
+
+        private void UpdateExplorerSelectionStatus()
+        {
+            int selectedCount = IsTreeMode
+                ? _leftSidebar.ExplorerTree.SelectedItems.Count
+                : _leftSidebar.FileList.SelectedItems.Count;
+            if (selectedCount <= 0)
+            {
+                _leftSidebar.ExplorerStatus.Text = _explorerStatusBaseText;
+                return;
+            }
+
+            string format = _localizationService.GetString(
+                "ExplorerSelectedItemCountFormat",
+                "{0} ({1:N0})");
+            _leftSidebar.ExplorerStatus.Text = string.Format(
+                format,
+                _explorerStatusBaseText,
+                selectedCount);
+        }
+
         public async Task UpdateGitStatusesAsync()
         {
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
@@ -1992,7 +2022,7 @@ namespace TxtAIEditor.Controls
                         _viewModel.ExplorerItems.Add(item);
                     }
 
-                    _leftSidebar.ExplorerStatus.Text = FormatExplorerFilterResult(_viewModel.ExplorerItems.Count);
+                    SetExplorerStatusText(FormatExplorerFilterResult(_viewModel.ExplorerItems.Count));
                 });
 
                 await UpdateGitStatusesAsync();
@@ -2036,7 +2066,7 @@ namespace TxtAIEditor.Controls
                         _viewModel.ExplorerItems.Add(item);
                     }
 
-                    _leftSidebar.ExplorerStatus.Text = FormatExplorerFilterResult(_viewModel.ExplorerItems.Count);
+                    SetExplorerStatusText(FormatExplorerFilterResult(_viewModel.ExplorerItems.Count));
                 });
             }
         }

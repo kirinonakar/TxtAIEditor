@@ -630,6 +630,8 @@ namespace TxtAIEditor.Controls
             bool canConvertImages = selectedItems.Count > 0 && selectedItems.All(CanConvertImageItem);
             SetMenuVisibility(flyout, 12, canConvertImages);
 
+            bool canDelete = selectedItems.Count > 0 && selectedItems.All(CanDeleteItem);
+
             bool canDownloadRemote = hasSingleItem && item != null && item.IsRemote;
             if (flyout.Items.Count > 13 && flyout.Items[13] is MenuFlyoutItem downloadRemoteItem)
             {
@@ -663,11 +665,11 @@ namespace TxtAIEditor.Controls
 
             if (flyout.Items.Count > 21 && flyout.Items[21] is MenuFlyoutItem deleteItem)
             {
-                deleteItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
+                deleteItem.Visibility = canDelete ? Visibility.Visible : Visibility.Collapsed;
             }
 
             SetMenuVisibility(flyout, 15, hasSingleItem);
-            SetMenuVisibility(flyout, 19, hasSingleItem);
+            SetMenuVisibility(flyout, 19, hasSingleItem || canDelete);
         }
 
         private void SetMenuText(MenuFlyout flyout, int index, string key, string fallback)
@@ -863,6 +865,13 @@ namespace TxtAIEditor.Controls
                    !item.IsArchiveEntry &&
                    !string.IsNullOrWhiteSpace(item.Path) &&
                    (item.IsFolder ? Directory.Exists(item.Path) : File.Exists(item.Path));
+        }
+
+        private static bool CanDeleteItem(ExplorerItem item)
+        {
+            return !item.IsArchiveEntry &&
+                   !string.IsNullOrWhiteSpace(item.Path) &&
+                   (item.IsRemote || (item.IsFolder ? Directory.Exists(item.Path) : File.Exists(item.Path)));
         }
 
         private static bool CanCompressItem(ExplorerItem item)
@@ -1638,8 +1647,12 @@ namespace TxtAIEditor.Controls
 
         private async void OnDeleteClick(object sender, RoutedEventArgs e)
         {
-            var item = GetExplorerItem(sender);
-            if (item == null || item.IsArchiveEntry || string.IsNullOrEmpty(item.Path))
+            List<ExplorerItem> selectedItems = GetSelectedExplorerItems(sender)
+                .Where(CanDeleteItem)
+                .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+            if (selectedItems.Count == 0)
             {
                 return;
             }
@@ -1647,11 +1660,15 @@ namespace TxtAIEditor.Controls
             var confirmDialog = new ContentDialog
             {
                 Title = _getString("DeleteConfirmTitle", "삭제 확인"),
-                Content = string.Format(
-                    item.IsRemote
-                        ? _getString("RemoteDeleteConfirmMessage", "'{0}'을(를) 원격 서버에서 영구 삭제하시겠습니까?")
-                        : _getString("DeleteConfirmMessage", "'{0}'을(를) 휴지통으로 이동하시겠습니까?"),
-                    item.Name),
+                Content = selectedItems.Count == 1
+                    ? string.Format(
+                        selectedItems[0].IsRemote
+                            ? _getString("RemoteDeleteConfirmMessage", "'{0}'을(를) 원격 서버에서 영구 삭제하시겠습니까?")
+                            : _getString("DeleteConfirmMessage", "'{0}'을(를) 휴지통으로 이동하시겠습니까?"),
+                        selectedItems[0].Name)
+                    : string.Format(
+                        _getString("DeleteConfirmMultipleMessage", "선택한 {0}개 항목을 삭제하시겠습니까?"),
+                        selectedItems.Count),
                 PrimaryButtonText = _getString("DeleteConfirmOK", "삭제"),
                 CloseButtonText = _getString("DeleteConfirmCancel", "취소"),
                 DefaultButton = ContentDialogButton.Close,
@@ -1666,32 +1683,42 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                if (item.IsRemote)
+                bool deletedRemoteItem = false;
+                foreach (ExplorerItem item in selectedItems)
                 {
-                    await _remoteWorkspaceService.DeleteAsync(item.Path, item.IsFolder);
                     CloseOpenTabsForPath(item.Path);
-                    await _refreshRemoteExplorerAsync();
-                    return;
+
+                    if (item.IsRemote)
+                    {
+                        await _remoteWorkspaceService.DeleteAsync(item.Path, item.IsFolder);
+                        deletedRemoteItem = true;
+                        continue;
+                    }
+
+                    if (item.IsFolder)
+                    {
+                        Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(
+                            item.Path,
+                            Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                            Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                    }
+                    else
+                    {
+                        Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
+                            item.Path,
+                            Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                            Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                    }
                 }
 
-                CloseOpenTabsForPath(item.Path);
-
-                if (item.IsFolder)
+                if (deletedRemoteItem)
                 {
-                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(
-                        item.Path,
-                        Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                        Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                    await _refreshRemoteExplorerAsync();
                 }
                 else
                 {
-                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
-                        item.Path,
-                        Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                        Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                    _loadDirectoryRoot(_currentFolderProvider());
                 }
-
-                _loadDirectoryRoot(_currentFolderProvider());
             }
             catch (Exception ex)
             {

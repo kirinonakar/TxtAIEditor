@@ -122,6 +122,9 @@
   <data name="ExplorerItemCountPlural" xml:space="preserve">
     <value>{0:N0} items</value>
   </data>
+  <data name="ExplorerSelectedItemCountFormat" xml:space="preserve">
+    <value>{0} ({1:N0} selected)</value>
+  </data>
   <data name="FavoritesHeader" xml:space="preserve">
     <value>Favorites List</value>
   </data>
@@ -1996,6 +1999,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   </data>
   <data name="DeleteConfirmMessage" xml:space="preserve">
     <value>Move '{0}' to Recycle Bin?</value>
+  </data>
+  <data name="DeleteConfirmMultipleMessage" xml:space="preserve">
+    <value>Delete the selected {0} items?</value>
   </data>
   <data name="DeleteConfirmOK" xml:space="preserve">
     <value>Delete</value>

@@ -122,6 +122,9 @@
   <data name="ExplorerItemCountPlural" xml:space="preserve">
     <value>{0:N0}개 항목</value>
   </data>
+  <data name="ExplorerSelectedItemCountFormat" xml:space="preserve">
+    <value>{0} ({1:N0})</value>
+  </data>
   <data name="FavoritesHeader" xml:space="preserve">
     <value>즐겨찾기 목록</value>
   </data>
@@ -1996,6 +1999,9 @@
   </data>
   <data name="DeleteConfirmMessage" xml:space="preserve">
     <value>'{0}'을(를) 휴지통으로 이동하시겠습니까?</value>
+  </data>
+  <data name="DeleteConfirmMultipleMessage" xml:space="preserve">
+    <value>선택한 {0}개 항목을 삭제하시겠습니까?</value>
   </data>
   <data name="DeleteConfirmOK" xml:space="preserve">
     <value>삭제</value>
