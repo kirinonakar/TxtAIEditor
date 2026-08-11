@@ -10,7 +10,7 @@ namespace TxtAIEditor.Core.Services
         private const double ExplorerPanelMinWidth = 150;
         private const double PreviewPanelMinWidth = 150;
         private const double DefaultNormalPreviewWidth = 400;
-        private const double DefaultExpandedPreviewWidth = 800;
+        private const double DefaultExpandedPreviewWidth = 700;
 
         private double _normalPreviewWidth = DefaultNormalPreviewWidth;
         private double _expandedPreviewWidth = DefaultExpandedPreviewWidth;
