@@ -298,12 +298,16 @@
                                         </Button>
                                     </Grid>
                                 </StackPanel>
-                                <ListView x:Name="FileListView" Grid.Row="1" Margin="0,5,0,5" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnFileListViewItemClick" AllowDrop="True" DragOver="OnFileListViewDragOver" Drop="OnFileListViewDrop">
+                                <ListView x:Name="FileListView" Grid.Row="1" Margin="0,5,0,5" SelectionMode="Extended" IsTabStop="True" IsItemClickEnabled="True" ItemClick="OnFileListViewItemClick" AllowDrop="True" DragOver="OnFileListViewDragOver" Drop="OnFileListViewDrop">
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Padding="0,3,0,3" RightTapped="OnFileListViewItemRightTapped" AllowDrop="True" DragOver="OnFileListViewItemDragOver" Drop="OnFileListViewItemDrop">
                                                 <Grid.ContextFlyout>
                                                     <MenuFlyout>
+                                                        <MenuFlyoutItem Text="" Icon="Cut" Click="OnCutClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutItem Text="" Icon="Copy" Click="OnCopyItemsClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutItem Text="" Icon="Paste" Click="OnPasteClick" Tag="{Binding}"/>
+                                                        <MenuFlyoutSeparator/>
                                                         <MenuFlyoutItem Text="즐겨찾기에 추가" Icon="Favorite" Click="OnAddFileToFavoritesClick" Tag="{Binding}"/>
                                                         <MenuFlyoutItem Text="폴더를 즐겨찾기에 추가" Icon="OutlineStar" Click="OnAddFolderToFavoritesClick" Tag="{Binding}"/>
                                                         <MenuFlyoutItem x:Name="ExplorerInsertMarkdownImageMenuItem" Text="마크다운 삽입" Icon="Pictures" Click="OnInsertMarkdownImageClick" Tag="{Binding}"/>
@@ -330,6 +334,11 @@
                                                         <MenuFlyoutItem x:Name="ExplorerCompressFolderToSevenZipMenuItem" Text="" Click="OnCompressFolderToSevenZipClick" Tag="{Binding}">
                                                             <MenuFlyoutItem.Icon>
                                                                 <FontIcon Glyph="&#xE7B8;" FontSize="12"/>
+                                                            </MenuFlyoutItem.Icon>
+                                                        </MenuFlyoutItem>
+                                                        <MenuFlyoutItem Text="" Click="OnImageConversionClick" Tag="{Binding}">
+                                                            <MenuFlyoutItem.Icon>
+                                                                <FontIcon Glyph="&#xE91B;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
                                                         <MenuFlyoutItem x:Name="ExplorerDownloadRemoteMenuItem" Visibility="Collapsed" Text="다운로드" Click="OnDownloadRemoteItemClick" Tag="{Binding}">
@@ -375,7 +384,7 @@
                                           Margin="0,5,0,5"
                                           Visibility="Collapsed"
                                           IsTabStop="True"
-                                          SelectionMode="Single"
+                                          SelectionMode="Multiple"
                                           AllowDrop="True"
                                           DragOver="OnExplorerTreeDragOver"
                                           Drop="OnExplorerTreeDrop"
@@ -386,6 +395,10 @@
                                             <Grid Padding="0,3,8,3" ToolTipService.ToolTip="{Binding Content.ToolTipPath}" RightTapped="OnFileListViewItemRightTapped">
                                                 <Grid.ContextFlyout>
                                                     <MenuFlyout>
+                                                        <MenuFlyoutItem Text="" Icon="Cut" Click="OnCutClick" Tag="{Binding Content}"/>
+                                                        <MenuFlyoutItem Text="" Icon="Copy" Click="OnCopyItemsClick" Tag="{Binding Content}"/>
+                                                        <MenuFlyoutItem Text="" Icon="Paste" Click="OnPasteClick" Tag="{Binding Content}"/>
+                                                        <MenuFlyoutSeparator/>
                                                         <MenuFlyoutItem Text="즐겨찾기에 추가" Icon="Favorite" Click="OnAddFileToFavoritesClick" Tag="{Binding Content}"/>
                                                         <MenuFlyoutItem Text="폴더를 즐겨찾기에 추가" Icon="OutlineStar" Click="OnAddFolderToFavoritesClick" Tag="{Binding Content}"/>
                                                         <MenuFlyoutItem Text="마크다운 삽입" Icon="Pictures" Click="OnInsertMarkdownImageClick" Tag="{Binding Content}"/>
@@ -412,6 +425,11 @@
                                                         <MenuFlyoutItem Text="" Click="OnCompressFolderToSevenZipClick" Tag="{Binding Content}">
                                                             <MenuFlyoutItem.Icon>
                                                                 <FontIcon Glyph="&#xE7B8;" FontSize="12"/>
+                                                            </MenuFlyoutItem.Icon>
+                                                        </MenuFlyoutItem>
+                                                        <MenuFlyoutItem Text="" Click="OnImageConversionClick" Tag="{Binding Content}">
+                                                            <MenuFlyoutItem.Icon>
+                                                                <FontIcon Glyph="&#xE91B;" FontSize="12"/>
                                                             </MenuFlyoutItem.Icon>
                                                         </MenuFlyoutItem>
                                                         <MenuFlyoutItem x:Name="ExplorerTreeDownloadRemoteMenuItem" Visibility="Collapsed" Text="다운로드" Click="OnDownloadRemoteItemClick" Tag="{Binding Content}">

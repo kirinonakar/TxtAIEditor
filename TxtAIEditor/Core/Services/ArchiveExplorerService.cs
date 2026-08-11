@@ -26,6 +26,11 @@ namespace TxtAIEditor.Core.Services
             ".7z"
         };
 
+        private sealed record ArchiveSourceEntry(
+            string EntryPath,
+            string SourcePath,
+            bool IsDirectory);
+
         public bool IsSupportedArchiveFile(string filePath)
         {
             return IsSupportedArchivePath(filePath);
@@ -300,6 +305,16 @@ namespace TxtAIEditor.Core.Services
             return Task.Run(() => CreateSevenZipFromDirectory(sourceDirectory, outputPath, progress, cancellationToken), cancellationToken);
         }
 
+        public Task CreateZipFromPathsAsync(IReadOnlyList<string> sourcePaths, string outputPath, Action<double>? progress = null, System.Threading.CancellationToken cancellationToken = default)
+        {
+            return Task.Run(() => CreateZipFromPaths(sourcePaths, outputPath, progress, cancellationToken), cancellationToken);
+        }
+
+        public Task CreateSevenZipFromPathsAsync(IReadOnlyList<string> sourcePaths, string outputPath, Action<double>? progress = null, System.Threading.CancellationToken cancellationToken = default)
+        {
+            return Task.Run(() => CreateSevenZipFromPaths(sourcePaths, outputPath, progress, cancellationToken), cancellationToken);
+        }
+
         public static string NormalizeEntryPath(string entryPath)
         {
             return (entryPath ?? string.Empty)
@@ -415,6 +430,220 @@ namespace TxtAIEditor.Core.Services
                 processed++;
                 progress?.Invoke(total > 0 ? (double)processed / total * 100.0 : 100.0);
             }
+        }
+
+        private static void CreateZipFromPaths(IReadOnlyList<string> sourcePaths, string outputPath, Action<double>? progress = null, System.Threading.CancellationToken cancellationToken = default)
+        {
+            List<ArchiveSourceEntry> entries = BuildArchiveSourceEntries(sourcePaths, outputPath);
+            int total = entries.Count;
+            int processed = 0;
+            var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+            using var output = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            using var archive = new ZipArchive(
+                output,
+                ZipArchiveMode.Create,
+                leaveOpen: false,
+                entryNameEncoding: utf8);
+
+            foreach (ArchiveSourceEntry entry in entries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (entry.IsDirectory)
+                {
+                    ZipArchiveEntry directoryEntry = archive.CreateEntry(
+                        entry.EntryPath + "/",
+                        CompressionLevel.NoCompression);
+                    directoryEntry.LastWriteTime = Directory.GetLastWriteTime(entry.SourcePath);
+                }
+                else
+                {
+                    archive.CreateEntryFromFile(
+                        entry.SourcePath,
+                        entry.EntryPath,
+                        CompressionLevel.Optimal);
+                }
+
+                processed++;
+                progress?.Invoke(total > 0 ? (double)processed / total * 100.0 : 100.0);
+            }
+        }
+
+        private static void CreateSevenZipFromPaths(IReadOnlyList<string> sourcePaths, string outputPath, Action<double>? progress = null, System.Threading.CancellationToken cancellationToken = default)
+        {
+            List<ArchiveSourceEntry> entries = BuildArchiveSourceEntries(sourcePaths, outputPath);
+            int total = entries.Count;
+            int processed = 0;
+            var options = new SevenZipWriterOptions(CompressionType.LZMA2);
+
+            using IWriter writer = WriterFactory.OpenWriter(outputPath, ArchiveType.SevenZip, options);
+            foreach (ArchiveSourceEntry entry in entries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (entry.IsDirectory)
+                {
+                    writer.WriteDirectory(
+                        entry.EntryPath,
+                        Directory.GetLastWriteTime(entry.SourcePath));
+                }
+                else
+                {
+                    using var source = new FileStream(
+                        entry.SourcePath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite);
+                    writer.Write(
+                        entry.EntryPath,
+                        source,
+                        File.GetLastWriteTime(entry.SourcePath));
+                }
+
+                processed++;
+                progress?.Invoke(total > 0 ? (double)processed / total * 100.0 : 100.0);
+            }
+        }
+
+        private static List<ArchiveSourceEntry> BuildArchiveSourceEntries(
+            IReadOnlyList<string> sourcePaths,
+            string outputPath)
+        {
+            ArgumentNullException.ThrowIfNull(sourcePaths);
+            if (sourcePaths.Count == 0)
+            {
+                throw new ArgumentException("At least one source path is required.", nameof(sourcePaths));
+            }
+
+            string fullOutputPath = ValidateArchiveOutputPath(outputPath);
+            var entries = new List<ArchiveSourceEntry>();
+            var entryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string sourcePath in sourcePaths)
+            {
+                if (string.IsNullOrWhiteSpace(sourcePath))
+                {
+                    throw new FileNotFoundException("A source path is empty.");
+                }
+
+                string fullSourcePath = Path.GetFullPath(sourcePath);
+                if (File.Exists(fullSourcePath))
+                {
+                    AddArchiveSourceEntry(
+                        entries,
+                        entryNames,
+                        new ArchiveSourceEntry(
+                            Path.GetFileName(fullSourcePath),
+                            fullSourcePath,
+                            IsDirectory: false));
+                    continue;
+                }
+
+                if (!Directory.Exists(fullSourcePath))
+                {
+                    throw new FileNotFoundException("A source path was not found.", fullSourcePath);
+                }
+
+                var sourceDirectory = new DirectoryInfo(fullSourcePath);
+                if (sourceDirectory.Parent == null || string.IsNullOrWhiteSpace(sourceDirectory.Name))
+                {
+                    throw new InvalidOperationException("A drive root folder cannot be compressed.");
+                }
+
+                if (IsSameOrDescendantPath(fullOutputPath, fullSourcePath))
+                {
+                    throw new InvalidOperationException("The output archive cannot be inside a source folder.");
+                }
+
+                AddArchiveSourceEntry(
+                    entries,
+                    entryNames,
+                    new ArchiveSourceEntry(
+                        sourceDirectory.Name,
+                        fullSourcePath,
+                        IsDirectory: true));
+
+                foreach (string directoryPath in EnumerateArchiveDirectories(fullSourcePath))
+                {
+                    AddArchiveSourceEntry(
+                        entries,
+                        entryNames,
+                        new ArchiveSourceEntry(
+                            CombineArchiveEntryPath(
+                                sourceDirectory.Name,
+                                GetArchiveEntryPath(fullSourcePath, directoryPath)),
+                            directoryPath,
+                            IsDirectory: true));
+                }
+
+                foreach (string filePath in EnumerateArchiveFiles(fullSourcePath))
+                {
+                    AddArchiveSourceEntry(
+                        entries,
+                        entryNames,
+                        new ArchiveSourceEntry(
+                            CombineArchiveEntryPath(
+                                sourceDirectory.Name,
+                                GetArchiveEntryPath(fullSourcePath, filePath)),
+                            filePath,
+                            IsDirectory: false));
+                }
+            }
+
+            return entries
+                .OrderByDescending(entry => entry.IsDirectory)
+                .ThenBy(entry => entry.EntryPath, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static string ValidateArchiveOutputPath(string outputPath)
+        {
+            if (string.IsNullOrWhiteSpace(outputPath))
+            {
+                throw new ArgumentException("Output archive path is empty.", nameof(outputPath));
+            }
+
+            string fullOutputPath = Path.GetFullPath(outputPath);
+            string? outputDirectory = Path.GetDirectoryName(fullOutputPath);
+            if (string.IsNullOrWhiteSpace(outputDirectory) || !Directory.Exists(outputDirectory))
+            {
+                throw new DirectoryNotFoundException("Output directory was not found.");
+            }
+
+            if (File.Exists(fullOutputPath) || Directory.Exists(fullOutputPath))
+            {
+                throw new IOException("The output archive path already exists.");
+            }
+
+            return fullOutputPath;
+        }
+
+        private static void AddArchiveSourceEntry(
+            List<ArchiveSourceEntry> entries,
+            HashSet<string> entryNames,
+            ArchiveSourceEntry entry)
+        {
+            string normalizedEntryPath = NormalizeEntryPath(entry.EntryPath);
+            if (string.IsNullOrWhiteSpace(normalizedEntryPath) || !entryNames.Add(normalizedEntryPath))
+            {
+                throw new IOException($"Duplicate archive entry: {normalizedEntryPath}");
+            }
+
+            entries.Add(entry with { EntryPath = normalizedEntryPath });
+        }
+
+        private static string CombineArchiveEntryPath(string parentPath, string childPath)
+        {
+            string parent = NormalizeEntryPath(parentPath);
+            string child = NormalizeEntryPath(childPath);
+            return string.IsNullOrWhiteSpace(child) ? parent : parent + "/" + child;
+        }
+
+        private static bool IsSameOrDescendantPath(string candidatePath, string parentPath)
+        {
+            string normalizedCandidate = Path.TrimEndingDirectorySeparator(Path.GetFullPath(candidatePath));
+            string normalizedParent = Path.TrimEndingDirectorySeparator(Path.GetFullPath(parentPath));
+            return string.Equals(normalizedCandidate, normalizedParent, StringComparison.OrdinalIgnoreCase) ||
+                   normalizedCandidate.StartsWith(normalizedParent + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
         }
 
         private static string ValidateArchiveCreationPaths(string sourceDirectory, string outputPath)

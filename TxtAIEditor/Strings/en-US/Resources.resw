@@ -3938,4 +3938,15 @@ Plan: {0}</value>
   <data name="ImageConvertSuccessTitle" xml:space="preserve"><value>Image conversion complete</value></data>
   <data name="ImageConvertSuccessMessage" xml:space="preserve"><value>Image conversion completed.&#xA;Saved {0} file(s)&#xA;Example: {1}</value></data>
   <data name="ImageConvertErrorTitle" xml:space="preserve"><value>Image conversion error</value></data>
+  <data name="ExplorerCut" xml:space="preserve"><value>Cut</value></data>
+  <data name="ExplorerCopy" xml:space="preserve"><value>Copy</value></data>
+  <data name="ExplorerPaste" xml:space="preserve"><value>Paste</value></data>
+  <data name="ExplorerConvertImage" xml:space="preserve"><value>Convert Image</value></data>
+  <data name="ExplorerPasteErrorTitle" xml:space="preserve"><value>Paste Error</value></data>
+  <data name="ExplorerClipboardErrorTitle" xml:space="preserve"><value>Clipboard Error</value></data>
+  <data name="ExplorerMultipleArchiveBaseName" xml:space="preserve"><value>archive</value></data>
+  <data name="ArchiveCreateOutputDirectoryMissing" xml:space="preserve"><value>The folder for saving the archive could not be found.</value></data>
+  <data name="ImageConvertBatchSourceInfo" xml:space="preserve"><value>Selected images: {0}&#xA;Reference image: {1}&#xA;Size: {2} × {3}px · Frames: {4}</value></data>
+  <data name="ImageConvertBatchDialogTitle" xml:space="preserve"><value>Batch Image Conversion - {0} items</value></data>
+  <data name="ImageConvertBatchOutputConflict" xml:space="preserve"><value>The selected images produce duplicate output file names. Check the file names and try again.</value></data>
 </root>

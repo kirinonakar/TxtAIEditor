@@ -801,6 +801,11 @@ namespace TxtAIEditor.Controls
 
         private void OnExplorerTreeItemInvoked(object? sender, Microsoft.UI.Xaml.Controls.TreeViewItemInvokedEventArgs e)
         {
+            if (IsExplorerSelectionModifierDown())
+            {
+                return;
+            }
+
             Microsoft.UI.Xaml.Controls.TreeViewNode? node = e.InvokedItem as Microsoft.UI.Xaml.Controls.TreeViewNode;
             ExplorerItem? item = e.InvokedItem as ExplorerItem
                 ?? node?.Content as ExplorerItem;
@@ -1346,6 +1351,13 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            // Extended selection uses Ctrl/Shift clicks. Those clicks should only
+            // update the selection and must never navigate or open a file.
+            if (IsExplorerSelectionModifierDown())
+            {
+                return;
+            }
+
             if (item.IsRemote)
             {
                 if (item.IsFolder)
@@ -1386,6 +1398,16 @@ namespace TxtAIEditor.Controls
             {
                 _ = _loadFileIntoTabAsync(item.Path);
             }
+        }
+
+        private static bool IsExplorerSelectionModifierDown()
+        {
+            var controlState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(
+                Windows.System.VirtualKey.Control);
+            var shiftState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(
+                Windows.System.VirtualKey.Shift);
+            return (controlState & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down ||
+                   (shiftState & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
         }
 
         private void SetCurrentFolderPath(string folderPath)

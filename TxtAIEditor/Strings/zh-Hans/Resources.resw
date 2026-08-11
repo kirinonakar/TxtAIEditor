@@ -3902,4 +3902,15 @@
   <data name="ImageConvertSuccessTitle" xml:space="preserve"><value>图像转换完成</value></data>
   <data name="ImageConvertSuccessMessage" xml:space="preserve"><value>图像转换已完成。&#xA;已保存 {0} 个文件&#xA;示例：{1}</value></data>
   <data name="ImageConvertErrorTitle" xml:space="preserve"><value>图像转换错误</value></data>
+  <data name="ExplorerCut" xml:space="preserve"><value>剪切</value></data>
+  <data name="ExplorerCopy" xml:space="preserve"><value>复制</value></data>
+  <data name="ExplorerPaste" xml:space="preserve"><value>粘贴</value></data>
+  <data name="ExplorerConvertImage" xml:space="preserve"><value>转换图像</value></data>
+  <data name="ExplorerPasteErrorTitle" xml:space="preserve"><value>粘贴错误</value></data>
+  <data name="ExplorerClipboardErrorTitle" xml:space="preserve"><value>剪贴板错误</value></data>
+  <data name="ExplorerMultipleArchiveBaseName" xml:space="preserve"><value>archive</value></data>
+  <data name="ArchiveCreateOutputDirectoryMissing" xml:space="preserve"><value>找不到用于保存压缩文件的文件夹。</value></data>
+  <data name="ImageConvertBatchSourceInfo" xml:space="preserve"><value>已选择图像：{0} 个&#xA;参考图像：{1}&#xA;尺寸：{2} × {3}px · 帧数：{4}</value></data>
+  <data name="ImageConvertBatchDialogTitle" xml:space="preserve"><value>批量转换图像 - {0} 个</value></data>
+  <data name="ImageConvertBatchOutputConflict" xml:space="preserve"><value>所选图像会生成重复的输出文件名。请检查文件名后重试。</value></data>
 </root>

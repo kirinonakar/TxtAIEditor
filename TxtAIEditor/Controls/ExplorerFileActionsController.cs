@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -12,6 +13,7 @@ using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
 using TxtAIEditor.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage;
 
 namespace TxtAIEditor.Controls
 {
@@ -46,6 +48,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<Task> _refreshRemoteExplorerAsync;
         private readonly Action<object> _initializePickerWindow;
         private readonly Func<string>? _homeFolderPathProvider;
+        private readonly ImageConversionController _imageConversionController;
         private readonly ConditionalWeakTable<MenuFlyout, object> _localizedFlyouts = new ConditionalWeakTable<MenuFlyout, object>();
 
         private System.Threading.CancellationTokenSource? _archiveCts;
@@ -109,6 +112,7 @@ namespace TxtAIEditor.Controls
             _refreshRemoteExplorerAsync = refreshRemoteExplorerAsync;
             _initializePickerWindow = initializePickerWindow;
             _homeFolderPathProvider = homeFolderPathProvider;
+            _imageConversionController = new ImageConversionController(_getString, _themeProvider);
 
             WireEvents();
         }
@@ -116,6 +120,9 @@ namespace TxtAIEditor.Controls
         private void WireEvents()
         {
             _leftSidebar.FileListViewItemRightTapped += OnFileListViewItemRightTapped;
+            _leftSidebar.CutClick += OnCutClick;
+            _leftSidebar.CopyItemsClick += OnCopyItemsClick;
+            _leftSidebar.PasteClick += OnPasteClick;
             _leftSidebar.CreateFolderClick += OnCreateFolderClick;
             _leftSidebar.CreateFileClick += OnCreateFileClick;
             _leftSidebar.CreateNotebookClick += OnCreateNotebookClick;
@@ -125,6 +132,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.ExtractArchiveToFolderClick += OnExtractArchiveToFolderClick;
             _leftSidebar.CompressFolderToZipClick += OnCompressFolderToZipClick;
             _leftSidebar.CompressFolderToSevenZipClick += OnCompressFolderToSevenZipClick;
+            _leftSidebar.ImageConversionClick += OnImageConversionClick;
             _leftSidebar.DownloadRemoteItemClick += OnDownloadRemoteItemClick;
             _leftSidebar.UploadRemoteItemClick += OnUploadRemoteItemClick;
             _leftSidebar.CopyFileNameClick += OnCopyFileNameClick;
@@ -148,7 +156,31 @@ namespace TxtAIEditor.Controls
                 contextItem = GetTreeExplorerItem(element.DataContext);
                 if (element.DataContext is ExplorerItem listItem)
                 {
-                    _leftSidebar.FileList.SelectedItem = listItem;
+                    var selectedItems = _leftSidebar.FileList.SelectedItems
+                        .OfType<ExplorerItem>()
+                        .ToList();
+                    if (!selectedItems.Contains(listItem))
+                    {
+                        _leftSidebar.FileList.SelectedItems.Clear();
+                        _leftSidebar.FileList.SelectedItems.Add(listItem);
+                    }
+                }
+                else if (contextItem != null)
+                {
+                    var selectedItems = GetTreeSelectedExplorerItems();
+                    if (!selectedItems.Any(selected => ReferenceEquals(selected, contextItem)))
+                    {
+                        TreeViewNode? node = FindTreeNodeFromElement(element);
+                        if (node != null)
+                        {
+                            _leftSidebar.ExplorerTree.SelectedNodes.Clear();
+                            _leftSidebar.ExplorerTree.SelectedNodes.Add(node);
+                        }
+                        else
+                        {
+                            _leftSidebar.ExplorerTree.SelectedItem = contextItem;
+                        }
+                    }
                 }
 
                 if (element.ContextFlyout is MenuFlyout flyout && flyout.Items.Count >= 17)
@@ -156,7 +188,8 @@ namespace TxtAIEditor.Controls
                     LocalizeContextFlyout(flyout);
                     ConfigureContextFlyout(
                         flyout,
-                        contextItem ?? _leftSidebar.FileList.SelectedItem as ExplorerItem);
+                        contextItem ?? _leftSidebar.FileList.SelectedItem as ExplorerItem,
+                        GetSelectedExplorerItems(contextItem));
                     CursorResetHelper.AttachToFlyout(flyout, element);
                     CursorResetHelper.ResetToArrow(element);
                 }
@@ -506,56 +539,73 @@ namespace TxtAIEditor.Controls
             }
 
             _localizedFlyouts.Add(flyout, null!);
-            ((MenuFlyoutItem)flyout.Items[0]).Text = _getString("ExplorerAddToFavorites", "즐겨찾기에 추가");
-            ((MenuFlyoutItem)flyout.Items[1]).Text = _getString("ExplorerAddFolderToFavorites", "폴더를 즐겨찾기에 추가");
-            ((MenuFlyoutItem)flyout.Items[2]).Text = _getString("ExplorerInsertMarkdownImage", "마크다운 삽입");
-            ((MenuFlyoutItem)flyout.Items[3]).Text = _getString("OpenExternalViewerTooltip", "외부 뷰어로 열기");
-            ((MenuFlyoutItem)flyout.Items[4]).Text = _getString("OpenWithDefaultProgramTooltip", "기본 프로그램으로 열기");
-            ((MenuFlyoutItem)flyout.Items[5]).Text = _getString("ExplorerExtractArchiveToFolder", "폴더에 풀기");
-            ((MenuFlyoutItem)flyout.Items[6]).Text = _getString("ExplorerCompressFolderToZip", "ZIP으로 압축하기");
-            ((MenuFlyoutItem)flyout.Items[7]).Text = _getString("ExplorerCompressFolderToSevenZip", "7z로 압축하기");
-            ((MenuFlyoutItem)flyout.Items[8]).Text = _getString("ExplorerDownload", "다운로드");
-            ((MenuFlyoutItem)flyout.Items[9]).Text = _getString("ExplorerUpload", "업로드");
-            ((MenuFlyoutItem)flyout.Items[11]).Text = _getString("ExplorerCopyFileName", "파일이름 복사");
-            ((MenuFlyoutItem)flyout.Items[12]).Text = _getString("ExplorerCopyFilePath", "경로 복사");
-            ((MenuFlyoutItem)flyout.Items[13]).Text = _getString("ExplorerCopyFolderPath", "폴더 경로 복사");
-            ((MenuFlyoutItem)flyout.Items[15]).Text = _getString("ExplorerRename", "이름 바꾸기");
-            ((MenuFlyoutItem)flyout.Items[16]).Text = _getString("ExplorerDelete", "삭제");
+            SetMenuText(flyout, 0, "ExplorerCut", "잘라내기");
+            SetMenuText(flyout, 1, "ExplorerCopy", "복사");
+            SetMenuText(flyout, 2, "ExplorerPaste", "붙여넣기");
+            SetMenuText(flyout, 4, "ExplorerAddToFavorites", "즐겨찾기에 추가");
+            SetMenuText(flyout, 5, "ExplorerAddFolderToFavorites", "폴더를 즐겨찾기에 추가");
+            SetMenuText(flyout, 6, "ExplorerInsertMarkdownImage", "마크다운 삽입");
+            SetMenuText(flyout, 7, "OpenExternalViewerTooltip", "외부 뷰어로 열기");
+            SetMenuText(flyout, 8, "OpenWithDefaultProgramTooltip", "기본 프로그램으로 열기");
+            SetMenuText(flyout, 9, "ExplorerExtractArchiveToFolder", "폴더에 풀기");
+            SetMenuText(flyout, 10, "ExplorerCompressFolderToZip", "ZIP으로 압축하기");
+            SetMenuText(flyout, 11, "ExplorerCompressFolderToSevenZip", "7z로 압축하기");
+            SetMenuText(flyout, 12, "ExplorerConvertImage", "이미지 변환");
+            SetMenuText(flyout, 13, "ExplorerDownload", "다운로드");
+            SetMenuText(flyout, 14, "ExplorerUpload", "업로드");
+            SetMenuText(flyout, 16, "ExplorerCopyFileName", "파일이름 복사");
+            SetMenuText(flyout, 17, "ExplorerCopyFilePath", "경로 복사");
+            SetMenuText(flyout, 18, "ExplorerCopyFolderPath", "폴더 경로 복사");
+            SetMenuText(flyout, 20, "ExplorerRename", "이름 바꾸기");
+            SetMenuText(flyout, 21, "ExplorerDelete", "삭제");
         }
 
-        private void ConfigureContextFlyout(MenuFlyout flyout, ExplorerItem? item)
+        private void ConfigureContextFlyout(
+            MenuFlyout flyout,
+            ExplorerItem? item,
+            IReadOnlyList<ExplorerItem> selectedItems)
         {
+            bool hasSingleItem = selectedItems.Count == 1;
             bool isArchiveEntry = item?.IsArchiveEntry == true;
-            if (flyout.Items.Count > 0 && flyout.Items[0] is MenuFlyoutItem addFileFavoriteItem)
+            bool canUseLocalStorageItems = selectedItems.Count > 0 && selectedItems.All(CanUseLocalStorageItem);
+            bool canPaste = CanPasteStorageItems() && CanPasteIntoLocalDirectory(item);
+
+            SetMenuVisibility(flyout, 0, canUseLocalStorageItems);
+            SetMenuVisibility(flyout, 1, canUseLocalStorageItems);
+            SetMenuVisibility(flyout, 2, CanPasteIntoLocalDirectory(item));
+            SetMenuEnabled(flyout, 2, canPaste);
+            SetMenuVisibility(flyout, 3, canUseLocalStorageItems || CanPasteIntoLocalDirectory(item));
+
+            if (flyout.Items.Count > 4 && flyout.Items[4] is MenuFlyoutItem addFileFavoriteItem)
             {
-                addFileFavoriteItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
+                addFileFavoriteItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 1 && flyout.Items[1] is MenuFlyoutItem addFolderFavoriteItem)
+            if (flyout.Items.Count > 5 && flyout.Items[5] is MenuFlyoutItem addFolderFavoriteItem)
             {
-                addFolderFavoriteItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
+                addFolderFavoriteItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 2 && flyout.Items[2] is MenuFlyoutItem markdownItem)
+            if (flyout.Items.Count > 6 && flyout.Items[6] is MenuFlyoutItem markdownItem)
             {
-                markdownItem.Visibility = item != null && !item.IsRemote && !isArchiveEntry && !item.IsFolder && IsSupportedImageFile(item.Path)
+                markdownItem.Visibility = hasSingleItem && item != null && !item.IsRemote && !isArchiveEntry && !item.IsFolder && IsSupportedImageFile(item.Path)
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
 
-            bool canOpenFile = CanOpenExplorerFile(item);
-            if (flyout.Items.Count > 3 && flyout.Items[3] is MenuFlyoutItem externalViewerItem)
+            bool canOpenFile = hasSingleItem && CanOpenExplorerFile(item);
+            if (flyout.Items.Count > 7 && flyout.Items[7] is MenuFlyoutItem externalViewerItem)
             {
                 externalViewerItem.Visibility = canOpenFile ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 4 && flyout.Items[4] is MenuFlyoutItem defaultProgramItem)
+            if (flyout.Items.Count > 8 && flyout.Items[8] is MenuFlyoutItem defaultProgramItem)
             {
                 defaultProgramItem.Visibility = canOpenFile ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            bool canExtractArchive = IsSupportedArchiveFile(item);
-            if (flyout.Items.Count > 5 && flyout.Items[5] is MenuFlyoutItem extractArchiveItem)
+            bool canExtractArchive = hasSingleItem && IsSupportedArchiveFile(item);
+            if (flyout.Items.Count > 9 && flyout.Items[9] is MenuFlyoutItem extractArchiveItem)
             {
                 extractArchiveItem.Visibility = canExtractArchive ? Visibility.Visible : Visibility.Collapsed;
                 if (canExtractArchive && item != null)
@@ -566,47 +616,303 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            bool canCompressFolder = item != null &&
-                !item.IsRemote &&
-                item.IsFolder &&
-                !isArchiveEntry &&
-                !string.IsNullOrWhiteSpace(item.Path) &&
-                Directory.Exists(item.Path);
-            if (flyout.Items.Count > 6 && flyout.Items[6] is MenuFlyoutItem compressToZipItem)
+            bool canCompress = selectedItems.Count > 0 && selectedItems.All(CanCompressItem);
+            if (flyout.Items.Count > 10 && flyout.Items[10] is MenuFlyoutItem compressToZipItem)
             {
-                compressToZipItem.Visibility = canCompressFolder ? Visibility.Visible : Visibility.Collapsed;
+                compressToZipItem.Visibility = canCompress ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 7 && flyout.Items[7] is MenuFlyoutItem compressToSevenZipItem)
+            if (flyout.Items.Count > 11 && flyout.Items[11] is MenuFlyoutItem compressToSevenZipItem)
             {
-                compressToSevenZipItem.Visibility = canCompressFolder ? Visibility.Visible : Visibility.Collapsed;
+                compressToSevenZipItem.Visibility = canCompress ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            bool canDownloadRemote = item != null && item.IsRemote;
-            if (flyout.Items.Count > 8 && flyout.Items[8] is MenuFlyoutItem downloadRemoteItem)
+            bool canConvertImages = selectedItems.Count > 0 && selectedItems.All(CanConvertImageItem);
+            SetMenuVisibility(flyout, 12, canConvertImages);
+
+            bool canDownloadRemote = hasSingleItem && item != null && item.IsRemote;
+            if (flyout.Items.Count > 13 && flyout.Items[13] is MenuFlyoutItem downloadRemoteItem)
             {
                 downloadRemoteItem.Visibility = canDownloadRemote ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 9 && flyout.Items[9] is MenuFlyoutItem uploadRemoteItem)
+            if (flyout.Items.Count > 14 && flyout.Items[14] is MenuFlyoutItem uploadRemoteItem)
             {
                 uploadRemoteItem.Visibility = canDownloadRemote ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 13 && flyout.Items[13] is MenuFlyoutItem copyFolderPathItem)
+            if (flyout.Items.Count > 16 && flyout.Items[16] is MenuFlyoutItem copyFileNameItem)
             {
-                copyFolderPathItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
+                copyFileNameItem.Visibility = hasSingleItem ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 15 && flyout.Items[15] is MenuFlyoutItem renameItem)
+            if (flyout.Items.Count > 17 && flyout.Items[17] is MenuFlyoutItem copyFilePathItem)
             {
-                renameItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
+                copyFilePathItem.Visibility = hasSingleItem ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 16 && flyout.Items[16] is MenuFlyoutItem deleteItem)
+            if (flyout.Items.Count > 18 && flyout.Items[18] is MenuFlyoutItem copyFolderPathItem)
             {
-                deleteItem.Visibility = isArchiveEntry ? Visibility.Collapsed : Visibility.Visible;
+                copyFolderPathItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
             }
+
+            if (flyout.Items.Count > 20 && flyout.Items[20] is MenuFlyoutItem renameItem)
+            {
+                renameItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (flyout.Items.Count > 21 && flyout.Items[21] is MenuFlyoutItem deleteItem)
+            {
+                deleteItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            SetMenuVisibility(flyout, 15, hasSingleItem);
+            SetMenuVisibility(flyout, 19, hasSingleItem);
+        }
+
+        private void SetMenuText(MenuFlyout flyout, int index, string key, string fallback)
+        {
+            if (index >= 0 && index < flyout.Items.Count && flyout.Items[index] is MenuFlyoutItem item)
+            {
+                item.Text = _getString(key, fallback);
+            }
+        }
+
+        private static void SetMenuVisibility(MenuFlyout flyout, int index, bool isVisible)
+        {
+            if (index >= 0 && index < flyout.Items.Count && flyout.Items[index] is FrameworkElement element)
+            {
+                element.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private static void SetMenuEnabled(MenuFlyout flyout, int index, bool isEnabled)
+        {
+            if (index >= 0 && index < flyout.Items.Count && flyout.Items[index] is MenuFlyoutItem item)
+            {
+                item.IsEnabled = isEnabled;
+            }
+        }
+
+        private void OnCutClick(object sender, RoutedEventArgs e)
+        {
+            _ = SetClipboardStorageItemsAsync(sender, DataPackageOperation.Move);
+        }
+
+        private void OnCopyItemsClick(object sender, RoutedEventArgs e)
+        {
+            _ = SetClipboardStorageItemsAsync(sender, DataPackageOperation.Copy);
+        }
+
+        private async void OnPasteClick(object sender, RoutedEventArgs e)
+        {
+            ExplorerItem? contextItem = GetExplorerItem(sender);
+            string targetDirectory = GetPasteTargetDirectory(contextItem);
+            if (!Directory.Exists(targetDirectory))
+            {
+                return;
+            }
+
+            try
+            {
+                DataPackageView clipboard = Clipboard.GetContent();
+                if (!clipboard.Contains(StandardDataFormats.StorageItems))
+                {
+                    return;
+                }
+
+                IReadOnlyList<IStorageItem> storageItems = await clipboard.GetStorageItemsAsync();
+                bool move = (clipboard.RequestedOperation & DataPackageOperation.Move) == DataPackageOperation.Move;
+                int transferredCount = 0;
+                foreach (IStorageItem storageItem in storageItems)
+                {
+                    if (string.IsNullOrWhiteSpace(storageItem.Path))
+                    {
+                        continue;
+                    }
+
+                    if (await TransferStorageItemAsync(storageItem.Path, targetDirectory, move))
+                    {
+                        transferredCount++;
+                    }
+                }
+
+                if (move && transferredCount > 0)
+                {
+                    Clipboard.Clear();
+                }
+
+                _loadDirectoryRoot(_currentFolderProvider());
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("ExplorerPasteErrorTitle", "붙여넣기 오류"),
+                    ex.Message);
+            }
+        }
+
+        private async Task SetClipboardStorageItemsAsync(object sender, DataPackageOperation operation)
+        {
+            IReadOnlyList<ExplorerItem> selectedItems = GetSelectedExplorerItems(sender);
+            if (selectedItems.Count == 0 || selectedItems.Any(item => !CanUseLocalStorageItem(item)))
+            {
+                return;
+            }
+
+            try
+            {
+                var storageItems = new List<IStorageItem>(selectedItems.Count);
+                foreach (ExplorerItem item in selectedItems)
+                {
+                    IStorageItem storageItem = item.IsFolder
+                        ? await StorageFolder.GetFolderFromPathAsync(item.Path)
+                        : await StorageFile.GetFileFromPathAsync(item.Path);
+                    storageItems.Add(storageItem);
+                }
+
+                var dataPackage = new DataPackage
+                {
+                    RequestedOperation = operation
+                };
+                dataPackage.SetStorageItems(storageItems);
+                Clipboard.SetContent(dataPackage);
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("ExplorerClipboardErrorTitle", "클립보드 오류"),
+                    ex.Message);
+            }
+        }
+
+        private void OnImageConversionClick(object sender, RoutedEventArgs e)
+        {
+            IReadOnlyList<string> imagePaths = GetSelectedExplorerItems(sender)
+                .Where(CanConvertImageItem)
+                .Select(item => item.Path)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (imagePaths.Count == 0)
+            {
+                return;
+            }
+
+            FrameworkElement? sourceElement = sender as FrameworkElement;
+            _ = _imageConversionController.ShowAsync(
+                imagePaths,
+                sourceElement?.XamlRoot ?? _leftSidebar.XamlRoot,
+                sourceElement?.ActualTheme ?? _leftSidebar.ActualTheme);
+        }
+
+        private IReadOnlyList<ExplorerItem> GetSelectedExplorerItems(object? source)
+        {
+            ExplorerItem? contextItem = source as ExplorerItem;
+            if (contextItem == null && source != null)
+            {
+                contextItem = GetExplorerItem(source);
+            }
+
+            var selectedItems = _leftSidebar.FileList.SelectedItems
+                .OfType<ExplorerItem>()
+                .ToList();
+            if (contextItem != null && selectedItems.Any(item => ReferenceEquals(item, contextItem)))
+            {
+                return selectedItems;
+            }
+
+            var selectedTreeItems = GetTreeSelectedExplorerItems();
+            if (contextItem != null && selectedTreeItems.Any(item => ReferenceEquals(item, contextItem)))
+            {
+                return selectedTreeItems;
+            }
+
+            return contextItem != null
+                ? new[] { contextItem }
+                : selectedTreeItems.Count > 0 ? selectedTreeItems : selectedItems;
+        }
+
+        private IReadOnlyList<ExplorerItem> GetTreeSelectedExplorerItems()
+        {
+            return _leftSidebar.ExplorerTree.SelectedItems
+                .Select(GetTreeExplorerItem)
+                .Where(item => item != null)
+                .Cast<ExplorerItem>()
+                .ToList();
+        }
+
+        private TreeViewNode? FindTreeNodeFromElement(DependencyObject source)
+        {
+            DependencyObject? current = source;
+            while (current != null)
+            {
+                if (current is TreeViewItem treeViewItem)
+                {
+                    return _leftSidebar.ExplorerTree.NodeFromContainer(treeViewItem);
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return null;
+        }
+
+        private static bool CanUseLocalStorageItem(ExplorerItem item)
+        {
+            return !item.IsRemote &&
+                   !item.IsArchiveEntry &&
+                   !string.IsNullOrWhiteSpace(item.Path) &&
+                   (item.IsFolder ? Directory.Exists(item.Path) : File.Exists(item.Path));
+        }
+
+        private static bool CanCompressItem(ExplorerItem item)
+        {
+            return CanUseLocalStorageItem(item);
+        }
+
+        private static bool CanConvertImageItem(ExplorerItem item)
+        {
+            return !item.IsRemote &&
+                   !item.IsArchiveEntry &&
+                   !item.IsFolder &&
+                   !string.IsNullOrWhiteSpace(item.Path) &&
+                   File.Exists(item.Path) &&
+                   IsSupportedImageFile(item.Path);
+        }
+
+        private bool CanPasteIntoLocalDirectory(ExplorerItem? contextItem)
+        {
+            return !_isArchiveViewProvider() &&
+                   !_isRemoteViewProvider() &&
+                   (contextItem == null || (!contextItem.IsRemote && !contextItem.IsArchiveEntry)) &&
+                   Directory.Exists(GetPasteTargetDirectory(contextItem));
+        }
+
+        private static bool CanPasteStorageItems()
+        {
+            try
+            {
+                return Clipboard.GetContent().Contains(StandardDataFormats.StorageItems);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private string GetPasteTargetDirectory(ExplorerItem? contextItem)
+        {
+            if (contextItem != null && contextItem.IsFolder && !contextItem.IsArchiveEntry && !contextItem.IsRemote)
+            {
+                return contextItem.Path;
+            }
+
+            if (contextItem != null && !contextItem.IsFolder && !contextItem.IsArchiveEntry && !contextItem.IsRemote)
+            {
+                return Path.GetDirectoryName(contextItem.Path) ?? string.Empty;
+            }
+
+            return _currentFolderProvider();
         }
 
         private async void OnInsertMarkdownImageClick(object sender, RoutedEventArgs e)
@@ -775,31 +1081,35 @@ namespace TxtAIEditor.Controls
 
         private async void OnCompressFolderToZipClick(object sender, RoutedEventArgs e)
         {
-            await CompressFolderAsync(sender, ".zip", _archiveExplorerService.CreateZipFromDirectoryAsync);
+            await CompressSelectedItemsAsync(sender, ".zip", _archiveExplorerService.CreateZipFromPathsAsync);
         }
 
         private async void OnCompressFolderToSevenZipClick(object sender, RoutedEventArgs e)
         {
-            await CompressFolderAsync(sender, ".7z", _archiveExplorerService.CreateSevenZipFromDirectoryAsync);
+            await CompressSelectedItemsAsync(sender, ".7z", _archiveExplorerService.CreateSevenZipFromPathsAsync);
         }
 
-        private async Task CompressFolderAsync(
+        private async Task CompressSelectedItemsAsync(
             object sender,
             string archiveExtension,
-            Func<string, string, Action<double>?, System.Threading.CancellationToken, Task> createArchiveAsync)
+            Func<IReadOnlyList<string>, string, Action<double>?, System.Threading.CancellationToken, Task> createArchiveAsync)
         {
-            var item = GetExplorerItem(sender);
-            if (item == null ||
-                !item.IsFolder ||
-                item.IsArchiveEntry ||
-                string.IsNullOrWhiteSpace(item.Path) ||
-                !Directory.Exists(item.Path))
+            IReadOnlyList<ExplorerItem> selectedItems = GetSelectedExplorerItems(sender);
+            if (selectedItems.Count == 0 || !selectedItems.All(CanCompressItem))
             {
                 return;
             }
 
-            var sourceDirectory = new DirectoryInfo(Path.GetFullPath(item.Path));
-            if (sourceDirectory.Parent == null || string.IsNullOrWhiteSpace(sourceDirectory.Name))
+            IReadOnlyList<string> sourcePaths = selectedItems
+                .Select(item => Path.GetFullPath(item.Path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (sourcePaths.Count == 0)
+            {
+                return;
+            }
+
+            if (sourcePaths.Any(path => Directory.Exists(path) && Directory.GetParent(path) == null))
             {
                 _showError(
                     _getString("ArchiveCreateFailedTitle", "압축 파일 만들기 실패"),
@@ -807,9 +1117,23 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            string outputPath = Path.Combine(
-                sourceDirectory.Parent.FullName,
-                sourceDirectory.Name + archiveExtension);
+            string outputDirectory = GetArchiveOutputDirectory(sourcePaths);
+            if (string.IsNullOrWhiteSpace(outputDirectory) || !Directory.Exists(outputDirectory))
+            {
+                _showError(
+                    _getString("ArchiveCreateFailedTitle", "압축 파일 만들기 실패"),
+                    _getString("ArchiveCreateOutputDirectoryMissing", "압축 파일을 저장할 폴더를 찾을 수 없습니다."));
+                return;
+            }
+
+            string baseName = sourcePaths.Count == 1
+                ? GetArchiveBaseName(sourcePaths[0])
+                : _getString("ExplorerMultipleArchiveBaseName", "archive");
+            string outputPath = Path.Combine(outputDirectory, baseName + archiveExtension);
+            if (sourcePaths.Any(path => string.Equals(path, outputPath, StringComparison.OrdinalIgnoreCase)))
+            {
+                outputPath = Path.Combine(outputDirectory, baseName + "_archive" + archiveExtension);
+            }
 
             if (Directory.Exists(outputPath))
             {
@@ -851,7 +1175,7 @@ namespace TxtAIEditor.Controls
             try
             {
                 await createArchiveAsync(
-                    sourceDirectory.FullName,
+                    sourcePaths,
                     temporaryPath,
                     progress => _statusBar.ShowProgress(statusText, progress, () => _archiveCts?.Cancel()),
                     token
@@ -881,6 +1205,39 @@ namespace TxtAIEditor.Controls
                 _archiveCts = null;
                 TryDeleteTemporaryArchive(temporaryPath);
             }
+        }
+
+        private string GetArchiveOutputDirectory(IReadOnlyList<string> sourcePaths)
+        {
+            string? firstDirectory = GetItemParentDirectory(sourcePaths[0]);
+            if (!string.IsNullOrWhiteSpace(firstDirectory) &&
+                sourcePaths.All(path => string.Equals(
+                    GetItemParentDirectory(path),
+                    firstDirectory,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                return firstDirectory;
+            }
+
+            return _currentFolderProvider();
+        }
+
+        private static string? GetItemParentDirectory(string path)
+        {
+            if (Directory.Exists(path))
+            {
+                return Directory.GetParent(path)?.FullName;
+            }
+
+            return Path.GetDirectoryName(path);
+        }
+
+        private static string GetArchiveBaseName(string path)
+        {
+            string name = Directory.Exists(path)
+                ? new DirectoryInfo(path).Name
+                : Path.GetFileNameWithoutExtension(path);
+            return string.IsNullOrWhiteSpace(name) ? "archive" : name;
         }
 
         private static void TryDeleteTemporaryArchive(string path)
@@ -1784,15 +2141,35 @@ namespace TxtAIEditor.Controls
                 ?? (value as TreeViewNode)?.Content as ExplorerItem;
         }
 
-        private async Task CopyStorageItemAsync(string sourcePath, string targetDir)
+        private Task<bool> CopyStorageItemAsync(string sourcePath, string targetDir)
         {
-            if (string.IsNullOrWhiteSpace(sourcePath)) return;
+            return TransferStorageItemAsync(sourcePath, targetDir, move: false);
+        }
+
+        private async Task<bool> TransferStorageItemAsync(string sourcePath, string targetDir, bool move)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath) || !Directory.Exists(targetDir))
+            {
+                return false;
+            }
+
+            sourcePath = Path.GetFullPath(sourcePath);
+            targetDir = Path.GetFullPath(targetDir);
+            if (!File.Exists(sourcePath) && !Directory.Exists(sourcePath))
+            {
+                return false;
+            }
 
             string name = Path.GetFileName(sourcePath);
             string destPath = Path.Combine(targetDir, name);
 
             if (File.Exists(sourcePath))
             {
+                if (string.Equals(sourcePath, destPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
                 if (File.Exists(destPath))
                 {
                     var confirmDialog = new ContentDialog
@@ -1808,20 +2185,32 @@ namespace TxtAIEditor.Controls
 
                     if (await ShowDialogAsync(confirmDialog) != ContentDialogResult.Primary)
                     {
-                        return;
+                        return false;
                     }
                 }
 
-                await Task.Run(() => File.Copy(sourcePath, destPath, true));
+                await Task.Run(() =>
+                {
+                    if (move)
+                    {
+                        File.Move(sourcePath, destPath, overwrite: true);
+                    }
+                    else
+                    {
+                        File.Copy(sourcePath, destPath, true);
+                    }
+                });
+                return true;
             }
             else if (Directory.Exists(sourcePath))
             {
-                if (destPath.StartsWith(sourcePath, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(sourcePath, targetDir, StringComparison.OrdinalIgnoreCase) ||
+                    IsSameOrDescendantPath(targetDir, sourcePath))
                 {
                     _showError(
                         _getString("CopyFolderErrorTitle", "폴더 복사 오류"),
                         _getString("CopyFolderSelfParent", "폴더를 자기 자신 또는 하위 폴더에 복사할 수 없습니다."));
-                    return;
+                    return false;
                 }
 
                 if (Directory.Exists(destPath))
@@ -1839,12 +2228,42 @@ namespace TxtAIEditor.Controls
 
                     if (await ShowDialogAsync(confirmDialog) != ContentDialogResult.Primary)
                     {
-                        return;
+                        return false;
                     }
                 }
 
-                await Task.Run(() => CopyDirectory(sourcePath, destPath));
+                await Task.Run(() =>
+                {
+                    if (move && !Directory.Exists(destPath))
+                    {
+                        try
+                        {
+                            Directory.Move(sourcePath, destPath);
+                            return;
+                        }
+                        catch (IOException)
+                        {
+                            // Fall back to copy/delete for a cross-volume move.
+                        }
+                    }
+
+                    CopyDirectory(sourcePath, destPath);
+                    if (move)
+                    {
+                        Directory.Delete(sourcePath, recursive: true);
+                    }
+                });
+                return true;
             }
+
+            return false;
+        }
+
+        private static bool IsSameOrDescendantPath(string candidatePath, string parentPath)
+        {
+            string normalizedParent = Path.TrimEndingDirectorySeparator(Path.GetFullPath(parentPath)) + Path.DirectorySeparatorChar;
+            string normalizedCandidate = Path.TrimEndingDirectorySeparator(Path.GetFullPath(candidatePath)) + Path.DirectorySeparatorChar;
+            return normalizedCandidate.StartsWith(normalizedParent, StringComparison.OrdinalIgnoreCase);
         }
 
         private static void CopyDirectory(string sourceDir, string destDir)

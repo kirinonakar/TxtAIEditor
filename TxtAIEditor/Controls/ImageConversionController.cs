@@ -30,12 +30,29 @@ namespace TxtAIEditor.Controls
             _getCurrentElementTheme = getCurrentElementTheme;
         }
 
-        public async Task ShowAsync(
+        public Task ShowAsync(
             string sourcePath,
             XamlRoot? xamlRoot,
             ElementTheme theme)
         {
-            if (_isShowing || xamlRoot == null || string.IsNullOrWhiteSpace(sourcePath))
+            return ShowAsync(new[] { sourcePath }, xamlRoot, theme);
+        }
+
+        public async Task ShowAsync(
+            IReadOnlyList<string> sourcePaths,
+            XamlRoot? xamlRoot,
+            ElementTheme theme)
+        {
+            if (_isShowing || xamlRoot == null || sourcePaths == null)
+            {
+                return;
+            }
+
+            IReadOnlyList<string> paths = sourcePaths
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (paths.Count == 0)
             {
                 return;
             }
@@ -48,10 +65,13 @@ namespace TxtAIEditor.Controls
             _isShowing = true;
             try
             {
-                ImageConversionSourceInfo sourceInfo;
+                var sourceInfos = new Dictionary<string, ImageConversionSourceInfo>(StringComparer.OrdinalIgnoreCase);
                 try
                 {
-                    sourceInfo = await _imageConversionService.ReadSourceInfoAsync(sourcePath);
+                    foreach (string path in paths)
+                    {
+                        sourceInfos[path] = await _imageConversionService.ReadSourceInfoAsync(path);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -63,24 +83,47 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                bool isAnimated = sourceInfo.FrameCount > 1 && IsAnimatedImagePath(sourcePath);
+                ImageConversionSourceInfo sourceInfo = sourceInfos[paths[0]];
+                bool isAnimated = sourceInfos.Any(pair =>
+                    pair.Value.FrameCount > 1 && IsAnimatedImagePath(pair.Key));
                 ImageConversionDialogValues? values = await ShowOptionsDialogAsync(
-                    sourcePath,
+                    paths[0],
                     sourceInfo,
                     isAnimated,
                     xamlRoot,
-                    theme);
+                    theme,
+                    paths.Count);
                 if (values == null)
                 {
                     return;
                 }
 
-                IReadOnlyList<string> outputPaths = ImageConversionService.BuildOutputPaths(
-                    sourcePath,
-                    values.OutputFormat,
-                    values.ExtractFrames,
-                    sourceInfo.FrameCount);
-                string[] existingPaths = outputPaths.Where(File.Exists).ToArray();
+                var outputPaths = new List<string>();
+                foreach (string path in paths)
+                {
+                    outputPaths.AddRange(ImageConversionService.BuildOutputPaths(
+                        path,
+                        values.OutputFormat,
+                        values.ExtractFrames,
+                        sourceInfos[path].FrameCount));
+                }
+
+                if (outputPaths.Count != outputPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count())
+                {
+                    await ShowMessageAsync(
+                        _getString("ImageConvertErrorTitle", "이미지 변환 오류"),
+                        _getString(
+                            "ImageConvertBatchOutputConflict",
+                            "선택한 이미지의 출력 파일 이름이 서로 겹칩니다. 파일 이름을 확인한 후 다시 시도해 주세요."),
+                        xamlRoot,
+                        theme);
+                    return;
+                }
+
+                string[] existingPaths = outputPaths
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Where(File.Exists)
+                    .ToArray();
                 if (existingPaths.Length > 0)
                 {
                     string existingName = Path.GetFileName(existingPaths[0]);
@@ -104,21 +147,30 @@ namespace TxtAIEditor.Controls
 
                 try
                 {
-                    IReadOnlyList<string> convertedPaths = await _imageConversionService.ConvertAsync(
-                        sourcePath,
-                        new ImageConversionOptions
-                        {
-                            OutputFormat = values.OutputFormat,
-                            Quality = values.Quality,
-                            ResizeEnabled = values.ResizeEnabled,
-                            TargetWidth = values.TargetWidth,
-                            TargetHeight = values.TargetHeight,
-                            KeepAspectRatio = values.KeepAspectRatio,
-                            InterpolationMode = values.InterpolationMode,
-                            ExtractFrames = values.ExtractFrames
-                        });
+                    var convertedPaths = new List<string>();
+                    var options = new ImageConversionOptions
+                    {
+                        OutputFormat = values.OutputFormat,
+                        Quality = values.Quality,
+                        ResizeEnabled = values.ResizeEnabled,
+                        TargetWidth = values.TargetWidth,
+                        TargetHeight = values.TargetHeight,
+                        KeepAspectRatio = values.KeepAspectRatio,
+                        InterpolationMode = values.InterpolationMode,
+                        ExtractFrames = values.ExtractFrames
+                    };
 
-                    string firstOutputName = Path.GetFileName(convertedPaths[0]);
+                    foreach (string path in paths)
+                    {
+                        IReadOnlyList<string> converted = await _imageConversionService.ConvertAsync(
+                            path,
+                            options);
+                        convertedPaths.AddRange(converted);
+                    }
+
+                    string firstOutputName = convertedPaths.Count > 0
+                        ? Path.GetFileName(convertedPaths[0])
+                        : string.Empty;
                     string successMessage = string.Format(
                         _getString(
                             "ImageConvertSuccessMessage",
@@ -151,8 +203,28 @@ namespace TxtAIEditor.Controls
             ImageConversionSourceInfo sourceInfo,
             bool isAnimated,
             XamlRoot xamlRoot,
-            ElementTheme theme)
+            ElementTheme theme,
+            int sourceCount)
         {
+            string sourceInfoText = sourceCount > 1
+                ? string.Format(
+                    _getString(
+                        "ImageConvertBatchSourceInfo",
+                        "선택된 이미지: {0}개\n기준 이미지: {1}\n크기: {2} × {3}px · 프레임: {4}"),
+                    sourceCount,
+                    Path.GetFileName(sourcePath),
+                    sourceInfo.Width,
+                    sourceInfo.Height,
+                    sourceInfo.FrameCount)
+                : string.Format(
+                    _getString(
+                        "ImageConvertSourceInfo",
+                        "원본: {0}\n크기: {1} × {2}px · 프레임: {3}"),
+                    Path.GetFileName(sourcePath),
+                    sourceInfo.Width,
+                    sourceInfo.Height,
+                    sourceInfo.FrameCount);
+
             var root = new StackPanel
             {
                 Spacing = 10,
@@ -162,14 +234,7 @@ namespace TxtAIEditor.Controls
 
             root.Children.Add(new TextBlock
             {
-                Text = string.Format(
-                    _getString(
-                        "ImageConvertSourceInfo",
-                        "원본: {0}\n크기: {1} × {2}px · 프레임: {3}"),
-                    Path.GetFileName(sourcePath),
-                    sourceInfo.Width,
-                    sourceInfo.Height,
-                    sourceInfo.FrameCount),
+                Text = sourceInfoText,
                 TextWrapping = TextWrapping.Wrap
             });
 
@@ -391,9 +456,13 @@ namespace TxtAIEditor.Controls
 
             var dialog = new ContentDialog
             {
-                Title = string.Format(
-                    _getString("ImageConvertDialogTitle", "이미지 변환 - {0}"),
-                    Path.GetFileName(sourcePath)),
+                Title = sourceCount > 1
+                    ? string.Format(
+                        _getString("ImageConvertBatchDialogTitle", "이미지 일괄 변환 - {0}개"),
+                        sourceCount)
+                    : string.Format(
+                        _getString("ImageConvertDialogTitle", "이미지 변환 - {0}"),
+                        Path.GetFileName(sourcePath)),
                 Content = new ScrollViewer { Content = root },
                 PrimaryButtonText = _getString("ImageConvertConvertButton", "변환"),
                 CloseButtonText = _getString("ImageConvertCancelButton", "취소"),

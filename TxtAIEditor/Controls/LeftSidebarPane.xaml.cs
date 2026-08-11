@@ -35,6 +35,9 @@ namespace TxtAIEditor.Controls
         public event DragEventHandler? ExplorerTreeDrop { add => ExplorerView.TreeDrop += value; remove => ExplorerView.TreeDrop -= value; }
         public event ItemClickEventHandler? FileListViewItemClick { add => ExplorerView.FileItemClick += value; remove => ExplorerView.FileItemClick -= value; }
         public event RightTappedEventHandler? FileListViewItemRightTapped { add => ExplorerView.FileItemRightTapped += value; remove => ExplorerView.FileItemRightTapped -= value; }
+        public event RoutedEventHandler? CutClick { add => ExplorerView.CutClick += value; remove => ExplorerView.CutClick -= value; }
+        public event RoutedEventHandler? CopyItemsClick { add => ExplorerView.CopyItemsClick += value; remove => ExplorerView.CopyItemsClick -= value; }
+        public event RoutedEventHandler? PasteClick { add => ExplorerView.PasteClick += value; remove => ExplorerView.PasteClick -= value; }
         public event RoutedEventHandler? AddFileToFavoritesClick { add => ExplorerView.AddFileToFavoritesClick += value; remove => ExplorerView.AddFileToFavoritesClick -= value; }
         public event RoutedEventHandler? AddFolderToFavoritesClick { add => ExplorerView.AddFolderToFavoritesClick += value; remove => ExplorerView.AddFolderToFavoritesClick -= value; }
         public event RoutedEventHandler? InsertMarkdownImageClick { add => ExplorerView.InsertMarkdownImageClick += value; remove => ExplorerView.InsertMarkdownImageClick -= value; }
@@ -43,6 +46,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ExtractArchiveToFolderClick { add => ExplorerView.ExtractArchiveToFolderClick += value; remove => ExplorerView.ExtractArchiveToFolderClick -= value; }
         public event RoutedEventHandler? CompressFolderToZipClick { add => ExplorerView.CompressFolderToZipClick += value; remove => ExplorerView.CompressFolderToZipClick -= value; }
         public event RoutedEventHandler? CompressFolderToSevenZipClick { add => ExplorerView.CompressFolderToSevenZipClick += value; remove => ExplorerView.CompressFolderToSevenZipClick -= value; }
+        public event RoutedEventHandler? ImageConversionClick { add => ExplorerView.ImageConversionClick += value; remove => ExplorerView.ImageConversionClick -= value; }
         public event RoutedEventHandler? DownloadRemoteItemClick { add => ExplorerView.DownloadRemoteItemClick += value; remove => ExplorerView.DownloadRemoteItemClick -= value; }
         public event RoutedEventHandler? UploadRemoteItemClick { add => ExplorerView.UploadRemoteItemClick += value; remove => ExplorerView.UploadRemoteItemClick -= value; }
 

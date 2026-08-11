@@ -61,6 +61,9 @@ namespace TxtAIEditor.Controls
         public event DragEventHandler? TreeDrop;
         public event ItemClickEventHandler? FileItemClick;
         public event RightTappedEventHandler? FileItemRightTapped;
+        public event RoutedEventHandler? CutClick;
+        public event RoutedEventHandler? CopyItemsClick;
+        public event RoutedEventHandler? PasteClick;
         public event RoutedEventHandler? AddFileToFavoritesClick;
         public event RoutedEventHandler? AddFolderToFavoritesClick;
         public event RoutedEventHandler? InsertMarkdownImageClick;
@@ -69,6 +72,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ExtractArchiveToFolderClick;
         public event RoutedEventHandler? CompressFolderToZipClick;
         public event RoutedEventHandler? CompressFolderToSevenZipClick;
+        public event RoutedEventHandler? ImageConversionClick;
         public event RoutedEventHandler? DownloadRemoteItemClick;
         public event RoutedEventHandler? UploadRemoteItemClick;
         public event RoutedEventHandler? CopyFileNameClick;
@@ -299,6 +303,9 @@ namespace TxtAIEditor.Controls
         private void OnExplorerTreeDrop(object sender, DragEventArgs e) => TreeDrop?.Invoke(sender, e);
         private void OnFileListViewItemClick(object sender, ItemClickEventArgs e) => FileItemClick?.Invoke(sender, e);
         private void OnFileListViewItemRightTapped(object sender, RightTappedRoutedEventArgs e) => FileItemRightTapped?.Invoke(sender, e);
+        private void OnCutClick(object sender, RoutedEventArgs e) => CutClick?.Invoke(sender, e);
+        private void OnCopyItemsClick(object sender, RoutedEventArgs e) => CopyItemsClick?.Invoke(sender, e);
+        private void OnPasteClick(object sender, RoutedEventArgs e) => PasteClick?.Invoke(sender, e);
         private void OnAddFileToFavoritesClick(object sender, RoutedEventArgs e) => AddFileToFavoritesClick?.Invoke(sender, e);
         private void OnAddFolderToFavoritesClick(object sender, RoutedEventArgs e) => AddFolderToFavoritesClick?.Invoke(sender, e);
         private void OnInsertMarkdownImageClick(object sender, RoutedEventArgs e) => InsertMarkdownImageClick?.Invoke(sender, e);
@@ -307,6 +314,7 @@ namespace TxtAIEditor.Controls
         private void OnExtractArchiveToFolderClick(object sender, RoutedEventArgs e) => ExtractArchiveToFolderClick?.Invoke(sender, e);
         private void OnCompressFolderToZipClick(object sender, RoutedEventArgs e) => CompressFolderToZipClick?.Invoke(sender, e);
         private void OnCompressFolderToSevenZipClick(object sender, RoutedEventArgs e) => CompressFolderToSevenZipClick?.Invoke(sender, e);
+        private void OnImageConversionClick(object sender, RoutedEventArgs e) => ImageConversionClick?.Invoke(sender, e);
         private void OnDownloadRemoteItemClick(object sender, RoutedEventArgs e) => DownloadRemoteItemClick?.Invoke(sender, e);
         private void OnUploadRemoteItemClick(object sender, RoutedEventArgs e) => UploadRemoteItemClick?.Invoke(sender, e);
         private void OnCopyFileNameClick(object sender, RoutedEventArgs e) => CopyFileNameClick?.Invoke(sender, e);
