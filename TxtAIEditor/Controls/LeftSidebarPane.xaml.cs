@@ -188,6 +188,11 @@ namespace TxtAIEditor.Controls
             ExplorerView.SetTreeMode(isTreeMode);
         }
 
+        public void ClearExplorerTreeSelection()
+        {
+            ExplorerView.ClearTreeSelection();
+        }
+
         public void ClearExplorerFilter()
         {
             ExplorerView.ClearFilter();

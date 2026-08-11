@@ -133,7 +133,6 @@ namespace TxtAIEditor.Controls
             }
 
             IsTreeMode = enableTreeMode;
-            _treeSelectionCount = 0;
             ClearExplorerFilterState();
             _leftSidebar.SetExplorerTreeMode(IsTreeMode);
             UpdateBackButtonState();
@@ -154,8 +153,7 @@ namespace TxtAIEditor.Controls
 
             if (string.IsNullOrWhiteSpace(CurrentFolderPath) || !Directory.Exists(CurrentFolderPath))
             {
-                _treeSelectionCount = 0;
-                _leftSidebar.ExplorerTree.RootNodes.Clear();
+                ClearExplorerTreeNodes();
                 return;
             }
 
@@ -702,6 +700,9 @@ namespace TxtAIEditor.Controls
             Microsoft.UI.Xaml.Controls.TreeView sender,
             Microsoft.UI.Xaml.Controls.TreeViewSelectionChangedEventArgs args)
         {
+            // Reading SelectedItems/SelectedNodes from this callback can re-enter
+            // WinUI while RootNodes is being replaced. Track the count from the
+            // stable event payload instead.
             _treeSelectionCount += args.AddedItems.Count;
             _treeSelectionCount -= args.RemovedItems.Count;
             if (_treeSelectionCount < 0)
@@ -911,8 +912,7 @@ namespace TxtAIEditor.Controls
                 HasUnrealizedChildren = true
             };
 
-            _treeSelectionCount = 0;
-            _leftSidebar.ExplorerTree.RootNodes.Clear();
+            ClearExplorerTreeNodes();
             _leftSidebar.ExplorerTree.RootNodes.Add(rootNode);
             PopulateTreeNode(rootNode);
             rootNode.IsExpanded = true;
@@ -964,8 +964,7 @@ namespace TxtAIEditor.Controls
             };
 
             _viewModel.ExplorerItems.Clear();
-            _treeSelectionCount = 0;
-            _leftSidebar.ExplorerTree.RootNodes.Clear();
+            ClearExplorerTreeNodes();
             _leftSidebar.ExplorerTree.RootNodes.Add(rootNode);
             await PopulateRemoteTreeNodeAsync(rootNode, rootItem);
             rootNode.IsExpanded = true;
@@ -1686,6 +1685,16 @@ namespace TxtAIEditor.Controls
                 format,
                 _explorerStatusBaseText,
                 selectedCount);
+        }
+
+        private void ClearExplorerTreeNodes()
+        {
+            // Clear selection while every selected node still belongs to the tree.
+            // Letting RootNodes.Clear detach selected nodes itself can corrupt the
+            // WinUI TreeView selection projection in multiple-selection mode.
+            _leftSidebar.ClearExplorerTreeSelection();
+            _treeSelectionCount = 0;
+            _leftSidebar.ExplorerTree.RootNodes.Clear();
         }
 
         public async Task UpdateGitStatusesAsync()

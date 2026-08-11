@@ -109,8 +109,26 @@ namespace TxtAIEditor.Controls
             {
                 ExplorerTreeView.DispatcherQueue.TryEnqueue(() =>
                 {
-                    ExplorerTreeView.Focus(FocusState.Programmatic);
+                    if (ExplorerTreeView.Visibility == Visibility.Visible)
+                    {
+                        ExplorerTreeView.Focus(FocusState.Programmatic);
+                    }
                 });
+            }
+        }
+
+        public void ClearTreeSelection()
+        {
+            _treeSelectionAnchor = null;
+            _treeKeyboardFocusNode = null;
+            _isApplyingTreeSelection = true;
+            try
+            {
+                ExplorerTreeView.SelectedNodes.Clear();
+            }
+            finally
+            {
+                _isApplyingTreeSelection = false;
             }
         }
 
@@ -243,7 +261,14 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                ExplorerTreeView.DispatcherQueue.TryEnqueue(() => expanderNode.IsExpanded = !expanderNode.IsExpanded);
+                ExplorerTreeView.DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (ExplorerTreeView.Visibility == Visibility.Visible &&
+                        IndexOfNode(GetVisibleTreeNodes(), expanderNode) >= 0)
+                    {
+                        expanderNode.IsExpanded = !expanderNode.IsExpanded;
+                    }
+                });
                 return;
             }
 
@@ -258,11 +283,6 @@ namespace TxtAIEditor.Controls
             if (!controlPressed && !shiftPressed)
             {
                 _treeSelectionAnchor = node;
-                if (!IsTreeSelectionCheckBox(source))
-                {
-                    ExplorerTreeView.DispatcherQueue.TryEnqueue(() => SelectTreeNodeAsCurrent(node));
-                }
-
                 return;
             }
 
@@ -330,15 +350,22 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (sender.SelectedNodes.Count == 0)
+            // Do not inspect SelectedNodes here. WinUI can raise this event while
+            // it is detaching selected nodes from RootNodes, and re-entering the
+            // selection projection at that point can fail inside Microsoft.UI.Xaml.
+            if (args.AddedItems.Count == 0)
             {
                 _treeSelectionAnchor = null;
+                _treeKeyboardFocusNode = null;
                 return;
             }
 
-            TreeViewNode selectedNode = sender.SelectedNodes[sender.SelectedNodes.Count - 1];
-            _treeSelectionAnchor = selectedNode;
-            _treeKeyboardFocusNode = selectedNode;
+            object selectedItem = args.AddedItems[args.AddedItems.Count - 1];
+            if (TryGetInvokedTreeNode(selectedItem, out TreeViewNode? selectedNode) && selectedNode != null)
+            {
+                _treeSelectionAnchor = selectedNode;
+                _treeKeyboardFocusNode = selectedNode;
+            }
         }
 
         private void ApplyPointerSelection(
@@ -348,6 +375,12 @@ namespace TxtAIEditor.Controls
             bool shiftPressed,
             bool wasSelected)
         {
+            if (ExplorerTreeView.Visibility != Visibility.Visible ||
+                IndexOfNode(GetVisibleTreeNodes(), node) < 0)
+            {
+                return;
+            }
+
             if (shiftPressed)
             {
                 ApplyTreeRangeSelection(selectionAnchor, node, preserveExistingSelection: controlPressed);
@@ -392,7 +425,8 @@ namespace TxtAIEditor.Controls
         private void SelectTreeNodeAsCurrent(TreeViewNode node)
         {
             if (ExplorerTreeView.Visibility != Visibility.Visible ||
-                IndexOfNode(GetVisibleTreeNodes(), node) < 0)
+                IndexOfNode(GetVisibleTreeNodes(), node) < 0 ||
+                !IsTreeRangeSelectableNode(node))
             {
                 return;
             }
@@ -612,22 +646,6 @@ namespace TxtAIEditor.Controls
             return false;
         }
 
-        private static bool IsTreeSelectionCheckBox(DependencyObject source)
-        {
-            DependencyObject? current = source;
-            while (current != null)
-            {
-                if (current is CheckBox)
-                {
-                    return true;
-                }
-
-                current = VisualTreeHelper.GetParent(current);
-            }
-
-            return false;
-        }
-
         private static bool IsTreeModifierPressed(Windows.System.VirtualKey key)
         {
             var state = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(key);
@@ -698,7 +716,65 @@ namespace TxtAIEditor.Controls
         private void OnExplorerHomeClick(object sender, RoutedEventArgs e) => HomeClick?.Invoke(sender, e);
         private void OnExplorerTreeModeClick(object sender, RoutedEventArgs e) => TreeModeClick?.Invoke(sender, e);
         private void OnExplorerTreeExpanding(TreeView sender, TreeViewExpandingEventArgs e) => TreeExpanding?.Invoke(sender, e);
-        private void OnExplorerTreeItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs e) => TreeItemInvoked?.Invoke(sender, e);
+        private void OnExplorerTreeItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs e)
+        {
+            if (!IsTreeModifierPressed(Windows.System.VirtualKey.Control) &&
+                !IsTreeModifierPressed(Windows.System.VirtualKey.Shift) &&
+                TryGetInvokedTreeNode(e.InvokedItem, out TreeViewNode? node) &&
+                node != null &&
+                IsTreeRangeSelectableNode(node))
+            {
+                _treeSelectionAnchor = node;
+                _treeKeyboardFocusNode = node;
+                ExplorerTreeView.DispatcherQueue.TryEnqueue(() => SelectTreeNodeAsCurrent(node));
+            }
+
+            TreeItemInvoked?.Invoke(sender, e);
+        }
+
+        private bool TryGetInvokedTreeNode(object? invokedItem, out TreeViewNode? node)
+        {
+            node = invokedItem as TreeViewNode;
+            if (node != null)
+            {
+                return true;
+            }
+
+            if (invokedItem is not ExplorerItem item)
+            {
+                return false;
+            }
+
+            foreach (TreeViewNode rootNode in ExplorerTreeView.RootNodes)
+            {
+                node = FindTreeNodeByContent(rootNode, item);
+                if (node != null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static TreeViewNode? FindTreeNodeByContent(TreeViewNode node, ExplorerItem item)
+        {
+            if (ReferenceEquals(node.Content, item))
+            {
+                return node;
+            }
+
+            foreach (TreeViewNode childNode in node.Children)
+            {
+                TreeViewNode? match = FindTreeNodeByContent(childNode, item);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
         private void OnExplorerTreeDragOver(object sender, DragEventArgs e) => TreeDragOver?.Invoke(sender, e);
         private void OnExplorerTreeDrop(object sender, DragEventArgs e) => TreeDrop?.Invoke(sender, e);
         private void OnFileListViewItemClick(object sender, ItemClickEventArgs e) => FileItemClick?.Invoke(sender, e);
