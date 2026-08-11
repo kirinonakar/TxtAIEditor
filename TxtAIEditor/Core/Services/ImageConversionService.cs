@@ -109,6 +109,17 @@ namespace TxtAIEditor.Core.Services
                 options.ExtractFrames,
                 frameCount);
 
+            if (frameCount > 1 && AnimatedImageFrameComposer.IsSupportedAnimationPath(sourcePath))
+            {
+                await ConvertCompositedFramesAsync(
+                    decoder,
+                    sourcePath,
+                    outputFrameCount,
+                    outputPaths,
+                    options);
+                return outputPaths;
+            }
+
             for (uint frameIndex = 0; frameIndex < outputFrameCount; frameIndex++)
             {
                 BitmapFrame frame = await decoder.GetFrameAsync(frameIndex);
@@ -139,6 +150,83 @@ namespace TxtAIEditor.Core.Services
             }
 
             return outputPaths;
+        }
+
+        private static async Task ConvertCompositedFramesAsync(
+            BitmapDecoder decoder,
+            string sourcePath,
+            uint outputFrameCount,
+            IReadOnlyList<string> outputPaths,
+            ImageConversionOptions options)
+        {
+            await AnimatedImageFrameComposer.ComposeAsync(
+                decoder,
+                sourcePath,
+                outputFrameCount,
+                async (frameIndex, composedFrame) =>
+                {
+                    (uint outputWidth, uint outputHeight) = CalculateOutputSize(
+                        composedFrame.Width,
+                        composedFrame.Height,
+                        options);
+                    byte[] pixels = composedFrame.Pixels;
+                    if (outputWidth != composedFrame.Width || outputHeight != composedFrame.Height)
+                    {
+                        pixels = await ResizePixelsAsync(
+                            pixels,
+                            composedFrame.Width,
+                            composedFrame.Height,
+                            outputWidth,
+                            outputHeight,
+                            options.InterpolationMode);
+                    }
+
+                    await EncodeFrameAsync(
+                        outputPaths[(int)frameIndex],
+                        outputWidth,
+                        outputHeight,
+                        pixels,
+                        options);
+                });
+        }
+
+        private static async Task<byte[]> ResizePixelsAsync(
+            byte[] pixels,
+            uint sourceWidth,
+            uint sourceHeight,
+            uint outputWidth,
+            uint outputHeight,
+            BitmapInterpolationMode interpolationMode)
+        {
+            using var intermediate = new InMemoryRandomAccessStream();
+            BitmapEncoder encoder = await BitmapEncoder.CreateAsync(
+                BitmapEncoder.PngEncoderId,
+                intermediate);
+            encoder.SetPixelData(
+                BitmapPixelFormat.Bgra8,
+                BitmapAlphaMode.Premultiplied,
+                sourceWidth,
+                sourceHeight,
+                96,
+                96,
+                pixels);
+            await encoder.FlushAsync();
+
+            intermediate.Seek(0);
+            BitmapDecoder decoder = await BitmapDecoder.CreateAsync(intermediate);
+            var transform = new BitmapTransform
+            {
+                ScaledWidth = outputWidth,
+                ScaledHeight = outputHeight,
+                InterpolationMode = interpolationMode
+            };
+            PixelDataProvider resizedPixels = await decoder.GetPixelDataAsync(
+                BitmapPixelFormat.Bgra8,
+                BitmapAlphaMode.Premultiplied,
+                transform,
+                ExifOrientationMode.IgnoreExifOrientation,
+                ColorManagementMode.ColorManageToSRgb);
+            return resizedPixels.DetachPixelData();
         }
 
         private static async Task EncodeFrameAsync(
