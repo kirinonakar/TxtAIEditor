@@ -48,7 +48,78 @@ namespace TxtAIEditor.Core.Services
                     getString("OfficeViewerNoContent", "No content to display."));
             }
 
-            return BuildDocumentHtml(Path.GetFileName(filePath), content.ToString());
+            string? pageWidth = null;
+            string? pagePadding = null;
+            if (TryReadWordPageLayout(document, out string documentPageWidth, out string documentPagePadding))
+            {
+                pageWidth = documentPageWidth;
+                pagePadding = documentPagePadding;
+            }
+
+            return BuildDocumentHtml(
+                Path.GetFileName(filePath),
+                content.ToString(),
+                pageWidth,
+                pagePadding);
+        }
+
+        private static bool TryReadWordPageLayout(
+            XDocument document,
+            out string pageWidth,
+            out string pagePadding)
+        {
+            pageWidth = string.Empty;
+            pagePadding = string.Empty;
+
+            XElement? sectionProperties = document.Descendants()
+                .FirstOrDefault(element => element.Name.LocalName == "sectPr");
+            XElement? pageSize = GetDirectProperty(sectionProperties, "pgSz");
+            if (!TryReadWordTwips(pageSize, "w", out int widthTwips) ||
+                !TryReadWordTwips(pageSize, "h", out int heightTwips) ||
+                widthTwips <= 0 ||
+                heightTwips <= 0)
+            {
+                return false;
+            }
+
+            string orientation = GetAttributeValue(pageSize, "orient");
+            if (orientation.Equals("landscape", StringComparison.OrdinalIgnoreCase) && widthTwips < heightTwips ||
+                orientation.Equals("portrait", StringComparison.OrdinalIgnoreCase) && widthTwips > heightTwips)
+            {
+                (widthTwips, heightTwips) = (heightTwips, widthTwips);
+            }
+
+            pageWidth = WordTwipsToCssPoints(widthTwips);
+
+            XElement? pageMargins = GetDirectProperty(sectionProperties, "pgMar");
+            if (TryReadWordTwips(pageMargins, "top", out int topTwips) &&
+                TryReadWordTwips(pageMargins, "right", out int rightTwips) &&
+                TryReadWordTwips(pageMargins, "bottom", out int bottomTwips) &&
+                TryReadWordTwips(pageMargins, "left", out int leftTwips))
+            {
+                pagePadding = string.Join(
+                    ' ',
+                    WordTwipsToCssPoints(topTwips),
+                    WordTwipsToCssPoints(rightTwips),
+                    WordTwipsToCssPoints(bottomTwips),
+                    WordTwipsToCssPoints(leftTwips));
+            }
+
+            return true;
+        }
+
+        private static bool TryReadWordTwips(XElement? element, string attributeName, out int twips)
+        {
+            return int.TryParse(
+                GetAttributeValue(element, attributeName),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out twips);
+        }
+
+        private static string WordTwipsToCssPoints(int twips)
+        {
+            return (twips / 20.0).ToString("0.###", CultureInfo.InvariantCulture) + "pt";
         }
 
         private static void AppendBlockHtml(

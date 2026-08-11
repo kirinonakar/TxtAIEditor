@@ -106,6 +106,10 @@ body.dragging-selection .line-row.row-drop-target {
     position: absolute;
     inset: 0;
     overflow: auto;
+    /* Virtual rows and compressed scrolling are positioned by the editor.
+       Native scroll anchoring would apply the DOM insertion delta again when
+       Enter adds a row, causing a small upward drift on every split. */
+    overflow-anchor: none;
     background: var(--bg);
     font-family: var(--font-family);
     font-size: var(--font-size);
