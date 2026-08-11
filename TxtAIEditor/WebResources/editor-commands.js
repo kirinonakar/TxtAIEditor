@@ -375,12 +375,14 @@ function captureSplitScrollAnchor(element, caretOffset) {
     // measured, so the virtual lineTop estimate could over-scroll and make the
     // caret jump 6-7 rows upward; repeated Enter then accumulated that error.
     const naturalNextBottom = caretViewportBottom + rowHeight;
+    const shouldAdjustScroll = naturalNextBottom > guardBottom;
     const desiredViewportBottom = Math.min(naturalNextBottom, guardBottom);
 
     return {
         scrollTop: scrollContainer.scrollTop,
         caretViewportTop,
         caretViewportBottom,
+        shouldAdjustScroll,
         desiredViewportBottom,
         desiredViewportTop: desiredViewportBottom - caretHeight,
         bottomGuard,
@@ -407,15 +409,28 @@ function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, toke
         }
 
         setCaret(element, targetColumn);
+        if (!anchor.shouldAdjustScroll) {
+            // When the next visual row still fits, Enter should leave the
+            // viewport exactly where it was. Re-rendering a wrapped text row can
+            // differ by a fraction of a CSS pixel from the pre-split estimate;
+            // feeding that difference back into scrollTop causes a small upward
+            // drift that does not happen when splitting an empty line.
+            const preservedScrollTop = clampScrollTop(anchor.scrollTop);
+            if (Math.abs(scrollContainer.scrollTop - preservedScrollTop) > 0.5) {
+                scrollContainer.scrollTop = preservedScrollTop;
+            }
+        }
         const caretRect = caretRectForOffset(element, targetColumn);
         if (!caretRect) return;
 
         const containerRect = scrollContainer.getBoundingClientRect();
         const currentViewportBottom = caretRect.bottom - containerRect.top;
-        const delta = currentViewportBottom - anchor.desiredViewportBottom;
-        if (Math.abs(delta) > 0.5) {
-            scrollContainer.scrollTop = clampScrollTop(
-                scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(delta));
+        if (anchor.shouldAdjustScroll) {
+            const delta = currentViewportBottom - anchor.desiredViewportBottom;
+            if (Math.abs(delta) > 0.5) {
+                scrollContainer.scrollTop = clampScrollTop(
+                    scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(delta));
+            }
         }
 
         // A scrollTop write can cause one more virtual render.  Re-check once or
@@ -545,6 +560,10 @@ function splitCurrentLine(element, options = {}) {
     if (immediateTarget && immediateTarget.getAttribute('contenteditable') === 'true') {
         immediateTarget.innerHTML = renderLineContent(nextLineNumber, indentedAfter);
         setCaret(immediateTarget, nextCaretColumn);
+    }
+
+    if (splitScrollAnchor && !splitScrollAnchor.shouldAdjustScroll) {
+        scrollContainer.scrollTop = clampScrollTop(splitScrollAnchor.scrollTop);
     }
 
     queueRender(true);
