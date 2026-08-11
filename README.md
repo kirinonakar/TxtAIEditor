@@ -66,6 +66,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 ### 🖼️ Integrated Media & Document Viewer
 *   **Unified Viewer Workflow:** Open and inspect images, office documents, audio, and video files directly from the Explorer or editor tabs alongside your project files.
 *   **Image Viewer:** View popular image formats (`.png`, `.jpg`, `.jpeg`, `.gif`, `.bmp`, `.ico`, `.webp`, `.tiff`, `.avif`) seamlessly within the editor space.
+*   **Image Conversion:** Right-click an image tab to convert it to PNG or JPG with adjustable quality, aspect-ratio-preserving resize, and interpolation. Animated GIF/WebP frames can be composited and exported individually; converted files use the `_convert` suffix.
 *   **Document Viewer:** Preview PDFs (`.pdf`) and common Office documents (`.docx`, `.pptx`, `.xlsx`, `.hwpx`, `.doc`, `.xls`, `.ppt`) in a clean, read-only viewer.
 *   **Audio & Video Player:** Listen to audio (`.mp3`, `.wav`, `.m4a`, `.aac`, `.flac`, `.wma`, `.ogg`, `.oga`, `.opus`) and watch videos (`.mp4`, `.m4v`, `.mov`, `.wmv`, `.avi`, `.mkv`, `.webm`, `.mpeg`, `.mpg`) with native, integrated media playback controls.
 
