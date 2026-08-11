@@ -15,6 +15,7 @@ namespace TxtAIEditor.Controls
     public sealed class ImageConversionController
     {
         private const double MaxDimension = 100_000;
+        private const double InputHeight = 32;
 
         private readonly Func<string, string, string> _getString;
         private readonly Func<ElementTheme> _getCurrentElementTheme;
@@ -175,6 +176,10 @@ namespace TxtAIEditor.Controls
             var formatCombo = new ComboBox
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
+                Height = InputHeight,
+                MinHeight = InputHeight,
+                MaxHeight = InputHeight,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 SelectedIndex = 0
             };
             formatCombo.Items.Add(CreateComboItem(
@@ -193,7 +198,11 @@ namespace TxtAIEditor.Controls
                 Minimum = 1,
                 Maximum = 100,
                 SmallChange = 1,
-                HorizontalAlignment = HorizontalAlignment.Stretch
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Height = InputHeight,
+                MinHeight = InputHeight,
+                MaxHeight = InputHeight,
+                VerticalContentAlignment = VerticalAlignment.Center
             };
             var qualityField = new ContentControl
             {
@@ -479,6 +488,10 @@ namespace TxtAIEditor.Controls
             var comboBox = new ComboBox
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
+                Height = InputHeight,
+                MinHeight = InputHeight,
+                MaxHeight = InputHeight,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 SelectedIndex = 0
             };
             comboBox.Items.Add(CreateComboItem(
@@ -504,7 +517,11 @@ namespace TxtAIEditor.Controls
                 Minimum = 1,
                 Maximum = MaxDimension,
                 SmallChange = 1,
-                HorizontalAlignment = HorizontalAlignment.Stretch
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Height = InputHeight,
+                MinHeight = InputHeight,
+                MaxHeight = InputHeight,
+                VerticalContentAlignment = VerticalAlignment.Center
             };
         }
 
