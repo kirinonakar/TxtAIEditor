@@ -679,6 +679,53 @@ namespace TxtAIEditor.Controls
             }
 
             SetMenuVisibility(flyout, 22, hasSingleItem || canDelete);
+            NormalizeContextFlyoutSeparators(flyout);
+        }
+
+        private static void NormalizeContextFlyoutSeparators(MenuFlyout flyout)
+        {
+            var pendingSeparators = new List<MenuFlyoutSeparator>();
+            bool hasVisibleAction = false;
+
+            foreach (object menuItem in flyout.Items)
+            {
+                if (menuItem is MenuFlyoutSeparator separator)
+                {
+                    if (separator.Visibility != Visibility.Visible || !hasVisibleAction)
+                    {
+                        separator.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        pendingSeparators.Add(separator);
+                    }
+
+                    continue;
+                }
+
+                if (menuItem is not FrameworkElement element || element.Visibility != Visibility.Visible)
+                {
+                    continue;
+                }
+
+                if (pendingSeparators.Count > 0)
+                {
+                    pendingSeparators[0].Visibility = Visibility.Visible;
+                    for (int index = 1; index < pendingSeparators.Count; index++)
+                    {
+                        pendingSeparators[index].Visibility = Visibility.Collapsed;
+                    }
+
+                    pendingSeparators.Clear();
+                }
+
+                hasVisibleAction = true;
+            }
+
+            foreach (MenuFlyoutSeparator separator in pendingSeparators)
+            {
+                separator.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void SetMenuText(MenuFlyout flyout, int index, string key, string fallback)
