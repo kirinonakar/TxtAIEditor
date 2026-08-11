@@ -393,6 +393,16 @@
                                           Drop="OnExplorerTreeDrop"
                                           Expanding="OnExplorerTreeExpanding"
                                           ItemInvoked="OnExplorerTreeItemInvoked">
+                                    <TreeView.Resources>
+                                        <Style TargetType="CheckBox">
+                                            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                                            <Setter Property="RenderTransform">
+                                                <Setter.Value>
+                                                    <ScaleTransform ScaleX="0.6" ScaleY="0.6"/>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </TreeView.Resources>
                                     <TreeView.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Padding="0,3,8,3" ToolTipService.ToolTip="{Binding Content.ToolTipPath}" RightTapped="OnFileListViewItemRightTapped">

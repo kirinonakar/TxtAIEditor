@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -10,6 +11,10 @@ namespace TxtAIEditor.Controls
 {
     public sealed partial class ExplorerSidebarView : UserControl
     {
+        private TreeViewNode? _treeSelectionAnchor;
+        private TreeViewNode? _treeKeyboardFocusNode;
+        private bool _isApplyingTreeSelection;
+
         public ExplorerSidebarView()
         {
             InitializeComponent();
@@ -18,6 +23,11 @@ namespace TxtAIEditor.Controls
                 UIElement.PointerPressedEvent,
                 new PointerEventHandler(OnExplorerPointerPressed),
                 true);
+            RootGrid.AddHandler(
+                UIElement.KeyDownEvent,
+                new KeyEventHandler(OnExplorerKeyDown),
+                true);
+            ExplorerTreeView.SelectionChanged += OnExplorerTreeSelectionChanged;
         }
 
         public Grid Root => RootGrid;
@@ -226,12 +236,402 @@ namespace TxtAIEditor.Controls
             // Focus the tree for both paths, and only provide a fallback toggle when
             // WinUI did not handle the chevron press.
             ExplorerTreeView.Focus(FocusState.Pointer);
-            if (e.Handled || !TryGetTreeExpanderNode(source, out TreeViewNode? node) || node == null)
+            if (TryGetTreeExpanderNode(source, out TreeViewNode? expanderNode) && expanderNode != null)
+            {
+                if (e.Handled)
+                {
+                    return;
+                }
+
+                ExplorerTreeView.DispatcherQueue.TryEnqueue(() => expanderNode.IsExpanded = !expanderNode.IsExpanded);
+                return;
+            }
+
+            if (!TryGetTreeNode(source, out TreeViewNode? node) || node == null || !properties.IsLeftButtonPressed)
             {
                 return;
             }
 
-            ExplorerTreeView.DispatcherQueue.TryEnqueue(() => node.IsExpanded = !node.IsExpanded);
+            _treeKeyboardFocusNode = node;
+            bool controlPressed = IsTreeModifierPressed(Windows.System.VirtualKey.Control);
+            bool shiftPressed = IsTreeModifierPressed(Windows.System.VirtualKey.Shift);
+            if (!controlPressed && !shiftPressed)
+            {
+                _treeSelectionAnchor = node;
+                if (!IsTreeSelectionCheckBox(source))
+                {
+                    ExplorerTreeView.DispatcherQueue.TryEnqueue(() => SelectTreeNodeAsCurrent(node));
+                }
+
+                return;
+            }
+
+            TreeViewNode selectionAnchor = GetSelectionAnchor(node);
+            bool wasSelected = IsTreeNodeSelected(node);
+            ExplorerTreeView.DispatcherQueue.TryEnqueue(() =>
+            {
+                ApplyPointerSelection(node, selectionAnchor, controlPressed, shiftPressed, wasSelected);
+            });
+            e.Handled = true;
+        }
+
+        private void OnExplorerKeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (ExplorerTreeView.Visibility != Visibility.Visible ||
+                !IsTreeModifierPressed(Windows.System.VirtualKey.Shift) ||
+                IsTreeModifierPressed(Windows.System.VirtualKey.Control) ||
+                (e.Key != Windows.System.VirtualKey.Up && e.Key != Windows.System.VirtualKey.Down))
+            {
+                return;
+            }
+
+            TreeViewNode? currentNode = null;
+            if (e.OriginalSource is DependencyObject source)
+            {
+                TryGetTreeNode(source, out currentNode);
+            }
+
+            currentNode ??= _treeKeyboardFocusNode;
+            if (currentNode == null)
+            {
+                return;
+            }
+
+            List<TreeViewNode> visibleNodes = GetVisibleTreeNodes();
+            int currentIndex = IndexOfNode(visibleNodes, currentNode);
+            if (currentIndex < 0)
+            {
+                return;
+            }
+
+            int nextIndex = e.Key == Windows.System.VirtualKey.Up
+                ? currentIndex - 1
+                : currentIndex + 1;
+            if (nextIndex < 0 || nextIndex >= visibleNodes.Count)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            e.Handled = true;
+            int direction = e.Key == Windows.System.VirtualKey.Up ? -1 : 1;
+            ExplorerTreeView.DispatcherQueue.TryEnqueue(() =>
+            {
+                ApplyShiftArrowSelection(currentNode, direction);
+            });
+        }
+
+        private void OnExplorerTreeSelectionChanged(
+            TreeView sender,
+            TreeViewSelectionChangedEventArgs args)
+        {
+            if (_isApplyingTreeSelection)
+            {
+                return;
+            }
+
+            if (sender.SelectedNodes.Count == 0)
+            {
+                _treeSelectionAnchor = null;
+                return;
+            }
+
+            TreeViewNode selectedNode = sender.SelectedNodes[sender.SelectedNodes.Count - 1];
+            _treeSelectionAnchor = selectedNode;
+            _treeKeyboardFocusNode = selectedNode;
+        }
+
+        private void ApplyPointerSelection(
+            TreeViewNode node,
+            TreeViewNode selectionAnchor,
+            bool controlPressed,
+            bool shiftPressed,
+            bool wasSelected)
+        {
+            if (shiftPressed)
+            {
+                ApplyTreeRangeSelection(selectionAnchor, node, preserveExistingSelection: controlPressed);
+            }
+            else
+            {
+                SetTreeNodeSelection(node, !wasSelected);
+                _treeSelectionAnchor = node;
+            }
+
+            FocusTreeNode(node);
+            _treeKeyboardFocusNode = node;
+        }
+
+        private void ApplyShiftArrowSelection(TreeViewNode currentNode, int direction)
+        {
+            if (ExplorerTreeView.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            List<TreeViewNode> visibleNodes = GetVisibleTreeNodes();
+            int currentIndex = IndexOfNode(visibleNodes, currentNode);
+            if (currentIndex < 0)
+            {
+                return;
+            }
+
+            int targetIndex = currentIndex + direction;
+            if (targetIndex < 0 || targetIndex >= visibleNodes.Count)
+            {
+                return;
+            }
+
+            TreeViewNode targetNode = visibleNodes[targetIndex];
+            TreeViewNode selectionAnchor = GetSelectionAnchor(currentNode);
+            ApplyTreeRangeSelection(selectionAnchor, targetNode, preserveExistingSelection: false);
+            FocusTreeNode(targetNode);
+            _treeKeyboardFocusNode = targetNode;
+        }
+
+        private void SelectTreeNodeAsCurrent(TreeViewNode node)
+        {
+            if (ExplorerTreeView.Visibility != Visibility.Visible ||
+                IndexOfNode(GetVisibleTreeNodes(), node) < 0)
+            {
+                return;
+            }
+
+            _isApplyingTreeSelection = true;
+            try
+            {
+                ExplorerTreeView.SelectedNodes.Clear();
+                ExplorerTreeView.SelectedNodes.Add(node);
+            }
+            finally
+            {
+                _isApplyingTreeSelection = false;
+            }
+
+            _treeSelectionAnchor = node;
+            _treeKeyboardFocusNode = node;
+        }
+
+        private void ApplyTreeRangeSelection(
+            TreeViewNode selectionAnchor,
+            TreeViewNode targetNode,
+            bool preserveExistingSelection)
+        {
+            List<TreeViewNode> visibleNodes = GetVisibleTreeNodes();
+            int anchorIndex = IndexOfNode(visibleNodes, selectionAnchor);
+            int targetIndex = IndexOfNode(visibleNodes, targetNode);
+            if (targetIndex < 0)
+            {
+                return;
+            }
+
+            if (anchorIndex < 0)
+            {
+                anchorIndex = targetIndex;
+            }
+
+            int rangeStart = Math.Min(anchorIndex, targetIndex);
+            int rangeEnd = Math.Max(anchorIndex, targetIndex);
+            var rangeNodes = new List<TreeViewNode>();
+            for (int index = rangeStart; index <= rangeEnd; index++)
+            {
+                TreeViewNode node = visibleNodes[index];
+                if (IsTreeRangeSelectableNode(node))
+                {
+                    rangeNodes.Add(node);
+                }
+            }
+
+            if (rangeNodes.Count == 0)
+            {
+                return;
+            }
+
+            _isApplyingTreeSelection = true;
+            try
+            {
+                if (!preserveExistingSelection)
+                {
+                    ExplorerTreeView.SelectedNodes.Clear();
+                }
+
+                foreach (TreeViewNode node in rangeNodes)
+                {
+                    if (!IsTreeNodeSelected(node))
+                    {
+                        ExplorerTreeView.SelectedNodes.Add(node);
+                    }
+                }
+            }
+            finally
+            {
+                _isApplyingTreeSelection = false;
+            }
+
+            _treeSelectionAnchor = selectionAnchor;
+        }
+
+        private static bool IsTreeRangeSelectableNode(TreeViewNode node)
+        {
+            return node.Content is ExplorerItem item &&
+                   !item.IsFolder &&
+                   !node.HasUnrealizedChildren &&
+                   node.Children.Count == 0;
+        }
+
+        private void SetTreeNodeSelection(TreeViewNode node, bool isSelected)
+        {
+            _isApplyingTreeSelection = true;
+            try
+            {
+                bool currentlySelected = IsTreeNodeSelected(node);
+                if (currentlySelected == isSelected)
+                {
+                    return;
+                }
+
+                if (isSelected)
+                {
+                    ExplorerTreeView.SelectedNodes.Add(node);
+                }
+                else
+                {
+                    int selectedIndex = IndexOfSelectedNode(node);
+                    if (selectedIndex >= 0)
+                    {
+                        ExplorerTreeView.SelectedNodes.RemoveAt(selectedIndex);
+                    }
+                }
+            }
+            finally
+            {
+                _isApplyingTreeSelection = false;
+            }
+        }
+
+        private TreeViewNode GetSelectionAnchor(TreeViewNode fallback)
+        {
+            List<TreeViewNode> visibleNodes = GetVisibleTreeNodes();
+            return _treeSelectionAnchor != null && IndexOfNode(visibleNodes, _treeSelectionAnchor) >= 0
+                ? _treeSelectionAnchor
+                : fallback;
+        }
+
+        private bool IsTreeNodeSelected(TreeViewNode node)
+        {
+            return IndexOfSelectedNode(node) >= 0;
+        }
+
+        private int IndexOfSelectedNode(TreeViewNode node)
+        {
+            for (int index = 0; index < ExplorerTreeView.SelectedNodes.Count; index++)
+            {
+                if (AreSameTreeNode(ExplorerTreeView.SelectedNodes[index], node))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
+        private static int IndexOfNode(IReadOnlyList<TreeViewNode> nodes, TreeViewNode node)
+        {
+            for (int index = 0; index < nodes.Count; index++)
+            {
+                if (AreSameTreeNode(nodes[index], node))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool AreSameTreeNode(TreeViewNode left, TreeViewNode right)
+        {
+            return ReferenceEquals(left, right) ||
+                   Equals(left, right) ||
+                   (left.Content is ExplorerItem leftItem &&
+                    right.Content is ExplorerItem rightItem &&
+                    ReferenceEquals(leftItem, rightItem));
+        }
+
+        private List<TreeViewNode> GetVisibleTreeNodes()
+        {
+            var nodes = new List<TreeViewNode>();
+            foreach (TreeViewNode rootNode in ExplorerTreeView.RootNodes)
+            {
+                AddVisibleTreeNode(rootNode, nodes);
+            }
+
+            return nodes;
+        }
+
+        private static void AddVisibleTreeNode(TreeViewNode node, List<TreeViewNode> nodes)
+        {
+            nodes.Add(node);
+            if (!node.IsExpanded)
+            {
+                return;
+            }
+
+            foreach (TreeViewNode childNode in node.Children)
+            {
+                AddVisibleTreeNode(childNode, nodes);
+            }
+        }
+
+        private void FocusTreeNode(TreeViewNode node)
+        {
+            if (ExplorerTreeView.ContainerFromNode(node) is TreeViewItem treeViewItem)
+            {
+                treeViewItem.Focus(FocusState.Keyboard);
+            }
+            else
+            {
+                ExplorerTreeView.Focus(FocusState.Keyboard);
+            }
+        }
+
+        private bool TryGetTreeNode(DependencyObject source, out TreeViewNode? node)
+        {
+            node = null;
+            DependencyObject? current = source;
+            while (current != null)
+            {
+                if (current is TreeViewItem treeViewItem)
+                {
+                    node = ExplorerTreeView.NodeFromContainer(treeViewItem);
+                    return node != null;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return false;
+        }
+
+        private static bool IsTreeSelectionCheckBox(DependencyObject source)
+        {
+            DependencyObject? current = source;
+            while (current != null)
+            {
+                if (current is CheckBox)
+                {
+                    return true;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return false;
+        }
+
+        private static bool IsTreeModifierPressed(Windows.System.VirtualKey key)
+        {
+            var state = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(key);
+            return (state & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
         }
 
         private bool TryGetTreeExpanderNode(DependencyObject source, out TreeViewNode? node)
