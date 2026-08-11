@@ -365,7 +365,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <FontIcon Grid.Column="0" Glyph="{Binding IconGlyph}" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center">
+                                                <FontIcon Grid.Column="0" Glyph="{Binding IconGlyph}" Opacity="{Binding IconOpacity}" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center">
                                                     <FontIcon.Foreground>
                                                         <SolidColorBrush Color="{Binding IconColor}"/>
                                                     </FontIcon.Foreground>
@@ -458,6 +458,7 @@
                                                 </Grid.ColumnDefinitions>
                                                 <FontIcon Grid.Column="0"
                                                           Glyph="{Binding Content.IconGlyph}"
+                                                          Opacity="{Binding Content.IconOpacity}"
                                                           FontFamily="{StaticResource SymbolThemeFontFamily}"
                                                           FontSize="11"
                                                           Margin="0,0,6,0"

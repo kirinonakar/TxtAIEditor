@@ -87,6 +87,23 @@ namespace TxtAIEditor
             }
         }
 
+        private bool _isCut;
+        public bool IsCut
+        {
+            get => _isCut;
+            set
+            {
+                if (_isCut != value)
+                {
+                    _isCut = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IconOpacity));
+                }
+            }
+        }
+
+        public double IconOpacity => _isCut ? 0.45 : 1.0;
+
         public void RefreshThemeColors()
         {
             OnPropertyChanged(nameof(ForegroundColor));

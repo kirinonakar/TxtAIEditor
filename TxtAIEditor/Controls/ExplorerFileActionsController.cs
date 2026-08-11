@@ -50,6 +50,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string>? _homeFolderPathProvider;
         private readonly ImageConversionController _imageConversionController;
         private readonly ConditionalWeakTable<MenuFlyout, object> _localizedFlyouts = new ConditionalWeakTable<MenuFlyout, object>();
+        private readonly HashSet<ExplorerItem> _cutItems = new();
 
         private System.Threading.CancellationTokenSource? _archiveCts;
         private string _treeDropTargetFolderPath = string.Empty;
@@ -146,6 +147,10 @@ namespace TxtAIEditor.Controls
             _leftSidebar.FileListViewItemDrop += OnFileListViewItemDrop;
             _leftSidebar.ExplorerTreeDragOver += OnExplorerTreeDragOver;
             _leftSidebar.ExplorerTreeDrop += OnExplorerTreeDrop;
+            _leftSidebar.ExplorerPage.AddHandler(
+                UIElement.KeyDownEvent,
+                new KeyEventHandler(OnExplorerKeyDown),
+                handledEventsToo: true);
         }
 
         private void OnFileListViewItemRightTapped(object sender, RightTappedRoutedEventArgs e)
@@ -706,6 +711,31 @@ namespace TxtAIEditor.Controls
             _ = SetClipboardStorageItemsAsync(sender, DataPackageOperation.Copy);
         }
 
+        private void OnExplorerKeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key != Windows.System.VirtualKey.Escape || _cutItems.Count == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                DataPackageView clipboard = Clipboard.GetContent();
+                if (clipboard.Contains(StandardDataFormats.StorageItems) &&
+                    (clipboard.RequestedOperation & DataPackageOperation.Move) == DataPackageOperation.Move)
+                {
+                    Clipboard.Clear();
+                }
+            }
+            catch
+            {
+                // The visual state is still cleared if the clipboard is unavailable.
+            }
+
+            ClearCutItems();
+            e.Handled = true;
+        }
+
         private async void OnPasteClick(object sender, RoutedEventArgs e)
         {
             ExplorerItem? contextItem = GetExplorerItem(sender);
@@ -742,6 +772,7 @@ namespace TxtAIEditor.Controls
                 if (move && transferredCount > 0)
                 {
                     Clipboard.Clear();
+                    ClearCutItems();
                 }
 
                 _loadDirectoryRoot(_currentFolderProvider());
@@ -779,6 +810,14 @@ namespace TxtAIEditor.Controls
                 };
                 dataPackage.SetStorageItems(storageItems);
                 Clipboard.SetContent(dataPackage);
+                if (operation == DataPackageOperation.Move)
+                {
+                    SetCutItems(selectedItems);
+                }
+                else
+                {
+                    ClearCutItems();
+                }
             }
             catch (Exception ex)
             {
@@ -786,6 +825,26 @@ namespace TxtAIEditor.Controls
                     _getString("ExplorerClipboardErrorTitle", "클립보드 오류"),
                     ex.Message);
             }
+        }
+
+        private void SetCutItems(IEnumerable<ExplorerItem> items)
+        {
+            ClearCutItems();
+            foreach (ExplorerItem item in items)
+            {
+                item.IsCut = true;
+                _cutItems.Add(item);
+            }
+        }
+
+        private void ClearCutItems()
+        {
+            foreach (ExplorerItem item in _cutItems)
+            {
+                item.IsCut = false;
+            }
+
+            _cutItems.Clear();
         }
 
         private void OnImageConversionClick(object sender, RoutedEventArgs e)
@@ -1138,42 +1197,11 @@ namespace TxtAIEditor.Controls
             string baseName = sourcePaths.Count == 1
                 ? GetArchiveBaseName(sourcePaths[0])
                 : _getString("ExplorerMultipleArchiveBaseName", "archive");
-            string outputPath = Path.Combine(outputDirectory, baseName + archiveExtension);
-            if (sourcePaths.Any(path => string.Equals(path, outputPath, StringComparison.OrdinalIgnoreCase)))
-            {
-                outputPath = Path.Combine(outputDirectory, baseName + "_archive" + archiveExtension);
-            }
-
-            if (Directory.Exists(outputPath))
-            {
-                _showError(
-                    _getString("ArchiveCreateFailedTitle", "압축 파일 만들기 실패"),
-                    string.Format(
-                        _getString("ArchiveCreateTargetDirectoryExistsFormat", "'{0}' 이름의 폴더가 이미 있어 압축 파일을 만들 수 없습니다."),
-                        Path.GetFileName(outputPath)));
-                return;
-            }
-
-            if (File.Exists(outputPath))
-            {
-                var confirmDialog = new ContentDialog
-                {
-                    Title = _getString("ArchiveCreateOverwriteTitle", "압축 파일 덮어쓰기 확인"),
-                    Content = string.Format(
-                        _getString("ArchiveCreateOverwriteMessageFormat", "'{0}' 파일이 이미 있습니다. 덮어쓸까요?"),
-                        Path.GetFileName(outputPath)),
-                    PrimaryButtonText = _getString("ArchiveCreateOverwriteOK", "덮어쓰기"),
-                    CloseButtonText = _getString("CopyOverwriteCancel", "취소"),
-                    DefaultButton = ContentDialogButton.Close,
-                    XamlRoot = _xamlRootProvider(),
-                    RequestedTheme = _themeProvider()
-                };
-
-                if (await ShowDialogAsync(confirmDialog) != ContentDialogResult.Primary)
-                {
-                    return;
-                }
-            }
+            string outputPath = GetUniqueArchiveOutputPath(
+                outputDirectory,
+                baseName,
+                archiveExtension,
+                sourcePaths);
 
             _archiveCts = new System.Threading.CancellationTokenSource();
             var token = _archiveCts.Token;
@@ -1189,7 +1217,7 @@ namespace TxtAIEditor.Controls
                     progress => _statusBar.ShowProgress(statusText, progress, () => _archiveCts?.Cancel()),
                     token
                 );
-                File.Move(temporaryPath, outputPath, overwrite: true);
+                File.Move(temporaryPath, outputPath, overwrite: false);
 
                 string currentFolder = _currentFolderProvider();
                 if (!string.IsNullOrWhiteSpace(currentFolder) && Directory.Exists(currentFolder))
@@ -1247,6 +1275,27 @@ namespace TxtAIEditor.Controls
                 ? new DirectoryInfo(path).Name
                 : Path.GetFileNameWithoutExtension(path);
             return string.IsNullOrWhiteSpace(name) ? "archive" : name;
+        }
+
+        private static string GetUniqueArchiveOutputPath(
+            string outputDirectory,
+            string baseName,
+            string archiveExtension,
+            IReadOnlyList<string> sourcePaths)
+        {
+            for (int suffix = 1; ; suffix++)
+            {
+                string candidateName = suffix == 1
+                    ? baseName
+                    : $"{baseName}_{suffix}";
+                string candidatePath = Path.Combine(outputDirectory, candidateName + archiveExtension);
+                bool isSourcePath = sourcePaths.Any(path =>
+                    string.Equals(path, candidatePath, StringComparison.OrdinalIgnoreCase));
+                if (!isSourcePath && !File.Exists(candidatePath) && !Directory.Exists(candidatePath))
+                {
+                    return candidatePath;
+                }
+            }
         }
 
         private static void TryDeleteTemporaryArchive(string path)
