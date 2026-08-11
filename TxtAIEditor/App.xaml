@@ -39,6 +39,7 @@
                     <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#E0E0E0"/>
                     <SolidColorBrush x:Key="AgentOutputBackground" Color="#FCFCFC"/>
                     <SolidColorBrush x:Key="AgentOutputForeground" Color="#1F2937"/>
+                    <SolidColorBrush x:Key="AgentActivityForeground" Color="#6B7280"/>
                     <SolidColorBrush x:Key="AgentUserPromptForeground" Color="#0078D4"/>
                     <SolidColorBrush x:Key="AgentPowerShellConfirmDangerForeground" Color="#DC2626"/>
                     <SolidColorBrush x:Key="AgentCodeBackground" Color="#EAEAEA"/>
@@ -103,6 +104,7 @@
                     <SolidColorBrush x:Key="AgentButtonBorderBrush" Color="#2E3033"/>
                     <SolidColorBrush x:Key="AgentOutputBackground" Color="#151618"/>
                     <SolidColorBrush x:Key="AgentOutputForeground" Color="#D4D4D4"/>
+                    <SolidColorBrush x:Key="AgentActivityForeground" Color="#9CA3AF"/>
                     <SolidColorBrush x:Key="AgentUserPromptForeground" Color="#60A5FA"/>
                     <SolidColorBrush x:Key="AgentPowerShellConfirmDangerForeground" Color="#F87171"/>
                     <SolidColorBrush x:Key="AgentCodeBackground" Color="#252526"/>

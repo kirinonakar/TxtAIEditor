@@ -77,6 +77,11 @@ namespace TxtAIEditor.Controls
                 displayLines.AddRange(lines);
             }
 
+            if (HideHtmlCodeBlocks)
+            {
+                displayLines.RemoveAll(IsHiddenNonVerboseActivityLine);
+            }
+
             _renderedLines.Clear();
             _renderedLines.AddRange(displayLines);
             _lineBlocksMatchRenderedLines = !RequiresGroupedRendering(displayLines, 0);
@@ -535,6 +540,11 @@ namespace TxtAIEditor.Controls
                 Margin = new Thickness(0, 2, 0, 2)
             };
 
+            Brush? activityForeground = HideHtmlCodeBlocks &&
+                IsMutedNonVerboseActivityLine(line)
+                ? GetBrushResource("AgentActivityForeground", Microsoft.UI.Colors.Gray)
+                : null;
+
             if (string.IsNullOrEmpty(line))
             {
                 paragraph.Inlines.Add(new Run { Text = string.Empty });
@@ -565,7 +575,12 @@ namespace TxtAIEditor.Controls
             if (isHeading)
             {
                 paragraph.Margin = new Thickness(0, 8, 0, 4);
-                AddTextRunsWithEmojiSupport(line, paragraph.Inlines, isBold: true, headingFontSize);
+                AddTextRunsWithEmojiSupport(
+                    line,
+                    paragraph.Inlines,
+                    isBold: true,
+                    fontSize: headingFontSize,
+                    foreground: activityForeground);
                 return paragraph;
             }
 
@@ -609,14 +624,87 @@ namespace TxtAIEditor.Controls
                 };
                 paragraph.Inlines.Add(bulletRun);
 
-                ParseLineToInlines(itemText, paragraph.Inlines);
+                ParseLineToInlines(itemText, paragraph.Inlines, activityForeground);
             }
             else
             {
-                ParseLineToInlines(line, paragraph.Inlines);
+                ParseLineToInlines(line, paragraph.Inlines, activityForeground);
             }
 
             return paragraph;
+        }
+
+        private bool IsHiddenNonVerboseActivityLine(string line)
+        {
+            if (!TryGetActivityMessage(line, out string message))
+            {
+                return false;
+            }
+
+            string collectingContext = GetLocalizedString(
+                "AgentActivityCollectingContext",
+                "맥락 수집 중").Trim();
+            return collectingContext.Length > 0 &&
+                string.Equals(message, collectingContext, StringComparison.Ordinal);
+        }
+
+        private bool IsMutedNonVerboseActivityLine(string line)
+        {
+            if (!TryGetActivityMessage(line, out string message))
+            {
+                return false;
+            }
+
+            return StartsWithLocalizedActivityLabel(
+                       message,
+                       "AgentActivityThinking",
+                       "생각중") ||
+                   StartsWithLocalizedActivityLabel(
+                       message,
+                       "AgentOutputPreparingTool",
+                       "도구 호출 준비 중") ||
+                   StartsWithLocalizedActivityFormat(
+                       message,
+                       "AgentActivityUnknownToolFormat",
+                       "도구 실행 중: {0}") ||
+                   StartsWithLocalizedActivityFormat(
+                       message,
+                       "AgentActivityMcpToolFormat",
+                       "MCP 도구 실행 중: {0} ({1})");
+        }
+
+        private bool StartsWithLocalizedActivityLabel(string message, string key, string fallback)
+        {
+            string label = GetLocalizedString(key, fallback).Trim();
+            return label.Length > 0 && message.StartsWith(label, StringComparison.Ordinal);
+        }
+
+        private bool StartsWithLocalizedActivityFormat(string message, string key, string fallback)
+        {
+            string format = GetLocalizedString(key, fallback);
+            int placeholderIndex = format.IndexOf("{0}", StringComparison.Ordinal);
+            string prefix = placeholderIndex >= 0
+                ? format.Substring(0, placeholderIndex).TrimEnd()
+                : format.Trim();
+            return prefix.Length > 0 && message.StartsWith(prefix, StringComparison.Ordinal);
+        }
+
+        private string GetLocalizedString(string key, string fallback)
+        {
+            return _getString?.Invoke(key, fallback) ?? fallback;
+        }
+
+        private static bool TryGetActivityMessage(string line, out string message)
+        {
+            string trimmed = (line ?? string.Empty).TrimStart();
+            if (trimmed.Length >= 8 && IsTimestampPrefix(trimmed.Substring(0, 8)))
+            {
+                message = trimmed.Substring(8).TrimStart();
+                return true;
+            }
+
+            message = string.Empty;
+            return false;
         }
 
         private static bool TryGetUserPromptLineParts(string line, out string prefix, out string markerAndPrompt)
@@ -689,11 +777,17 @@ namespace TxtAIEditor.Controls
             UpdateRichText(raw);
         }
 
-        private void ParseLineToInlines(string line, InlineCollection inlines)
+        private void ParseLineToInlines(string line, InlineCollection inlines, Brush? defaultForeground = null)
         {
             if (string.IsNullOrEmpty(line))
             {
-                inlines.Add(new Run { Text = string.Empty });
+                var emptyRun = new Run { Text = string.Empty };
+                if (defaultForeground != null)
+                {
+                    emptyRun.Foreground = defaultForeground;
+                }
+
+                inlines.Add(emptyRun);
                 return;
             }
 
@@ -703,7 +797,12 @@ namespace TxtAIEditor.Controls
 
             if (string.IsNullOrEmpty(line))
             {
-                AddTextRunsWithEmojiSupport(string.Empty, inlines, isHeading, headingFontSize);
+                AddTextRunsWithEmojiSupport(
+                    string.Empty,
+                    inlines,
+                    isHeading,
+                    headingFontSize,
+                    foreground: defaultForeground);
                 return;
             }
 
@@ -730,7 +829,12 @@ namespace TxtAIEditor.Controls
                 }
                 else
                 {
-                    AddTextRunsWithEmojiSupport(text, inlines, isHeading || isBold, headingFontSize);
+                    AddTextRunsWithEmojiSupport(
+                        text,
+                        inlines,
+                        isHeading || isBold,
+                        headingFontSize,
+                        foreground: defaultForeground);
                 }
             }
 
