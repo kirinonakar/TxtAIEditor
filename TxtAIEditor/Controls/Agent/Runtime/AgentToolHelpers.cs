@@ -13,7 +13,7 @@ namespace TxtAIEditor.Controls
         public const string EditFailureContextEndMarker = "[End edit failure context]";
 
         private static readonly Regex DangerousPowerShellCommandRegex = new(
-            @"(?:\$home\b|\b(Remove\w*|rm\w*|Clear-Content|Clear-Disk|Initialize-Disk|Resize-Partition|Set-Disk|format(?!-(?:table|list)\b|=)|diskpart|del|delete|erase|rd|ri)\b)",
+            @"(?:\$home\b|\b(Remove\w*|rm\w*|Clear-Content|Clear-Disk|Initialize-Disk|Resize-Partition|Set-Disk|(?<!message-)format(?!-(?:table|list)\b|=)|diskpart|del|delete|erase|rd|ri)\b)",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         public static bool IsDangerousPowerShellCommand(string? command)
