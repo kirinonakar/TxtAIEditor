@@ -128,7 +128,9 @@ namespace TxtAIEditor.Controls
                 settings.LlmModel ?? string.Empty);
             if (limits.output > 0 && limits.output < contextLimit)
             {
-                return Math.Min(limits.output, MaximumOutputReserveTokens);
+                return Math.Min(
+                    Math.Min(limits.output, MaximumOutputReserveTokens),
+                    (int)Math.Floor(contextLimit * DefaultOutputReserveRatio));
             }
 
             return Math.Min(
