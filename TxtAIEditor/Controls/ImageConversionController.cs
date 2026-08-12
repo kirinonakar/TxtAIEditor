@@ -30,7 +30,7 @@ namespace TxtAIEditor.Controls
             _getCurrentElementTheme = getCurrentElementTheme;
         }
 
-        public Task ShowAsync(
+        public Task<bool> ShowAsync(
             string sourcePath,
             XamlRoot? xamlRoot,
             ElementTheme theme)
@@ -38,14 +38,14 @@ namespace TxtAIEditor.Controls
             return ShowAsync(new[] { sourcePath }, xamlRoot, theme);
         }
 
-        public async Task ShowAsync(
+        public async Task<bool> ShowAsync(
             IReadOnlyList<string> sourcePaths,
             XamlRoot? xamlRoot,
             ElementTheme theme)
         {
             if (_isShowing || xamlRoot == null || sourcePaths == null)
             {
-                return;
+                return false;
             }
 
             IReadOnlyList<string> paths = sourcePaths
@@ -54,7 +54,7 @@ namespace TxtAIEditor.Controls
                 .ToList();
             if (paths.Count == 0)
             {
-                return;
+                return false;
             }
 
             if (theme == ElementTheme.Default)
@@ -80,7 +80,7 @@ namespace TxtAIEditor.Controls
                         ex.Message,
                         xamlRoot,
                         theme);
-                    return;
+                    return false;
                 }
 
                 ImageConversionSourceInfo sourceInfo = sourceInfos[paths[0]];
@@ -95,7 +95,7 @@ namespace TxtAIEditor.Controls
                     paths.Count);
                 if (values == null)
                 {
-                    return;
+                    return false;
                 }
 
                 var outputPaths = new List<string>();
@@ -117,7 +117,7 @@ namespace TxtAIEditor.Controls
                             "선택한 이미지의 출력 파일 이름이 서로 겹칩니다. 파일 이름을 확인한 후 다시 시도해 주세요."),
                         xamlRoot,
                         theme);
-                    return;
+                    return false;
                 }
 
                 string[] existingPaths = outputPaths
@@ -141,7 +141,7 @@ namespace TxtAIEditor.Controls
                         theme);
                     if (overwriteResult != ContentDialogResult.Primary)
                     {
-                        return;
+                        return false;
                     }
                 }
 
@@ -182,6 +182,7 @@ namespace TxtAIEditor.Controls
                         successMessage,
                         xamlRoot,
                         theme);
+                    return true;
                 }
                 catch (Exception ex)
                 {
@@ -190,6 +191,7 @@ namespace TxtAIEditor.Controls
                         ex.Message,
                         xamlRoot,
                         theme);
+                    return false;
                 }
             }
             finally

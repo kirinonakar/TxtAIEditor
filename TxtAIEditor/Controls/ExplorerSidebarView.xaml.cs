@@ -162,6 +162,12 @@ namespace TxtAIEditor.Controls
             ExplorerCreateFolderMenuItem.Text = getString("ExplorerCreateFolderTooltip", "새 폴더");
             ExplorerCreateFileMenuItem.Text = getString("ExplorerCreateFileTooltip", "새 파일");
             ExplorerCreateNotebookMenuItem.Text = getString("ExplorerCreateNotebookTooltip", "새 노트북");
+            ExplorerEmptyAreaFavoriteItem.Text = getString("ExplorerAddFolderToFavorites", "폴더를 즐겨찾기에 추가");
+            ExplorerEmptyAreaPasteItem.Text = getString("ExplorerPaste", "붙여넣기");
+            ExplorerEmptyAreaCreateFolderItem.Text = getString("ExplorerCreateFolderTooltip", "새 폴더");
+            ExplorerEmptyAreaCreateFileItem.Text = getString("ExplorerCreateFileTooltip", "새 파일");
+            ExplorerEmptyAreaCreateNotebookItem.Text = getString("ExplorerCreateNotebookTooltip", "새 노트북");
+            ExplorerEmptyAreaRefreshItem.Text = getString("ExplorerRefreshTooltip", "새로고침");
             string refreshText = getString("ExplorerRefreshTooltip", "새로고침");
             ToolTipService.SetToolTip(ExplorerRefreshButton, refreshText);
             string sortText = getString("ExplorerSortName", "이름순 정렬");

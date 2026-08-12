@@ -299,6 +299,18 @@
                                     </Grid>
                                 </StackPanel>
                                 <ListView x:Name="FileListView" Grid.Row="1" Margin="0,5,0,5" SelectionMode="Extended" IsTabStop="True" IsItemClickEnabled="True" ItemClick="OnFileListViewItemClick" AllowDrop="True" DragOver="OnFileListViewDragOver" Drop="OnFileListViewDrop">
+                                    <ListView.ContextFlyout>
+                                        <MenuFlyout>
+                                            <MenuFlyoutItem x:Name="ExplorerEmptyAreaFavoriteItem" Text="폴더를 즐겨찾기에 추가" Icon="OutlineStar" Click="OnAddFolderToFavoritesClick"/>
+                                            <MenuFlyoutItem x:Name="ExplorerEmptyAreaPasteItem" Text="붙여넣기" Icon="Paste" Click="OnPasteClick"/>
+                                            <MenuFlyoutSeparator/>
+                                            <MenuFlyoutItem x:Name="ExplorerEmptyAreaCreateFolderItem" Text="새 폴더" Icon="Folder" Click="OnCreateFolderClick"/>
+                                            <MenuFlyoutItem x:Name="ExplorerEmptyAreaCreateFileItem" Text="새 파일" Icon="Document" Click="OnCreateFileClick"/>
+                                            <MenuFlyoutItem x:Name="ExplorerEmptyAreaCreateNotebookItem" Text="새 노트북" Icon="Document" Click="OnCreateNotebookClick"/>
+                                            <MenuFlyoutSeparator/>
+                                            <MenuFlyoutItem x:Name="ExplorerEmptyAreaRefreshItem" Text="새로고침" Icon="Refresh" Click="OnRefreshClick"/>
+                                        </MenuFlyout>
+                                    </ListView.ContextFlyout>
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Padding="0,3,0,3" RightTapped="OnFileListViewItemRightTapped" AllowDrop="True" DragOver="OnFileListViewItemDragOver" Drop="OnFileListViewItemDrop">

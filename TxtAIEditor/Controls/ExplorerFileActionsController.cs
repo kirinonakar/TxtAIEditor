@@ -121,6 +121,7 @@ namespace TxtAIEditor.Controls
         private void WireEvents()
         {
             _leftSidebar.FileListViewItemRightTapped += OnFileListViewItemRightTapped;
+            _leftSidebar.FileList.RightTapped += OnFileListRightTapped;
             _leftSidebar.CutClick += OnCutClick;
             _leftSidebar.CopyItemsClick += OnCopyItemsClick;
             _leftSidebar.PasteClick += OnPasteClick;
@@ -201,6 +202,55 @@ namespace TxtAIEditor.Controls
             }
 
             e.Handled = true;
+        }
+
+        private void OnFileListRightTapped(object sender, RightTappedRoutedEventArgs e)
+        {
+            if (sender is not ListView listView)
+            {
+                return;
+            }
+
+            DependencyObject? current = e.OriginalSource as DependencyObject;
+            while (current != null && current != listView)
+            {
+                if (current is ListViewItem)
+                {
+                    return;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            listView.SelectedItems.Clear();
+
+            if (listView.ContextFlyout is not MenuFlyout flyout || flyout.Items.Count < 2)
+            {
+                return;
+            }
+
+            ExplorerItem? currentFolderItem = null;
+            string currentFolder = _currentFolderProvider();
+            if (!_isArchiveViewProvider() &&
+                !_isRemoteViewProvider() &&
+                !string.IsNullOrWhiteSpace(currentFolder))
+            {
+                currentFolderItem = new ExplorerItem
+                {
+                    Path = currentFolder,
+                    IsFolder = true
+                };
+            }
+
+            if (flyout.Items[0] is MenuFlyoutItem favoriteItem)
+            {
+                favoriteItem.Tag = currentFolderItem;
+            }
+
+            if (flyout.Items[1] is MenuFlyoutItem pasteItem)
+            {
+                pasteItem.Tag = currentFolderItem;
+            }
         }
 
         private async void OnCreateFolderClick(object sender, RoutedEventArgs e)
@@ -583,7 +633,9 @@ namespace TxtAIEditor.Controls
 
             if (flyout.Items.Count > 4 && flyout.Items[4] is MenuFlyoutItem addFileFavoriteItem)
             {
-                addFileFavoriteItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
+                addFileFavoriteItem.Visibility = hasSingleItem && !isArchiveEntry && item is not { IsFolder: true }
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
             }
 
             if (flyout.Items.Count > 5 && flyout.Items[5] is MenuFlyoutItem addFolderFavoriteItem)
@@ -912,10 +964,21 @@ namespace TxtAIEditor.Controls
             }
 
             FrameworkElement? sourceElement = sender as FrameworkElement;
-            _ = _imageConversionController.ShowAsync(
+            _ = ShowImageConversionAndRefreshAsync(imagePaths, sourceElement);
+        }
+
+        private async Task ShowImageConversionAndRefreshAsync(
+            IReadOnlyList<string> imagePaths,
+            FrameworkElement? sourceElement)
+        {
+            bool converted = await _imageConversionController.ShowAsync(
                 imagePaths,
                 sourceElement?.XamlRoot ?? _leftSidebar.XamlRoot,
                 sourceElement?.ActualTheme ?? _leftSidebar.ActualTheme);
+            if (converted)
+            {
+                _loadDirectoryRoot(_currentFolderProvider());
+            }
         }
 
         private IReadOnlyList<ExplorerItem> GetSelectedExplorerItems(object? source)
