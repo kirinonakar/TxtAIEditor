@@ -1883,6 +1883,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="ExplorerCopyFileName" xml:space="preserve">
     <value>Copy File Name</value>
   </data>
+  <data name="ExplorerCopyFolderName" xml:space="preserve">
+    <value>Copy Folder Name</value>
+  </data>
   <data name="ExplorerCopyFilePath" xml:space="preserve">
     <value>Copy File Path</value>
   </data>

@@ -1883,6 +1883,9 @@
   <data name="ExplorerCopyFileName" xml:space="preserve">
     <value>复制文件名</value>
   </data>
+  <data name="ExplorerCopyFolderName" xml:space="preserve">
+    <value>复制文件夹名称</value>
+  </data>
   <data name="ExplorerCopyFilePath" xml:space="preserve">
     <value>复制文件路径</value>
   </data>

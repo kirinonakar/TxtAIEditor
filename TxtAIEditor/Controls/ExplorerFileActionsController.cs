@@ -709,11 +709,16 @@ namespace TxtAIEditor.Controls
             if (flyout.Items.Count > 19 && flyout.Items[19] is MenuFlyoutItem copyFileNameItem)
             {
                 copyFileNameItem.Visibility = hasSingleItem ? Visibility.Visible : Visibility.Collapsed;
+                copyFileNameItem.Text = item is { IsFolder: true }
+                    ? _getString("ExplorerCopyFolderName", "폴더이름 복사")
+                    : _getString("ExplorerCopyFileName", "파일이름 복사");
             }
 
             if (flyout.Items.Count > 20 && flyout.Items[20] is MenuFlyoutItem copyFilePathItem)
             {
-                copyFilePathItem.Visibility = hasSingleItem ? Visibility.Visible : Visibility.Collapsed;
+                copyFilePathItem.Visibility = hasSingleItem && item is not { IsFolder: true }
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
             }
 
             if (flyout.Items.Count > 21 && flyout.Items[21] is MenuFlyoutItem copyFolderPathItem)

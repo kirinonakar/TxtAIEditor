@@ -1883,6 +1883,9 @@
   <data name="ExplorerCopyFileName" xml:space="preserve">
     <value>ファイル名をコピー</value>
   </data>
+  <data name="ExplorerCopyFolderName" xml:space="preserve">
+    <value>フォルダー名をコピー</value>
+  </data>
   <data name="ExplorerCopyFilePath" xml:space="preserve">
     <value>パスをコピー</value>
   </data>

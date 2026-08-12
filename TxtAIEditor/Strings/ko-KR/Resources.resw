@@ -1883,6 +1883,9 @@
   <data name="ExplorerCopyFileName" xml:space="preserve">
     <value>파일이름 복사</value>
   </data>
+  <data name="ExplorerCopyFolderName" xml:space="preserve">
+    <value>폴더이름 복사</value>
+  </data>
   <data name="ExplorerCopyFilePath" xml:space="preserve">
     <value>경로 복사</value>
   </data>
