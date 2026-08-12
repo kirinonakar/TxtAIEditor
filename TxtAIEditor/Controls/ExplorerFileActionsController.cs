@@ -121,7 +121,10 @@ namespace TxtAIEditor.Controls
         private void WireEvents()
         {
             _leftSidebar.FileListViewItemRightTapped += OnFileListViewItemRightTapped;
-            _leftSidebar.FileList.RightTapped += OnFileListRightTapped;
+            if (_leftSidebar.FileList.ContextFlyout is MenuFlyout emptyAreaFlyout)
+            {
+                emptyAreaFlyout.Opening += OnEmptyAreaFlyoutOpening;
+            }
             _leftSidebar.CutClick += OnCutClick;
             _leftSidebar.CopyItemsClick += OnCopyItemsClick;
             _leftSidebar.PasteClick += OnPasteClick;
@@ -204,30 +207,14 @@ namespace TxtAIEditor.Controls
             e.Handled = true;
         }
 
-        private void OnFileListRightTapped(object sender, RightTappedRoutedEventArgs e)
+        private void OnEmptyAreaFlyoutOpening(object? sender, object args)
         {
-            if (sender is not ListView listView)
+            if (sender is not MenuFlyout flyout || flyout.Items.Count < 2)
             {
                 return;
             }
 
-            DependencyObject? current = e.OriginalSource as DependencyObject;
-            while (current != null && current != listView)
-            {
-                if (current is ListViewItem)
-                {
-                    return;
-                }
-
-                current = VisualTreeHelper.GetParent(current);
-            }
-
-            listView.SelectedItems.Clear();
-
-            if (listView.ContextFlyout is not MenuFlyout flyout || flyout.Items.Count < 2)
-            {
-                return;
-            }
+            _leftSidebar.FileList.SelectedItems.Clear();
 
             ExplorerItem? currentFolderItem = null;
             string currentFolder = _currentFolderProvider();
@@ -250,6 +237,7 @@ namespace TxtAIEditor.Controls
             if (flyout.Items[1] is MenuFlyoutItem pasteItem)
             {
                 pasteItem.Tag = currentFolderItem;
+                pasteItem.IsEnabled = CanPasteStorageItems() && CanPasteIntoLocalDirectory(currentFolderItem);
             }
         }
 
