@@ -15,6 +15,8 @@ namespace TxtAIEditor.Controls
         private const double SummaryTargetRatio = 0.20;
         private const int MinimumSummaryTargetTokens = 128;
         private const int MaximumSummaryTargetTokens = 4096;
+        private const double DefaultOutputReserveRatio = 0.25;
+        private const int MinimumInputBudgetTokens = 4096;
 
         private readonly ILLMService _llmService;
         private readonly AgentModelContextLimitProvider _modelContextLimits;
@@ -52,6 +54,9 @@ namespace TxtAIEditor.Controls
                 return AgentContextCompressionResult.Unchanged(modelTranscript);
             }
 
+            int outputLimit = ResolveOutputLimit(settings, contextLimit);
+            int inputBudget = Math.Max(MinimumInputBudgetTokens, contextLimit - outputLimit);
+
             string languageCode = LlmLanguageResolver.Resolve(settings);
             string targetLanguage = ResolveTargetLanguage(settings, languageCode);
             string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(
@@ -73,7 +78,7 @@ namespace TxtAIEditor.Controls
                 attachments,
                 AgentPromptContextService.SupportsNativeToolCatalog(settings) ? tools : null);
 
-            if (requestTokens <= Math.Floor(contextLimit * CompressionThresholdRatio))
+            if (requestTokens <= Math.Floor(inputBudget * CompressionThresholdRatio))
             {
                 return AgentContextCompressionResult.Unchanged(modelTranscript);
             }
@@ -113,6 +118,19 @@ namespace TxtAIEditor.Controls
             }
 
             return new AgentContextCompressionResult(compressedPrefix + tail, true);
+        }
+
+        private static int ResolveOutputLimit(EditorSettings settings, int contextLimit)
+        {
+            var limits = ModelsDevCatalog.GetBestCachedLimits(
+                settings.LlmProvider ?? string.Empty,
+                settings.LlmModel ?? string.Empty);
+            if (limits.output > 0 && limits.output < contextLimit)
+            {
+                return limits.output;
+            }
+
+            return (int)Math.Floor(contextLimit * DefaultOutputReserveRatio);
         }
 
         private static int FindPrefixLengthByTokenRatio(string text, double ratio)
