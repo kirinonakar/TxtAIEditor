@@ -288,6 +288,20 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            // 같은 워크스페이스에 제목 없는(빈) 세션이 이미 열려 있으면
+            // 추가 세션을 만들지 않고 그 세션으로 이동한다.
+            string currentWorkspaceRoot = CaptureCurrentWorkspaceRoot();
+            var reusableSession = _openSessions
+                .Where(session => IsReusableBlankSession(session) &&
+                    AreSameWorkspace(session.WorkspaceRoot, currentWorkspaceRoot))
+                .OrderByDescending(session => session.UpdatedAt)
+                .FirstOrDefault();
+            if (reusableSession != null)
+            {
+                RestoreSession(reusableSession);
+                return;
+            }
+
             var session = CreateBlankSession();
             _openSessions.Insert(0, session);
             RestoreSession(session);
@@ -937,6 +951,22 @@ namespace TxtAIEditor.Controls
             }
 
             return text ?? string.Empty;
+        }
+
+        private static bool AreSameWorkspace(string? first, string? second)
+        {
+            if (string.IsNullOrWhiteSpace(first) || string.IsNullOrWhiteSpace(second))
+            {
+                return string.IsNullOrWhiteSpace(first) && string.IsNullOrWhiteSpace(second);
+            }
+
+            string TrimTrailingSeparators(string value) =>
+                value.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            return string.Equals(
+                TrimTrailingSeparators(first),
+                TrimTrailingSeparators(second),
+                StringComparison.OrdinalIgnoreCase);
         }
 
         private bool IsReusableBlankSession(AgentOpenSessionState session)
