@@ -16,6 +16,7 @@ namespace TxtAIEditor.Controls
         private const int MinimumSummaryTargetTokens = 128;
         private const int MaximumSummaryTargetTokens = 4096;
         private const double DefaultOutputReserveRatio = 0.25;
+        private const int MaximumOutputReserveTokens = 65536;
         private const int MinimumInputBudgetTokens = 4096;
 
         private readonly ILLMService _llmService;
@@ -127,10 +128,12 @@ namespace TxtAIEditor.Controls
                 settings.LlmModel ?? string.Empty);
             if (limits.output > 0 && limits.output < contextLimit)
             {
-                return limits.output;
+                return Math.Min(limits.output, MaximumOutputReserveTokens);
             }
 
-            return (int)Math.Floor(contextLimit * DefaultOutputReserveRatio);
+            return Math.Min(
+                (int)Math.Floor(contextLimit * DefaultOutputReserveRatio),
+                MaximumOutputReserveTokens);
         }
 
         private static int FindPrefixLengthByTokenRatio(string text, double ratio)
