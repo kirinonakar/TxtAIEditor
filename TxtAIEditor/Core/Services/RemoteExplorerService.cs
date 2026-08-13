@@ -795,7 +795,8 @@ namespace TxtAIEditor.Core.Services
                 GetHost(connection.Address),
                 connection.Profile.Port,
                 connection.Profile.UserName,
-                connection.Password);
+                connection.Password,
+                RemotePathTransformation.ShellQuote);
         }
 
         private static SshClient CreateSshClient(RemoteConnectionSettings connection)
