@@ -384,11 +384,10 @@ namespace TxtAIEditor.Controls
             int startLine,
             int endLine,
             string newText,
-            string? expectedSnippet,
+            string? expectedStartLine,
+            string? expectedEndLine,
             int? allowedStartLine = null,
-            int? allowedEndLine = null,
-            List<string>? expectedStartLines = null,
-            List<string>? expectedEndLines = null)
+            int? allowedEndLine = null)
         {
             string fullPath = _workspace.ResolveInsideWorkspace(path);
             if (!File.Exists(fullPath))
@@ -401,6 +400,8 @@ namespace TxtAIEditor.Controls
             string lineEnding = DetectLineEnding(rawText);
             string content = NormalizeNewlines(rawText);
             string[] lines = content.Split('\n');
+            List<string> startBoundaryLines = SplitExpectedBoundaryLines(expectedStartLine);
+            List<string> endBoundaryLines = SplitExpectedBoundaryLines(expectedEndLine);
 
             string WithFailureContext(string message)
             {
@@ -412,105 +413,58 @@ namespace TxtAIEditor.Controls
                     endLine);
             }
 
-            if (startLine < 1 || startLine > lines.Length)
+            if (startBoundaryLines.Count == 0)
             {
                 return WithFailureContext(
-                    $"replace_range failed: startLine {startLine} is out of bounds (1-{lines.Length}).");
+                    "replace_range failed: expectedStartLine is required and must contain at least one line.");
             }
-            if (endLine < startLine || endLine > lines.Length)
+
+            if (endBoundaryLines.Count == 0)
             {
                 return WithFailureContext(
-                    $"replace_range failed: endLine {endLine} is out of bounds (startLine-{lines.Length}).");
+                    "replace_range failed: expectedEndLine is required and must contain at least one line.");
             }
 
-            string? rangeAdjustmentNote = null;
-            var targetLines = new List<string>();
-            for (int i = startLine - 1; i <= endLine - 1; i++)
+            if (startLine < 1)
             {
-                targetLines.Add(lines[i]);
+                return WithFailureContext(
+                    $"replace_range failed: startLine {startLine} must be at least 1.");
             }
-            string targetText = string.Join("\n", targetLines);
 
-            bool LinesMatch(string actual, string expected)
+            if (endLine < 1)
             {
-                if (string.Equals(actual, expected, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-                return string.Equals(
-                    NormalizeWhitespaceForSnippetComparison(actual),
-                    NormalizeWhitespaceForSnippetComparison(expected),
-                    StringComparison.Ordinal);
+                return WithFailureContext(
+                    $"replace_range failed: endLine {endLine} must be at least 1.");
             }
 
-            int lineCount = endLine - startLine + 1;
-            if (!string.IsNullOrWhiteSpace(expectedSnippet))
+            if (endLine < startLine)
             {
-                if (!TryValidateExpectedSnippet(expectedSnippet, targetText))
-                {
-                    string normalizedExpected = TrimBoundaryNewlines(NormalizeNewlines(expectedSnippet));
-                    int requestedStartLine = startLine;
-                    int requestedEndLine = endLine;
-                    int adjustedStartLine;
-                    int adjustedEndLine;
-                    if (!TryResolveNearbyExpectedSnippetRange(
-                            lines,
-                            startLine,
-                            endLine,
-                            normalizedExpected,
-                            allowedStartLine,
-                            allowedEndLine,
-                            out adjustedStartLine,
-                            out adjustedEndLine))
-                    {
-                        return WithFailureContext(
-                            $"replace_range failed: expectedSnippet did not exactly match the requested range ({requestedStartLine}-{requestedEndLine}) or a unique range within ±3 lines.");
-                    }
-
-                    startLine = adjustedStartLine;
-                    endLine = adjustedEndLine;
-                    lineCount = endLine - startLine + 1;
-                    targetText = string.Join("\n", lines.Skip(startLine - 1).Take(lineCount));
-                    rangeAdjustmentNote = $" (range adjusted from {requestedStartLine}-{requestedEndLine} to {startLine}-{endLine})";
-                }
+                return WithFailureContext(
+                    $"replace_range failed: endLine {endLine} must be greater than or equal to startLine {startLine}.");
             }
-            else
+
+            int requestedStartLine = startLine;
+            int requestedEndLine = endLine;
+            if (!TryResolveExpectedBoundaryRange(
+                    lines,
+                    requestedStartLine,
+                    requestedEndLine,
+                    startBoundaryLines,
+                    endBoundaryLines,
+                    allowedStartLine,
+                    allowedEndLine,
+                    out int adjustedStartLine,
+                    out int adjustedEndLine))
             {
-                if (expectedStartLines == null || expectedStartLines.Count == 0)
-                {
-                    return WithFailureContext(
-                        "replace_range failed: expectedStartLines is required and must contain boundary text.");
-                }
-                int startCheckCount = Math.Min(expectedStartLines.Count, lines.Length - (startLine - 1));
-                for (int i = 0; i < startCheckCount; i++)
-                {
-                    int fileLineIndex = startLine - 1 + i;
-                    if (!LinesMatch(lines[fileLineIndex], expectedStartLines[i]))
-                    {
-                        return WithFailureContext(
-                            $"replace_range failed: expectedStartLines[{i}] did not match line {fileLineIndex + 1} of the file.");
-                    }
-                }
-
-                if (expectedEndLines == null || expectedEndLines.Count == 0)
-                {
-                    return WithFailureContext(
-                        "replace_range failed: expectedEndLines is required and must contain boundary text.");
-                }
-                int expectedEndStartIndex = endLine - expectedEndLines.Count;
-                for (int i = 0; i < expectedEndLines.Count; i++)
-                {
-                    int fileLineIndex = expectedEndStartIndex + i;
-                    if (fileLineIndex >= 0 && fileLineIndex < lines.Length)
-                    {
-                        if (!LinesMatch(lines[fileLineIndex], expectedEndLines[i]))
-                        {
-                            return WithFailureContext(
-                                $"replace_range failed: expectedEndLines[{i}] did not match line {fileLineIndex + 1} of the file.");
-                        }
-                    }
-                }
+                return WithFailureContext(
+                    $"replace_range failed: expectedStartLine and expectedEndLine did not identify a unique range near {requestedStartLine}-{requestedEndLine} within ±3 lines.");
             }
+
+            startLine = adjustedStartLine;
+            endLine = adjustedEndLine;
+            string? rangeAdjustmentNote = startLine == requestedStartLine && endLine == requestedEndLine
+                ? null
+                : $" (range adjusted from {requestedStartLine}-{requestedEndLine} to {startLine}-{endLine})";
 
             var beforeLines = lines.Take(startLine - 1);
             var afterLines = lines.Skip(endLine);
@@ -550,24 +504,150 @@ namespace TxtAIEditor.Controls
             return $"modified: {_workspace.RelativePath(fullPath)}{rangeAdjustmentNote}";
         }
 
-        private static bool TryValidateExpectedSnippet(string? expectedSnippet, string targetText)
+        private static List<string> SplitExpectedBoundaryLines(string? boundaryText)
         {
-            if (string.IsNullOrEmpty(expectedSnippet))
+            string normalizedBoundary = TrimBoundaryNewlines(NormalizeNewlines(boundaryText));
+            if (string.IsNullOrEmpty(normalizedBoundary))
+            {
+                return new List<string>();
+            }
+
+            return normalizedBoundary.Split('\n').ToList();
+        }
+
+        private static bool TryResolveExpectedBoundaryRange(
+            string[] lines,
+            int requestedStartLine,
+            int requestedEndLine,
+            IReadOnlyList<string> startBoundaryLines,
+            IReadOnlyList<string> endBoundaryLines,
+            int? allowedStartLine,
+            int? allowedEndLine,
+            out int adjustedStartLine,
+            out int adjustedEndLine)
+        {
+            adjustedStartLine = requestedStartLine;
+            adjustedEndLine = requestedEndLine;
+
+            int minimumAllowedLine = Math.Max(1, allowedStartLine ?? 1);
+            int maximumAllowedLine = Math.Min(lines.Length, allowedEndLine ?? lines.Length);
+            if (minimumAllowedLine > maximumAllowedLine)
             {
                 return false;
             }
 
-            string normalizedExpected = TrimBoundaryNewlines(NormalizeNewlines(expectedSnippet));
-            if (string.IsNullOrEmpty(normalizedExpected))
+            const int adjustmentLimit = 3;
+            long startWindowMin = Math.Max(
+                minimumAllowedLine,
+                (long)requestedStartLine - adjustmentLimit);
+            long startWindowMax = Math.Min(
+                (long)maximumAllowedLine - startBoundaryLines.Count + 1,
+                (long)requestedStartLine + adjustmentLimit);
+            long endWindowMin = Math.Max(
+                (long)minimumAllowedLine + endBoundaryLines.Count - 1,
+                (long)requestedEndLine - adjustmentLimit);
+            long endWindowMax = Math.Min(
+                maximumAllowedLine,
+                (long)requestedEndLine + adjustmentLimit);
+
+            var matchingStartLines = new List<int>();
+            if (startWindowMin <= startWindowMax)
+            {
+                for (int candidateStartLine = (int)startWindowMin;
+                     candidateStartLine <= startWindowMax;
+                     candidateStartLine++)
+                {
+                    if (BoundaryLinesMatch(lines, candidateStartLine, startBoundaryLines))
+                    {
+                        matchingStartLines.Add(candidateStartLine);
+                    }
+                }
+            }
+
+            var matchingEndLines = new List<int>();
+            if (endWindowMin <= endWindowMax)
+            {
+                for (int candidateEndLine = (int)endWindowMin;
+                     candidateEndLine <= endWindowMax;
+                     candidateEndLine++)
+                {
+                    int boundaryStartLine = candidateEndLine - endBoundaryLines.Count + 1;
+                    if (BoundaryLinesMatch(lines, boundaryStartLine, endBoundaryLines))
+                    {
+                        matchingEndLines.Add(candidateEndLine);
+                    }
+                }
+            }
+
+            var candidates = new List<(int StartLine, int EndLine, long Distance)>();
+            foreach (int candidateStartLine in matchingStartLines)
+            {
+                foreach (int candidateEndLine in matchingEndLines)
+                {
+                    if (candidateStartLine + startBoundaryLines.Count - 1 > candidateEndLine ||
+                        candidateEndLine - endBoundaryLines.Count + 1 < candidateStartLine)
+                    {
+                        continue;
+                    }
+
+                    long distance = Math.Abs((long)candidateStartLine - requestedStartLine) +
+                        Math.Abs((long)candidateEndLine - requestedEndLine);
+                    candidates.Add((candidateStartLine, candidateEndLine, distance));
+                }
+            }
+
+            if (candidates.Count == 0)
             {
                 return false;
             }
 
-            return string.Equals(targetText, normalizedExpected, StringComparison.Ordinal) ||
-                string.Equals(
-                    NormalizeWhitespaceForSnippetComparison(targetText),
-                    NormalizeWhitespaceForSnippetComparison(normalizedExpected),
-                    StringComparison.Ordinal);
+            long bestDistance = candidates.Min(candidate => candidate.Distance);
+            var bestCandidates = candidates
+                .Where(candidate => candidate.Distance == bestDistance)
+                .ToList();
+            if (bestCandidates.Count != 1)
+            {
+                return false;
+            }
+
+            adjustedStartLine = bestCandidates[0].StartLine;
+            adjustedEndLine = bestCandidates[0].EndLine;
+            return true;
+        }
+
+        private static bool BoundaryLinesMatch(
+            string[] lines,
+            int oneBasedStartLine,
+            IReadOnlyList<string> expectedLines)
+        {
+            int startIndex = oneBasedStartLine - 1;
+            if (startIndex < 0 || startIndex + expectedLines.Count > lines.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < expectedLines.Count; i++)
+            {
+                if (!LinesMatch(lines[startIndex + i], expectedLines[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool LinesMatch(string actual, string expected)
+        {
+            if (string.Equals(actual, expected, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return string.Equals(
+                NormalizeWhitespaceForSnippetComparison(actual),
+                NormalizeWhitespaceForSnippetComparison(expected),
+                StringComparison.Ordinal);
         }
 
         public async Task<string> ApplyPatchAsync(string path, string patchText)
@@ -1448,117 +1528,6 @@ namespace TxtAIEditor.Controls
         {
             int offset = GetLineStartOffset(lines, oneBasedLine);
             return offset + lines[oneBasedLine - 1].Length;
-        }
-
-        private static bool TryResolveNearbyExpectedSnippetRange(
-            string[] lines,
-            int startLine,
-            int endLine,
-            string normalizedExpected,
-            int? allowedStartLine,
-            int? allowedEndLine,
-            out int adjustedStartLine,
-            out int adjustedEndLine)
-        {
-            adjustedStartLine = startLine;
-            adjustedEndLine = endLine;
-
-            if (string.IsNullOrWhiteSpace(normalizedExpected))
-            {
-                return false;
-            }
-
-            int requestedLineCount = endLine - startLine + 1;
-            int expectedLineCount = CountNormalizedLines(normalizedExpected);
-            const int margin = 3;
-            if (Math.Abs(expectedLineCount - requestedLineCount) > margin)
-            {
-                return false;
-            }
-
-            int earliestStartForEndMargin = endLine - margin - expectedLineCount + 1;
-            int latestEndForStartMargin = startLine + margin + expectedLineCount - 1;
-            int windowStartLine = Math.Max(
-                allowedStartLine ?? 1,
-                Math.Max(startLine - margin, earliestStartForEndMargin));
-            int windowEndLine = Math.Min(
-                allowedEndLine ?? lines.Length,
-                Math.Min(endLine + margin, latestEndForStartMargin));
-            if (windowEndLine - windowStartLine + 1 < expectedLineCount)
-            {
-                return false;
-            }
-
-            SnippetRangeResolution resolution = TryResolveUniqueExpectedSnippetLineRange(
-                lines,
-                windowStartLine,
-                windowEndLine,
-                normalizedExpected,
-                false,
-                out adjustedStartLine,
-                out adjustedEndLine);
-            if (resolution == SnippetRangeResolution.NotFound)
-            {
-                resolution = TryResolveUniqueExpectedSnippetLineRange(
-                    lines,
-                    windowStartLine,
-                    windowEndLine,
-                    normalizedExpected,
-                    true,
-                    out adjustedStartLine,
-                    out adjustedEndLine);
-            }
-
-            return resolution == SnippetRangeResolution.Unique;
-        }
-
-        private enum SnippetRangeResolution
-        {
-            NotFound,
-            Unique,
-            Ambiguous
-        }
-
-        private static SnippetRangeResolution TryResolveUniqueExpectedSnippetLineRange(
-            string[] lines,
-            int windowStartLine,
-            int windowEndLine,
-            string normalizedExpected,
-            bool allowWhitespaceOnlyDifference,
-            out int matchStartLine,
-            out int matchEndLine)
-        {
-            matchStartLine = 0;
-            matchEndLine = 0;
-
-            int expectedLineCount = CountNormalizedLines(normalizedExpected);
-            string expectedComparable = allowWhitespaceOnlyDifference
-                ? NormalizeWhitespaceForSnippetComparison(normalizedExpected)
-                : normalizedExpected;
-
-            for (int candidateStartLine = windowStartLine; candidateStartLine + expectedLineCount - 1 <= windowEndLine; candidateStartLine++)
-            {
-                string candidateText = string.Join("\n", lines.Skip(candidateStartLine - 1).Take(expectedLineCount));
-                string candidateComparable = allowWhitespaceOnlyDifference
-                    ? NormalizeWhitespaceForSnippetComparison(candidateText)
-                    : candidateText;
-                if (string.Equals(candidateComparable, expectedComparable, StringComparison.Ordinal))
-                {
-                    if (matchStartLine != 0)
-                    {
-                        matchStartLine = 0;
-                        matchEndLine = 0;
-                        return SnippetRangeResolution.Ambiguous;
-                    }
-
-                    matchStartLine = candidateStartLine;
-                    matchEndLine = candidateStartLine + expectedLineCount - 1;
-                }
-            }
-
-            return matchStartLine == 0
-                ? SnippetRangeResolution.NotFound
-                : SnippetRangeResolution.Unique;
         }
 
         private int FindHunkMatch(List<string> lines, PatchHunk hunk)

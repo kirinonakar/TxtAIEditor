@@ -526,23 +526,26 @@ namespace TxtAIEditor.Controls
             int startLine = GetReplaceRangeStartLineArgument(arguments, path);
             int endLine = GetReplaceRangeEndLineArgument(arguments, path);
 
-            List<string>? expectedStartLines = GetStringListArgument(arguments, "expectedStartLines", "expected_start_lines");
-            List<string>? expectedEndLines = GetStringListArgument(arguments, "expectedEndLines", "expected_end_lines");
-            bool hasExplicitBoundaryVerification = expectedStartLines != null || expectedEndLines != null;
-            string? expectedSnippet = hasExplicitBoundaryVerification
-                ? GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected")
-                : GetReplaceRangeExpectedSnippetArgument(arguments, path);
+            string expectedStartLine = GetFirstStringArgument(
+                arguments,
+                "expectedStartLine",
+                "expected_start_line",
+                "expectedstartline");
+            string expectedEndLine = GetFirstStringArgument(
+                arguments,
+                "expectedEndLine",
+                "expected_end_line",
+                "expectedendline");
 
             return await _fileTools.ReplaceRangeAsync(
                 path,
                 startLine,
                 endLine,
                 GetFirstStringArgument(arguments, "newText", "new_text", "content", "text"),
-                expectedSnippet,
+                expectedStartLine,
+                expectedEndLine,
                 null,
-                null,
-                expectedStartLines,
-                expectedEndLines);
+                null);
         }
 
         public async Task<string> InsertIntoFileAsync(JsonElement arguments)
@@ -622,67 +625,6 @@ namespace TxtAIEditor.Controls
             }
 
             return PathsReferToSameFile(path, selection.SourcePath);
-        }
-
-        private string GetReplaceRangeExpectedSnippetArgument(JsonElement arguments, string path)
-        {
-            string explicitExpected = GetFirstStringArgument(arguments, "expectedSnippet", "expected_snippet", "guard", "expected");
-            if (!string.IsNullOrEmpty(explicitExpected))
-            {
-                return explicitExpected;
-            }
-
-            if (TryGetIntArgument(arguments, "startLine", out _) ||
-                TryGetIntArgument(arguments, "endLine", out _))
-            {
-                return string.Empty;
-            }
-
-            AgentSelectionSnapshot selection = CaptureActiveSelectionSnapshot();
-            return ShouldUseActiveSelectionRangeForPath(path)
-                ? selection.Text
-                : string.Empty;
-        }
-
-        private List<string>? GetStringListArgument(JsonElement arguments, params string[] names)
-        {
-            if (arguments.ValueKind != JsonValueKind.Object)
-            {
-                return null;
-            }
-
-            foreach (string name in names)
-            {
-                if (arguments.TryGetProperty(name, out var prop) && prop.ValueKind == JsonValueKind.Array)
-                {
-                    var list = new List<string>();
-                    foreach (var item in prop.EnumerateArray())
-                    {
-                        list.Add(item.GetString() ?? string.Empty);
-                    }
-                    return list;
-                }
-
-                if (arguments.TryGetProperty(name, out prop) && prop.ValueKind == JsonValueKind.String)
-                {
-                    return SplitStringArgumentIntoLines(prop.GetString() ?? string.Empty);
-                }
-            }
-
-            return null;
-        }
-
-        private static List<string> SplitStringArgumentIntoLines(string value)
-        {
-            string normalizedValue = value.Replace("\r\n", "\n").Replace('\r', '\n');
-            var lines = new List<string>(normalizedValue.Split('\n'));
-
-            if (lines.Count > 1 && lines[^1].Length == 0)
-            {
-                lines.RemoveAt(lines.Count - 1);
-            }
-
-            return lines;
         }
 
         private bool PathsReferToSameFile(string path, string selectionPath)

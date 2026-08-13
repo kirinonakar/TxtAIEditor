@@ -264,11 +264,10 @@ namespace TxtAIEditor.Controls
                             startLine = new { type = "integer", description = "Start line number to replace" },
                             endLine = new { type = "integer", description = "End line number to replace" },
                             newText = new { type = "string", description = "New text to insert" },
-                            expectedSnippet = new { type = "string", description = "The exact full text expected at the range to verify correctness. If the requested boundaries are off by up to 3 lines, a unique nearby match is used automatically. For any range length, provide either this full-range snippet or expectedStartLines plus expectedEndLines." },
-                            expectedStartLines = new { type = "string", description = "The exact text at the start of the range when expectedSnippet is not provided. Pass it as one string; include newline characters when the boundary spans multiple lines." },
-                            expectedEndLines = new { type = "string", description = "The exact text at the end of the range when expectedSnippet is not provided. Pass it as one string; include newline characters when the boundary spans multiple lines." }
+                            expectedStartLine = new { type = "string", description = "Required boundary text at the start of the original range. Provide at least one line; include newline characters when the boundary spans multiple lines." },
+                            expectedEndLine = new { type = "string", description = "Required boundary text at the end of the original range. Provide at least one line; include newline characters when the boundary spans multiple lines." }
                         },
-                        required = new[] { "path", "startLine", "endLine", "newText" }
+                        required = new[] { "path", "startLine", "endLine", "newText", "expectedStartLine", "expectedEndLine" }
                     }
                 },
                 new LlmTool
