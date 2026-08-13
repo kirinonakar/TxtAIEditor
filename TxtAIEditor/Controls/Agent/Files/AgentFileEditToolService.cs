@@ -638,6 +638,9 @@ namespace TxtAIEditor.Controls
                 .OrderByDescending(h => h.HasExplicitLocation)
                 .ThenByDescending(h => h.OldStart)
                 .ToList();
+            var skippedHunks = new List<string>();
+            int changedHunkCount = 0;
+
             foreach (var hunk in sortedHunks)
             {
                 bool ambiguousUnlocatedMatch = false;
@@ -650,19 +653,24 @@ namespace TxtAIEditor.Controls
                     {
                         if (ambiguousUnlocatedMatch)
                         {
-                            return $"apply_patch failed: hunk without a line range is ambiguous in file {path}; its context block must occur exactly once.";
+                            skippedHunks.Add(
+                                $"hunk without a line range is ambiguous in file {path}; its context block must occur exactly once.");
+                            continue;
                         }
 
-                        return $"apply_patch failed: hunk without a line range requires a unique context or deleted block in file {path}.";
+                        skippedHunks.Add(
+                            $"hunk without a line range requires a unique context or deleted block in file {path}.");
+                        continue;
                     }
 
                     int targetEndLine = hunk.OldStart + Math.Max(hunk.OldCount, 1) - 1;
-                    return AppendEditFailureContext(
-                        $"apply_patch failed: could not match hunk starting at line {hunk.OldStart} in file {path}.",
+                    skippedHunks.Add(AppendEditFailureContext(
+                        $"could not match hunk starting at line {hunk.OldStart} in file {path}.",
                         path,
                         lines,
                         hunk.OldStart,
-                        targetEndLine);
+                        targetEndLine));
+                    continue;
                 }
 
                 int fileLinesConsumed = 0;
@@ -684,13 +692,27 @@ namespace TxtAIEditor.Controls
                     }
                 }
 
+                var existingLines = lines
+                    .Skip(matchIndex)
+                    .Take(fileLinesConsumed)
+                    .ToList();
+                bool hunkChanged = !existingLines.SequenceEqual(replacementLines);
                 lines.RemoveRange(matchIndex, fileLinesConsumed);
                 lines.InsertRange(matchIndex, replacementLines);
+                if (hunkChanged)
+                {
+                    changedHunkCount++;
+                }
             }
 
             string updated = string.Join("\n", lines);
             if (string.Equals(updated, content, StringComparison.Ordinal))
             {
+                if (skippedHunks.Count > 0)
+                {
+                    return BuildApplyPatchSkippedResult(path, changedHunkCount, skippedHunks);
+                }
+
                 return BuildUnchangedEditResult("apply_patch", fullPath);
             }
 
@@ -711,7 +733,33 @@ namespace TxtAIEditor.Controls
             await WriteTextFileAsync(fullPath, RestoreLineEndings(updated, lineEnding), file.Encoding);
             await _notifyFileEditCommittedAsync(preview);
             await _notifyFileModifiedAsync(fullPath);
-            return $"modified: {_workspace.RelativePath(fullPath)}";
+
+            string result = $"modified: {_workspace.RelativePath(fullPath)}";
+            if (skippedHunks.Count > 0)
+            {
+                result += "\n" + BuildApplyPatchSkippedResult(path, changedHunkCount, skippedHunks);
+            }
+
+            return result;
+        }
+
+        private static string BuildApplyPatchSkippedResult(
+            string path,
+            int changedHunkCount,
+            IReadOnlyList<string> skippedHunks)
+        {
+            string header = changedHunkCount > 0
+                ? $"apply_patch partial: applied {changedHunkCount} hunk(s); skipped {skippedHunks.Count} hunk(s) in {path}."
+                : $"apply_patch failed: no hunk was applied; skipped {skippedHunks.Count} failed hunk(s) in {path}.";
+
+            var builder = new StringBuilder(header);
+            foreach (string skippedHunk in skippedHunks)
+            {
+                builder.AppendLine();
+                builder.AppendLine($"[Skipped patch hunk] {skippedHunk}");
+            }
+
+            return builder.ToString();
         }
 
         public async Task<string> OverwriteFileAsync(string path, string content)

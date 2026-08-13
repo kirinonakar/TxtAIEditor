@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
@@ -725,6 +727,7 @@ namespace TxtAIEditor.Controls
                     }
 
                     bool stopAfterLoopGuard = false;
+                    toolCalls = OrderToolCallsForExecution(toolCalls, runContext.WorkspaceRoot);
                     var toolCallResults = new List<(string Name, JsonElement Args, string Result, string ResultForTranscript, bool Skipped, string NormalizedName)>();
                     bool hasWebSearchCallInBatch = false;
 
@@ -828,7 +831,8 @@ namespace TxtAIEditor.Controls
 
                         toolCallResults.Add((currentToolName, currentArguments, toolResult, toolResultForTranscript, false, normalizedToolName));
 
-                        if (!IsSuccessfulToolResult(toolResult) || stopAfterLoopGuard)
+                        if (stopAfterLoopGuard ||
+                            (!IsSuccessfulToolResult(toolResult) && toolCalls.Count == 1))
                         {
                             break;
                         }
@@ -1092,6 +1096,165 @@ namespace TxtAIEditor.Controls
                     await RunAgentAsync();
                 });
             }
+        }
+
+        private List<AgentToolCallParser.ToolCallInfo> OrderToolCallsForExecution(
+            IReadOnlyList<AgentToolCallParser.ToolCallInfo> toolCalls,
+            string workspaceRoot)
+        {
+            var orderedToolCalls = toolCalls.ToList();
+            var lineByIndex = new Dictionary<int, int>();
+            var indexesByPath = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+
+            for (int index = 0; index < orderedToolCalls.Count; index++)
+            {
+                if (!TryGetFileEditOrderingKey(
+                        orderedToolCalls[index],
+                        workspaceRoot,
+                        out string canonicalPath,
+                        out int startLine))
+                {
+                    continue;
+                }
+
+                lineByIndex[index] = startLine;
+                if (!indexesByPath.TryGetValue(canonicalPath, out List<int>? indexes))
+                {
+                    indexes = new List<int>();
+                    indexesByPath[canonicalPath] = indexes;
+                }
+
+                indexes.Add(index);
+            }
+
+            foreach (List<int> indexes in indexesByPath.Values)
+            {
+                if (indexes.Count < 2)
+                {
+                    continue;
+                }
+
+                List<AgentToolCallParser.ToolCallInfo> sortedCalls = indexes
+                    .OrderByDescending(index => lineByIndex[index])
+                    .ThenBy(index => index)
+                    .Select(index => orderedToolCalls[index])
+                    .ToList();
+
+                for (int slot = 0; slot < indexes.Count; slot++)
+                {
+                    orderedToolCalls[indexes[slot]] = sortedCalls[slot];
+                }
+            }
+
+            return orderedToolCalls;
+        }
+
+        private bool TryGetFileEditOrderingKey(
+            AgentToolCallParser.ToolCallInfo toolCall,
+            string workspaceRoot,
+            out string canonicalPath,
+            out int startLine)
+        {
+            canonicalPath = string.Empty;
+            startLine = 0;
+
+            string normalizedToolName = NormalizeToolName(toolCall.ToolName);
+            if (!IsFileEditingTool(normalizedToolName))
+            {
+                return false;
+            }
+
+            int? candidateStartLine = normalizedToolName switch
+            {
+                "replace_range" => TryGetPositiveIntArgument(
+                    toolCall.Arguments,
+                    "startLine",
+                    "start_line"),
+                "search_replace" => TryGetPositiveIntArgument(
+                    toolCall.Arguments,
+                    "startLine",
+                    "start_line") ?? TryGetPositiveIntArgument(
+                    toolCall.Arguments,
+                    "endLine",
+                    "end_line"),
+                "apply_patch" => GetHighestPatchStartLine(toolCall.Arguments),
+                _ => null
+            };
+
+            if (!candidateStartLine.HasValue)
+            {
+                return false;
+            }
+
+            string path;
+            try
+            {
+                path = _fileToolController.GetEditPathArgument(toolCall.Arguments);
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            try
+            {
+                string root = string.IsNullOrWhiteSpace(workspaceRoot)
+                    ? _fileTools.WorkspaceRoot
+                    : workspaceRoot;
+                string fullPath = Path.IsPathRooted(path)
+                    ? path
+                    : Path.Combine(root, path);
+                canonicalPath = Path.GetFullPath(fullPath);
+                startLine = candidateStartLine.Value;
+                return startLine >= 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static int? TryGetPositiveIntArgument(JsonElement arguments, params string[] names)
+        {
+            foreach (string name in names)
+            {
+                if (TryGetIntArgument(arguments, name, out int value) && value > 0)
+                {
+                    return value;
+                }
+            }
+
+            return null;
+        }
+
+        private static int? GetHighestPatchStartLine(JsonElement arguments)
+        {
+            string patch = GetFirstStringArgument(arguments, "patch", "patchText", "diff", "content");
+            if (string.IsNullOrWhiteSpace(patch))
+            {
+                return null;
+            }
+
+            int highestStartLine = 0;
+            bool foundHunk = false;
+            foreach (Match match in Regex.Matches(patch, @"@@\s*-(\d+)", RegexOptions.CultureInvariant))
+            {
+                if (match.Groups.Count <= 1 ||
+                    !int.TryParse(match.Groups[1].Value, out int startLine))
+                {
+                    continue;
+                }
+
+                foundHunk = true;
+                highestStartLine = Math.Max(highestStartLine, startLine);
+            }
+
+            return foundHunk ? highestStartLine : null;
         }
 
         private async Task StartApprovedPlanSessionAsync(string executionPrompt, string workspaceRoot)
