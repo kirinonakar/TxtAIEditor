@@ -289,6 +289,12 @@ namespace TxtAIEditor.Controls
             }
 
             string authType = AgentMcpTransportTypes.IsStdio(connection.Transport) ? AuthTypeNone : input.AuthType;
+            bool allowAutomaticOAuth =
+                !AgentMcpTransportTypes.IsStdio(connection.Transport) &&
+                authType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) &&
+                (string.IsNullOrWhiteSpace(input.OAuthClientId) ||
+                 string.IsNullOrWhiteSpace(input.OAuthAuthorizationEndpoint) ||
+                 string.IsNullOrWhiteSpace(input.OAuthTokenEndpoint));
             if (!_configuration.TryBuildAuthSettings(
                 authType,
                 input.HeaderName,
@@ -299,6 +305,7 @@ namespace TxtAIEditor.Controls
                 input.OAuthAuthorizationEndpoint,
                 input.OAuthTokenEndpoint,
                 input.OAuthScopes,
+                allowAutomaticOAuth,
                 out var authSettings,
                 out string authError))
             {
@@ -440,6 +447,12 @@ namespace TxtAIEditor.Controls
             }
 
             string authType = AgentMcpTransportTypes.IsStdio(connection.Transport) ? AuthTypeNone : input.AuthType;
+            bool allowAutomaticOAuth =
+                !AgentMcpTransportTypes.IsStdio(connection.Transport) &&
+                authType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) &&
+                (string.IsNullOrWhiteSpace(input.OAuthClientId) ||
+                 string.IsNullOrWhiteSpace(input.OAuthAuthorizationEndpoint) ||
+                 string.IsNullOrWhiteSpace(input.OAuthTokenEndpoint));
             if (!_configuration.TryBuildAuthSettings(
                 authType,
                 input.HeaderName,
@@ -450,6 +463,7 @@ namespace TxtAIEditor.Controls
                 input.OAuthAuthorizationEndpoint,
                 input.OAuthTokenEndpoint,
                 input.OAuthScopes,
+                allowAutomaticOAuth,
                 out var authSettings,
                 out string authError))
             {

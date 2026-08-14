@@ -81,7 +81,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            bool automaticOAuth = server.AuthType.Equals(AuthTypeNone, StringComparison.OrdinalIgnoreCase);
+            bool automaticOAuth = NeedsAutomaticOAuth(server);
             if (!automaticOAuth &&
                 (!server.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) ||
                  !string.IsNullOrWhiteSpace(_credentialStore.GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken))))
@@ -122,12 +122,19 @@ namespace TxtAIEditor.Controls
         {
             int port = GetFreeTcpPort();
             string redirectUri = $"http://127.0.0.1:{port}/callback/";
-            if (server.AuthType.Equals(AuthTypeNone, StringComparison.OrdinalIgnoreCase))
+            if (NeedsAutomaticOAuth(server))
             {
                 bool configured = await TryConfigureAutomaticOAuthAsync(server, redirectUri, cancellationToken);
                 if (!configured)
                 {
-                    return string.Empty;
+                    if (server.AuthType.Equals(AuthTypeNone, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return string.Empty;
+                    }
+
+                    throw new InvalidOperationException(_getString(
+                        "AgentMcpOAuthClientConfigRequired",
+                        "OAuth Client ID, Authorization URL, Token URL을 입력해주세요. Client Secret은 공개 클라이언트에서는 생략할 수 있습니다."));
                 }
 
                 await _saveAsync();
@@ -215,6 +222,19 @@ namespace TxtAIEditor.Controls
                 _credentialStore.GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken));
             await _saveAsync();
             return token.AccessToken;
+        }
+
+        private static bool NeedsAutomaticOAuth(AgentMcpServer server)
+        {
+            if (server.AuthType.Equals(AuthTypeNone, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return server.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) &&
+                (string.IsNullOrWhiteSpace(server.OAuthClientId) ||
+                 string.IsNullOrWhiteSpace(server.OAuthAuthorizationEndpoint) ||
+                 string.IsNullOrWhiteSpace(server.OAuthTokenEndpoint));
         }
 
         private async Task<bool> TryConfigureAutomaticOAuthAsync(

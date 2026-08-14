@@ -387,6 +387,7 @@ namespace TxtAIEditor.Controls
             string oauthAuthorizationEndpoint,
             string oauthTokenEndpoint,
             string oauthScopes,
+            bool allowAutomaticOAuth,
             out AgentMcpAuthSettings settings,
             out string error)
         {
@@ -435,15 +436,18 @@ namespace TxtAIEditor.Controls
 
             if (settings.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase))
             {
-                if (string.IsNullOrWhiteSpace(oauthClientId) ||
+                bool missingClientConfiguration =
+                    string.IsNullOrWhiteSpace(oauthClientId) ||
                     string.IsNullOrWhiteSpace(oauthAuthorizationEndpoint) ||
-                    string.IsNullOrWhiteSpace(oauthTokenEndpoint))
+                    string.IsNullOrWhiteSpace(oauthTokenEndpoint);
+                if (missingClientConfiguration && !allowAutomaticOAuth)
                 {
                     error = _getString("AgentMcpOAuthClientConfigRequired", "OAuth Client ID, Authorization URL, Token URL을 입력해주세요. Client Secret은 공개 클라이언트에서는 생략할 수 있습니다.");
                     return false;
                 }
 
-                if (!IsValidHttpEndpoint(oauthAuthorizationEndpoint) || !IsValidHttpEndpoint(oauthTokenEndpoint))
+                if (!missingClientConfiguration &&
+                    (!IsValidHttpEndpoint(oauthAuthorizationEndpoint) || !IsValidHttpEndpoint(oauthTokenEndpoint)))
                 {
                     error = _getString("AgentMcpOAuthEndpointInvalid", "OAuth Authorization URL과 Token URL은 http 또는 https URL이어야 합니다.");
                     return false;
