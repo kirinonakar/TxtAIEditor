@@ -440,6 +440,24 @@ namespace TxtAIEditor.Controls
             var oauthScopesLabel = CreateLabel(_getString("AgentMcpOAuthScopesLabel", "OAuth Scope"));
             var oauthScopesBox = CreateTextBox(_getString("AgentMcpOAuthScopesPlaceholder", "scope1 scope2"));
             oauthScopesBox.Text = initial.OAuthScopes;
+            var oauthManualSettingsPanel = new StackPanel { Spacing = 10 };
+            oauthManualSettingsPanel.Children.Add(oauthClientIdLabel);
+            oauthManualSettingsPanel.Children.Add(oauthClientIdBox);
+            oauthManualSettingsPanel.Children.Add(oauthClientSecretLabel);
+            oauthManualSettingsPanel.Children.Add(oauthClientSecretBox);
+            oauthManualSettingsPanel.Children.Add(oauthAuthorizationEndpointLabel);
+            oauthManualSettingsPanel.Children.Add(oauthAuthorizationEndpointBox);
+            oauthManualSettingsPanel.Children.Add(oauthTokenEndpointLabel);
+            oauthManualSettingsPanel.Children.Add(oauthTokenEndpointBox);
+            oauthManualSettingsPanel.Children.Add(oauthScopesLabel);
+            oauthManualSettingsPanel.Children.Add(oauthScopesBox);
+            bool oauthManualSettingsExpanded = false;
+            var oauthManualSettingsButton = new Button
+            {
+                Content = _getString("AgentMcpOAuthManualSettingsButton", "수동 OAuth 설정"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Height = 32
+            };
 
             void UpdateFieldVisibility()
             {
@@ -478,9 +496,23 @@ namespace TxtAIEditor.Controls
                 oauthAuthorizationEndpointBox,
                 oauthTokenEndpointLabel,
                 oauthTokenEndpointBox,
-                    oauthScopesLabel,
-                    oauthScopesBox);
+                oauthScopesLabel,
+                oauthScopesBox,
+                oauthManualSettingsButton,
+                oauthManualSettingsPanel,
+                oauthManualSettingsExpanded);
             }
+
+            oauthManualSettingsButton.Click += (_, _) =>
+            {
+                oauthManualSettingsExpanded = !oauthManualSettingsExpanded;
+                oauthManualSettingsButton.Content = _getString(
+                    oauthManualSettingsExpanded
+                        ? "AgentMcpOAuthManualSettingsHideButton"
+                        : "AgentMcpOAuthManualSettingsButton",
+                    oauthManualSettingsExpanded ? "수동 OAuth 설정 숨기기" : "수동 OAuth 설정");
+                UpdateFieldVisibility();
+            };
 
             transportBox.SelectionChanged += (_, _) => UpdateFieldVisibility();
             authTypeBox.SelectionChanged += (_, _) => UpdateFieldVisibility();
@@ -519,16 +551,8 @@ namespace TxtAIEditor.Controls
             stack.Children.Add(apiKeyBox);
             stack.Children.Add(oauthTokenLabel);
             stack.Children.Add(oauthTokenBox);
-            stack.Children.Add(oauthClientIdLabel);
-            stack.Children.Add(oauthClientIdBox);
-            stack.Children.Add(oauthClientSecretLabel);
-            stack.Children.Add(oauthClientSecretBox);
-            stack.Children.Add(oauthAuthorizationEndpointLabel);
-            stack.Children.Add(oauthAuthorizationEndpointBox);
-            stack.Children.Add(oauthTokenEndpointLabel);
-            stack.Children.Add(oauthTokenEndpointBox);
-            stack.Children.Add(oauthScopesLabel);
-            stack.Children.Add(oauthScopesBox);
+            stack.Children.Add(oauthManualSettingsButton);
+            stack.Children.Add(oauthManualSettingsPanel);
             stack.Children.Add(CreateInfoText(_getString("AgentMcpCredentialInfo", "API Key, OAuth Client Secret, OAuth 토큰, stdio 환경 변수는 설정 파일에 저장하지 않고 Windows 자격 증명 관리자에 저장합니다.")));
 
             double availableHeight = _agentPane.XamlRoot?.Size.Height ?? 720;
@@ -672,12 +696,16 @@ namespace TxtAIEditor.Controls
             TextBlock oauthTokenEndpointLabel,
             TextBox oauthTokenEndpointBox,
             TextBlock oauthScopesLabel,
-            TextBox oauthScopesBox)
+            TextBox oauthScopesBox,
+            Button oauthManualSettingsButton,
+            StackPanel oauthManualSettingsPanel,
+            bool oauthManualSettingsExpanded)
         {
             string authType = GetSelectedAuthType(authTypeBox);
             bool showApiKey = authEnabled && authType.Equals(AuthTypeApiKey, StringComparison.OrdinalIgnoreCase);
             bool showBearer = authEnabled && authType.Equals(AuthTypeOAuthBearer, StringComparison.OrdinalIgnoreCase);
             bool showBrowserOAuth = authEnabled && authType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase);
+            bool showManualOAuth = showBrowserOAuth && oauthManualSettingsExpanded;
 
             SetVisible(headerNameLabel, showApiKey);
             SetVisible(headerNameBox, showApiKey);
@@ -685,16 +713,18 @@ namespace TxtAIEditor.Controls
             SetVisible(apiKeyBox, showApiKey);
             SetVisible(oauthTokenLabel, showBearer);
             SetVisible(oauthTokenBox, showBearer);
-            SetVisible(oauthClientIdLabel, showBrowserOAuth);
-            SetVisible(oauthClientIdBox, showBrowserOAuth);
-            SetVisible(oauthClientSecretLabel, showBrowserOAuth);
-            SetVisible(oauthClientSecretBox, showBrowserOAuth);
-            SetVisible(oauthAuthorizationEndpointLabel, showBrowserOAuth);
-            SetVisible(oauthAuthorizationEndpointBox, showBrowserOAuth);
-            SetVisible(oauthTokenEndpointLabel, showBrowserOAuth);
-            SetVisible(oauthTokenEndpointBox, showBrowserOAuth);
-            SetVisible(oauthScopesLabel, showBrowserOAuth);
-            SetVisible(oauthScopesBox, showBrowserOAuth);
+            SetVisible(oauthManualSettingsButton, showBrowserOAuth);
+            SetVisible(oauthManualSettingsPanel, showManualOAuth);
+            SetVisible(oauthClientIdLabel, showManualOAuth);
+            SetVisible(oauthClientIdBox, showManualOAuth);
+            SetVisible(oauthClientSecretLabel, showManualOAuth);
+            SetVisible(oauthClientSecretBox, showManualOAuth);
+            SetVisible(oauthAuthorizationEndpointLabel, showManualOAuth);
+            SetVisible(oauthAuthorizationEndpointBox, showManualOAuth);
+            SetVisible(oauthTokenEndpointLabel, showManualOAuth);
+            SetVisible(oauthTokenEndpointBox, showManualOAuth);
+            SetVisible(oauthScopesLabel, showManualOAuth);
+            SetVisible(oauthScopesBox, showManualOAuth);
         }
 
         private static void SetVisible(UIElement element, bool isVisible)

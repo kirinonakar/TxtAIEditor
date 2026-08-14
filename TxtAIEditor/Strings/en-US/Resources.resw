@@ -3207,6 +3207,12 @@ Plan: {0}</value>
   <data name="AgentMcpAuthTypeOAuthBrowser" xml:space="preserve">
     <value>OAuth browser login</value>
   </data>
+  <data name="AgentMcpOAuthManualSettingsButton" xml:space="preserve">
+    <value>Manual OAuth settings</value>
+  </data>
+  <data name="AgentMcpOAuthManualSettingsHideButton" xml:space="preserve">
+    <value>Hide manual OAuth settings</value>
+  </data>
   <data name="AgentMcpOAuthTokenLabel" xml:space="preserve">
     <value>OAuth Access Token</value>
   </data>

@@ -3207,6 +3207,12 @@
   <data name="AgentMcpAuthTypeOAuthBrowser" xml:space="preserve">
     <value>OAuth 브라우저 로그인</value>
   </data>
+  <data name="AgentMcpOAuthManualSettingsButton" xml:space="preserve">
+    <value>수동 OAuth 설정</value>
+  </data>
+  <data name="AgentMcpOAuthManualSettingsHideButton" xml:space="preserve">
+    <value>수동 OAuth 설정 숨기기</value>
+  </data>
   <data name="AgentMcpOAuthTokenLabel" xml:space="preserve">
     <value>OAuth Access Token</value>
   </data>

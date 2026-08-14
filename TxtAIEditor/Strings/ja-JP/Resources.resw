@@ -3173,6 +3173,12 @@
   <data name="AgentMcpAuthTypeOAuthBrowser" xml:space="preserve">
     <value>OAuth ブラウザーログイン</value>
   </data>
+  <data name="AgentMcpOAuthManualSettingsButton" xml:space="preserve">
+    <value>OAuth 手動設定</value>
+  </data>
+  <data name="AgentMcpOAuthManualSettingsHideButton" xml:space="preserve">
+    <value>OAuth 手動設定を隠す</value>
+  </data>
   <data name="AgentMcpOAuthTokenLabel" xml:space="preserve">
     <value>OAuth Access Token</value>
   </data>

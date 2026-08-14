@@ -3173,6 +3173,12 @@
   <data name="AgentMcpAuthTypeOAuthBrowser" xml:space="preserve">
     <value>OAuth瀏覽器登入</value>
   </data>
+  <data name="AgentMcpOAuthManualSettingsButton" xml:space="preserve">
+    <value>手動 OAuth 設定</value>
+  </data>
+  <data name="AgentMcpOAuthManualSettingsHideButton" xml:space="preserve">
+    <value>隱藏手動 OAuth 設定</value>
+  </data>
   <data name="AgentMcpOAuthTokenLabel" xml:space="preserve">
     <value>OAuth 存取令牌</value>
   </data>
