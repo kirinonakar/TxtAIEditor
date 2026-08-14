@@ -972,13 +972,20 @@ namespace TxtAIEditor.Editor
         public bool IsDirty
         {
             get => _isDirty;
-            set
-            {
-                if (_isDirty == value)
-                {
-                    return;
-                }
+            set => SetDirtyState(value, updateUndoSavedState: true);
+        }
 
+        internal UndoManager UndoManager { get; } = new();
+
+        internal void SetDirtyState(bool value, bool updateUndoSavedState)
+        {
+            if (_isDirty == value)
+            {
+                return;
+            }
+
+            if (updateUndoSavedState)
+            {
                 if (value)
                 {
                     UndoManager.MarkUnsavedState();
@@ -987,13 +994,11 @@ namespace TxtAIEditor.Editor
                 {
                     UndoManager.MarkSavedState();
                 }
-
-                _isDirty = value;
-                StateChanged?.Invoke(nameof(IsDirty));
             }
-        }
 
-        internal UndoManager UndoManager { get; } = new();
+            _isDirty = value;
+            StateChanged?.Invoke(nameof(IsDirty));
+        }
 
         internal EditorDocumentChange? LastChange { get; private set; }
 

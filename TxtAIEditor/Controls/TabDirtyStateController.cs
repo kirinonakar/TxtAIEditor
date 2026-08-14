@@ -134,7 +134,9 @@ namespace TxtAIEditor.Controls
                     continue;
                 }
 
-                tab.IsDirty = isDirty;
+                // Dirty reconciliation reflects the current undo position; it must not
+                // move or invalidate the saved undo baseline used to recognize a full undo.
+                tab.SetDirtyStatePreservingUndoBaseline(isDirty);
                 changed = true;
             }
 

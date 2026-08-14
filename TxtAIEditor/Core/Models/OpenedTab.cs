@@ -139,6 +139,20 @@ namespace TxtAIEditor.Core.Models
             }
         }
 
+        internal void SetDirtyStatePreservingUndoBaseline(bool value)
+        {
+            if (_document != null)
+            {
+                _document.SetDirtyState(value, updateUndoSavedState: false);
+            }
+            else if (_isDirty != value)
+            {
+                _isDirty = value;
+                OnPropertyChanged(nameof(IsDirty));
+                OnPropertyChanged(nameof(DisplayTitle));
+            }
+        }
+
         public string Language { get; set; } = "plaintext";
         public bool IsLanguageManuallySelected { get; set; } = false;
         private string _encodingName = "UTF-8";
