@@ -899,6 +899,13 @@ namespace TxtAIEditor.Core.Services
                 _modelStatusText.Text = _getString("SettingsLlmOllamaCloudInfo", "Ollama Cloud는 지정된 endpoint에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
             }
+            else if (provider.Equals("Unsloth Desktop", StringComparison.OrdinalIgnoreCase))
+            {
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadUnslothModels", "Unsloth Desktop 모델 불러오기"));
+                _refreshModelsButton.Visibility = Visibility.Visible;
+                _modelStatusText.Text = _getString("SettingsLlmUnslothInfo", "Unsloth Desktop는 서버가 켜져 있을 때 http://localhost:8888/v1/models 에서 모델 목록을 불러옵니다.");
+                _modelStatusText.Visibility = Visibility.Visible;
+            }
             else
             {
                 _refreshModelsButton.Visibility = Visibility.Collapsed;
@@ -945,6 +952,10 @@ namespace TxtAIEditor.Core.Services
             else if (provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
             {
                 ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadOllamaCloudModels", "Ollama Cloud 모델 불러오기"));
+            }
+            else if (provider.Equals("Unsloth Desktop", StringComparison.OrdinalIgnoreCase))
+            {
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadUnslothModels", "Unsloth Desktop 모델 불러오기"));
             }
             else
             {

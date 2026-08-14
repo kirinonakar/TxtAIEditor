@@ -11,14 +11,14 @@ using TxtAIEditor.Core.Interfaces;
 
 namespace TxtAIEditor.Core.Services.LLM
 {
-    public class LMStudioProvider : ILLMProvider
+    public class UnslothProvider : ILLMProvider
     {
         private readonly ILocalizationService _localizationService;
         private readonly string _thinkingLevel;
 
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public LMStudioProvider(ILocalizationService localizationService, string thinkingLevel = "")
+        public UnslothProvider(ILocalizationService localizationService, string thinkingLevel = "")
         {
             _localizationService = localizationService;
             _thinkingLevel = thinkingLevel ?? string.Empty;
@@ -59,9 +59,9 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
-                throw new ArgumentException(_localizationService.GetString("LmStudioErrorNoModelSelected", "LM Studio 모델을 먼저 선택해 주십시오."));
+                throw new ArgumentException(_localizationService.GetString("UnslothErrorNoModelSelected", "Unsloth Desktop 모델을 먼저 선택해 주십시오."));
 
-            string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:1234/v1" : endpoint.Trim();
+            string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:8888/v1" : endpoint.Trim();
             string requestUrl = baseEndpoint.TrimEnd('/') + "/responses";
 
             var payloadDict = new Dictionary<string, object>
@@ -89,7 +89,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
                     if (!response.IsSuccessStatusCode)
                     {
-                        throw new HttpRequestException(string.Format(_localizationService.GetString("LmStudioErrorApiCallFailed", "LM Studio API 호출 실패 ({0}): {1}"), response.StatusCode, responseBody));
+                        throw new HttpRequestException(string.Format(_localizationService.GetString("UnslothErrorApiCallFailed", "Unsloth Desktop API 호출 실패 ({0}): {1}"), response.StatusCode, responseBody));
                     }
 
                     using (var doc = JsonDocument.Parse(responseBody))
@@ -170,7 +170,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         }
                     }
 
-                    return _localizationService.GetString("LmStudioErrorEmptyResponse", "LM Studio로부터 빈 응답을 수신했습니다.");
+                    return _localizationService.GetString("UnslothErrorEmptyResponse", "Unsloth Desktop로부터 빈 응답을 수신했습니다.");
                 }
             }
         }
@@ -179,9 +179,9 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
-                throw new ArgumentException(_localizationService.GetString("LmStudioErrorNoModelSelected", "LM Studio 모델을 먼저 선택해 주십시오."));
+                throw new ArgumentException(_localizationService.GetString("UnslothErrorNoModelSelected", "Unsloth Desktop 모델을 먼저 선택해 주십시오."));
 
-            string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:1234/v1" : endpoint.Trim();
+            string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:8888/v1" : endpoint.Trim();
             string requestUrl = baseEndpoint.TrimEnd('/') + "/responses";
 
             var payloadDict = new Dictionary<string, object>
@@ -210,7 +210,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!response.IsSuccessStatusCode)
                     {
                         string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                        throw new HttpRequestException(string.Format(_localizationService.GetString("LmStudioErrorStreamCallFailed", "LM Studio API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
+                        throw new HttpRequestException(string.Format(_localizationService.GetString("UnslothErrorStreamCallFailed", "Unsloth Desktop API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
                     }
 
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))

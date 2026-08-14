@@ -473,6 +473,12 @@
   <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
     <value>Ollama Cloud 從指定端點載入模型清單。</value>
   </data>
+  <data name="SettingsLlmLoadUnslothModels" xml:space="preserve">
+    <value>加載Unsloth Desktop型號</value>
+  </data>
+  <data name="SettingsLlmUnslothInfo" xml:space="preserve">
+    <value>當伺服器運行時，Unsloth Desktop 從 http://localhost:8888/v1/models 載入模型清單。</value>
+  </data>
   <data name="SettingsLlmVisionFallbackProvider" xml:space="preserve">
     <value>視覺備援提供者</value>
   </data>

@@ -473,6 +473,12 @@
   <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
     <value>Ollama Cloud는 지정된 endpoint에서 모델 목록을 불러옵니다.</value>
   </data>
+  <data name="SettingsLlmLoadUnslothModels" xml:space="preserve">
+    <value>Unsloth Desktop 모델 불러오기</value>
+  </data>
+  <data name="SettingsLlmUnslothInfo" xml:space="preserve">
+    <value>Unsloth Desktop는 서버가 켜져 있을 때 http://localhost:8888/v1/models 에서 모델 목록을 불러옵니다.</value>
+  </data>
   <data name="SettingsLlmVisionFallbackProvider" xml:space="preserve">
     <value>Vision fallback 공급자</value>
   </data>

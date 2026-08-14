@@ -193,7 +193,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 int payloadStart = openIndex + ToolCallOpenTag.Length;
-                int closeIndex = trimmed.IndexOf(ToolCallCloseTag, payloadStart, StringComparison.OrdinalIgnoreCase);
+                int closeIndex = FindToolCallCloseOutsideJsonString(trimmed, payloadStart);
                 if (closeIndex < 0)
                 {
                     break;
@@ -249,6 +249,49 @@ namespace TxtAIEditor.Controls
             }
 
             return false;
+        }
+
+        private static int FindToolCallCloseOutsideJsonString(string text, int startIndex)
+        {
+            bool inJsonString = false;
+            bool escaped = false;
+            for (int i = startIndex; i < text.Length; i++)
+            {
+                char current = text[i];
+                if (inJsonString)
+                {
+                    if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (current == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (current == '"')
+                    {
+                        inJsonString = false;
+                    }
+
+                    continue;
+                }
+
+                if (current == '"')
+                {
+                    inJsonString = true;
+                    continue;
+                }
+
+                if (i + ToolCallCloseTag.Length <= text.Length &&
+                    text.AsSpan(i, ToolCallCloseTag.Length).Equals(
+                        ToolCallCloseTag.AsSpan(),
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         private static bool TryParsePayloads(string payload, List<ToolCallInfo> toolCalls)
@@ -1207,7 +1250,7 @@ namespace TxtAIEditor.Controls
             if (toolCallIndex >= 0)
             {
                 int payloadStart = toolCallIndex + ToolCallOpenTag.Length;
-                int payloadEnd = text.IndexOf(ToolCallCloseTag, payloadStart, StringComparison.OrdinalIgnoreCase);
+                int payloadEnd = FindToolCallCloseOutsideJsonString(text, payloadStart);
                 payload = payloadEnd >= 0
                     ? text.Substring(payloadStart, payloadEnd - payloadStart).Trim()
                     : text.Substring(payloadStart).Trim();

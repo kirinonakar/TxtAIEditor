@@ -473,6 +473,12 @@
   <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
     <value>Ollama Cloudは、指定されたエンドポイントからモデルリストを取得します。</value>
   </data>
+  <data name="SettingsLlmLoadUnslothModels" xml:space="preserve">
+    <value>Unsloth Desktopモデルを取得</value>
+  </data>
+  <data name="SettingsLlmUnslothInfo" xml:space="preserve">
+    <value>Unsloth Desktopは、サーバーが起動しているときに http://localhost:8888/v1/models からモデルリストを取得します。</value>
+  </data>
   <data name="SettingsLlmVisionFallbackProvider" xml:space="preserve">
     <value>Vision フォールバックプロバイダー</value>
   </data>

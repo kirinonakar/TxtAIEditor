@@ -473,6 +473,12 @@
   <data name="SettingsLlmOllamaCloudInfo" xml:space="preserve">
     <value>Ollama Cloud loads the list of models from the specified endpoint.</value>
   </data>
+  <data name="SettingsLlmLoadUnslothModels" xml:space="preserve">
+    <value>Load Unsloth Desktop Models</value>
+  </data>
+  <data name="SettingsLlmUnslothInfo" xml:space="preserve">
+    <value>Unsloth Desktop loads the list of models from http://localhost:8888/v1/models when the server is running.</value>
+  </data>
   <data name="SettingsLlmVisionFallbackProvider" xml:space="preserve">
     <value>Vision fallback provider</value>
   </data>

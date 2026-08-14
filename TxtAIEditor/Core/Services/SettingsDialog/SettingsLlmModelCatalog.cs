@@ -19,6 +19,7 @@ namespace TxtAIEditor.Core.Services
             "OpenCode Zen",
             "Ollama",
             "Ollama Cloud",
+            "Unsloth Desktop",
             "Custom"
         };
 
@@ -39,7 +40,8 @@ namespace TxtAIEditor.Core.Services
                 provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase) ||
-                provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase);
+                provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Unsloth Desktop", StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool SupportsThinkingLevel(string provider)
@@ -51,9 +53,12 @@ namespace TxtAIEditor.Core.Services
                 provider.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Upstage", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OllamaCloud", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Unsloth Desktop", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Custom", StringComparison.OrdinalIgnoreCase);
         }
@@ -82,7 +87,9 @@ namespace TxtAIEditor.Core.Services
                 endpoint.Equals("https://opencode.ai/zen/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("http://localhost:11434/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("https://ollama.com", StringComparison.OrdinalIgnoreCase) ||
-                endpoint.Equals("https://ollama.com/v1", StringComparison.OrdinalIgnoreCase);
+                endpoint.Equals("https://ollama.com/v1", StringComparison.OrdinalIgnoreCase) ||
+                endpoint.Equals("http://localhost:8888/v1", StringComparison.OrdinalIgnoreCase) ||
+                endpoint.Equals("http://localhost:8000/v1", StringComparison.OrdinalIgnoreCase);
         }
 
         public static string GetDefaultEndpoint(string provider, string fallback)
@@ -100,6 +107,7 @@ namespace TxtAIEditor.Core.Services
                 "OpenCode Zen" => "https://opencode.ai/zen/v1",
                 "Ollama" => "http://localhost:11434/v1",
                 "Ollama Cloud" => "https://ollama.com",
+                "Unsloth Desktop" => "http://localhost:8888/v1",
                 _ => fallback
             };
         }
@@ -337,6 +345,11 @@ namespace TxtAIEditor.Core.Services
                 return !string.IsNullOrEmpty(settings.LlmModelOllamaCloud) ? settings.LlmModelOllamaCloud : selectedModel;
             }
 
+            if (provider.Equals("Unsloth Desktop", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelUnsloth) ? settings.LlmModelUnsloth : selectedModel;
+            }
+
             if (provider.Equals("Custom", StringComparison.OrdinalIgnoreCase))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelCustom) ? settings.LlmModelCustom : string.Empty;
@@ -397,6 +410,11 @@ namespace TxtAIEditor.Core.Services
                 return !string.IsNullOrEmpty(settings.LlmModelOllamaCloud) ? settings.LlmModelOllamaCloud : "llama3:latest";
             }
 
+            if (provider.Equals("Unsloth Desktop", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelUnsloth) ? settings.LlmModelUnsloth : string.Empty;
+            }
+
             if (provider.Equals("Custom", StringComparison.OrdinalIgnoreCase))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelCustom) ? settings.LlmModelCustom : string.Empty;
@@ -440,6 +458,11 @@ namespace TxtAIEditor.Core.Services
             if (provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelOllamaCloud) ? settings.LlmModelOllamaCloud : settings.LlmModel;
+            }
+
+            if (provider.Equals("Unsloth Desktop", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelUnsloth) ? settings.LlmModelUnsloth : settings.LlmModel;
             }
 
             if (provider.Equals("Custom", StringComparison.OrdinalIgnoreCase))
@@ -491,6 +514,10 @@ namespace TxtAIEditor.Core.Services
             else if (settings.LlmProvider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase))
             {
                 settings.LlmModelOllamaCloud = settings.LlmModel;
+            }
+            else if (settings.LlmProvider.Equals("Unsloth Desktop", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.LlmModelUnsloth = settings.LlmModel;
             }
             else if (settings.LlmProvider.Equals("Custom", StringComparison.OrdinalIgnoreCase))
             {
