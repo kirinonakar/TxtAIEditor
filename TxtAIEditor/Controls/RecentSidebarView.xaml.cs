@@ -2,6 +2,7 @@ using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
 
 namespace TxtAIEditor.Controls
 {
@@ -19,6 +20,7 @@ namespace TxtAIEditor.Controls
         public ToggleButton FolderTab => RecentFolderTab;
 
         public event ItemClickEventHandler? ItemClick;
+        public event RightTappedEventHandler? ItemRightTapped;
         public event RoutedEventHandler? RemoveClick;
         public event RoutedEventHandler? TabClick;
 
@@ -30,6 +32,7 @@ namespace TxtAIEditor.Controls
         }
 
         private void OnRecentFileItemClick(object sender, ItemClickEventArgs e) => ItemClick?.Invoke(sender, e);
+        private void OnRecentFileItemRightTapped(object sender, RightTappedRoutedEventArgs e) => ItemRightTapped?.Invoke(sender, e);
         private void OnRemoveRecentFileClick(object sender, RoutedEventArgs e) => RemoveClick?.Invoke(sender, e);
         private void OnRecentTabClick(object sender, RoutedEventArgs e) => TabClick?.Invoke(sender, e);
     }

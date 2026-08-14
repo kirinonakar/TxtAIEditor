@@ -2,6 +2,7 @@ using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
 
 namespace TxtAIEditor.Controls
 {
@@ -19,6 +20,7 @@ namespace TxtAIEditor.Controls
         public ToggleButton FolderTab => FavoritesFolderTab;
 
         public event ItemClickEventHandler? ItemClick;
+        public event RightTappedEventHandler? ItemRightTapped;
         public event RoutedEventHandler? RemoveClick;
         public event RoutedEventHandler? PinClick;
         public event RoutedEventHandler? TabClick;
@@ -31,6 +33,7 @@ namespace TxtAIEditor.Controls
         }
 
         private void OnFavoriteItemClick(object sender, ItemClickEventArgs e) => ItemClick?.Invoke(sender, e);
+        private void OnFavoriteItemRightTapped(object sender, RightTappedRoutedEventArgs e) => ItemRightTapped?.Invoke(sender, e);
         private void OnRemoveFavoriteClick(object sender, RoutedEventArgs e) => RemoveClick?.Invoke(sender, e);
         private void OnFavoritePinClick(object sender, RoutedEventArgs e) => PinClick?.Invoke(sender, e);
         private void OnFavoritesTabClick(object sender, RoutedEventArgs e) => TabClick?.Invoke(sender, e);

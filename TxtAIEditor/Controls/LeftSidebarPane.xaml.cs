@@ -57,6 +57,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? RenameClick { add => ExplorerView.RenameClick += value; remove => ExplorerView.RenameClick -= value; }
         public event RoutedEventHandler? DeleteClick { add => ExplorerView.DeleteClick += value; remove => ExplorerView.DeleteClick -= value; }
         public event ItemClickEventHandler? FavoriteItemClick { add => FavoritesView.ItemClick += value; remove => FavoritesView.ItemClick -= value; }
+        public event RightTappedEventHandler? FavoriteItemRightTapped { add => FavoritesView.ItemRightTapped += value; remove => FavoritesView.ItemRightTapped -= value; }
         public event RoutedEventHandler? RemoveFavoriteClick { add => FavoritesView.RemoveClick += value; remove => FavoritesView.RemoveClick -= value; }
         public event RoutedEventHandler? FavoritePinClick { add => FavoritesView.PinClick += value; remove => FavoritesView.PinClick -= value; }
         public event RoutedEventHandler? FavoritesTabClick { add => FavoritesView.TabClick += value; remove => FavoritesView.TabClick -= value; }
@@ -96,6 +97,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ReplaceOneClick { add => SearchView.ReplaceOneClick += value; remove => SearchView.ReplaceOneClick -= value; }
         public event ItemClickEventHandler? SearchResultItemClick { add => SearchView.ResultItemClick += value; remove => SearchView.ResultItemClick -= value; }
         public event ItemClickEventHandler? RecentFileItemClick { add => RecentView.ItemClick += value; remove => RecentView.ItemClick -= value; }
+        public event RightTappedEventHandler? RecentFileItemRightTapped { add => RecentView.ItemRightTapped += value; remove => RecentView.ItemRightTapped -= value; }
         public event RoutedEventHandler? RemoveRecentFileClick { add => RecentView.RemoveClick += value; remove => RecentView.RemoveClick -= value; }
         public event ItemClickEventHandler? TocItemClick { add => TocView.ItemClick += value; remove => TocView.ItemClick -= value; }
         public event TextChangedEventHandler? ExplorerFilterTextChanged { add => ExplorerView.FilterTextChanged += value; remove => ExplorerView.FilterTextChanged -= value; }

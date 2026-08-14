@@ -23,7 +23,7 @@
                             <ListView x:Name="RecentFilesListView" Grid.Row="2" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnRecentFileItemClick">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
-                                         <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding DisplayPath}">
+                                         <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding DisplayPath}" RightTapped="OnRecentFileItemRightTapped">
                                              <Grid.ColumnDefinitions>
                                                  <ColumnDefinition Width="Auto"/>
                                                  <ColumnDefinition Width="Auto"/>

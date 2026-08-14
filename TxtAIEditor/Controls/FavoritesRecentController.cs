@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -194,7 +195,9 @@ namespace TxtAIEditor.Controls
             _leftSidebar.FavoritesTabClick += OnFavoritesTabClick;
             _leftSidebar.FavoritesList.DragItemsStarting += OnFavoritesDragItemsStarting;
             _leftSidebar.FavoritesList.DragItemsCompleted += OnFavoritesDragItemsCompleted;
+            _leftSidebar.FavoriteItemRightTapped += OnFavoriteItemRightTapped;
             _leftSidebar.RecentFileItemClick += OnRecentFileItemClick;
+            _leftSidebar.RecentFileItemRightTapped += OnRecentFileItemRightTapped;
             _leftSidebar.RemoveRecentFileClick += OnRemoveRecentFileClick;
             _leftSidebar.RecentTabClick += OnRecentTabClick;
         }
@@ -351,6 +354,86 @@ private static bool InferFolderWithoutTouchingFileSystem(string path)
             if (!_isExplorerTreeMode() && !string.IsNullOrEmpty(parentDir) && Directory.Exists(parentDir))
             {
                 await _navigateExplorerToFolderAsync(parentDir);
+            }
+        }
+
+        private void OnFavoriteItemRightTapped(object sender, RightTappedRoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element &&
+                element.DataContext is FavoriteItem item &&
+                item.IsFolder)
+            {
+                ShowOpenFolderContextMenu(element, e, item.Path);
+            }
+        }
+
+        private void OnRecentFileItemRightTapped(object sender, RightTappedRoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element &&
+                element.DataContext is RecentFileItem item &&
+                item.IsFolder)
+            {
+                ShowOpenFolderContextMenu(element, e, item.Path);
+            }
+        }
+
+        private void ShowOpenFolderContextMenu(
+            FrameworkElement target,
+            RightTappedRoutedEventArgs args,
+            string folderPath)
+        {
+            if (RemotePath.IsRemote(folderPath))
+            {
+                return;
+            }
+
+            args.Handled = true;
+
+            var flyout = new MenuFlyout();
+            var openInWindowsExplorerItem = new MenuFlyoutItem
+            {
+                Text = _getString("ExplorerOpenInWindowsTooltip", "Windows 탐색기에서 열기"),
+                Icon = new FontIcon { Glyph = "\uE8DA" },
+                Tag = folderPath,
+                IsEnabled = Directory.Exists(folderPath)
+            };
+            openInWindowsExplorerItem.Click += OnOpenFolderInWindowsExplorerClick;
+            flyout.Items.Add(openInWindowsExplorerItem);
+
+            CursorResetHelper.AttachToFlyout(flyout, target);
+            CursorResetHelper.ResetToArrow(target);
+            flyout.ShowAt(target, new FlyoutShowOptions
+            {
+                Position = args.GetPosition(target)
+            });
+            CursorResetHelper.ResetToArrow(target);
+        }
+
+        private void OnOpenFolderInWindowsExplorerClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuFlyoutItem { Tag: string folderPath } ||
+                string.IsNullOrWhiteSpace(folderPath) ||
+                RemotePath.IsRemote(folderPath) ||
+                !Directory.Exists(folderPath))
+            {
+                return;
+            }
+
+            try
+            {
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    UseShellExecute = false
+                };
+                startInfo.ArgumentList.Add(folderPath);
+                Process.Start(startInfo);
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("ExplorerOpenInWindowsTooltip", "Windows 탐색기에서 열기"),
+                    ex.Message);
             }
         }
 
