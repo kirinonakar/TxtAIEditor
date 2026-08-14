@@ -127,7 +127,7 @@
                     </StackPanel>
                 </Button>
                 <TextBlock x:Name="StatusTotalLines" MinWidth="85" Text="전체 줄수: 0" FontSize="11" VerticalAlignment="Center"/>
-                <TextBlock x:Name="StatusFileStats" MinWidth="110" Text="크기: 0 bytes" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusFileStats" MinWidth="110" Text="크기: 0 B" FontSize="11" VerticalAlignment="Center"/>
                 <Button x:Name="LineEndingButton" MinWidth="35" HorizontalContentAlignment="Left" Padding="4,0" Background="Transparent" BorderBrush="Transparent" Click="HandleLineEndingClick" ToolTipService.ToolTip="클릭하여 줄 끝 방식 변경">
                     <TextBlock x:Name="StatusLineEnding" Text="LF" FontSize="11" VerticalAlignment="Center"/>
                 </Button>

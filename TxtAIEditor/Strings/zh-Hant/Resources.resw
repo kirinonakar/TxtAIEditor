@@ -927,10 +927,10 @@
     <value>點擊以移至偏移</value>
   </data>
   <data name="StatusFileSizeFormat" xml:space="preserve">
-    <value>大小：{0:N0} 位元組</value>
+    <value>大小：{0}</value>
   </data>
   <data name="StatusImageFileStatsFormat" xml:space="preserve">
-    <value>大小：{0:N0} 位元組 / {1:N0} x {2:N0} px</value>
+    <value>大小：{0} / {1:N0} x {2:N0} px</value>
   </data>
   <data name="StatusLineLabel" xml:space="preserve">
     <value>熔點</value>
@@ -3123,6 +3123,9 @@
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP 位址</value>
   </data>
+  <data name="AgentMcpStatelessLabel" xml:space="preserve"><value>無狀態 HTTP（不使用工作階段）</value></data>
+  <data name="AgentMcpStatelessInfo" xml:space="preserve"><value>無狀態模式會在不使用工作階段 ID 的情況下傳送獨立的 MCP 要求。需要工作階段狀態或伺服器到用戶端要求的伺服器不應使用此模式。</value></data>
+  <data name="AgentMcpStatelessSummary" xml:space="preserve"><value>無狀態 HTTP</value></data>
   <data name="AgentMcpTransportLabel" xml:space="preserve"><value>連線方式</value></data>
   <data name="AgentMcpTransportHttp" xml:space="preserve"><value>HTTP / SSE</value></data>
   <data name="AgentMcpTransportStdio" xml:space="preserve"><value>stdio（本機處理程序）</value></data>
@@ -3238,7 +3241,19 @@
     <value>Enter OAuth 存取令牌。</value>
   </data>
   <data name="AgentMcpOAuthClientConfigRequired" xml:space="preserve">
-    <value>Enter、OAuth 客戶端 ID、客戶端金鑰、授權 URL 和令牌 URL。</value>
+    <value>請輸入 OAuth 用戶端 ID、授權 URL 和權杖 URL。公開用戶端可以省略用戶端密鑰。</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationRequired" xml:space="preserve">
+    <value>此 MCP 伺服器支援 OAuth 登入，但不提供自動用戶端註冊。請手動輸入 OAuth 設定。</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationFailed" xml:space="preserve">
+    <value>OAuth 用戶端自動註冊失敗：{0}</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationResponseInvalid" xml:space="preserve">
+    <value>OAuth 用戶端自動註冊回應中沒有用戶端 ID。</value>
+  </data>
+  <data name="AgentMcpOAuthPkceUnsupported" xml:space="preserve">
+    <value>MCP OAuth 伺服器未宣告支援 PKCE S256，無法繼續登入。</value>
   </data>
   <data name="AgentMcpOAuthEndpointInvalid" xml:space="preserve">
     <value>OAuth 授權 URL 和令牌 URL 必須是 http 或 https URL。</value>

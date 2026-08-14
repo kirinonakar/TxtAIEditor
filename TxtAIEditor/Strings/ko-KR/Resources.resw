@@ -927,10 +927,10 @@
     <value>클릭하여 오프셋 이동</value>
   </data>
   <data name="StatusFileSizeFormat" xml:space="preserve">
-    <value>크기: {0:N0} bytes</value>
+    <value>크기: {0}</value>
   </data>
   <data name="StatusImageFileStatsFormat" xml:space="preserve">
-    <value>크기: {0:N0} bytes / {1:N0} x {2:N0} px</value>
+    <value>크기: {0} / {1:N0} x {2:N0} px</value>
   </data>
   <data name="StatusLineLabel" xml:space="preserve">
     <value>줄</value>
@@ -3123,6 +3123,15 @@
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP 주소</value>
   </data>
+  <data name="AgentMcpStatelessLabel" xml:space="preserve">
+    <value>Stateless HTTP (세션 사용 안 함)</value>
+  </data>
+  <data name="AgentMcpStatelessInfo" xml:space="preserve">
+    <value>Stateless 모드는 MCP 세션 ID 없이 독립적인 요청을 전송합니다. 세션 상태나 서버→클라이언트 요청이 필요한 서버에는 사용하지 마세요.</value>
+  </data>
+  <data name="AgentMcpStatelessSummary" xml:space="preserve">
+    <value>stateless HTTP</value>
+  </data>
   <data name="AgentMcpTransportLabel" xml:space="preserve">
     <value>연결 방식</value>
   </data>
@@ -3274,7 +3283,19 @@
     <value>OAuth Access Token을 입력해주세요.</value>
   </data>
   <data name="AgentMcpOAuthClientConfigRequired" xml:space="preserve">
-    <value>OAuth Client ID, Client Secret, Authorization URL, Token URL을 입력해주세요.</value>
+    <value>OAuth Client ID, Authorization URL, Token URL을 입력해주세요. 공개 클라이언트는 Client Secret을 생략할 수 있습니다.</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationRequired" xml:space="preserve">
+    <value>이 MCP 서버는 OAuth 로그인을 지원하지만 자동 클라이언트 등록을 제공하지 않습니다. OAuth 설정을 직접 입력해주세요.</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationFailed" xml:space="preserve">
+    <value>OAuth 클라이언트 자동 등록에 실패했습니다: {0}</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationResponseInvalid" xml:space="preserve">
+    <value>OAuth 클라이언트 자동 등록 응답에 Client ID가 없습니다.</value>
+  </data>
+  <data name="AgentMcpOAuthPkceUnsupported" xml:space="preserve">
+    <value>MCP OAuth 서버가 PKCE S256을 지원한다고 알리지 않아 로그인을 진행할 수 없습니다.</value>
   </data>
   <data name="AgentMcpOAuthEndpointInvalid" xml:space="preserve">
     <value>OAuth Authorization URL과 Token URL은 http 또는 https URL이어야 합니다.</value>

@@ -81,7 +81,9 @@ namespace TxtAIEditor.Controls
 
             if (root.ValueKind == JsonValueKind.Array)
             {
-                return JsonSerializer.Deserialize<List<AgentMcpServer>>(json) ?? new List<AgentMcpServer>();
+                return JsonSerializer.Deserialize<List<AgentMcpServer>>(
+                    json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<AgentMcpServer>();
             }
 
             var servers = new List<AgentMcpServer>();
@@ -113,6 +115,7 @@ namespace TxtAIEditor.Controls
                     Transport = AgentMcpTransportTypes.Normalize(
                         TryGetStringProperty(property.Value, "transport"),
                         command),
+                    Stateless = TryGetBooleanProperty(property.Value, "stateless"),
                     Endpoint = endpoint,
                     Command = command,
                     Arguments = ReadStringArrayProperty(property.Value, "args"),
@@ -233,6 +236,8 @@ namespace TxtAIEditor.Controls
             settings = new AgentMcpConnectionSettings
             {
                 Transport = AgentMcpTransportTypes.Normalize(input.Transport, input.Command),
+                Stateless = !AgentMcpTransportTypes.IsStdio(
+                    AgentMcpTransportTypes.Normalize(input.Transport, input.Command)) && input.Stateless,
                 Endpoint = input.Endpoint?.Trim() ?? string.Empty,
                 Command = input.Command?.Trim() ?? string.Empty,
                 WorkingDirectory = input.WorkingDirectory?.Trim() ?? string.Empty,
@@ -342,6 +347,7 @@ namespace TxtAIEditor.Controls
         public void ApplyConnectionSettings(AgentMcpServer server, AgentMcpConnectionSettings settings)
         {
             server.Transport = settings.Transport;
+            server.Stateless = !AgentMcpTransportTypes.IsStdio(settings.Transport) && settings.Stateless;
             server.Endpoint = AgentMcpTransportTypes.IsStdio(settings.Transport) ? string.Empty : settings.Endpoint;
             server.Command = AgentMcpTransportTypes.IsStdio(settings.Transport) ? settings.Command : string.Empty;
             server.Arguments = AgentMcpTransportTypes.IsStdio(settings.Transport) ? settings.Arguments : new List<string>();
@@ -430,11 +436,10 @@ namespace TxtAIEditor.Controls
             if (settings.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase))
             {
                 if (string.IsNullOrWhiteSpace(oauthClientId) ||
-                    string.IsNullOrWhiteSpace(oauthClientSecret) ||
                     string.IsNullOrWhiteSpace(oauthAuthorizationEndpoint) ||
                     string.IsNullOrWhiteSpace(oauthTokenEndpoint))
                 {
-                    error = _getString("AgentMcpOAuthClientConfigRequired", "OAuth Client ID, Client Secret, Authorization URL, Token URL을 입력해주세요.");
+                    error = _getString("AgentMcpOAuthClientConfigRequired", "OAuth Client ID, Authorization URL, Token URL을 입력해주세요. Client Secret은 공개 클라이언트에서는 생략할 수 있습니다.");
                     return false;
                 }
 
@@ -519,6 +524,37 @@ namespace TxtAIEditor.Controls
                 ? property.GetString() ?? string.Empty
                 : property.GetRawText();
         }
+
+        private static bool TryGetBooleanProperty(JsonElement element, string propertyName)
+        {
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            JsonElement property = default;
+            bool found = element.TryGetProperty(propertyName, out property);
+            if (!found)
+            {
+                foreach (JsonProperty candidate in element.EnumerateObject())
+                {
+                    if (candidate.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        property = candidate.Value;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found)
+            {
+                return false;
+            }
+
+            return property.ValueKind == JsonValueKind.True ||
+                (property.ValueKind == JsonValueKind.String &&
+                    bool.TryParse(property.GetString(), out bool value) && value);
+        }
     }
 
     internal sealed class AgentMcpAuthSettings
@@ -538,6 +574,7 @@ namespace TxtAIEditor.Controls
     internal sealed class AgentMcpConnectionSettings
     {
         public string Transport { get; set; } = AgentMcpTransportTypes.Http;
+        public bool Stateless { get; set; }
         public string Endpoint { get; set; } = string.Empty;
         public string Command { get; set; } = string.Empty;
         public List<string> Arguments { get; set; } = new();

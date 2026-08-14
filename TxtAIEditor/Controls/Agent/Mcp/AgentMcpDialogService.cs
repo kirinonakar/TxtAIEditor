@@ -14,6 +14,7 @@ namespace TxtAIEditor.Controls
     {
         public string Name { get; set; } = string.Empty;
         public string Transport { get; set; } = AgentMcpTransportTypes.Http;
+        public bool Stateless { get; set; }
         public string Endpoint { get; set; } = string.Empty;
         public string Command { get; set; } = string.Empty;
         public string ArgumentsJson { get; set; } = "[]";
@@ -352,6 +353,15 @@ namespace TxtAIEditor.Controls
             var endpointLabel = CreateLabel(_getString("AgentMcpEndpointLabel", "MCP 주소"));
             var endpointBox = CreateTextBox(_getString("AgentMcpEndpointPlaceholder", "https://server.example/mcp"));
             endpointBox.Text = initial.Endpoint;
+            var statelessCheckBox = new CheckBox
+            {
+                Content = _getString("AgentMcpStatelessLabel", "Stateless HTTP (세션 사용 안 함)"),
+                IsChecked = initial.Stateless,
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+            var statelessInfo = CreateInfoText(_getString(
+                "AgentMcpStatelessInfo",
+                "Stateless 모드는 MCP 세션 ID를 사용하지 않고 요청을 독립적으로 전송합니다. 세션 상태나 서버→클라이언트 요청이 필요한 서버에는 사용하지 마세요."));
             var commandLabel = CreateLabel(_getString("AgentMcpCommandLabel", "실행 명령 (전체 명령줄 입력 가능)"));
             var commandBox = CreateTextBox(_getString("AgentMcpCommandPlaceholder", "npx -y @modelcontextprotocol/server-memory"));
             commandBox.Text = initial.Command;
@@ -436,6 +446,8 @@ namespace TxtAIEditor.Controls
                 bool isStdio = GetSelectedTransport(transportBox).Equals(AgentMcpTransportTypes.Stdio, StringComparison.OrdinalIgnoreCase);
                 SetVisible(endpointLabel, !isStdio);
                 SetVisible(endpointBox, !isStdio);
+                SetVisible(statelessCheckBox, !isStdio);
+                SetVisible(statelessInfo, !isStdio);
                 SetVisible(commandLabel, isStdio);
                 SetVisible(commandBox, isStdio);
                 SetVisible(argumentsLabel, isStdio);
@@ -486,6 +498,8 @@ namespace TxtAIEditor.Controls
             stack.Children.Add(transportBox);
             stack.Children.Add(endpointLabel);
             stack.Children.Add(endpointBox);
+            stack.Children.Add(statelessCheckBox);
+            stack.Children.Add(statelessInfo);
             stack.Children.Add(commandLabel);
             stack.Children.Add(commandBox);
             stack.Children.Add(argumentsLabel);
@@ -549,6 +563,7 @@ namespace TxtAIEditor.Controls
             {
                 Name = nameBox.Text?.Trim() ?? string.Empty,
                 Transport = GetSelectedTransport(transportBox),
+                Stateless = statelessCheckBox.IsChecked == true,
                 Endpoint = endpointBox.Text?.Trim() ?? string.Empty,
                 Command = commandBox.Text?.Trim() ?? string.Empty,
                 ArgumentsJson = argumentsBox.Text?.Trim() ?? "[]",

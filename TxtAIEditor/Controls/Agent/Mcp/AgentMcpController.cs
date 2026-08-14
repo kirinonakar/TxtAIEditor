@@ -102,7 +102,9 @@ namespace TxtAIEditor.Controls
                 if (File.Exists(_mcpFilePath))
                 {
                     string json = await File.ReadAllTextAsync(_mcpFilePath);
-                    var loaded = JsonSerializer.Deserialize<List<AgentMcpServer>>(json);
+                    var loaded = JsonSerializer.Deserialize<List<AgentMcpServer>>(
+                        json,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                     if (loaded != null)
                     {
                         _servers.Clear();
@@ -117,6 +119,7 @@ namespace TxtAIEditor.Controls
 
                                 s.Name = s.Name.Trim();
                                 s.Transport = AgentMcpTransportTypes.Normalize(s.Transport, s.Command);
+                                s.Stateless = !AgentMcpTransportTypes.IsStdio(s.Transport) && s.Stateless;
                                 s.Endpoint = s.Endpoint?.Trim() ?? string.Empty;
                                 s.Command = s.Command?.Trim() ?? string.Empty;
                                 s.Arguments = AgentMcpConfigurationService.NormalizeArguments(s.Arguments);
@@ -392,6 +395,7 @@ namespace TxtAIEditor.Controls
             {
                 Name = server.Name,
                 Transport = server.Transport,
+                Stateless = server.Stateless,
                 Endpoint = server.Endpoint,
                 Command = server.Command,
                 ArgumentsJson = JsonSerializer.Serialize(server.Arguments),
@@ -467,6 +471,16 @@ namespace TxtAIEditor.Controls
                 _serverStatus.Remove(duplicate.Id);
             }
 
+            string previousAuthType = server.AuthType;
+            string previousOAuthClientId = server.OAuthClientId;
+            string previousOAuthAuthorizationEndpoint = server.OAuthAuthorizationEndpoint;
+            string previousOAuthTokenEndpoint = server.OAuthTokenEndpoint;
+            string previousOAuthRefreshToken = _credentialStore.GetOAuthSecret(
+                server,
+                "refresh_token",
+                server.OAuthRefreshToken);
+            DateTimeOffset previousOAuthAccessTokenExpiresAt = server.OAuthAccessTokenExpiresAt;
+
             server.Name = name;
             _credentialStore.DeleteCredentialsForRemovedHeaders(server, authSettings.Headers);
             _credentialStore.DeleteCredentialsForRemovedEnvironment(server, connection.Environment);
@@ -477,6 +491,22 @@ namespace TxtAIEditor.Controls
 
             _configuration.ApplyConnectionSettings(server, connection);
             _configuration.ApplyAuthSettings(server, authSettings, deleteEmptySecrets: true);
+            bool preserveOAuthRefreshToken =
+                previousAuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) &&
+                authType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) &&
+                previousOAuthClientId.Equals(server.OAuthClientId, StringComparison.Ordinal) &&
+                previousOAuthAuthorizationEndpoint.Equals(server.OAuthAuthorizationEndpoint, StringComparison.Ordinal) &&
+                previousOAuthTokenEndpoint.Equals(server.OAuthTokenEndpoint, StringComparison.Ordinal);
+            if (preserveOAuthRefreshToken)
+            {
+                server.OAuthRefreshToken = _credentialStore.StoreOAuthSecret(
+                    server,
+                    "refresh_token",
+                    previousOAuthRefreshToken,
+                    deleteEmptySecret: false);
+                server.OAuthAccessTokenExpiresAt = previousOAuthAccessTokenExpiresAt;
+            }
+
             _runtime.RemoveSession(server.Id);
             _serverStatus.Remove(server.Id);
             await SaveAsync();
@@ -579,6 +609,7 @@ namespace TxtAIEditor.Controls
                 {
                     string name = item.Name?.Trim() ?? string.Empty;
                     item.Transport = AgentMcpTransportTypes.Normalize(item.Transport, item.Command);
+                    item.Stateless = !AgentMcpTransportTypes.IsStdio(item.Transport) && item.Stateless;
                     item.Endpoint = item.Endpoint?.Trim() ?? string.Empty;
                     item.Command = item.Command?.Trim() ?? string.Empty;
                     item.Arguments = AgentMcpConfigurationService.NormalizeArguments(item.Arguments);
@@ -601,6 +632,7 @@ namespace TxtAIEditor.Controls
                         _credentialStore.DeleteCredentialsForRemovedHeaders(existing, headers);
                         _credentialStore.DeleteCredentialsForRemovedEnvironment(existing, item.Environment);
                         existing.Transport = item.Transport;
+                        existing.Stateless = item.Stateless;
                         existing.Endpoint = item.Endpoint;
                         existing.Command = item.Command;
                         existing.Arguments = item.Arguments;
@@ -617,6 +649,7 @@ namespace TxtAIEditor.Controls
                         {
                             Name = name,
                             Transport = item.Transport,
+                            Stateless = item.Stateless,
                             Endpoint = item.Endpoint,
                             Command = item.Command,
                             Arguments = item.Arguments,
@@ -1360,6 +1393,10 @@ namespace TxtAIEditor.Controls
                     string detail = _serverStatus.TryGetValue(server.Id, out string? status) && !string.IsNullOrWhiteSpace(status)
                         ? $"{connectionDetail} - {status}"
                         : connectionDetail;
+                    if (server.Stateless && !AgentMcpTransportTypes.IsStdio(server.Transport))
+                    {
+                        detail += $" - {_getString("AgentMcpStatelessSummary", "stateless HTTP")}";
+                    }
                     if (!AgentMcpTransportTypes.IsStdio(server.Transport) && server.Headers.Count > 0)
                     {
                         detail += $" - headers: {string.Join(", ", server.Headers.Keys)}";
@@ -1558,6 +1595,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 existing.Transport = imported.Transport;
+                existing.Stateless = imported.Stateless;
                 existing.Endpoint = imported.Endpoint;
                 existing.Command = imported.Command;
                 existing.Arguments = imported.Arguments;

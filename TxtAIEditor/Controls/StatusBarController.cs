@@ -101,18 +101,21 @@ namespace TxtAIEditor.Controls
             {
                 string imageFormat = _getString(
                     "StatusImageFileStatsFormat",
-                    "크기: {0:N0} bytes / {1:N0} x {2:N0} px");
+                    "크기: {0} / {1:N0} x {2:N0} px");
                 _statusBar.FileStatsText.Text = string.Format(
                     CultureInfo.CurrentCulture,
                     imageFormat,
-                    bytes,
+                    FormatFileSize(bytes),
                     imageInfo.Width,
                     imageInfo.Height);
                 return;
             }
 
-            string format = _getString("StatusFileSizeFormat", "크기: {0:N0} bytes");
-            _statusBar.FileStatsText.Text = string.Format(format, bytes);
+            string format = _getString("StatusFileSizeFormat", "크기: {0}");
+            _statusBar.FileStatsText.Text = string.Format(
+                CultureInfo.CurrentCulture,
+                format,
+                FormatFileSize(bytes));
         }
 
         public void UpdateTotalLines(OpenedTab tab)
@@ -836,7 +839,7 @@ namespace TxtAIEditor.Controls
         private static string FormatFileSize(long bytes)
         {
             string[] units = { "B", "KB", "MB", "GB", "TB" };
-            double size = bytes;
+            double size = Math.Max(0, bytes);
             int unit = 0;
             while (size >= 1024 && unit < units.Length - 1)
             {
@@ -847,7 +850,7 @@ namespace TxtAIEditor.Controls
             string number = unit == 0
                 ? size.ToString("N0", CultureInfo.CurrentCulture)
                 : size.ToString("0.##", CultureInfo.CurrentCulture);
-            return $"{number} {units[unit]} ({bytes:N0} bytes)";
+            return $"{number} {units[unit]}";
         }
 
         private static string FormatBitrate(uint bitsPerSecond)

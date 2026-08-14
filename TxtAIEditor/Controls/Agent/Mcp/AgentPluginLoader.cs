@@ -36,7 +36,7 @@ namespace TxtAIEditor.Controls
 
         private static readonly HashSet<string> HttpFields = new(StringComparer.Ordinal)
         {
-            "type", "url", "headers"
+            "type", "url", "headers", "stateless"
         };
 
         public static AgentPluginLoadResult Load(string selectedDirectory, string pluginDataBaseDirectory)
@@ -368,6 +368,7 @@ namespace TxtAIEditor.Controls
                 {
                     Name = displayName,
                     Transport = AgentMcpTransportTypes.Http,
+                    Stateless = ReadOptionalBoolean(element, "stateless"),
                     Endpoint = endpoint,
                     Headers = ReadOptionalStringObject(element, "headers"),
                     AgentPluginName = pluginName,
@@ -668,6 +669,21 @@ namespace TxtAIEditor.Controls
             }
 
             return result;
+        }
+
+        private static bool ReadOptionalBoolean(JsonElement element, string name)
+        {
+            if (!element.TryGetProperty(name, out JsonElement value))
+            {
+                return false;
+            }
+
+            if (value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            {
+                throw new InvalidDataException($"'{name}' must be a boolean.");
+            }
+
+            return value.GetBoolean();
         }
 
         [GeneratedRegex("^(?!.*(?:--|\\.\\.))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$")]

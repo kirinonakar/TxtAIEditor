@@ -927,10 +927,10 @@
     <value>クリックしてオフセットへ移動</value>
   </data>
   <data name="StatusFileSizeFormat" xml:space="preserve">
-    <value>サイズ: {0:N0} bytes</value>
+    <value>サイズ: {0}</value>
   </data>
   <data name="StatusImageFileStatsFormat" xml:space="preserve">
-    <value>サイズ: {0:N0} bytes / {1:N0} x {2:N0} px</value>
+    <value>サイズ: {0} / {1:N0} x {2:N0} px</value>
   </data>
   <data name="StatusLineLabel" xml:space="preserve">
     <value>行</value>
@@ -3123,6 +3123,9 @@
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP アドレス</value>
   </data>
+  <data name="AgentMcpStatelessLabel" xml:space="preserve"><value>Stateless HTTP（セッションなし）</value></data>
+  <data name="AgentMcpStatelessInfo" xml:space="preserve"><value>Stateless モードではセッション ID を使わず、独立した MCP リクエストを送信します。セッション状態やサーバーからクライアントへのリクエストが必要なサーバーには使用しないでください。</value></data>
+  <data name="AgentMcpStatelessSummary" xml:space="preserve"><value>stateless HTTP</value></data>
   <data name="AgentMcpTransportLabel" xml:space="preserve"><value>接続方式</value></data>
   <data name="AgentMcpTransportHttp" xml:space="preserve"><value>HTTP / SSE</value></data>
   <data name="AgentMcpTransportStdio" xml:space="preserve"><value>stdio（ローカル プロセス）</value></data>
@@ -3238,7 +3241,19 @@
     <value>OAuth Access Token を入力してください。</value>
   </data>
   <data name="AgentMcpOAuthClientConfigRequired" xml:space="preserve">
-    <value>OAuth Client ID、Client Secret、Authorization URL、Token URL を入力してください。</value>
+    <value>OAuth Client ID、Authorization URL、Token URLを入力してください。公開クライアントではClient Secretを省略できます。</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationRequired" xml:space="preserve">
+    <value>このMCPサーバーはOAuthログインをサポートしていますが、自動クライアント登録を提供していません。OAuth設定を手動で入力してください。</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationFailed" xml:space="preserve">
+    <value>OAuthクライアントの自動登録に失敗しました: {0}</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationResponseInvalid" xml:space="preserve">
+    <value>OAuthクライアントの自動登録応答にClient IDがありません。</value>
+  </data>
+  <data name="AgentMcpOAuthPkceUnsupported" xml:space="preserve">
+    <value>MCP OAuthサーバーがPKCE S256をサポートしていると通知していないため、ログインを続行できません。</value>
   </data>
   <data name="AgentMcpOAuthEndpointInvalid" xml:space="preserve">
     <value>OAuth Authorization URL と Token URL は http または https URL である必要があります。</value>

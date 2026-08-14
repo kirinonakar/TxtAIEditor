@@ -927,10 +927,10 @@
     <value>单击以转到偏移</value>
   </data>
   <data name="StatusFileSizeFormat" xml:space="preserve">
-    <value>大小：{0:N0} 字节</value>
+    <value>大小：{0}</value>
   </data>
   <data name="StatusImageFileStatsFormat" xml:space="preserve">
-    <value>大小：{0:N0} 字节 / {1:N0} x {2:N0} px</value>
+    <value>大小：{0} / {1:N0} x {2:N0} px</value>
   </data>
   <data name="StatusLineLabel" xml:space="preserve">
     <value>熔点</value>
@@ -3123,6 +3123,9 @@
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP 地址</value>
   </data>
+  <data name="AgentMcpStatelessLabel" xml:space="preserve"><value>无状态 HTTP（不使用会话）</value></data>
+  <data name="AgentMcpStatelessInfo" xml:space="preserve"><value>无状态模式会在不使用会话 ID 的情况下发送独立的 MCP 请求。需要会话状态或服务器到客户端请求的服务器不应使用此模式。</value></data>
+  <data name="AgentMcpStatelessSummary" xml:space="preserve"><value>无状态 HTTP</value></data>
   <data name="AgentMcpTransportLabel" xml:space="preserve"><value>连接方式</value></data>
   <data name="AgentMcpTransportHttp" xml:space="preserve"><value>HTTP / SSE</value></data>
   <data name="AgentMcpTransportStdio" xml:space="preserve"><value>stdio（本地进程）</value></data>
@@ -3238,7 +3241,19 @@
     <value>Enter OAuth 访问令牌。</value>
   </data>
   <data name="AgentMcpOAuthClientConfigRequired" xml:space="preserve">
-    <value>Enter、OAuth 客户端 ID、客户端密钥、授权 URL 和令牌 URL。</value>
+    <value>请输入 OAuth 客户端 ID、授权 URL 和令牌 URL。公共客户端可以省略客户端密钥。</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationRequired" xml:space="preserve">
+    <value>此 MCP 服务器支持 OAuth 登录，但不提供自动客户端注册。请手动输入 OAuth 设置。</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationFailed" xml:space="preserve">
+    <value>OAuth 客户端自动注册失败：{0}</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationResponseInvalid" xml:space="preserve">
+    <value>OAuth 客户端自动注册响应中没有客户端 ID。</value>
+  </data>
+  <data name="AgentMcpOAuthPkceUnsupported" xml:space="preserve">
+    <value>MCP OAuth 服务器未声明支持 PKCE S256，无法继续登录。</value>
   </data>
   <data name="AgentMcpOAuthEndpointInvalid" xml:space="preserve">
     <value>OAuth 授权 URL 和令牌 URL 必须是 http 或 https URL。</value>

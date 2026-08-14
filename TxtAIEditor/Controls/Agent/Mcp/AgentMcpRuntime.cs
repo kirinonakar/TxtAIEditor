@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -15,7 +16,8 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentMcpRuntime : IDisposable
     {
-        private const string ProtocolVersion = "2025-06-18";
+        private const string LegacyProtocolVersion = "2025-06-18";
+        private const string StatelessProtocolVersion = "2026-07-28";
         private static readonly HttpClient HttpClient = new()
         {
             Timeout = TimeSpan.FromSeconds(30)
@@ -72,7 +74,7 @@ namespace TxtAIEditor.Controls
                         parameters["cursor"] = cursor;
                     }
 
-                    using JsonDocument response = await SendJsonRpcAsync(server, session, "tools/list", parameters, cancellationToken);
+                    using JsonDocument response = await SendMcpRequestAsync(server, session, "tools/list", parameters, cancellationToken);
                     if (TryGetRpcError(response.RootElement, out string error))
                     {
                         throw new InvalidOperationException(error);
@@ -126,7 +128,7 @@ namespace TxtAIEditor.Controls
                 ? arguments.Clone()
                 : JsonDocument.Parse("{}").RootElement.Clone();
 
-            return await SendJsonRpcAsync(
+            return await SendMcpRequestAsync(
                 server,
                 session,
                 "tools/call",
@@ -135,7 +137,8 @@ namespace TxtAIEditor.Controls
                     ["name"] = toolName,
                     ["arguments"] = callArguments
                 },
-                cancellationToken);
+                cancellationToken,
+                toolName);
         }
 
         public void RemoveSession(string serverId)
@@ -167,7 +170,13 @@ namespace TxtAIEditor.Controls
             }
 
             RemoveSession(server.Id);
-            var session = new AgentMcpSession();
+            var session = new AgentMcpSession
+            {
+                UsesStatelessProtocol = !AgentMcpTransportTypes.IsStdio(server.Transport) && server.Stateless,
+                ProtocolVersion = !AgentMcpTransportTypes.IsStdio(server.Transport) && server.Stateless
+                    ? StatelessProtocolVersion
+                    : LegacyProtocolVersion
+            };
             if (AgentMcpTransportTypes.IsStdio(server.Transport))
             {
                 StartStdioProcess(server, session);
@@ -176,27 +185,29 @@ namespace TxtAIEditor.Controls
 
             try
             {
+                if (session.UsesStatelessProtocol)
+                {
+                    session.Initialized = true;
+                    return session;
+                }
+
                 using JsonDocument initializeResponse = await SendJsonRpcAsync(
                     server,
                     session,
                     "initialize",
-                    new Dictionary<string, object?>
-                    {
-                        ["protocolVersion"] = ProtocolVersion,
-                        ["capabilities"] = new Dictionary<string, object?>(),
-                        ["clientInfo"] = new Dictionary<string, object?>
-                        {
-                            ["name"] = "TxtAIEditor",
-                            ["version"] = "1.0"
-                        }
-                    },
+                    CreateInitializeParameters(LegacyProtocolVersion),
                     cancellationToken);
 
-                if (TryGetRpcError(initializeResponse.RootElement, out string error))
+                EnsureSuccessfulResponse(initializeResponse.RootElement);
+                string negotiatedProtocolVersion = TryGetStringProperty(
+                    initializeResponse.RootElement.TryGetProperty("result", out var initializeResult)
+                        ? initializeResult
+                        : default,
+                    "protocolVersion");
+                if (!string.IsNullOrWhiteSpace(negotiatedProtocolVersion))
                 {
-                    throw new InvalidOperationException(error);
+                    session.ProtocolVersion = negotiatedProtocolVersion;
                 }
-
                 await SendJsonRpcNotificationAsync(server, session, "notifications/initialized", cancellationToken);
                 session.Initialized = true;
                 return session;
@@ -213,19 +224,60 @@ namespace TxtAIEditor.Controls
             AgentMcpSession session,
             string method,
             object? parameters,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? mcpName = null)
         {
             int id = session.NextId++;
+            object requestParameters = session.UsesStatelessProtocol
+                ? CreateStatelessParameters(parameters)
+                : parameters ?? new Dictionary<string, object?>();
             var payload = new Dictionary<string, object?>
             {
                 ["jsonrpc"] = "2.0",
                 ["id"] = id,
                 ["method"] = method,
-                ["params"] = parameters ?? new Dictionary<string, object?>()
+                ["params"] = requestParameters
             };
 
-            string responseText = await PostAsync(server, session, payload, cancellationToken);
+            string responseText = await PostAsync(server, session, method, mcpName, payload, cancellationToken);
             return ParseRpcResponse(responseText);
+        }
+
+        private async Task<JsonDocument> SendMcpRequestAsync(
+            AgentMcpServer server,
+            AgentMcpSession session,
+            string method,
+            object? parameters,
+            CancellationToken cancellationToken,
+            string? mcpName = null)
+        {
+            if (!session.UsesStatelessProtocol)
+            {
+                return await SendJsonRpcAsync(server, session, method, parameters, cancellationToken, mcpName);
+            }
+
+            try
+            {
+                JsonDocument response = await SendJsonRpcAsync(
+                    server,
+                    session,
+                    method,
+                    parameters,
+                    cancellationToken,
+                    mcpName);
+                if (!IsStatelessCompatibilityError(response.RootElement))
+                {
+                    return response;
+                }
+
+                response.Dispose();
+            }
+            catch (McpHttpException ex) when (IsStatelessCompatibilityStatus(ex.StatusCode))
+            {
+            }
+
+            await InitializeLegacyStatelessSessionAsync(server, session, cancellationToken);
+            return await SendJsonRpcAsync(server, session, method, parameters, cancellationToken, mcpName);
         }
 
         private async Task SendJsonRpcNotificationAsync(
@@ -248,7 +300,7 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                await PostAsync(server, session, payload, cancellationToken);
+                await PostAsync(server, session, method, null, payload, cancellationToken);
             }
             catch (InvalidOperationException)
             {
@@ -256,9 +308,105 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private async Task InitializeLegacyStatelessSessionAsync(
+            AgentMcpServer server,
+            AgentMcpSession session,
+            CancellationToken cancellationToken)
+        {
+            session.UsesStatelessProtocol = false;
+            session.ProtocolVersion = LegacyProtocolVersion;
+            session.UseSessionId = false;
+
+            using JsonDocument initializeResponse = await SendJsonRpcAsync(
+                server,
+                session,
+                "initialize",
+                CreateInitializeParameters(LegacyProtocolVersion),
+                cancellationToken);
+
+            EnsureSuccessfulResponse(initializeResponse.RootElement);
+            string negotiatedProtocolVersion = TryGetStringProperty(
+                initializeResponse.RootElement.TryGetProperty("result", out var initializeResult)
+                    ? initializeResult
+                    : default,
+                "protocolVersion");
+            if (!string.IsNullOrWhiteSpace(negotiatedProtocolVersion))
+            {
+                session.ProtocolVersion = negotiatedProtocolVersion;
+            }
+
+            await SendJsonRpcNotificationAsync(server, session, "notifications/initialized", cancellationToken);
+        }
+
+        private static Dictionary<string, object?> CreateInitializeParameters(string protocolVersion)
+        {
+            return new Dictionary<string, object?>
+            {
+                ["protocolVersion"] = protocolVersion,
+                ["capabilities"] = new Dictionary<string, object?>(),
+                ["clientInfo"] = new Dictionary<string, object?>
+                {
+                    ["name"] = "TxtAIEditor",
+                    ["version"] = "1.0"
+                }
+            };
+        }
+
+        private static Dictionary<string, object?> CreateStatelessParameters(object? parameters)
+        {
+            var statelessParameters = parameters is IDictionary<string, object?> dictionary
+                ? new Dictionary<string, object?>(dictionary, StringComparer.Ordinal)
+                : new Dictionary<string, object?>();
+            statelessParameters["_meta"] = new Dictionary<string, object?>
+            {
+                ["io.modelcontextprotocol/protocolVersion"] = StatelessProtocolVersion,
+                ["io.modelcontextprotocol/clientInfo"] = new Dictionary<string, object?>
+                {
+                    ["name"] = "TxtAIEditor",
+                    ["version"] = "1.0"
+                },
+                ["io.modelcontextprotocol/clientCapabilities"] = new Dictionary<string, object?>()
+            };
+            return statelessParameters;
+        }
+
+        private static void EnsureSuccessfulResponse(JsonElement root)
+        {
+            if (TryGetRpcError(root, out string error))
+            {
+                throw new InvalidOperationException(error);
+            }
+        }
+
+        private static bool IsStatelessCompatibilityError(JsonElement root)
+        {
+            if (!root.TryGetProperty("error", out var error) ||
+                !error.TryGetProperty("code", out var code) ||
+                !code.TryGetInt32(out int errorCode))
+            {
+                return false;
+            }
+
+            return errorCode == -32600 ||
+                errorCode == -32602 ||
+                errorCode == -32601 ||
+                errorCode == -32000 ||
+                (errorCode >= -32022 && errorCode <= -32020);
+        }
+
+        private static bool IsStatelessCompatibilityStatus(HttpStatusCode statusCode)
+        {
+            return statusCode == HttpStatusCode.BadRequest ||
+                statusCode == HttpStatusCode.NotFound ||
+                statusCode == HttpStatusCode.MethodNotAllowed ||
+                statusCode == HttpStatusCode.UnsupportedMediaType;
+        }
+
         private async Task<string> PostAsync(
             AgentMcpServer server,
             AgentMcpSession session,
+            string method,
+            string? mcpName,
             object payload,
             CancellationToken cancellationToken)
         {
@@ -274,6 +422,18 @@ namespace TxtAIEditor.Controls
             };
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+            if (!method.Equals("initialize", StringComparison.Ordinal))
+            {
+                request.Headers.TryAddWithoutValidation("MCP-Protocol-Version", session.ProtocolVersion);
+            }
+            if (session.UsesStatelessProtocol)
+            {
+                request.Headers.TryAddWithoutValidation("Mcp-Method", method);
+                if (!string.IsNullOrWhiteSpace(mcpName))
+                {
+                    request.Headers.TryAddWithoutValidation("Mcp-Name", mcpName);
+                }
+            }
             if (server.AuthType.Equals(AuthTypeApiKey, StringComparison.OrdinalIgnoreCase) || server.IsAgentPlugin)
             {
                 foreach (var header in server.Headers)
@@ -294,22 +454,29 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (!string.IsNullOrEmpty(session.SessionId))
+            if (session.UseSessionId && !string.IsNullOrEmpty(session.SessionId))
             {
                 request.Headers.TryAddWithoutValidation("Mcp-Session-Id", session.SessionId);
             }
 
             HttpClient httpClient = server.IsAgentPlugin ? AgentPluginHttpClient : HttpClient;
             using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
-            if (response.Headers.TryGetValues("Mcp-Session-Id", out var sessionIds))
+            if (!session.UsesStatelessProtocol && response.Headers.TryGetValues("Mcp-Session-Id", out var sessionIds))
             {
-                session.SessionId = sessionIds.FirstOrDefault() ?? session.SessionId;
+                string sessionId = sessionIds.FirstOrDefault() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(sessionId))
+                {
+                    session.SessionId = sessionId;
+                    session.UseSessionId = true;
+                }
             }
 
             string body = await response.Content.ReadAsStringAsync(cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                throw new InvalidOperationException(_credentialStore.RedactServerSecrets(server, $"{(int)response.StatusCode} {response.ReasonPhrase}: {body}"));
+                throw new McpHttpException(
+                    response.StatusCode,
+                    _credentialStore.RedactServerSecrets(server, $"{(int)response.StatusCode} {response.ReasonPhrase}: {body}"));
             }
 
             return body;
@@ -728,11 +895,25 @@ namespace TxtAIEditor.Controls
             return property.GetRawText();
         }
 
+        private sealed class McpHttpException : InvalidOperationException
+        {
+            public McpHttpException(HttpStatusCode statusCode, string message)
+                : base(message)
+            {
+                StatusCode = statusCode;
+            }
+
+            public HttpStatusCode StatusCode { get; }
+        }
+
         private sealed class AgentMcpSession : IDisposable
         {
             private int _disposed;
 
             public string SessionId { get; set; } = string.Empty;
+            public string ProtocolVersion { get; set; } = LegacyProtocolVersion;
+            public bool UsesStatelessProtocol { get; set; }
+            public bool UseSessionId { get; set; }
             public bool Initialized { get; set; }
             public int NextId { get; set; } = 1;
             public List<AgentMcpTool> Tools { get; } = new();

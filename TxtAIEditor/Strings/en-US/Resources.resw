@@ -927,10 +927,10 @@
     <value>Click to go to offset</value>
   </data>
   <data name="StatusFileSizeFormat" xml:space="preserve">
-    <value>Size: {0:N0} bytes</value>
+    <value>Size: {0}</value>
   </data>
   <data name="StatusImageFileStatsFormat" xml:space="preserve">
-    <value>Size: {0:N0} bytes / {1:N0} x {2:N0} px</value>
+    <value>Size: {0} / {1:N0} x {2:N0} px</value>
   </data>
   <data name="StatusLineLabel" xml:space="preserve">
     <value>Ln</value>
@@ -3123,6 +3123,15 @@ Plan: {0}</value>
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP Address</value>
   </data>
+  <data name="AgentMcpStatelessLabel" xml:space="preserve">
+    <value>Stateless HTTP (no session)</value>
+  </data>
+  <data name="AgentMcpStatelessInfo" xml:space="preserve">
+    <value>Stateless mode sends independent MCP requests without a session ID. Do not use it for servers that require session state or server-to-client requests.</value>
+  </data>
+  <data name="AgentMcpStatelessSummary" xml:space="preserve">
+    <value>stateless HTTP</value>
+  </data>
   <data name="AgentMcpTransportLabel" xml:space="preserve">
     <value>Transport</value>
   </data>
@@ -3274,7 +3283,19 @@ Plan: {0}</value>
     <value>Enter the OAuth Access Token.</value>
   </data>
   <data name="AgentMcpOAuthClientConfigRequired" xml:space="preserve">
-    <value>Enter the OAuth Client ID, Client Secret, Authorization URL, and Token URL.</value>
+    <value>Enter the OAuth Client ID, Authorization URL, and Token URL. Client Secret can be omitted for public clients.</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationRequired" xml:space="preserve">
+    <value>This MCP server supports OAuth login but does not provide automatic client registration. Enter the OAuth settings manually.</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationFailed" xml:space="preserve">
+    <value>Automatic OAuth client registration failed: {0}</value>
+  </data>
+  <data name="AgentMcpOAuthRegistrationResponseInvalid" xml:space="preserve">
+    <value>The automatic OAuth client registration response did not include a Client ID.</value>
+  </data>
+  <data name="AgentMcpOAuthPkceUnsupported" xml:space="preserve">
+    <value>The MCP OAuth server does not advertise PKCE S256 support, so sign-in cannot continue.</value>
   </data>
   <data name="AgentMcpOAuthEndpointInvalid" xml:space="preserve">
     <value>The OAuth Authorization URL and Token URL must be http or https URLs.</value>
