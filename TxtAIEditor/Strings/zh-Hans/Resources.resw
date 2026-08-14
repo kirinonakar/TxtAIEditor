@@ -2222,9 +2222,6 @@
   <data name="AgentActivityCreateFileFormat" xml:space="preserve">
     <value>创建文件：{0}</value>
   </data>
-  <data name="AgentActivityReplaceFileFormat" xml:space="preserve">
-    <value>修改文件：{0}</value>
-  </data>
   <data name="AgentActivityReplaceRangeFormat" xml:space="preserve">
     <value>替换文件中的范围：{0}（行 {1} 到 {2}）</value>
   </data>

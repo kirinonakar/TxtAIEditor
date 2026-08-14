@@ -187,7 +187,6 @@ namespace TxtAIEditor.Controls
             return normalizedToolName is "create_file"
                 or "extract_document"
                 or "overwrite_file"
-                or "replace_in_file"
                 or "search_replace"
                 or "replace_range"
                 or "apply_patch"
@@ -214,7 +213,6 @@ namespace TxtAIEditor.Controls
         public static bool IsFileEditingTool(string normalizedToolName)
         {
             return normalizedToolName is "overwrite_file"
-                or "replace_in_file"
                 or "search_replace"
                 or "replace_range"
                 or "apply_patch"
@@ -353,9 +351,9 @@ namespace TxtAIEditor.Controls
 
             return normalized switch
             {
-                "replace_text" => "replace_in_file",
-                "replace" => "replace_in_file",
-                "edit_file" => "replace_in_file",
+                "replace_text" => "search_replace",
+                "replace" => "search_replace",
+                "edit_file" => "search_replace",
                 "search_replace" => "search_replace",
                 "search_and_replace" => "search_replace",
                 "find_replace" => "search_replace",

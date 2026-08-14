@@ -12,6 +12,7 @@ namespace TxtAIEditor.Controls
     {
         private const string ToolCallOpenTag = "<tool_call>";
         private const string ToolCallCloseTag = "</tool_call>";
+        private const string LegacyToolCallCloseTag = "</log_tool_call>";
         private const int PlaywrightCliCommandTimeoutMs = 60000;
 
         public static bool ContainsToolCallSyntax(string response)
@@ -154,6 +155,16 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
+            // Some providers concatenate several bare/native-style calls in one
+            // response instead of emitting one <tool_call> tag per call. Parse the
+            // complete sequence before falling back to the single-call extractor.
+            if (LooksLikeToolCallPayloadStart(text) &&
+                TryParsePayloads(text, toolCalls) &&
+                toolCalls.Count > 0)
+            {
+                return true;
+            }
+
             // 2. Try bare payload.
             if (TryExtractBareToolCallPayload(text, out string barePayload))
             {
@@ -194,7 +205,10 @@ namespace TxtAIEditor.Controls
 
                 int payloadStart = openIndex + ToolCallOpenTag.Length;
                 int closeIndex = FindToolCallCloseOutsideJsonString(trimmed, payloadStart);
-                if (closeIndex < 0)
+                int closeTagLength = closeIndex >= 0
+                    ? GetCloseTagLengthAt(trimmed, closeIndex)
+                    : 0;
+                if (closeIndex < 0 || closeTagLength <= 0)
                 {
                     break;
                 }
@@ -202,10 +216,10 @@ namespace TxtAIEditor.Controls
                 string payload = trimmed.Substring(payloadStart, closeIndex - payloadStart).Trim();
                 if (!string.IsNullOrWhiteSpace(payload))
                 {
-                    matches.Add((openIndex, closeIndex + ToolCallCloseTag.Length, payload));
+                    matches.Add((openIndex, closeIndex + closeTagLength, payload));
                 }
 
-                searchIndex = closeIndex + ToolCallCloseTag.Length;
+                searchIndex = closeIndex + closeTagLength;
             }
 
             if (matches.Count > 0)
@@ -282,10 +296,7 @@ namespace TxtAIEditor.Controls
                     continue;
                 }
 
-                if (i + ToolCallCloseTag.Length <= text.Length &&
-                    text.AsSpan(i, ToolCallCloseTag.Length).Equals(
-                        ToolCallCloseTag.AsSpan(),
-                        StringComparison.OrdinalIgnoreCase))
+                if (GetCloseTagLengthAt(text, i) > 0)
                 {
                     return i;
                 }
@@ -308,9 +319,13 @@ namespace TxtAIEditor.Controls
             {
                 trimmedPayload = trimmedPayload.Substring(ToolCallOpenTag.Length).Trim();
             }
-            while (trimmedPayload.EndsWith(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase))
+            while (trimmedPayload.EndsWith(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) ||
+                   trimmedPayload.EndsWith(LegacyToolCallCloseTag, StringComparison.OrdinalIgnoreCase))
             {
-                trimmedPayload = trimmedPayload.Substring(0, trimmedPayload.Length - ToolCallCloseTag.Length).Trim();
+                int closeTagLength = trimmedPayload.EndsWith(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase)
+                    ? ToolCallCloseTag.Length
+                    : LegacyToolCallCloseTag.Length;
+                trimmedPayload = trimmedPayload.Substring(0, trimmedPayload.Length - closeTagLength).Trim();
             }
 
             int index = 0;
@@ -364,6 +379,7 @@ namespace TxtAIEditor.Controls
                         int nextBrace = trimmedPayload.IndexOf('{', index + 1);
                         if (nextBrace < 0)
                         {
+                            hasUnparsedToolCall = list.Count > 0;
                             break;
                         }
                         index = nextBrace;
@@ -395,6 +411,7 @@ namespace TxtAIEditor.Controls
                                 int nextBrace = trimmedPayload.IndexOf('{', openBraceIndex + 1);
                                 if (nextBrace < 0)
                                 {
+                                    hasUnparsedToolCall = list.Count > 0;
                                     break;
                                 }
                                 index = nextBrace;
@@ -406,6 +423,7 @@ namespace TxtAIEditor.Controls
                             int nextBrace = trimmedPayload.IndexOf('{', openBraceIndex + 1);
                             if (nextBrace < 0)
                             {
+                                hasUnparsedToolCall = list.Count > 0;
                                 break;
                             }
                             index = nextBrace;
@@ -413,6 +431,7 @@ namespace TxtAIEditor.Controls
                     }
                     else
                     {
+                        hasUnparsedToolCall = list.Count > 0;
                         break;
                     }
                 }
@@ -604,9 +623,13 @@ namespace TxtAIEditor.Controls
             {
                 trimmedPayload = trimmedPayload.Substring(ToolCallOpenTag.Length).Trim();
             }
-            while (trimmedPayload.EndsWith(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase))
+            while (trimmedPayload.EndsWith(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) ||
+                   trimmedPayload.EndsWith(LegacyToolCallCloseTag, StringComparison.OrdinalIgnoreCase))
             {
-                trimmedPayload = trimmedPayload.Substring(0, trimmedPayload.Length - ToolCallCloseTag.Length).Trim();
+                int closeTagLength = trimmedPayload.EndsWith(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase)
+                    ? ToolCallCloseTag.Length
+                    : LegacyToolCallCloseTag.Length;
+                trimmedPayload = trimmedPayload.Substring(0, trimmedPayload.Length - closeTagLength).Trim();
             }
 
             int openBraceIndex = trimmedPayload.IndexOf('{');
@@ -1042,7 +1065,7 @@ namespace TxtAIEditor.Controls
             }
 
             string fallback = text.Substring(objectStart);
-            int closingTagIndex = fallback.IndexOf("</tool_call>", StringComparison.OrdinalIgnoreCase);
+            int closingTagIndex = FindToolCallCloseOutsideJsonString(fallback, 0);
             if (closingTagIndex >= 0)
             {
                 fallback = fallback.Substring(0, closingTagIndex);
@@ -1550,22 +1573,68 @@ namespace TxtAIEditor.Controls
         public static int FindLastToolCallCloseIndex(string text)
         {
             if (string.IsNullOrEmpty(text)) return -1;
-            string[] closeTags = { "</tool_call>", "</invoke>", "</\uFF5C\uFF5CDSML\uFF5C\uFF5Ctool_calls>" };
-            int lastIdx = -1;
-            foreach (var tag in closeTags)
+
+            int openIndex = FindToolCallIndex(text);
+            int startIndex = 0;
+            if (openIndex >= 0)
             {
-                int idx = text.LastIndexOf(tag, StringComparison.OrdinalIgnoreCase);
-                if (idx > lastIdx)
+                int tagEndIndex = text.IndexOf('>', openIndex);
+                if (tagEndIndex >= 0)
                 {
-                    lastIdx = idx;
+                    startIndex = tagEndIndex + 1;
                 }
             }
-            return lastIdx;
+
+            return FindLastToolCallCloseOutsideJsonString(text, startIndex);
+        }
+
+        private static int FindLastToolCallCloseOutsideJsonString(string text, int startIndex)
+        {
+            bool inJsonString = false;
+            bool escaped = false;
+            int lastIndex = -1;
+
+            for (int i = Math.Max(0, startIndex); i < text.Length; i++)
+            {
+                char current = text[i];
+                if (inJsonString)
+                {
+                    if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (current == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (current == '"')
+                    {
+                        inJsonString = false;
+                    }
+
+                    continue;
+                }
+
+                if (current == '"')
+                {
+                    inJsonString = true;
+                    continue;
+                }
+
+                int closeTagLength = GetCloseTagLengthAt(text, i);
+                if (closeTagLength > 0)
+                {
+                    lastIndex = i;
+                    i += closeTagLength - 1;
+                }
+            }
+
+            return lastIndex;
         }
 
         private static int GetCloseTagLengthAt(string text, int index)
         {
-            string[] closeTags = { "</tool_call>", "</invoke>", "</\uFF5C\uFF5CDSML\uFF5C\uFF5Ctool_calls>" };
+            string[] closeTags = { ToolCallCloseTag, LegacyToolCallCloseTag, "</invoke>", "</\uFF5C\uFF5CDSML\uFF5C\uFF5Ctool_calls>" };
             foreach (var tag in closeTags)
             {
                 if (index + tag.Length <= text.Length &&

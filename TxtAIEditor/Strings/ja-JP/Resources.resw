@@ -2222,9 +2222,6 @@
   <data name="AgentActivityCreateFileFormat" xml:space="preserve">
     <value>ファイルの作成中: {0}</value>
   </data>
-  <data name="AgentActivityReplaceFileFormat" xml:space="preserve">
-    <value>ファイルの修正中: {0}</value>
-  </data>
   <data name="AgentActivityReplaceRangeFormat" xml:space="preserve">
     <value>ファイルの範囲を修正中: {0} ({1}行目から{2}行目)</value>
   </data>

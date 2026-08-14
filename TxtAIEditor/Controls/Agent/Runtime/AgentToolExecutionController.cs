@@ -66,11 +66,7 @@ namespace TxtAIEditor.Controls
                 _appendActivity(GetToolStartMessage(normalizedToolName, arguments, verbose));
 
                 string result;
-                if (normalizedToolName == "replace_in_file")
-                {
-                    result = await _fileToolController.ReplaceInFileAsync(arguments);
-                }
-                else if (normalizedToolName == "search_replace")
+                if (normalizedToolName == "search_replace")
                 {
                     result = await _fileToolController.SearchReplaceAsync(arguments);
                 }
@@ -367,9 +363,6 @@ namespace TxtAIEditor.Controls
                 "create_file" => string.Format(
                     _getString("AgentActivityCreateFileFormat", "파일 만드는 중: {0}"),
                     GetStringArgument(arguments, "path")),
-                "replace_in_file" => string.Format(
-                    _getString("AgentActivityReplaceFileFormat", "파일 수정 중: {0}"),
-                    _fileToolController.GetEditPathArgument(arguments)),
                 "search_replace" => string.Format(
                     _getString("AgentActivitySearchReplaceFormat", "검색/치환 중: {0}"),
                     _fileToolController.GetEditPathArgument(arguments)),

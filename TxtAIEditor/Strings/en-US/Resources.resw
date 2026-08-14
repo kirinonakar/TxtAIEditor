@@ -2222,9 +2222,6 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityCreateFileFormat" xml:space="preserve">
     <value>Creating file: {0}</value>
   </data>
-  <data name="AgentActivityReplaceFileFormat" xml:space="preserve">
-    <value>Modifying file: {0}</value>
-  </data>
   <data name="AgentActivityReplaceRangeFormat" xml:space="preserve">
     <value>Replacing range in file: {0} (lines {1} to {2})</value>
   </data>

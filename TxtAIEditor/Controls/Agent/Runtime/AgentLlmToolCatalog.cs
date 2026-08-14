@@ -253,6 +253,28 @@ namespace TxtAIEditor.Controls
                 },
                 new LlmTool
                 {
+                    Name = "search_replace",
+                    Description = "Search for text in a file and replace matching occurrences. maxReplacements=0 replaces all matches; use apply_patch for structured or multi-hunk changes.",
+                    Parameters = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            path = new { type = "string", description = "Relative path to the file" },
+                            search = new { type = "string", description = "Text or regular expression to find" },
+                            replacement = new { type = "string", description = "Replacement text" },
+                            useRegex = new { type = "boolean", @default = false, description = "Treat search as a regular expression" },
+                            matchCase = new { type = "boolean", @default = true, description = "Match letter case" },
+                            wholeWord = new { type = "boolean", @default = false, description = "Match only complete words" },
+                            maxReplacements = new { type = "integer", minimum = 0, @default = 0, description = "Maximum replacements; 0 means replace all matches" },
+                            startLine = new { type = "integer", minimum = 0, description = "Optional first line to search; 0 means the whole file" },
+                            endLine = new { type = "integer", minimum = 0, description = "Optional last line to search; 0 means the whole file" }
+                        },
+                        required = new[] { "path", "search", "replacement" }
+                    }
+                },
+                new LlmTool
+                {
                     Name = "replace_range",
                     Description = "Replace a range of lines in a file.",
                     Parameters = new

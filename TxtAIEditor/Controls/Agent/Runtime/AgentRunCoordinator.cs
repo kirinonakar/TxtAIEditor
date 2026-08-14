@@ -953,7 +953,7 @@ namespace TxtAIEditor.Controls
                     if (toolCalls.Count == 1)
                     {
                         var tcRes = toolCallResults[0];
-                        bool isFileEditTool = tcRes.NormalizedName is "replace_in_file" or "search_replace" or "replace_range"
+                        bool isFileEditTool = tcRes.NormalizedName is "search_replace" or "replace_range"
                             or "apply_patch" or "overwrite_file" or "append_to_file";
                         if (isFileEditTool && IsUnchangedEditCompletionResult(tcRes.Result))
                         {

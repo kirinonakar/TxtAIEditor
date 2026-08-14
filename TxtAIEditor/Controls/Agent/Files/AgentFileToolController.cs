@@ -70,7 +70,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (normalizedToolName is not ("read_file" or "read_image" or "extract_document" or "replace_in_file" or "search_replace" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file" or "insert_to_file"))
+            if (normalizedToolName is not ("read_file" or "read_image" or "extract_document" or "search_replace" or "replace_range" or "apply_patch" or "overwrite_file" or "append_to_file" or "merge_files" or "split_file" or "insert_to_file"))
             {
                 return;
             }
@@ -211,23 +211,6 @@ namespace TxtAIEditor.Controls
             }
 
             return 0;
-        }
-
-        public async Task<string> ReplaceInFileAsync(JsonElement arguments)
-        {
-            string path = GetEditPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return "replace_in_file failed: path is empty and no selected, recently read, or active file path could be inferred.";
-            }
-
-            string oldText = GetFirstStringArgument(arguments, "oldText", "old_text", "find", "search", "target", "before");
-            string newText = GetFirstStringArgument(arguments, "newText", "new_text", "replace", "replacement", "after");
-            string content = GetFirstStringArgument(arguments, "content", "text");
-
-            return string.IsNullOrEmpty(oldText) && !string.IsNullOrEmpty(content)
-                ? await _fileTools.OverwriteFileAsync(path, content)
-                : await _fileTools.ReplaceInFileAsync(path, oldText, newText);
         }
 
         public async Task<string> SearchReplaceAsync(JsonElement arguments)

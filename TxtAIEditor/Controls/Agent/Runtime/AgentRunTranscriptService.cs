@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Text.RegularExpressions;
 using TxtAIEditor.Core.Models;
 using static TxtAIEditor.Controls.AgentToolHelpers;
 
@@ -16,9 +15,134 @@ namespace TxtAIEditor.Controls
                 return text ?? string.Empty;
             }
 
-            text = Regex.Replace(text, @"<tool_call(?=[\s>])", "<log_tool_call", RegexOptions.IgnoreCase);
-            text = Regex.Replace(text, @"</tool_call>", "</log_tool_call>", RegexOptions.IgnoreCase);
-            return text;
+            var builder = new StringBuilder(text.Length);
+            bool inToolCall = false;
+            bool payloadStarted = false;
+            bool inJsonString = false;
+            bool escaped = false;
+
+            for (int index = 0; index < text.Length;)
+            {
+                if (!inToolCall)
+                {
+                    if (StartsWithToolCallOpenTag(text, index, out int openTagLength))
+                    {
+                        builder.Append("<log_tool_call");
+                        inToolCall = true;
+                        payloadStarted = false;
+                        index += openTagLength;
+                        continue;
+                    }
+
+                    builder.Append(text[index]);
+                    index++;
+                    continue;
+                }
+
+                if (!payloadStarted)
+                {
+                    char current = text[index];
+                    builder.Append(current);
+                    index++;
+                    if (current == '>')
+                    {
+                        payloadStarted = true;
+                    }
+                    continue;
+                }
+
+                if (inJsonString)
+                {
+                    char current = text[index];
+                    builder.Append(current);
+                    index++;
+                    if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (current == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (current == '"')
+                    {
+                        inJsonString = false;
+                    }
+
+                    continue;
+                }
+
+                if (text[index] == '"')
+                {
+                    inJsonString = true;
+                    builder.Append(text[index]);
+                    index++;
+                    continue;
+                }
+
+                if (TryGetToolCallCloseTagLength(text, index, out int closeTagLength))
+                {
+                    builder.Append("</log_tool_call>");
+                    index += closeTagLength;
+                    inToolCall = false;
+                    payloadStarted = false;
+                    continue;
+                }
+
+                builder.Append(text[index]);
+                index++;
+            }
+
+            return builder.ToString();
+        }
+
+        private static bool StartsWithToolCallOpenTag(string text, int index, out int tagLength)
+        {
+            const string openTag = "<tool_call";
+            tagLength = 0;
+            if (index < 0 || index + openTag.Length > text.Length ||
+                !text.AsSpan(index, openTag.Length).Equals(openTag.AsSpan(), StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            int nextIndex = index + openTag.Length;
+            if (nextIndex < text.Length &&
+                !char.IsWhiteSpace(text[nextIndex]) &&
+                text[nextIndex] != '>')
+            {
+                return false;
+            }
+
+            tagLength = openTag.Length;
+            return true;
+        }
+
+        private static bool TryGetToolCallCloseTagLength(string text, int index, out int tagLength)
+        {
+            const string closeTag = "</tool_call>";
+            const string legacyCloseTag = "</log_tool_call>";
+            tagLength = 0;
+            if (index < 0)
+            {
+                return false;
+            }
+
+            if (index + closeTag.Length <= text.Length &&
+                text.AsSpan(index, closeTag.Length).Equals(closeTag.AsSpan(), StringComparison.OrdinalIgnoreCase))
+            {
+                tagLength = closeTag.Length;
+                return true;
+            }
+
+            if (index + legacyCloseTag.Length <= text.Length &&
+                text.AsSpan(index, legacyCloseTag.Length).Equals(legacyCloseTag.AsSpan(), StringComparison.OrdinalIgnoreCase))
+            {
+                tagLength = legacyCloseTag.Length;
+                return true;
+            }
+
+            return false;
         }
 
         public static string ConvertUserRequestMarkersForHistory(string text)

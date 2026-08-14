@@ -186,11 +186,6 @@ namespace TxtAIEditor.Controls
             return _edits.CreateFileAsync(path, content);
         }
 
-        public Task<string> ReplaceInFileAsync(string path, string oldText, string newText)
-        {
-            return _edits.ReplaceInFileAsync(path, oldText, newText);
-        }
-
         public Task<string> SearchReplaceAsync(
             string path,
             string searchText,
