@@ -215,15 +215,21 @@ namespace TxtAIEditor.Controls
         private void SetVerboseState(bool verbose)
         {
             var settings = _settingsService.CurrentSettings;
-            if (settings.LlmAgentVerbose == verbose)
+            var sessionSettings = _openSessionController.GetCurrentSessionSettings();
+            bool settingsChanged = settings.LlmAgentVerbose != verbose;
+            if (!settingsChanged && sessionSettings.LlmAgentVerbose == verbose)
             {
                 return;
             }
 
             settings.LlmAgentVerbose = verbose;
+            sessionSettings.LlmAgentVerbose = verbose;
             _agentPane.HideHtmlCodeBlocks = !verbose;
             _sessionHistoryCoordinator.RefreshOutputDisplay();
-            _ = _settingsService.SaveSettingsAsync(settings);
+            if (settingsChanged)
+            {
+                _ = _settingsService.SaveSettingsAsync(settings);
+            }
         }
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEditController.SessionEdits;
