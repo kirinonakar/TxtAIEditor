@@ -52,6 +52,7 @@ namespace TxtAIEditor.Controls
         public string LastAnswerText { get; set; } = string.Empty;
         public string WorkspaceRoot { get; set; } = string.Empty;
         public EditorSettings LlmSettings { get; set; } = new();
+        public string ApiType { get; set; } = string.Empty;
         public bool IsPlanningMode { get; set; }
         public bool HasEnabledSkills { get; set; }
         public bool HasEnabledMcp { get; set; }

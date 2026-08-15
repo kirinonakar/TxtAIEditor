@@ -457,6 +457,11 @@ namespace TxtAIEditor.Controls
                     {
                         nativeFunctionToolCallDetected = true;
                         return Task.CompletedTask;
+                    },
+                    onApiType: apiType =>
+                    {
+                        runContext.ApiType = apiType;
+                        return Task.CompletedTask;
                     });
             }
             catch (ResponseTruncatedException)

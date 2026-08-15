@@ -32,6 +32,12 @@ namespace TxtAIEditor.Controls
             string initialTranscript,
             string? responseLine)
         {
+            if (!string.IsNullOrWhiteSpace(context.ApiType))
+            {
+                AppendLine(context, $"[LLM API: {context.ApiType}]");
+                context.ApiType = string.Empty;
+            }
+
             string runTranscript = transcript.Substring(initialTranscript.Length);
             if (!string.IsNullOrWhiteSpace(runTranscript))
             {

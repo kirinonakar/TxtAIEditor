@@ -42,7 +42,8 @@ namespace TxtAIEditor.Core.Services.LLM
             IReadOnlyList<LlmMessageAttachment>? attachments = null,
             IReadOnlyList<LlmTool>? tools = null,
             Func<LlmTokenUsage, Task>? onUsage = null,
-            Func<Task>? onNativeToolCall = null)
+            Func<Task>? onNativeToolCall = null,
+            Func<string, Task>? onApiType = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
@@ -66,6 +67,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     model,
                     cancellationToken))
             {
+                await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 return await LlmResponsesApiClient.GenerateCompletionAsync(
                     _httpClient,
                     endpoint,
@@ -84,6 +86,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."));
             }
 
+            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
             var payloadDict = await BuildPayloadAsync(model, systemPrompt, userContent, attachments, tools, stream: false, cancellationToken);
 
@@ -171,7 +174,8 @@ namespace TxtAIEditor.Core.Services.LLM
             Func<string, Task>? onReasoning = null,
             IReadOnlyList<LlmTool>? tools = null,
             Func<LlmTokenUsage, Task>? onUsage = null,
-            Func<Task>? onNativeToolCall = null)
+            Func<Task>? onNativeToolCall = null,
+            Func<string, Task>? onApiType = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
@@ -195,6 +199,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     model,
                     cancellationToken))
             {
+                await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 await LlmResponsesApiClient.GenerateCompletionStreamAsync(
                     _httpClient,
                     endpoint,
@@ -215,6 +220,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 return;
             }
 
+            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
             var payloadDict = await BuildPayloadAsync(model, systemPrompt, userContent, attachments, tools, stream: true, cancellationToken);
 

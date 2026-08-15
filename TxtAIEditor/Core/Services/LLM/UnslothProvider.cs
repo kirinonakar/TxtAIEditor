@@ -55,13 +55,14 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
                 throw new ArgumentException(_localizationService.GetString("UnslothErrorNoModelSelected", "Unsloth Desktop 모델을 먼저 선택해 주십시오."));
 
             string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:8888/v1" : endpoint.Trim();
+            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
             string requestUrl = baseEndpoint.TrimEnd('/') + "/responses";
 
             var payloadDict = new Dictionary<string, object>
@@ -175,13 +176,14 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
                 throw new ArgumentException(_localizationService.GetString("UnslothErrorNoModelSelected", "Unsloth Desktop 모델을 먼저 선택해 주십시오."));
 
             string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:8888/v1" : endpoint.Trim();
+            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
             string requestUrl = baseEndpoint.TrimEnd('/') + "/responses";
 
             var payloadDict = new Dictionary<string, object>

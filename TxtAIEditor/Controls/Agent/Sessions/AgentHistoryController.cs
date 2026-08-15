@@ -752,6 +752,7 @@ namespace TxtAIEditor.Controls
         private static bool IsStructuredUserTurnBoundary(string line)
         {
             return line.StartsWith("[assistant:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[LLM API:", StringComparison.OrdinalIgnoreCase) ||
                 line.StartsWith("[Agent tool call]", StringComparison.OrdinalIgnoreCase) ||
                 line.StartsWith("[Tool result:", StringComparison.OrdinalIgnoreCase) ||
                 line.StartsWith("[tool:", StringComparison.OrdinalIgnoreCase) ||
@@ -766,6 +767,7 @@ namespace TxtAIEditor.Controls
         private static bool IsHistorySectionBoundaryLine(string line)
         {
             return line.StartsWith("[assistant:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("[LLM API:", StringComparison.OrdinalIgnoreCase) ||
                 line.StartsWith("[Retry detail:", StringComparison.OrdinalIgnoreCase) ||
                 line.StartsWith("[End retry detail]", StringComparison.OrdinalIgnoreCase) ||
                 line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase) ||

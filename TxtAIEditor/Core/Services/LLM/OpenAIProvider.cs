@@ -46,7 +46,7 @@ namespace TxtAIEditor.Core.Services.LLM
             return (context, output > 0 ? output : 0);
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             bool isLocalEndpoint = endpoint.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
@@ -70,6 +70,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     model,
                     cancellationToken))
             {
+                await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 return await LlmResponsesApiClient.GenerateCompletionAsync(
                     _httpClient,
                     endpoint,
@@ -88,6 +89,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."));
             }
 
+            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
             bool reasoning = IsReasoningModel(model);
             string tokenField = reasoning ? "max_completion_tokens" : "max_tokens";
@@ -200,7 +202,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             bool isLocalEndpoint = endpoint.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
@@ -224,6 +226,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     model,
                     cancellationToken))
             {
+                await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 await LlmResponsesApiClient.GenerateCompletionStreamAsync(
                     _httpClient,
                     endpoint,
@@ -244,6 +247,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 return;
             }
 
+            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
             bool reasoning = IsReasoningModel(model);
             string tokenField = reasoning ? "max_completion_tokens" : "max_tokens";

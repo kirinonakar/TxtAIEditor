@@ -173,6 +173,22 @@ namespace TxtAIEditor.Core.Services.LLM
         }
     }
 
+    internal static class LlmApiTypes
+    {
+        public const string Responses = "/responses";
+        public const string ChatCompletions = "/chat/completions";
+        public const string AnthropicMessages = "/messages";
+        public const string GeminiGenerateContent = "Gemini generateContent";
+    }
+
+    internal static class LlmApiTypeReporter
+    {
+        public static Task ReportAsync(Func<string, Task>? callback, string apiType)
+        {
+            return callback == null ? Task.CompletedTask : callback(apiType);
+        }
+    }
+
     public class StreamToolCallAccumulator
     {
         public string Name { get; set; } = string.Empty;
@@ -235,8 +251,8 @@ namespace TxtAIEditor.Core.Services.LLM
 
     public interface ILLMProvider
     {
-        Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null);
+        Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null);
 
-        Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null);
+        Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null);
     }
 }

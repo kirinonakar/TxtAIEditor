@@ -120,7 +120,8 @@ namespace TxtAIEditor.Core.Services
             bool allowVisionFallback = false,
             Func<string, Task<bool>>? onVisionFallbackResult = null,
             string fixedContext = "",
-            Func<Task>? onNativeToolCall = null)
+            Func<Task>? onNativeToolCall = null,
+            Func<string, Task>? onApiType = null)
         {
             return _agentService.RunAgentAsync(
                 instruction,
@@ -139,7 +140,8 @@ namespace TxtAIEditor.Core.Services
                 allowVisionFallback,
                 onVisionFallbackResult,
                 fixedContext,
-                onNativeToolCall);
+                onNativeToolCall,
+                onApiType);
         }
 
         public Task<string> RunAgentAsync(
@@ -160,7 +162,8 @@ namespace TxtAIEditor.Core.Services
             bool allowVisionFallback = false,
             Func<string, Task<bool>>? onVisionFallbackResult = null,
             string fixedContext = "",
-            Func<Task>? onNativeToolCall = null)
+            Func<Task>? onNativeToolCall = null,
+            Func<string, Task>? onApiType = null)
         {
             return _agentService.RunAgentAsync(
                 settings,
@@ -180,7 +183,8 @@ namespace TxtAIEditor.Core.Services
                 allowVisionFallback,
                 onVisionFallbackResult,
                 fixedContext,
-                onNativeToolCall);
+                onNativeToolCall,
+                onApiType);
         }
 
         public void ResetTokenUsageStats()

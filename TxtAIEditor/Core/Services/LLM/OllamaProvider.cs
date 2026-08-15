@@ -47,18 +47,18 @@ namespace TxtAIEditor.Core.Services.LLM
             return (context, output > 0 ? output : 0);
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null)
+        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
         {
             var sb = new StringBuilder();
             await GenerateCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, chunk =>
             {
                 sb.Append(chunk);
                 return Task.CompletedTask;
-            }, cancellationToken, attachments, null, tools, onUsage, onNativeToolCall);
+            }, cancellationToken, attachments, null, tools, onUsage, onNativeToolCall, onApiType);
             return sb.ToString();
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null)
+        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -82,6 +82,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         model,
                         cancellationToken))
                 {
+                    await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                     await StreamResponsesAsync(
                         cloudEndpoint,
                         apiKey,
@@ -98,12 +99,14 @@ namespace TxtAIEditor.Core.Services.LLM
                 }
                 else
                 {
+                    await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
                     await StreamChatCompletionsAsync(endpoint, apiKey, model, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, onNativeToolCall);
                 }
                 return;
             }
 
             // Local Ollama (v0.13.3+) supports the OpenAI Responses API (/v1/responses).
+            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
             await StreamResponsesAsync(endpoint, apiKey, model, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, onNativeToolCall);
         }
 
