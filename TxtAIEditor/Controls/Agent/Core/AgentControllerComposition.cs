@@ -96,7 +96,7 @@ namespace TxtAIEditor.Controls
             var displayText = new AgentDisplayLocalizer(getString);
             var runTextFormatter = new AgentRunTextFormatter();
             var runWorkspaceResolver = new AgentRunWorkspaceResolver(() => fileTools.WorkspaceRoot);
-            var modelContextLimits = new AgentModelContextLimitProvider();
+            var modelContextLimits = new AgentModelContextLimitProvider(credentialService);
             var llmToolCatalog = new AgentLlmToolCatalog();
             var responseInspector = new AgentResponseInspector();
 

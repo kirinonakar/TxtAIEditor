@@ -1,6 +1,7 @@
 using System;
 using System.Text.Json;
 using System.Threading.Tasks;
+using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services.LLM;
 
@@ -8,19 +9,34 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentModelContextLimitProvider
     {
+        private readonly ICredentialService? _credentialService;
         private int? _lmStudioContextLimitCache;
         private string? _lmStudioLastFetchedModel;
         private string? _lmStudioLastFetchedEndpoint;
         private bool _lmStudioFetchInProgress;
         private DateTime _lmStudioLastFetchedTime = DateTime.MinValue;
+        private int? _unslothContextLimitCache;
+        private string? _unslothLastFetchedModel;
+        private string? _unslothLastFetchedEndpoint;
+        private bool _unslothFetchInProgress;
+        private DateTime _unslothLastFetchedTime = DateTime.MinValue;
         private bool _modelsDevPriming;
 
-        public void ResetLmStudioCache()
+        public AgentModelContextLimitProvider(ICredentialService? credentialService = null)
+        {
+            _credentialService = credentialService;
+        }
+
+        public void ResetContextLimitCache()
         {
             _lmStudioContextLimitCache = null;
             _lmStudioLastFetchedModel = null;
             _lmStudioLastFetchedEndpoint = null;
             _lmStudioLastFetchedTime = DateTime.MinValue;
+            _unslothContextLimitCache = null;
+            _unslothLastFetchedModel = null;
+            _unslothLastFetchedEndpoint = null;
+            _unslothLastFetchedTime = DateTime.MinValue;
         }
 
         public int GetContextLimit(EditorSettings? settings, Action onContextLimitChanged)
@@ -54,6 +70,35 @@ namespace TxtAIEditor.Controls
                 }
 
                 return 0;
+            }
+
+            if (provider.Contains("unsloth", StringComparison.Ordinal))
+            {
+                bool sameRequest = string.Equals(
+                    settings.LlmModel,
+                    _unslothLastFetchedModel,
+                    StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(
+                        settings.LlmEndpoint,
+                        _unslothLastFetchedEndpoint,
+                        StringComparison.OrdinalIgnoreCase);
+                bool needFetch = !sameRequest ||
+                                 !_unslothContextLimitCache.HasValue ||
+                                 (DateTime.Now - _unslothLastFetchedTime) > TimeSpan.FromSeconds(10);
+
+                if (needFetch && !_unslothFetchInProgress)
+                {
+                    _ = Task.Run(() => FetchUnslothContextLimitAsync(
+                        settings.LlmEndpoint ?? string.Empty,
+                        settings.LlmModel ?? string.Empty,
+                        settings.LlmProvider ?? string.Empty,
+                        onContextLimitChanged));
+                }
+
+                if (sameRequest && _unslothContextLimitCache.HasValue)
+                {
+                    return _unslothContextLimitCache.Value;
+                }
             }
 
             if (!ModelsDevCatalog.IsLoaded && !_modelsDevPriming)
@@ -179,6 +224,305 @@ namespace TxtAIEditor.Controls
             {
                 _lmStudioFetchInProgress = false;
             }
+        }
+
+        private async Task FetchUnslothContextLimitAsync(
+            string endpoint,
+            string modelName,
+            string providerName,
+            Action onContextLimitChanged)
+        {
+            if (_unslothFetchInProgress) return;
+            _unslothFetchInProgress = true;
+
+            try
+            {
+                string apiEndpoint = string.IsNullOrWhiteSpace(endpoint)
+                    ? "http://localhost:8888/v1"
+                    : endpoint.Trim();
+                string baseUrl = GetEndpointOrigin(apiEndpoint);
+                string[] requestUrls =
+                {
+                    apiEndpoint.TrimEnd('/') + "/models",
+                    baseUrl.TrimEnd('/') + "/api/monitor",
+                    baseUrl.TrimEnd('/') + "/api/models/list"
+                };
+
+                using (var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(15) })
+                {
+                    string apiKey = GetApiKey(providerName);
+                    foreach (string requestUrl in requestUrls)
+                    {
+                        using var request = new System.Net.Http.HttpRequestMessage(
+                            System.Net.Http.HttpMethod.Get,
+                            requestUrl);
+                        if (!string.IsNullOrWhiteSpace(apiKey))
+                        {
+                            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                                "Bearer",
+                                apiKey);
+                        }
+
+                        using var response = await client.SendAsync(request);
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            continue;
+                        }
+
+                        string body = await response.Content.ReadAsStringAsync();
+                        using var doc = JsonDocument.Parse(body);
+                        if (!TryFindUnslothContextLimit(doc.RootElement, modelName, out int contextLimit))
+                        {
+                            continue;
+                        }
+
+                        _unslothContextLimitCache = contextLimit;
+                        _unslothLastFetchedModel = modelName;
+                        _unslothLastFetchedEndpoint = endpoint;
+                        _unslothLastFetchedTime = DateTime.Now;
+                        onContextLimitChanged();
+                        return;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to fetch Unsloth context length: {ex.Message}");
+            }
+            finally
+            {
+                _unslothFetchInProgress = false;
+            }
+        }
+
+        private string GetApiKey(string providerName)
+        {
+            if (_credentialService == null || string.IsNullOrWhiteSpace(providerName))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return _credentialService.ReadCredential($"TxtAIEditor_LLM_{providerName}") ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to read {providerName} API key: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        private static string GetEndpointOrigin(string endpoint)
+        {
+            try
+            {
+                var uri = new Uri(endpoint);
+                return $"{uri.Scheme}://{uri.Authority}";
+            }
+            catch
+            {
+                return "http://localhost:8888";
+            }
+        }
+
+        private static bool TryFindUnslothContextLimit(
+            JsonElement root,
+            string modelName,
+            out int contextLimit)
+        {
+            contextLimit = 0;
+
+            if (root.ValueKind == JsonValueKind.Array)
+            {
+                return TryFindUnslothModelArrayContext(root, modelName, out contextLimit);
+            }
+
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            if (TryGetUnslothContextLength(root, out contextLimit))
+            {
+                return true;
+            }
+
+            foreach (string propertyName in new[] { "data", "models", "items", "model_list" })
+            {
+                if (root.TryGetProperty(propertyName, out var array) &&
+                    array.ValueKind == JsonValueKind.Array &&
+                    TryFindUnslothModelArrayContext(array, modelName, out contextLimit))
+                {
+                    return true;
+                }
+            }
+
+            foreach (string propertyName in new[] { "model", "active_model", "loaded_model", "model_info" })
+            {
+                if (root.TryGetProperty(propertyName, out var model) &&
+                    model.ValueKind == JsonValueKind.Object &&
+                    TryGetUnslothContextLength(model, out contextLimit))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryFindUnslothModelArrayContext(
+            JsonElement array,
+            string modelName,
+            out int contextLimit)
+        {
+            contextLimit = 0;
+            JsonElement? exactMatch = null;
+            JsonElement? partialMatch = null;
+            JsonElement? loadedModel = null;
+            JsonElement? firstModel = null;
+
+            foreach (var item in array.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                firstModel ??= item;
+                if (IsUnslothModelMatch(item, modelName, allowPartial: false))
+                {
+                    exactMatch ??= item;
+                }
+                else if (IsUnslothModelMatch(item, modelName, allowPartial: true))
+                {
+                    partialMatch ??= item;
+                }
+
+                if (IsUnslothLoadedModel(item))
+                {
+                    loadedModel ??= item;
+                }
+            }
+
+            foreach (JsonElement? candidate in new[] { exactMatch, partialMatch, loadedModel, firstModel })
+            {
+                if (candidate.HasValue &&
+                    TryGetUnslothContextLength(candidate.Value, out contextLimit))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsUnslothModelMatch(JsonElement item, string modelName, bool allowPartial)
+        {
+            if (string.IsNullOrWhiteSpace(modelName))
+            {
+                return false;
+            }
+
+            foreach (string propertyName in new[]
+            {
+                "id", "name", "model", "model_name", "model_id", "path", "model_path", "repo_id", "display_name"
+            })
+            {
+                string? value = GetJsonString(item, propertyName);
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    continue;
+                }
+
+                if (value.Equals(modelName, StringComparison.OrdinalIgnoreCase) ||
+                    (allowPartial &&
+                     (value.Contains(modelName, StringComparison.OrdinalIgnoreCase) ||
+                      modelName.Contains(value, StringComparison.OrdinalIgnoreCase))))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsUnslothLoadedModel(JsonElement item)
+        {
+            foreach (string propertyName in new[] { "loaded", "is_loaded", "active", "is_active" })
+            {
+                if (item.TryGetProperty(propertyName, out var value) &&
+                    value.ValueKind == JsonValueKind.True)
+                {
+                    return true;
+                }
+            }
+
+            foreach (string propertyName in new[] { "status", "state" })
+            {
+                string? value = GetJsonString(item, propertyName);
+                if (value != null &&
+                    (value.Equals("loaded", StringComparison.OrdinalIgnoreCase) ||
+                     value.Equals("active", StringComparison.OrdinalIgnoreCase) ||
+                     value.Equals("ready", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetUnslothContextLength(JsonElement item, out int contextLimit)
+        {
+            contextLimit = 0;
+
+            foreach (string propertyName in new[]
+            {
+                "context_length", "context_window", "requested_context_length", "max_seq_length"
+            })
+            {
+                if (TryGetPositiveJsonInt(item, propertyName, out contextLimit))
+                {
+                    return true;
+                }
+            }
+
+            foreach (string propertyName in new[]
+            {
+                "config", "settings", "runtime", "model_config", "model_info", "backend", "loaded_model", "llama_backend"
+            })
+            {
+                if (item.TryGetProperty(propertyName, out var nested) &&
+                    nested.ValueKind == JsonValueKind.Object &&
+                    TryGetUnslothContextLength(nested, out contextLimit))
+                {
+                    return true;
+                }
+            }
+
+            foreach (string propertyName in new[] { "max_context_length", "native_context_length" })
+            {
+                if (TryGetPositiveJsonInt(item, propertyName, out contextLimit))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string? GetJsonString(JsonElement parent, string propName)
+        {
+            return parent.TryGetProperty(propName, out var prop) &&
+                   prop.ValueKind == JsonValueKind.String
+                ? prop.GetString()
+                : null;
+        }
+
+        private static bool TryGetPositiveJsonInt(JsonElement parent, string propName, out int value)
+        {
+            return TryGetJsonInt(parent, propName, out value) && value > 0;
         }
 
         private static bool TryFindLmStudioContextLimit(JsonElement arrayEl, string modelName, out int contextLimit)

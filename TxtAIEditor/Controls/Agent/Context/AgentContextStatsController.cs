@@ -193,7 +193,7 @@ namespace TxtAIEditor.Controls
 
             if (forceClearCache)
             {
-                _modelContextLimits.ResetLmStudioCache();
+                _modelContextLimits.ResetContextLimitCache();
             }
 
                 string provider = settings.LlmProvider ?? string.Empty;
