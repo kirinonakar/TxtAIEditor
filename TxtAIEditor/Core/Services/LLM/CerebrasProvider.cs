@@ -50,6 +50,40 @@ namespace TxtAIEditor.Core.Services.LLM
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
             }
 
+            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
+            outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
+                contextLimit,
+                outputLimit,
+                systemPrompt,
+                userContent,
+                attachments,
+                tools);
+
+            if (await LlmResponsesApiClient.SupportsAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    cancellationToken))
+            {
+                return await LlmResponsesApiClient.GenerateCompletionAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    systemPrompt,
+                    userContent,
+                    outputLimit,
+                    GetReasoningEffort(model, _thinkingLevel),
+                    attachments,
+                    tools,
+                    cancellationToken,
+                    onUsage,
+                    onNativeToolCall,
+                    _localizationService.GetString("CerebrasErrorApiCallFailed", "Cerebras API 호출 실패 ({0}): {1}"),
+                    _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."));
+            }
+
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
             var payloadDict = await BuildPayloadAsync(model, systemPrompt, userContent, attachments, tools, stream: false, cancellationToken);
 
@@ -143,6 +177,42 @@ namespace TxtAIEditor.Core.Services.LLM
             if (string.IsNullOrEmpty(apiKey))
             {
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
+            }
+
+            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
+            outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
+                contextLimit,
+                outputLimit,
+                systemPrompt,
+                userContent,
+                attachments,
+                tools);
+
+            if (await LlmResponsesApiClient.SupportsAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    cancellationToken))
+            {
+                await LlmResponsesApiClient.GenerateCompletionStreamAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    systemPrompt,
+                    userContent,
+                    outputLimit,
+                    GetReasoningEffort(model, _thinkingLevel),
+                    attachments,
+                    tools,
+                    onChunk,
+                    cancellationToken,
+                    onReasoning,
+                    onUsage,
+                    onNativeToolCall,
+                    _localizationService.GetString("CerebrasErrorStreamCallFailed", "Cerebras API 스트리밍 호출 실패 ({0}): {1}"));
+                return;
             }
 
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";

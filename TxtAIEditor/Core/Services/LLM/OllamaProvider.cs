@@ -74,9 +74,32 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (_isCloud)
             {
-                // Ollama Cloud (ollama.com) does not expose /v1/responses yet,
-                // so it keeps the OpenAI-compatible Chat Completions endpoint.
-                await StreamChatCompletionsAsync(endpoint, apiKey, model, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, onNativeToolCall);
+                string cloudEndpoint = NormalizeCloudEndpoint(endpoint);
+                if (await LlmResponsesApiClient.SupportsAsync(
+                        _httpClient,
+                        cloudEndpoint,
+                        apiKey,
+                        model,
+                        cancellationToken))
+                {
+                    await StreamResponsesAsync(
+                        cloudEndpoint,
+                        apiKey,
+                        model,
+                        systemPrompt,
+                        userContent,
+                        onChunk,
+                        cancellationToken,
+                        attachments,
+                        onReasoning,
+                        tools,
+                        onUsage,
+                        onNativeToolCall);
+                }
+                else
+                {
+                    await StreamChatCompletionsAsync(endpoint, apiKey, model, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, onNativeToolCall);
+                }
                 return;
             }
 
@@ -292,12 +315,7 @@ namespace TxtAIEditor.Core.Services.LLM
             Func<LlmTokenUsage, Task>? onUsage,
             Func<Task>? onNativeToolCall)
         {
-            string defaultEndpoint = "https://ollama.com";
-            string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? defaultEndpoint : endpoint.Trim();
-            if (baseEndpoint.Equals("https://ollama.com", StringComparison.OrdinalIgnoreCase))
-            {
-                baseEndpoint = "https://ollama.com/v1";
-            }
+            string baseEndpoint = NormalizeCloudEndpoint(endpoint);
             string requestUrl = baseEndpoint.TrimEnd('/') + "/chat/completions";
 
             var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
@@ -624,6 +642,17 @@ namespace TxtAIEditor.Core.Services.LLM
             }
 
             payloadDict["tools"] = toolsList;
+        }
+
+        private static string NormalizeCloudEndpoint(string endpoint)
+        {
+            string baseEndpoint = string.IsNullOrWhiteSpace(endpoint)
+                ? "https://ollama.com/v1"
+                : endpoint.Trim();
+
+            return baseEndpoint.Equals("https://ollama.com", StringComparison.OrdinalIgnoreCase)
+                ? "https://ollama.com/v1"
+                : baseEndpoint;
         }
 
         private static object BuildResponsesInput(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)

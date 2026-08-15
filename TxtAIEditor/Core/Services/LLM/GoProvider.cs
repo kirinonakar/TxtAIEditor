@@ -83,8 +83,6 @@ namespace TxtAIEditor.Core.Services.LLM
                 return await GenerateAnthropicCompletionAsync(endpoint, apiKey, model, systemPrompt, userContent, cancellationToken, attachments, onUsage);
             }
 
-            string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
-
             var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
             outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
                 contextLimit,
@@ -93,6 +91,33 @@ namespace TxtAIEditor.Core.Services.LLM
                 userContent,
                 attachments,
                 tools);
+
+            if (await LlmResponsesApiClient.SupportsAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    cancellationToken))
+            {
+                return await LlmResponsesApiClient.GenerateCompletionAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    systemPrompt,
+                    userContent,
+                    outputLimit,
+                    GetResponsesReasoningEffort(model),
+                    attachments,
+                    tools,
+                    cancellationToken,
+                    onUsage,
+                    onNativeToolCall,
+                    _localizationService.GetString("GoErrorApiCallFailed", "OpenCode Go API 호출 실패 ({0}): {1}"),
+                    _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."));
+            }
+
+            string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
             var payloadDict = new Dictionary<string, object>
             {
@@ -228,8 +253,6 @@ namespace TxtAIEditor.Core.Services.LLM
                 return;
             }
 
-            string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
-
             var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
             outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
                 contextLimit,
@@ -238,6 +261,35 @@ namespace TxtAIEditor.Core.Services.LLM
                 userContent,
                 attachments,
                 tools);
+
+            if (await LlmResponsesApiClient.SupportsAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    cancellationToken))
+            {
+                await LlmResponsesApiClient.GenerateCompletionStreamAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    systemPrompt,
+                    userContent,
+                    outputLimit,
+                    GetResponsesReasoningEffort(model),
+                    attachments,
+                    tools,
+                    onChunk,
+                    cancellationToken,
+                    onReasoning,
+                    onUsage,
+                    onNativeToolCall,
+                    _localizationService.GetString("GoErrorStreamCallFailed", "OpenCode Go API 스트리밍 호출 실패 ({0}): {1}"));
+                return;
+            }
+
+            string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
             var payloadDict = new Dictionary<string, object>
             {
@@ -687,6 +739,26 @@ namespace TxtAIEditor.Core.Services.LLM
             if (string.IsNullOrEmpty(model)) return false;
             return model.Contains("kimi", StringComparison.OrdinalIgnoreCase) ||
                    model.Contains("moonshot", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string? GetResponsesReasoningEffort(string model)
+        {
+            if (HasThinking)
+            {
+                string effort = LlmThinkingLevelMapper.MapEffort(model, _thinkingLevel);
+                if (effort.Equals("xhigh", StringComparison.OrdinalIgnoreCase) ||
+                    effort.Equals("max", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "high";
+                }
+
+                return effort;
+            }
+
+            return _thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
+                   _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase)
+                ? "none"
+                : null;
         }
 
         private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)

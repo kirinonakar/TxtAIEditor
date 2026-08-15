@@ -54,8 +54,6 @@ namespace TxtAIEditor.Core.Services.LLM
             if (string.IsNullOrEmpty(apiKey) && !isLocalEndpoint)
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
-            string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
-
             var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
             outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
                 contextLimit,
@@ -64,6 +62,33 @@ namespace TxtAIEditor.Core.Services.LLM
                 userContent,
                 attachments,
                 tools);
+
+            if (await LlmResponsesApiClient.SupportsAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    cancellationToken))
+            {
+                return await LlmResponsesApiClient.GenerateCompletionAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    systemPrompt,
+                    userContent,
+                    outputLimit,
+                    GetResponsesReasoningEffort(model),
+                    attachments,
+                    tools,
+                    cancellationToken,
+                    onUsage,
+                    onNativeToolCall,
+                    _localizationService.GetString("OpenAIErrorApiCallFailed", "OpenAI API 호출 실패 ({0}): {1}"),
+                    _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."));
+            }
+
+            string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
             bool reasoning = IsReasoningModel(model);
             string tokenField = reasoning ? "max_completion_tokens" : "max_tokens";
 
@@ -183,8 +208,6 @@ namespace TxtAIEditor.Core.Services.LLM
             if (string.IsNullOrEmpty(apiKey) && !isLocalEndpoint)
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
-            string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
-
             var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
             outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
                 contextLimit,
@@ -193,6 +216,35 @@ namespace TxtAIEditor.Core.Services.LLM
                 userContent,
                 attachments,
                 tools);
+
+            if (await LlmResponsesApiClient.SupportsAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    cancellationToken))
+            {
+                await LlmResponsesApiClient.GenerateCompletionStreamAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    systemPrompt,
+                    userContent,
+                    outputLimit,
+                    GetResponsesReasoningEffort(model),
+                    attachments,
+                    tools,
+                    onChunk,
+                    cancellationToken,
+                    onReasoning,
+                    onUsage,
+                    onNativeToolCall,
+                    _localizationService.GetString("OpenAIErrorStreamCallFailed", "OpenAI API 스트리밍 호출 실패 ({0}): {1}"));
+                return;
+            }
+
+            string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
             bool reasoning = IsReasoningModel(model);
             string tokenField = reasoning ? "max_completion_tokens" : "max_tokens";
 
@@ -402,6 +454,23 @@ namespace TxtAIEditor.Core.Services.LLM
             if (string.IsNullOrEmpty(model)) return false;
             return model.Contains("kimi", StringComparison.OrdinalIgnoreCase) ||
                    model.Contains("moonshot", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string? GetResponsesReasoningEffort(string model)
+        {
+            if (HasThinking)
+            {
+                string effort = LlmThinkingLevelMapper.MapEffort(model, _thinkingLevel);
+                return effort.Equals("xhigh", StringComparison.OrdinalIgnoreCase) ||
+                       effort.Equals("max", StringComparison.OrdinalIgnoreCase)
+                    ? "high"
+                    : effort;
+            }
+
+            return _thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
+                   _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase)
+                ? "none"
+                : null;
         }
 
         private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)

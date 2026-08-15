@@ -54,8 +54,6 @@ namespace TxtAIEditor.Core.Services.LLM
             if (string.IsNullOrEmpty(apiKey))
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
-            string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
-
             var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
             outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
                 contextLimit,
@@ -64,6 +62,37 @@ namespace TxtAIEditor.Core.Services.LLM
                 userContent,
                 attachments,
                 tools);
+
+            if (await LlmResponsesApiClient.SupportsAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    cancellationToken,
+                    ConfigureOpenRouterRequest))
+            {
+                await LlmResponsesApiClient.GenerateCompletionStreamAsync(
+                    _httpClient,
+                    endpoint,
+                    apiKey,
+                    model,
+                    systemPrompt,
+                    userContent,
+                    outputLimit,
+                    GetResponsesReasoningEffort(model),
+                    attachments,
+                    tools,
+                    onChunk,
+                    cancellationToken,
+                    onReasoning,
+                    onUsage,
+                    onNativeToolCall,
+                    _localizationService.GetString("OpenRouterErrorStreamCallFailed", "OpenRouter API 스트리밍 호출 실패 ({0}): {1}"),
+                    ConfigureOpenRouterRequest);
+                return;
+            }
+
+            string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
 
             var payloadDict = new Dictionary<string, object>
             {
@@ -125,9 +154,7 @@ namespace TxtAIEditor.Core.Services.LLM
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-                request.Headers.Add("User-Agent", "TxtAIEditor/1.0.0");
-                request.Headers.Add("HTTP-Referer", "https://github.com/kirinonakar/TxtAIEditor");
-                request.Headers.Add("X-Title", "TxtAIEditor");
+                ConfigureOpenRouterRequest(request);
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
                 using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
@@ -267,6 +294,30 @@ namespace TxtAIEditor.Core.Services.LLM
             if (string.IsNullOrEmpty(model)) return false;
             return model.Contains("kimi", StringComparison.OrdinalIgnoreCase) ||
                    model.Contains("moonshot", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string? GetResponsesReasoningEffort(string model)
+        {
+            if (HasThinking)
+            {
+                string effort = LlmThinkingLevelMapper.MapEffort(model, _thinkingLevel);
+                return effort.Equals("xhigh", StringComparison.OrdinalIgnoreCase) ||
+                       effort.Equals("max", StringComparison.OrdinalIgnoreCase)
+                    ? "high"
+                    : effort;
+            }
+
+            return _thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
+                   _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase)
+                ? "none"
+                : null;
+        }
+
+        private static void ConfigureOpenRouterRequest(HttpRequestMessage request)
+        {
+            request.Headers.Add("User-Agent", "TxtAIEditor/1.0.0");
+            request.Headers.Add("HTTP-Referer", "https://github.com/kirinonakar/TxtAIEditor");
+            request.Headers.Add("X-Title", "TxtAIEditor");
         }
 
         private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)
