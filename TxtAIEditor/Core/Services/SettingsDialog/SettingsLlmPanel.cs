@@ -1044,7 +1044,7 @@ namespace TxtAIEditor.Core.Services
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelLow", "낮음 (Low)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelMedium", "중간 (Medium)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelHigh", "높음 (High)"));
-            comboBox.Items.Add(getString("SettingsLlmThinkingLevelXHigh", "매우 높음 (Very High)"));
+            comboBox.Items.Add(getString("SettingsLlmThinkingLevelXHigh", "매우 높음 (xhigh)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelMax", "최대 (Max)"));
             comboBox.SelectedIndex = thinkingLevel.ToLowerInvariant() switch
             {

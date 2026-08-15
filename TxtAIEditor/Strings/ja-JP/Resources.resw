@@ -444,7 +444,7 @@
     <value>高い (High)</value>
   </data>
   <data name="SettingsLlmThinkingLevelXHigh" xml:space="preserve">
-    <value>非常に高い (Very High)</value>
+    <value>非常に高い (xhigh)</value>
   </data>
   <data name="SettingsLlmThinkingLevelMax" xml:space="preserve">
     <value>最大 (Max)</value>

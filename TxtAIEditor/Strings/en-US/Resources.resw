@@ -444,7 +444,7 @@
     <value>High</value>
   </data>
   <data name="SettingsLlmThinkingLevelXHigh" xml:space="preserve">
-    <value>Very High</value>
+    <value>xhigh</value>
   </data>
   <data name="SettingsLlmThinkingLevelMax" xml:space="preserve">
     <value>Max</value>
