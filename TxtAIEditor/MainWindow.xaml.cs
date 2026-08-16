@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -286,7 +287,25 @@ namespace TxtAIEditor
 
         internal string GetWindowDisplayName()
         {
-            return string.IsNullOrWhiteSpace(Title) ? "TxtAIEditor" : Title;
+            if (string.IsNullOrWhiteSpace(Title))
+            {
+                return "TxtAIEditor";
+            }
+
+            string title = Title;
+            const string titlePrefix = "TxtAIEditor - ";
+            if (title.StartsWith(titlePrefix, StringComparison.Ordinal))
+            {
+                title = title.Substring(titlePrefix.Length);
+            }
+
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return "TxtAIEditor";
+            }
+
+            string fileName = Path.GetFileName(title.TrimEnd('\\', '/'));
+            return string.IsNullOrWhiteSpace(fileName) ? title : fileName;
         }
 
     }
