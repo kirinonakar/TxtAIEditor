@@ -24,6 +24,7 @@ namespace TxtAIEditor.Core.Services
         private const uint WmRButtonUp = 0x0205;
         private const uint WmNull = 0x0000;
         private const uint MfString = 0x00000000;
+        private const uint MfSeparator = 0x00000800;
         private const uint TpmRightButton = 0x0002;
         private const uint TpmReturnCommand = 0x0100;
         private const uint OpenMenuCommand = 1;
@@ -205,6 +206,7 @@ namespace TxtAIEditor.Core.Services
                     }
                 }
 
+                AppendMenu(menu, MfSeparator, 0, null);
                 AppendMenu(menu, MfString, OpenMenuCommand, _openText);
                 AppendMenu(menu, MfString, CloseMenuCommand, _closeText);
                 GetCursorPos(out Point cursorPosition);
@@ -342,7 +344,7 @@ namespace TxtAIEditor.Core.Services
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool AppendMenu(IntPtr menu, uint flags, nuint itemId, string text);
+        private static extern bool AppendMenu(IntPtr menu, uint flags, nuint itemId, string? text);
 
         [DllImport("user32.dll")]
         private static extern uint TrackPopupMenu(
