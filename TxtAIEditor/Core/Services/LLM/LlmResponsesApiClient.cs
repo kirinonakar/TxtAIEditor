@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -14,6 +15,20 @@ namespace TxtAIEditor.Core.Services.LLM
 {
     internal static class LlmResponsesApiClient
     {
+        private static readonly string[] ConversationBoundaryPrefixes =
+        {
+            "[user]",
+            "[assistant:",
+            "[LLM API:",
+            "[Agent tool call]",
+            "[Tool result:",
+            "[tool:",
+            "[Agent Response]:",
+            "[Previous Tool Call]:",
+            "[Previous Response]:",
+            "[Retry detail:"
+        };
+
         private static readonly ConcurrentDictionary<string, bool> _supportCache =
             new(StringComparer.OrdinalIgnoreCase);
 
@@ -100,7 +115,8 @@ namespace TxtAIEditor.Core.Services.LLM
             Func<Task>? onNativeToolCall,
             string errorMessageTemplate,
             string emptyResponseMessage,
-            Action<HttpRequestMessage>? configureRequest = null)
+            Action<HttpRequestMessage>? configureRequest = null,
+            bool enablePromptCaching = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -113,7 +129,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 reasoningEffort,
                 attachments,
                 tools,
-                stream: false);
+                stream: false,
+                enablePromptCaching);
 
             using var request = CreateRequest(requestUrl, apiKey, payload, configureRequest);
             using var response = await httpClient.SendAsync(request, cancellationToken);
@@ -235,7 +252,8 @@ namespace TxtAIEditor.Core.Services.LLM
             Func<LlmTokenUsage, Task>? onUsage,
             Func<Task>? onNativeToolCall,
             string errorMessageTemplate,
-            Action<HttpRequestMessage>? configureRequest = null)
+            Action<HttpRequestMessage>? configureRequest = null,
+            bool enablePromptCaching = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -248,7 +266,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 reasoningEffort,
                 attachments,
                 tools,
-                stream: true);
+                stream: true,
+                enablePromptCaching);
 
             using var request = CreateRequest(requestUrl, apiKey, payload, configureRequest);
             using var response = await httpClient.SendAsync(
@@ -460,14 +479,35 @@ namespace TxtAIEditor.Core.Services.LLM
             string? reasoningEffort,
             IReadOnlyList<LlmMessageAttachment>? attachments,
             IReadOnlyList<LlmTool>? tools,
-            bool stream)
+            bool stream,
+            bool enablePromptCaching)
         {
+            PromptSections promptSections = default;
+            bool usePromptCaching = enablePromptCaching &&
+                SupportsExplicitPromptCaching(model) &&
+                TrySplitPromptSections(
+                    userContent,
+                    out promptSections);
             var payload = new Dictionary<string, object>
             {
                 ["model"] = model,
                 ["instructions"] = systemPrompt,
-                ["input"] = BuildInput(userContent, attachments)
+                ["input"] = usePromptCaching
+                    ? BuildPromptCachingInput(promptSections, attachments)
+                    : BuildInput(userContent, attachments)
             };
+
+            if (usePromptCaching)
+            {
+                payload["prompt_cache_key"] = BuildPromptCacheKey(
+                    model,
+                    systemPrompt,
+                    promptSections);
+                payload["prompt_cache_options"] = new Dictionary<string, object>
+                {
+                    ["mode"] = "explicit"
+                };
+            }
 
             if (outputLimit > 0)
             {
@@ -506,6 +546,240 @@ namespace TxtAIEditor.Core.Services.LLM
 
             return payload;
         }
+
+        private static object BuildPromptCachingInput(
+            PromptSections sections,
+            IReadOnlyList<LlmMessageAttachment>? attachments)
+        {
+            var parts = new List<object>
+            {
+                BuildPromptCachingTextBlock(sections.FixedContext, addBreakpoint: true)
+            };
+
+            foreach (string conversationBlock in SplitConversationBlocks(sections.Conversation))
+            {
+                parts.Add(BuildPromptCachingTextBlock(conversationBlock, addBreakpoint: true));
+            }
+
+            parts.Add(BuildPromptCachingTextBlock(
+                sections.TransientSuffix,
+                addBreakpoint: false));
+
+            var images = attachments?.Where(a => a.IsImage && !string.IsNullOrWhiteSpace(a.Base64Data)).ToList();
+            if (images != null)
+            {
+                foreach (var image in images)
+                {
+                    parts.Add(new
+                    {
+                        type = "input_image",
+                        image_url = $"data:{image.MimeType};base64,{image.Base64Data}"
+                    });
+                }
+            }
+
+            return new[]
+            {
+                new { type = "message", role = "user", content = (object)parts }
+            };
+        }
+
+        private static object BuildPromptCachingTextBlock(string text, bool addBreakpoint)
+        {
+            var block = new Dictionary<string, object>
+            {
+                ["type"] = "input_text",
+                ["text"] = text
+            };
+            if (addBreakpoint)
+            {
+                block["prompt_cache_breakpoint"] = new Dictionary<string, object>
+                {
+                    ["mode"] = "explicit"
+                };
+            }
+
+            return block;
+        }
+
+        private static IReadOnlyList<string> SplitConversationBlocks(string conversation)
+        {
+            var boundaryIndexes = new List<int> { 0 };
+            int searchIndex = 0;
+            while (TryFindConversationBoundary(conversation, searchIndex, out int boundaryIndex))
+            {
+                if (boundaryIndex > boundaryIndexes[^1])
+                {
+                    boundaryIndexes.Add(boundaryIndex);
+                }
+
+                searchIndex = boundaryIndex + 1;
+            }
+
+            var blocks = new List<string>(boundaryIndexes.Count);
+            for (int i = 0; i < boundaryIndexes.Count; i++)
+            {
+                int startIndex = boundaryIndexes[i];
+                int endIndex = i + 1 < boundaryIndexes.Count
+                    ? boundaryIndexes[i + 1]
+                    : conversation.Length;
+                if (endIndex > startIndex)
+                {
+                    blocks.Add(conversation.Substring(startIndex, endIndex - startIndex));
+                }
+            }
+
+            return blocks;
+        }
+
+        private static bool TryFindConversationBoundary(
+            string conversation,
+            int startIndex,
+            out int boundaryIndex)
+        {
+            int lineStart = Math.Max(0, startIndex);
+            if (lineStart > 0 && conversation[lineStart - 1] != '\n')
+            {
+                int nextLineIndex = conversation.IndexOf('\n', lineStart);
+                lineStart = nextLineIndex < 0 ? conversation.Length : nextLineIndex + 1;
+            }
+
+            while (lineStart < conversation.Length)
+            {
+                if (IsConversationBoundaryLine(conversation, lineStart))
+                {
+                    boundaryIndex = lineStart;
+                    return true;
+                }
+
+                int nextLineIndex = conversation.IndexOf('\n', lineStart);
+                if (nextLineIndex < 0)
+                {
+                    break;
+                }
+
+                lineStart = nextLineIndex + 1;
+            }
+
+            boundaryIndex = -1;
+            return false;
+        }
+
+        private static bool IsConversationBoundaryLine(string conversation, int lineStart)
+        {
+            foreach (string prefix in ConversationBoundaryPrefixes)
+            {
+                if (conversation.AsSpan(lineStart).StartsWith(
+                    prefix.AsSpan(),
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TrySplitPromptSections(
+            string userContent,
+            out PromptSections sections)
+        {
+            const string appendOnlyMarker = "[Append-only conversation]";
+            const string transientMarker = "[Transient suffix]";
+            int appendOnlyIndex = userContent.IndexOf(appendOnlyMarker, StringComparison.Ordinal);
+            int transientIndex = userContent.IndexOf(
+                transientMarker,
+                appendOnlyIndex < 0 ? 0 : appendOnlyIndex + appendOnlyMarker.Length,
+                StringComparison.Ordinal);
+            if (appendOnlyIndex < 0 || transientIndex < 0)
+            {
+                sections = default;
+                return false;
+            }
+
+            sections = new PromptSections(
+                userContent.Substring(0, appendOnlyIndex),
+                userContent.Substring(appendOnlyIndex, transientIndex - appendOnlyIndex),
+                userContent.Substring(transientIndex));
+            return true;
+        }
+
+        private static bool SupportsExplicitPromptCaching(string model)
+        {
+            int modelIndex = model.IndexOf("gpt-", StringComparison.OrdinalIgnoreCase);
+            if (modelIndex < 0)
+            {
+                return false;
+            }
+
+            string versionText = model.Substring(modelIndex + 4);
+            int separatorIndex = versionText.IndexOfAny(new[] { '-', '/', ':' });
+            if (separatorIndex >= 0)
+            {
+                versionText = versionText.Substring(0, separatorIndex);
+            }
+
+            string[] parts = versionText.Split('.');
+            if (parts.Length == 0 || !int.TryParse(parts[0], out int major))
+            {
+                return false;
+            }
+
+            int minor = 0;
+            if (parts.Length > 1 && !int.TryParse(parts[1], out minor))
+            {
+                return false;
+            }
+
+            return major > 5 || (major == 5 && minor >= 6);
+        }
+
+        private static string BuildPromptCacheKey(
+            string model,
+            string systemPrompt,
+            PromptSections sections)
+        {
+            string conversationAnchor = GetInitialConversationAnchor(sections.Conversation);
+            byte[] bytes = Encoding.UTF8.GetBytes(
+                model + "\n" + systemPrompt + "\n" + sections.FixedContext + conversationAnchor);
+            byte[] hash = SHA256.HashData(bytes);
+            return "txtaieditor:" + Convert.ToHexString(hash.AsSpan(0, 16)).ToLowerInvariant();
+        }
+
+        private static string GetInitialConversationAnchor(string conversation)
+        {
+            int firstRoleIndex = FindRoleHeader(conversation, 0);
+            if (firstRoleIndex < 0)
+            {
+                return conversation;
+            }
+
+            int nextRoleIndex = FindRoleHeader(conversation, firstRoleIndex + 1);
+            return nextRoleIndex < 0
+                ? conversation
+                : conversation.Substring(0, nextRoleIndex);
+        }
+
+        private static int FindRoleHeader(string value, int startIndex)
+        {
+            string[] roleHeaders = { "[user]", "[assistant", "[tool" };
+            int matchIndex = -1;
+            foreach (string roleHeader in roleHeaders)
+            {
+                int candidate = value.IndexOf(roleHeader, startIndex, StringComparison.Ordinal);
+                if (candidate >= 0 && (matchIndex < 0 || candidate < matchIndex))
+                {
+                    matchIndex = candidate;
+                }
+            }
+
+            return matchIndex;
+        }
+
+        private readonly record struct PromptSections(
+            string FixedContext,
+            string Conversation,
+            string TransientSuffix);
 
         private static object BuildInput(
             string userContent,

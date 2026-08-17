@@ -4,6 +4,8 @@ namespace TxtAIEditor.Core.Services.LLM
 {
     public static class AgentPromptBuilder
     {
+        internal const string TransientEditLedgerBoundary = "\u001eTxtAIEditor.EditLedger\u001e";
+
         public static string BuildSystemPrompt(
             string languageCode,
             bool isPlanningMode = false,
@@ -130,6 +132,11 @@ namespace TxtAIEditor.Core.Services.LLM
             string openTabsContext,
             string languageCode = "en-US")
         {
+            SplitConversationTranscript(
+                conversationTranscript,
+                out string appendOnlyTranscript,
+                out string editLedger);
+
             var builder = new StringBuilder();
             builder.AppendLine("[Fixed prompt context]");
             if (!string.IsNullOrWhiteSpace(fixedContext))
@@ -139,10 +146,16 @@ namespace TxtAIEditor.Core.Services.LLM
 
             builder.AppendLine();
             builder.AppendLine("[Append-only conversation]");
-            builder.AppendLine(conversationTranscript);
+            builder.AppendLine(appendOnlyTranscript);
 
             builder.AppendLine();
             builder.AppendLine("[Transient suffix]");
+
+            if (!string.IsNullOrWhiteSpace(editLedger))
+            {
+                builder.AppendLine();
+                builder.AppendLine(editLedger);
+            }
 
             if (!string.IsNullOrWhiteSpace(openTabsContext))
             {
@@ -182,6 +195,32 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("Resolve relative dates (today/tomorrow/yesterday/this week/now) from this value.");
 
             return builder.ToString();
+        }
+
+        private static void SplitConversationTranscript(
+            string conversationTranscript,
+            out string appendOnlyTranscript,
+            out string editLedger)
+        {
+            const string editLedgerMarker = "[Accepted file edits before this user task]";
+            int boundaryIndex = conversationTranscript.LastIndexOf(
+                TransientEditLedgerBoundary,
+                System.StringComparison.Ordinal);
+            int editLedgerIndex = boundaryIndex >= 0
+                ? boundaryIndex + TransientEditLedgerBoundary.Length
+                : conversationTranscript.LastIndexOf(
+                    editLedgerMarker,
+                    System.StringComparison.Ordinal);
+            if (editLedgerIndex < 0)
+            {
+                appendOnlyTranscript = conversationTranscript;
+                editLedger = string.Empty;
+                return;
+            }
+
+            int transcriptEndIndex = boundaryIndex >= 0 ? boundaryIndex : editLedgerIndex;
+            appendOnlyTranscript = conversationTranscript.Substring(0, transcriptEndIndex).TrimEnd();
+            editLedger = conversationTranscript.Substring(editLedgerIndex).Trim();
         }
     }
 }

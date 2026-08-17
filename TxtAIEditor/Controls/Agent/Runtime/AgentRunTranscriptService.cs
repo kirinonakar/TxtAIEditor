@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services.LLM;
 using static TxtAIEditor.Controls.AgentToolHelpers;
 
 namespace TxtAIEditor.Controls
@@ -198,6 +199,7 @@ namespace TxtAIEditor.Controls
 
             builder.AppendLine();
             builder.AppendLine();
+            builder.AppendLine(AgentPromptBuilder.TransientEditLedgerBoundary);
             builder.AppendLine("[Accepted file edits before this user task]");
             builder.AppendLine(string.IsNullOrEmpty(earlierEdits)
                 ? "(No earlier accepted file edits in this agent session.)"
