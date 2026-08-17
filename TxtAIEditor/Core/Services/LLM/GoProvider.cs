@@ -116,8 +116,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     onUsage,
                     onNativeToolCall,
                     _localizationService.GetString("GoErrorApiCallFailed", "OpenCode Go API 호출 실패 ({0}): {1}"),
-                    _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."),
-                    enablePromptCaching: true);
+                    _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."));
             }
 
             await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
@@ -291,8 +290,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     onReasoning,
                     onUsage,
                     onNativeToolCall,
-                    _localizationService.GetString("GoErrorStreamCallFailed", "OpenCode Go API 스트리밍 호출 실패 ({0}): {1}"),
-                    enablePromptCaching: true);
+                    _localizationService.GetString("GoErrorStreamCallFailed", "OpenCode Go API 스트리밍 호출 실패 ({0}): {1}"));
                 return;
             }
 

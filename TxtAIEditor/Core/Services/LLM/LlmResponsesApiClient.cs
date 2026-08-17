@@ -115,8 +115,7 @@ namespace TxtAIEditor.Core.Services.LLM
             Func<Task>? onNativeToolCall,
             string errorMessageTemplate,
             string emptyResponseMessage,
-            Action<HttpRequestMessage>? configureRequest = null,
-            bool enablePromptCaching = false)
+            Action<HttpRequestMessage>? configureRequest = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -129,8 +128,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 reasoningEffort,
                 attachments,
                 tools,
-                stream: false,
-                enablePromptCaching);
+                stream: false);
 
             using var request = CreateRequest(requestUrl, apiKey, payload, configureRequest);
             using var response = await httpClient.SendAsync(request, cancellationToken);
@@ -252,8 +250,7 @@ namespace TxtAIEditor.Core.Services.LLM
             Func<LlmTokenUsage, Task>? onUsage,
             Func<Task>? onNativeToolCall,
             string errorMessageTemplate,
-            Action<HttpRequestMessage>? configureRequest = null,
-            bool enablePromptCaching = false)
+            Action<HttpRequestMessage>? configureRequest = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -266,8 +263,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 reasoningEffort,
                 attachments,
                 tools,
-                stream: true,
-                enablePromptCaching);
+                stream: true);
 
             using var request = CreateRequest(requestUrl, apiKey, payload, configureRequest);
             using var response = await httpClient.SendAsync(
@@ -479,12 +475,10 @@ namespace TxtAIEditor.Core.Services.LLM
             string? reasoningEffort,
             IReadOnlyList<LlmMessageAttachment>? attachments,
             IReadOnlyList<LlmTool>? tools,
-            bool stream,
-            bool enablePromptCaching)
+            bool stream)
         {
             PromptSections promptSections = default;
-            bool usePromptCaching = enablePromptCaching &&
-                SupportsExplicitPromptCaching(model) &&
+            bool usePromptCaching = SupportsExplicitPromptCaching(model) &&
                 TrySplitPromptSections(
                     userContent,
                     out promptSections);
