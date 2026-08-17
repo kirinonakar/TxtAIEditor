@@ -743,7 +743,7 @@ namespace TxtAIEditor.Controls
                         {
                             if (hasWebSearchCallInBatch)
                             {
-                                int delayMilliseconds = Random.Shared.Next(3000, 5001);
+                                int delayMilliseconds = Random.Shared.Next(500, 2001);
                                 await Task.Delay(delayMilliseconds, cancellationToken);
                             }
 
