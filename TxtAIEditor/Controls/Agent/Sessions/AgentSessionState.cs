@@ -16,6 +16,7 @@ namespace TxtAIEditor.Controls
         public string OutputText { get; set; } = string.Empty;
         public string ActivityText { get; set; } = string.Empty;
         public string SessionHistoryText { get; set; } = string.Empty;
+        public string ModelSessionHistoryText { get; set; } = string.Empty;
         public string LastAnswerText { get; set; } = string.Empty;
         public string WorkspaceRoot { get; set; } = string.Empty;
         public double SessionHistoryTokenCount { get; set; }
@@ -38,6 +39,7 @@ namespace TxtAIEditor.Controls
         public string SessionId { get; set; } = string.Empty;
         public CancellationTokenSource? Cancellation { get; set; }
         public StringBuilder SessionHistory { get; } = new();
+        public StringBuilder ModelSessionHistory { get; } = new();
         public StringBuilder RetryDebugHistory { get; } = new();
         public double SessionHistoryTokenCount { get; set; }
         public double CurrentRunTranscriptTokens { get; set; }
@@ -69,6 +71,7 @@ namespace TxtAIEditor.Controls
         public string OutputText { get; set; } = string.Empty;
         public string ActivityText { get; set; } = string.Empty;
         public string SessionHistoryText { get; set; } = string.Empty;
+        public string ModelSessionHistoryText { get; set; } = string.Empty;
         public string LastAnswerText { get; set; } = string.Empty;
         public string WorkspaceRoot { get; set; } = string.Empty;
         public double SessionHistoryTokenCount { get; set; }
@@ -85,6 +88,7 @@ namespace TxtAIEditor.Controls
                 OutputText = session.OutputText,
                 ActivityText = session.ActivityText,
                 SessionHistoryText = session.SessionHistoryText,
+                ModelSessionHistoryText = session.ModelSessionHistoryText,
                 LastAnswerText = session.LastAnswerText,
                 WorkspaceRoot = session.WorkspaceRoot,
                 SessionHistoryTokenCount = session.SessionHistoryTokenCount,

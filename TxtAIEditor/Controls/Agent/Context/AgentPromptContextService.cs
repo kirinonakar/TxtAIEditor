@@ -167,8 +167,13 @@ namespace TxtAIEditor.Controls
                 return string.Empty;
             }
 
+            return PrepareSessionHistoryForPrompt(history);
+        }
+
+        public string PrepareSessionHistoryForPrompt(string history)
+        {
             history = AgentRunTranscriptService.RemoveRetryDebugDetails(history);
-            history = AgentRunTranscriptService.ConvertToolCallTagsToLogTags(history);
+            history = AgentRunTranscriptService.RemoveApiTypeMarkers(history);
             if (!_settingsProvider().LlmRetainThinking)
             {
                 history = AgentThinkingTranscriptFormatter.RemoveRetainedThinkingSections(history);

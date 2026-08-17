@@ -146,6 +146,35 @@ namespace TxtAIEditor.Controls
             return false;
         }
 
+        public static string RemoveApiTypeMarkers(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text ?? string.Empty;
+            }
+
+            string newline = text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+            string[] lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var builder = new StringBuilder(text.Length);
+            bool wroteLine = false;
+            foreach (string line in lines)
+            {
+                if (line.StartsWith("[LLM API:", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (wroteLine)
+                {
+                    builder.Append(newline);
+                }
+                builder.Append(line);
+                wroteLine = true;
+            }
+
+            return builder.ToString();
+        }
+
         public static string ConvertUserRequestMarkersForHistory(string text)
         {
             if (string.IsNullOrEmpty(text))

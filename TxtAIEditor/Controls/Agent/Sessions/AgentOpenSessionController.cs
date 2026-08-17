@@ -194,6 +194,7 @@ namespace TxtAIEditor.Controls
             if (_runningSessions.TryGetValue(session.Id, out AgentRunContext? runContext))
             {
                 session.SessionHistoryText = runContext.SessionHistory.ToString();
+                session.ModelSessionHistoryText = runContext.ModelSessionHistory.ToString();
                 session.SessionHistoryTokenCount = runContext.SessionHistoryTokenCount;
                 session.CurrentRunTranscriptTokens = runContext.CurrentRunTranscriptTokens;
                 session.Attachments = runContext.Attachments.ToList();
@@ -237,6 +238,7 @@ namespace TxtAIEditor.Controls
                 if (isRunningSession && runContext != null)
                 {
                     session.SessionHistoryText = runContext.SessionHistory.ToString();
+                    session.ModelSessionHistoryText = runContext.ModelSessionHistory.ToString();
                     session.SessionHistoryTokenCount = runContext.SessionHistoryTokenCount;
                     session.CurrentRunTranscriptTokens = runContext.CurrentRunTranscriptTokens;
                     session.Attachments = runContext.Attachments.ToList();

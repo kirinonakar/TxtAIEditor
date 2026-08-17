@@ -46,6 +46,7 @@ namespace TxtAIEditor.Controls
             string historyText = AgentRunTranscriptService.ConvertToolCallTagsToLogTags(context.SessionHistory.ToString());
             historyText = AgentRunTranscriptService.ConvertUserRequestMarkersForHistory(historyText);
             openSession.SessionHistoryText = historyText;
+            openSession.ModelSessionHistoryText = context.ModelSessionHistory.ToString();
             openSession.LastAnswerText = context.LastAnswerText;
             openSession.SessionHistoryTokenCount = context.SessionHistoryTokenCount;
             openSession.CurrentRunTranscriptTokens = context.CurrentRunTranscriptTokens;
@@ -61,6 +62,7 @@ namespace TxtAIEditor.Controls
                 Timestamp = DateTime.Now,
                 Title = openSession.Title,
                 SessionHistoryText = historyText,
+                ModelSessionHistoryText = context.ModelSessionHistory.ToString(),
                 LastAnswerText = context.LastAnswerText,
                 SessionHistoryTokenCount = context.SessionHistoryTokenCount,
                 SessionEdits = context.SessionEdits.ToList(),
@@ -90,6 +92,7 @@ namespace TxtAIEditor.Controls
                 _getString);
             session.ActivityText = _getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨");
             session.SessionHistoryText = item.SessionHistoryText;
+            session.ModelSessionHistoryText = item.ModelSessionHistoryText;
             session.LastAnswerText = string.IsNullOrWhiteSpace(item.LastAnswerText)
                 ? AgentHistoryController.ExtractLastAgentResponse(item.SessionHistoryText)
                 : item.LastAnswerText;

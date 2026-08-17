@@ -120,6 +120,7 @@ namespace TxtAIEditor.Controls
                 ? _displayText.ActivityIdle
                 : snapshot.ActivityText;
             session.SessionHistoryText = snapshot.SessionHistoryText;
+            session.ModelSessionHistoryText = snapshot.ModelSessionHistoryText;
             session.LastAnswerText = snapshot.LastAnswerText;
             session.SessionHistoryTokenCount = snapshot.SessionHistoryTokenCount;
             session.CurrentRunTranscriptTokens = snapshot.CurrentRunTranscriptTokens;
@@ -147,6 +148,7 @@ namespace TxtAIEditor.Controls
                 Timestamp = DateTime.Now,
                 Title = session.Title,
                 SessionHistoryText = session.SessionHistoryText,
+                ModelSessionHistoryText = session.ModelSessionHistoryText,
                 LastAnswerText = session.LastAnswerText,
                 SessionHistoryTokenCount = session.SessionHistoryTokenCount,
                 SessionEdits = AgentSessionRewindSnapshot.CloneEdits(session.SessionEdits),

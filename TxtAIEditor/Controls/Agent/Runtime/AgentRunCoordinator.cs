@@ -213,6 +213,13 @@ namespace TxtAIEditor.Controls
                 OriginalUserInstruction = userInstruction
             };
             runContext.SessionHistory.Append(activeOpenSession.SessionHistoryText ?? string.Empty);
+            string modelSessionHistory = activeOpenSession.ModelSessionHistoryText;
+            if (string.IsNullOrEmpty(modelSessionHistory))
+            {
+                modelSessionHistory = _promptContextService.PrepareSessionHistoryForPrompt(
+                    activeOpenSession.SessionHistoryText ?? string.Empty);
+            }
+            runContext.ModelSessionHistory.Append(modelSessionHistory);
   
             _isRunning = true;
             _runningSessions[activeOpenSession.Id] = runContext;
@@ -260,10 +267,8 @@ namespace TxtAIEditor.Controls
                 runContext.PlanWorkspaceContext = currentWorkspaceContext;
                 runContext.PlanSelectionContext = runSelectionContext;
                 var initialTranscriptBuilder = new StringBuilder();
-                string sessionHistoryForPrompt = _promptContextService.BuildSessionHistoryForPrompt(
-                    conversationTurn,
-                    currentWorkspaceContext,
-                    runSelectionContext);
+                string sessionHistoryForPrompt = _promptContextService.PrepareSessionHistoryForPrompt(
+                    runContext.ModelSessionHistory.ToString());
                 if (!string.IsNullOrWhiteSpace(sessionHistoryForPrompt))
                 {
                     initialTranscriptBuilder.Append(sessionHistoryForPrompt.TrimEnd());
@@ -1046,6 +1051,7 @@ namespace TxtAIEditor.Controls
                 cancellationSource.Dispose();
                 await _uiDispatcher.RunAsync(async () => await _runOutputController.FinishStreamToTabAsync(runContext));
                 activeOpenSession.SessionHistoryText = runContext.SessionHistory.ToString();
+                activeOpenSession.ModelSessionHistoryText = runContext.ModelSessionHistory.ToString();
                 activeOpenSession.SessionHistoryTokenCount = runContext.SessionHistoryTokenCount;
                 activeOpenSession.CurrentRunTranscriptTokens = runContext.CurrentRunTranscriptTokens;
                 activeOpenSession.SessionEdits = runContext.SessionEdits.ToList();
@@ -1269,6 +1275,7 @@ namespace TxtAIEditor.Controls
                 session.OutputText = _displayText.OutputPlaceholder;
                 session.ActivityText = _displayText.ActivityIdle;
                 session.SessionHistoryText = string.Empty;
+                session.ModelSessionHistoryText = string.Empty;
                 session.LastAnswerText = string.Empty;
                 session.SessionHistoryTokenCount = 0;
                 session.CurrentRunTranscriptTokens = 0;

@@ -11,6 +11,11 @@ namespace TxtAIEditor.Controls
             context.SessionHistoryTokenCount += AgentTokenEstimator.Estimate(logLine + Environment.NewLine);
         }
 
+        private static void AppendModelLine(AgentRunContext context, string line = "")
+        {
+            context.ModelSessionHistory.AppendLine(line);
+        }
+
         public static void AppendPromptTranscript(
             AgentRunContext context,
             string instruction,
@@ -42,6 +47,7 @@ namespace TxtAIEditor.Controls
             if (!string.IsNullOrWhiteSpace(runTranscript))
             {
                 AppendLine(context, runTranscript.Trim());
+                AppendModelLine(context, runTranscript.Trim());
             }
 
             if (context.RetryDebugHistory.Length > 0)
@@ -55,15 +61,20 @@ namespace TxtAIEditor.Controls
                 if (responseLine.StartsWith(legacyPrefix, StringComparison.Ordinal))
                 {
                     AppendLine(context, "[assistant: final answer]");
-                    AppendLine(context, responseLine.Substring(legacyPrefix.Length).TrimStart());
+                    AppendModelLine(context, "[assistant: final answer]");
+                    string responseText = responseLine.Substring(legacyPrefix.Length).TrimStart();
+                    AppendLine(context, responseText);
+                    AppendModelLine(context, responseText);
                 }
                 else
                 {
                     AppendLine(context, responseLine);
+                    AppendModelLine(context, responseLine);
                 }
             }
 
             AppendLine(context);
+            AppendModelLine(context);
         }
     }
 }

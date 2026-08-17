@@ -15,6 +15,7 @@ namespace TxtAIEditor.Controls
         public DateTime Timestamp { get; set; }
         public string Title { get; set; } = string.Empty;
         public string SessionHistoryText { get; set; } = string.Empty;
+        public string ModelSessionHistoryText { get; set; } = string.Empty;
         public string LastAnswerText { get; set; } = string.Empty;
         public double SessionHistoryTokenCount { get; set; }
         public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
@@ -76,6 +77,7 @@ namespace TxtAIEditor.Controls
                 existing.Timestamp = session.Timestamp;
                 existing.Title = session.Title;
                 existing.SessionHistoryText = session.SessionHistoryText;
+                existing.ModelSessionHistoryText = session.ModelSessionHistoryText;
                 existing.LastAnswerText = session.LastAnswerText;
                 existing.SessionHistoryTokenCount = session.SessionHistoryTokenCount;
                 existing.SessionEdits = session.SessionEdits.ToList();
