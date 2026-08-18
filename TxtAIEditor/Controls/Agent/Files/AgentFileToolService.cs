@@ -234,7 +234,7 @@ namespace TxtAIEditor.Controls
                 allowedEndLine);
         }
 
-        public Task<string> ApplyPatchAsync(string path, string patchText)
+        public Task<string> ApplyPatchAsync(string? path, string patchText)
         {
             return _edits.ApplyPatchAsync(path, patchText);
         }

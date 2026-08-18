@@ -295,16 +295,16 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "apply_patch",
-                    Description = "Apply a unified diff patch to a file. Hunk line ranges may be omitted when each hunk has a unique context or deleted block.",
+                    Description = "Apply a unified diff patch to one file, or a multi-file patch containing *** Update File: relative/path sections. For a multi-file patch, path may be omitted; hunk line ranges may be omitted when each hunk has a unique context or deleted block.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the file" },
-                            patch = new { type = "string", description = "Unified diff patch content" }
+                            path = new { type = "string", description = "Relative path to the file for a single-file patch; omit it when patch contains *** Update File: sections" },
+                            patch = new { type = "string", description = "Unified diff patch content. Multi-file format: *** Begin Patch, one or more *** Update File: relative/path sections, then *** End Patch." }
                         },
-                        required = new[] { "path", "patch" }
+                        required = new[] { "patch" }
                     }
                 },
                 new LlmTool

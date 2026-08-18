@@ -113,6 +113,7 @@ namespace TxtAIEditor.Core.Services.LLM
         public string Model { get; init; } = string.Empty;
         public int RequestCount { get; init; }
         public long PromptTokens { get; init; }
+        public long CacheEligiblePromptTokens { get; init; }
         public long CompletionTokens { get; init; }
         public long TotalTokens { get; init; }
         public long CachedTokens { get; init; }
@@ -123,6 +124,7 @@ namespace TxtAIEditor.Core.Services.LLM
         public string Period { get; init; } = string.Empty;
         public int RequestCount { get; init; }
         public long PromptTokens { get; init; }
+        public long CacheEligiblePromptTokens { get; init; }
         public long CompletionTokens { get; init; }
         public long TotalTokens { get; init; }
         public long CachedTokens { get; init; }
@@ -132,6 +134,7 @@ namespace TxtAIEditor.Core.Services.LLM
     {
         public int RequestCount { get; init; }
         public long PromptTokens { get; init; }
+        public long CacheEligiblePromptTokens { get; init; }
         public long CompletionTokens { get; init; }
         public long TotalTokens { get; init; }
         public long CachedTokens { get; init; }

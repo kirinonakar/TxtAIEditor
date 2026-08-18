@@ -22,6 +22,12 @@ namespace TxtAIEditor.Controls
             public Encoding Encoding { get; init; } = Utf8NoBom;
         }
 
+        private sealed class FilePatchSection
+        {
+            public string Path { get; init; } = string.Empty;
+            public string PatchText { get; init; } = string.Empty;
+        }
+
         private readonly AgentWorkspaceFileResolver _workspace;
         private readonly Func<AgentFileEditPreview, Task<bool>> _confirmEditAsync;
         private readonly Func<string, Task> _notifyFileModifiedAsync;
@@ -527,9 +533,57 @@ namespace TxtAIEditor.Controls
                 StringComparison.Ordinal);
         }
 
-        public async Task<string> ApplyPatchAsync(string path, string patchText)
+        public async Task<string> ApplyPatchAsync(string? path, string patchText)
         {
-            string fullPath = _workspace.ResolveInsideWorkspace(path);
+            if (string.IsNullOrWhiteSpace(patchText))
+            {
+                return "apply_patch failed: patch content is empty.";
+            }
+
+            if (!TryParseFilePatchSections(path, patchText, out List<FilePatchSection> sections, out string? parseError))
+            {
+                return parseError ?? "apply_patch failed: patch content could not be parsed.";
+            }
+
+            if (sections.Count == 1)
+            {
+                return await ApplySingleFilePatchAsync(sections[0].Path, sections[0].PatchText);
+            }
+
+            var results = new List<string>();
+            foreach (FilePatchSection section in sections)
+            {
+                string result = await ApplySingleFilePatchAsync(section.Path, section.PatchText);
+                results.Add(result);
+
+                if (result.StartsWith("apply_patch cancelled", StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+            }
+
+            return "apply_patch multi-file results:" + Environment.NewLine + string.Join(
+                Environment.NewLine,
+                results.Select(result => $"- {result.Replace(Environment.NewLine, Environment.NewLine + "  ")}"));
+        }
+
+        private async Task<string> ApplySingleFilePatchAsync(string path, string patchText)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "apply_patch failed: path is empty and no file section was provided.";
+            }
+
+            string fullPath;
+            try
+            {
+                fullPath = _workspace.ResolveInsideWorkspace(path);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return $"apply_patch failed: invalid path '{path}': {ex.Message}";
+            }
+
             if (!File.Exists(fullPath))
             {
                 return $"apply_patch failed: file not found: {path}";
@@ -698,6 +752,127 @@ namespace TxtAIEditor.Controls
             }
 
             return result;
+        }
+
+        private static bool TryParseFilePatchSections(
+            string? fallbackPath,
+            string patchText,
+            out List<FilePatchSection> sections,
+            out string? error)
+        {
+            var parsedSections = new List<FilePatchSection>();
+            sections = parsedSections;
+            error = null;
+
+            string normalizedPatch = NormalizeNewlines(patchText);
+            string[] patchLines = normalizedPatch.Split('\n');
+            bool containsFileSections = patchLines.Any(line =>
+                line.StartsWith("*** Update File:", StringComparison.Ordinal));
+
+            if (!containsFileSections)
+            {
+                if (string.IsNullOrWhiteSpace(fallbackPath))
+                {
+                    error = "apply_patch failed: path is empty and the patch contains no '*** Update File:' sections.";
+                    return false;
+                }
+
+                parsedSections.Add(new FilePatchSection
+                {
+                    Path = fallbackPath.Trim(),
+                    PatchText = patchText
+                });
+                return true;
+            }
+
+            string? currentPath = null;
+            var currentLines = new List<string>();
+            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            void FlushCurrentSection()
+            {
+                if (string.IsNullOrWhiteSpace(currentPath))
+                {
+                    return;
+                }
+
+                parsedSections.Add(new FilePatchSection
+                {
+                    Path = currentPath,
+                    PatchText = string.Join("\n", currentLines)
+                });
+                currentPath = null;
+                currentLines = new List<string>();
+            }
+
+            foreach (string line in patchLines)
+            {
+                if (string.Equals(line, "*** Begin Patch", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (string.Equals(line, "*** End Patch", StringComparison.Ordinal))
+                {
+                    FlushCurrentSection();
+                    continue;
+                }
+
+                if (line.StartsWith("*** Update File:", StringComparison.Ordinal))
+                {
+                    FlushCurrentSection();
+
+                    string sectionPath = line.Substring("*** Update File:".Length).Trim();
+                    if (string.IsNullOrWhiteSpace(sectionPath))
+                    {
+                        error = "apply_patch failed: an '*** Update File:' section is missing its path.";
+                        return false;
+                    }
+
+                    sectionPath = sectionPath.Replace('\\', '/');
+                    if (!seenPaths.Add(sectionPath))
+                    {
+                        error = $"apply_patch failed: the patch contains duplicate file sections for '{sectionPath}'.";
+                        return false;
+                    }
+
+                    currentPath = sectionPath;
+                    continue;
+                }
+
+                if (line.StartsWith("*** Add File:", StringComparison.Ordinal) ||
+                    line.StartsWith("*** Delete File:", StringComparison.Ordinal) ||
+                    line.StartsWith("*** Move to:", StringComparison.Ordinal))
+                {
+                    error = "apply_patch failed: multi-file patches currently support existing files with '*** Update File:' sections only.";
+                    return false;
+                }
+
+                if (string.Equals(line, "*** End of File", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (line.StartsWith("*** ", StringComparison.Ordinal))
+                {
+                    error = $"apply_patch failed: unsupported multi-file patch directive: {line}";
+                    return false;
+                }
+
+                if (currentPath != null)
+                {
+                    currentLines.Add(line);
+                }
+            }
+
+            FlushCurrentSection();
+            if (parsedSections.Count == 0)
+            {
+                error = "apply_patch failed: no '*** Update File:' sections were found.";
+                return false;
+            }
+
+            return true;
         }
 
         private static string BuildApplyPatchSkippedResult(

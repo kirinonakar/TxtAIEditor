@@ -85,6 +85,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
                 bucket.RequestCount++;
                 bucket.PromptTokens += usage.PromptTokens ?? 0;
+                bucket.CacheEligiblePromptTokens += GetCacheEligiblePromptTokens(usage);
                 bucket.CompletionTokens += usage.CompletionTokens ?? 0;
                 bucket.TotalTokens += usage.TotalTokens ?? 0;
                 bucket.CachedTokens += usage.CachedTokens ?? 0;
@@ -120,6 +121,7 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 RequestCount = buckets.Sum(item => item.RequestCount),
                 PromptTokens = buckets.Sum(item => item.PromptTokens),
+                CacheEligiblePromptTokens = buckets.Sum(item => item.CacheEligiblePromptTokens),
                 CompletionTokens = buckets.Sum(item => item.CompletionTokens),
                 TotalTokens = buckets.Sum(item => item.TotalTokens),
                 CachedTokens = buckets.Sum(item => item.CachedTokens),
@@ -143,9 +145,15 @@ namespace TxtAIEditor.Core.Services.LLM
 
             bucket.RequestCount++;
             bucket.PromptTokens += usage.PromptTokens ?? 0;
+            bucket.CacheEligiblePromptTokens += GetCacheEligiblePromptTokens(usage);
             bucket.CompletionTokens += usage.CompletionTokens ?? 0;
             bucket.TotalTokens += usage.TotalTokens ?? 0;
             bucket.CachedTokens += usage.CachedTokens ?? 0;
+        }
+
+        private static long GetCacheEligiblePromptTokens(LlmTokenUsage usage)
+        {
+            return usage.CachedTokens is > 0 ? usage.PromptTokens ?? 0 : 0;
         }
 
         private void LoadTokenUsageStats()
@@ -180,6 +188,7 @@ namespace TxtAIEditor.Core.Services.LLM
                             Model = bucket.Model,
                             RequestCount = bucket.RequestCount,
                             PromptTokens = bucket.PromptTokens,
+                            CacheEligiblePromptTokens = GetPersistedCacheEligiblePromptTokens(bucket.CacheEligiblePromptTokens, bucket.PromptTokens, bucket.CachedTokens),
                             CompletionTokens = bucket.CompletionTokens,
                             TotalTokens = bucket.TotalTokens,
                             CachedTokens = bucket.CachedTokens
@@ -193,6 +202,7 @@ namespace TxtAIEditor.Core.Services.LLM
                             Period = bucket.Period,
                             RequestCount = bucket.RequestCount,
                             PromptTokens = bucket.PromptTokens,
+                            CacheEligiblePromptTokens = GetPersistedCacheEligiblePromptTokens(bucket.CacheEligiblePromptTokens, bucket.PromptTokens, bucket.CachedTokens),
                             CompletionTokens = bucket.CompletionTokens,
                             TotalTokens = bucket.TotalTokens,
                             CachedTokens = bucket.CachedTokens
@@ -206,6 +216,7 @@ namespace TxtAIEditor.Core.Services.LLM
                             Period = bucket.Period,
                             RequestCount = bucket.RequestCount,
                             PromptTokens = bucket.PromptTokens,
+                            CacheEligiblePromptTokens = GetPersistedCacheEligiblePromptTokens(bucket.CacheEligiblePromptTokens, bucket.PromptTokens, bucket.CachedTokens),
                             CompletionTokens = bucket.CompletionTokens,
                             TotalTokens = bucket.TotalTokens,
                             CachedTokens = bucket.CachedTokens
@@ -270,12 +281,20 @@ namespace TxtAIEditor.Core.Services.LLM
             return Path.Combine(SettingsBackupService.SettingsDirectoryPath, "llm-token-usage-stats.json");
         }
 
+        private static long GetPersistedCacheEligiblePromptTokens(long cacheEligiblePromptTokens, long promptTokens, long cachedTokens)
+        {
+            return cacheEligiblePromptTokens > 0
+                ? cacheEligiblePromptTokens
+                : cachedTokens > 0 ? promptTokens : 0;
+        }
+
         private sealed class MutableTokenUsageBucket
         {
             public string Provider { get; init; } = string.Empty;
             public string Model { get; init; } = string.Empty;
             public int RequestCount { get; set; }
             public long PromptTokens { get; set; }
+            public long CacheEligiblePromptTokens { get; set; }
             public long CompletionTokens { get; set; }
             public long TotalTokens { get; set; }
             public long CachedTokens { get; set; }
@@ -288,6 +307,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     Model = Model,
                     RequestCount = RequestCount,
                     PromptTokens = PromptTokens,
+                    CacheEligiblePromptTokens = CacheEligiblePromptTokens,
                     CompletionTokens = CompletionTokens,
                     TotalTokens = TotalTokens,
                     CachedTokens = CachedTokens
@@ -300,6 +320,7 @@ namespace TxtAIEditor.Core.Services.LLM
             public string Period { get; init; } = string.Empty;
             public int RequestCount { get; set; }
             public long PromptTokens { get; set; }
+            public long CacheEligiblePromptTokens { get; set; }
             public long CompletionTokens { get; set; }
             public long TotalTokens { get; set; }
             public long CachedTokens { get; set; }
@@ -311,6 +332,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     Period = Period,
                     RequestCount = RequestCount,
                     PromptTokens = PromptTokens,
+                    CacheEligiblePromptTokens = CacheEligiblePromptTokens,
                     CompletionTokens = CompletionTokens,
                     TotalTokens = TotalTokens,
                     CachedTokens = CachedTokens

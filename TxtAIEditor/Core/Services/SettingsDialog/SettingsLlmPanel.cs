@@ -560,8 +560,8 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            double cachedPct = stats.PromptTokens > 0
-                ? ((double)stats.CachedTokens / stats.PromptTokens * 100)
+            double cachedPct = stats.CacheEligiblePromptTokens > 0
+                ? ((double)stats.CachedTokens / stats.CacheEligiblePromptTokens * 100)
                 : 0;
 
             string summary = string.Format(
@@ -583,8 +583,8 @@ namespace TxtAIEditor.Core.Services
                 return _getString("SettingsLlmTokenUsageStatsEmpty", "아직 관측된 LLM token usage가 없습니다.");
             }
 
-            double cachedPct = stats.PromptTokens > 0
-                ? ((double)stats.CachedTokens / stats.PromptTokens * 100)
+            double cachedPct = stats.CacheEligiblePromptTokens > 0
+                ? ((double)stats.CachedTokens / stats.CacheEligiblePromptTokens * 100)
                 : 0;
 
             string summary = string.Format(

@@ -150,7 +150,8 @@ const inData = days.map(item => item.promptTokens);
 const outData = days.map(item => item.completionTokens);
 const totalData = days.map(item => item.totalTokens);
 const cacheData = days.map(item => item.cachedTokens);
-const cacheRatio = stats.totalTokens ? stats.cachedTokens / stats.totalTokens * 100 : 0;
+const cacheEligiblePromptData = days.map(item => item.cacheEligiblePromptTokens);
+const cacheRatio = stats.cacheEligiblePromptTokens ? stats.cachedTokens / stats.cacheEligiblePromptTokens * 100 : 0;
 const peakRequestIndex = reqData.length ? reqData.indexOf(Math.max(...reqData)) : -1;
 const peakTokenIndex = totalData.length ? totalData.indexOf(Math.max(...totalData)) : -1;
 const topModel = [...models].sort((a,b) => b.requestCount - a.requestCount)[0];
@@ -221,7 +222,7 @@ if (window.Chart) {
   addChart('dailyRequests',()=>({type:'bar',data:{labels:dayLabels,datasets:[{label:s.requestCount,data:reqData,backgroundColor:`${themeTokens().primary}99`,hoverBackgroundColor:themeTokens().primary,borderRadius:7,borderSkipped:false,maxBarThickness:30}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:plugins(false),scales:scales(false)}}));
   addChart('dailyTokens',()=>({type:'line',data:{labels:dayLabels,datasets:[{label:s.totalTokens,data:totalData.map(v=>v/1e6),borderColor:themeTokens().purple,backgroundColor:`${themeTokens().purple}18`,fill:true,tension:.36,borderWidth:2.2,pointRadius:3.5,pointBackgroundColor:themeTokens().surface}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:plugins(false),scales:{...scales(false),y:{...scales(false).y,ticks:{...scales(false).y.ticks,callback:v=>`${v}M`}}}}}));
   addChart('dailyInOut',()=>({type:'bar',data:{labels:dayLabels,datasets:[{label:s.input,data:inData.map(v=>v/1e6),backgroundColor:`${themeTokens().primary}cc`,borderRadius:5,maxBarThickness:22},{label:s.output,data:outData.map(v=>v/1e6),backgroundColor:`${themeTokens().red}b8`,borderRadius:5,maxBarThickness:22}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:plugins(true),scales:{...scales(false),y:{...scales(false).y,ticks:{...scales(false).y.ticks,callback:v=>`${v}M`}}}}}));
-  addChart('dailyCache',()=>{const ratios=totalData.map((v,i)=>v?cacheData[i]/v*100:0);const t=themeTokens();return {type:'bar',data:{labels:dayLabels,datasets:[{label:s.cacheRatio,data:ratios,backgroundColor:ratios.map(v=>v>=70?`${t.green}d9`:v>=50?`${t.orange}d9`:`${t.red}c7`),borderRadius:7,borderSkipped:false,maxBarThickness:30}]},options:{responsive:true,maintainAspectRatio:false,plugins:plugins(false),scales:{...scales(false),y:{...scales(false).y,max:100,ticks:{...scales(false).y.ticks,callback:v=>`${v}%`}}}}};});
+  addChart('dailyCache',()=>{const ratios=cacheEligiblePromptData.map((v,i)=>v?cacheData[i]/v*100:0);const t=themeTokens();return {type:'bar',data:{labels:dayLabels,datasets:[{label:s.cacheRatio,data:ratios,backgroundColor:ratios.map(v=>v>=70?`${t.green}d9`:v>=50?`${t.orange}d9`:`${t.red}c7`),borderRadius:7,borderSkipped:false,maxBarThickness:30}]},options:{responsive:true,maintainAspectRatio:false,plugins:plugins(false),scales:{...scales(false),y:{...scales(false).y,max:100,ticks:{...scales(false).y.ticks,callback:v=>`${v}%`}}}}};});
   const palette=['#2864dc','#7656d6','#0f9bb5','#16a46c','#e78324','#dc4c5a','#667085','#8c6bd8','#3e89db','#54a578'];
   const namedModels=models.map((item,index)=>({...item,label:item.provider?`${item.provider} / ${item.model}`:item.model,color:palette[index%palette.length]}));
   const top8=[...namedModels].sort((a,b)=>b.requestCount-a.requestCount).slice(0,8);

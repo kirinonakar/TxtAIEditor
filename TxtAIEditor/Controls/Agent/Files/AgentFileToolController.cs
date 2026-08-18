@@ -555,11 +555,6 @@ namespace TxtAIEditor.Controls
         public async Task<string> ApplyPatchAsync(JsonElement arguments)
         {
             string path = GetEditPathArgument(arguments);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return "apply_patch failed: path is empty and no selected, recently read, or active file path could be inferred.";
-            }
-
             return await _fileTools.ApplyPatchAsync(
                 path,
                 GetFirstStringArgument(arguments, "patch", "patchText", "diff", "content"));
