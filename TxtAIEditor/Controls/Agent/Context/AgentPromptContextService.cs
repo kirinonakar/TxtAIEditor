@@ -165,6 +165,17 @@ namespace TxtAIEditor.Controls
             return builder.ToString().Trim();
         }
 
+        public string BuildGlobalAgentsMdLogSection()
+        {
+            string section = BuildGlobalAgentsMdSection();
+            if (string.IsNullOrWhiteSpace(section))
+            {
+                return string.Empty;
+            }
+
+            return section + Environment.NewLine + "[End global agent rules]";
+        }
+
         public string BuildSessionHistoryForPrompt(
             string instruction,
             string workspaceContext,

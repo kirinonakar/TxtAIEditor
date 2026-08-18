@@ -253,6 +253,15 @@ namespace TxtAIEditor.Controls
             try
             {
                 string fixedPromptContext = _promptContextService.BuildFixedPromptContext();
+                string globalAgentsMdLogSection = _promptContextService.BuildGlobalAgentsMdLogSection();
+                if (!string.IsNullOrWhiteSpace(globalAgentsMdLogSection))
+                {
+                    AgentRunTranscriptRecorder.AppendLine(runContext, globalAgentsMdLogSection);
+                    await _runOutputController.AppendRunOutputTextAsync(
+                        runContext,
+                        globalAgentsMdLogSection + Environment.NewLine + Environment.NewLine);
+                }
+
                 OpenedTab? currentRunActiveTab = await CaptureActiveTabForRunAsync();
                 AgentSelectionSnapshot currentRunSelectionSnapshot = _selectionContextController.CaptureSelectionForRun(_isRunning);
                 runContext.StreamToTabTargetTabId = currentRunActiveTab?.Id;

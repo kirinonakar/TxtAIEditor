@@ -79,6 +79,7 @@ namespace TxtAIEditor.Controls
 
             if (HideHtmlCodeBlocks)
             {
+                displayLines = RemoveHiddenNonVerboseSections(displayLines);
                 displayLines.RemoveAll(IsHiddenNonVerboseActivityLine);
             }
 
@@ -87,6 +88,35 @@ namespace TxtAIEditor.Controls
             _lineBlocksMatchRenderedLines = !RequiresGroupedRendering(displayLines, 0);
 
             RenderDisplayLinesToBlocks(displayLines);
+        }
+
+        private static List<string> RemoveHiddenNonVerboseSections(List<string> lines)
+        {
+            var visibleLines = new List<string>(lines.Count);
+            bool inGlobalAgentRules = false;
+            foreach (string line in lines)
+            {
+                string trimmed = line.Trim();
+                if (inGlobalAgentRules)
+                {
+                    if (trimmed.Equals("[End global agent rules]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        inGlobalAgentRules = false;
+                    }
+
+                    continue;
+                }
+
+                if (trimmed.Equals("[Global agent rules]", StringComparison.OrdinalIgnoreCase))
+                {
+                    inGlobalAgentRules = true;
+                    continue;
+                }
+
+                visibleLines.Add(line);
+            }
+
+            return visibleLines;
         }
 
         public void AppendText(string text)

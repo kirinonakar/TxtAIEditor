@@ -264,6 +264,7 @@ namespace TxtAIEditor.Controls
             bool afterUserRequest = false;
             bool inPlanningModeTaskDetails = false;
             bool inRetainedThinking = false;
+            bool inGlobalAgentRules = false;
             string? pendingToolResultToolName = null;
             var pendingToolResultBody = new StringBuilder();
             bool agentRunHeaderWritten = false;
@@ -310,6 +311,22 @@ namespace TxtAIEditor.Controls
 
             foreach (var line in lines)
             {
+                if (inGlobalAgentRules)
+                {
+                    if (line.Trim().Equals("[End global agent rules]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        inGlobalAgentRules = false;
+                    }
+
+                    continue;
+                }
+
+                if (line.Trim().Equals("[Global agent rules]", StringComparison.OrdinalIgnoreCase))
+                {
+                    inGlobalAgentRules = true;
+                    continue;
+                }
+
                 if (pendingToolResultToolName != null && IsHistorySectionBoundaryLine(line))
                 {
                     // The tool result section ended here. Decide success from the full
