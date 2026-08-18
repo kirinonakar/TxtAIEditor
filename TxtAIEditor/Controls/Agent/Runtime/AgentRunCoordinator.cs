@@ -1038,6 +1038,20 @@ namespace TxtAIEditor.Controls
                 await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityStopped", "중단됨"));
                 await _runOutputController.AppendRunOutputLineAsync(runContext, _getString("AgentOutputStopped", "Agent 실행이 중단되었습니다."));
 
+                string interruptedResponse = AgentThinkingTranscriptFormatter.BuildResponsePayload(
+                    AgentThinkingTranscriptFormatter.RemoveInlineThinking(runContext.StreamingResponseText),
+                    runContext.LlmSettings.LlmRetainThinking
+                        ? runContext.StreamingReasoningText
+                        : string.Empty);
+                if (!string.IsNullOrWhiteSpace(interruptedResponse))
+                {
+                    string interruptedTranscriptPart =
+                        Environment.NewLine + Environment.NewLine + interruptedResponse.Trim();
+                    transcript += interruptedTranscriptPart;
+                    modelTranscript += interruptedTranscriptPart;
+                    runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(interruptedTranscriptPart);
+                }
+
                 AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                     runContext,
                     conversationTurn,
@@ -1045,7 +1059,7 @@ namespace TxtAIEditor.Controls
                     initialTranscript,
                     "[Agent Response]: Agent execution was interrupted by the user.",
                     modelTranscript);
-                _ = PersistRunSessionToHistoryAsync();
+                await PersistRunSessionToHistoryAsync();
             }
             catch (Exception ex)
             {

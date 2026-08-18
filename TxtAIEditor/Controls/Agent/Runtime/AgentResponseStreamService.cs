@@ -57,6 +57,8 @@ namespace TxtAIEditor.Controls
             await _runOutputController.BeginRunThinkingActivityAsync(runContext, thinkingLabel);
 
             var responseBuilder = new StringBuilder();
+            runContext.StreamingResponseText = string.Empty;
+            runContext.StreamingReasoningText = string.Empty;
             int printedLength = 0;
             bool toolCallPlaceholderShown = false;
             bool visibleTextFlushed = false;
@@ -79,6 +81,7 @@ namespace TxtAIEditor.Controls
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     stepReasoningBuilder.Append(reasoningChunk);
+                    runContext.StreamingReasoningText = stepReasoningBuilder.ToString();
                     await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, reasoningChunk);
                 };
             }
@@ -88,6 +91,7 @@ namespace TxtAIEditor.Controls
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     stepReasoningBuilder.Append(reasoningChunk);
+                    runContext.StreamingReasoningText = stepReasoningBuilder.ToString();
                     int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(stepReasoningBuilder.ToString()));
                     string label = string.Format(
                         _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
@@ -129,6 +133,7 @@ namespace TxtAIEditor.Controls
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         responseBuilder.Append(chunk);
+                        runContext.StreamingResponseText = responseBuilder.ToString();
                         string rawStreamedText = responseBuilder.ToString();
 
                         if (!runContext.LlmSettings.LlmAgentVerbose)
