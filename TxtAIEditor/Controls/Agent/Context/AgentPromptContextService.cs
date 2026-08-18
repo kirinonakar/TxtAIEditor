@@ -134,8 +134,11 @@ namespace TxtAIEditor.Controls
         public string BuildFixedPromptContext()
         {
             string mcpSection = _mcpController.BuildSelectedMcpSection();
+            string globalAgentsMdSection = BuildGlobalAgentsMdSection();
             string agentsMdSection = BuildWorkspaceAgentsMdSection();
-            if (string.IsNullOrWhiteSpace(mcpSection) && string.IsNullOrWhiteSpace(agentsMdSection))
+            if (string.IsNullOrWhiteSpace(mcpSection) &&
+                string.IsNullOrWhiteSpace(globalAgentsMdSection) &&
+                string.IsNullOrWhiteSpace(agentsMdSection))
             {
                 return string.Empty;
             }
@@ -145,6 +148,12 @@ namespace TxtAIEditor.Controls
             {
                 builder.AppendLine("[MCP instructions and tool schemas]");
                 builder.AppendLine(mcpSection);
+                builder.AppendLine();
+            }
+
+            if (!string.IsNullOrWhiteSpace(globalAgentsMdSection))
+            {
+                builder.AppendLine(globalAgentsMdSection);
                 builder.AppendLine();
             }
 
@@ -222,6 +231,13 @@ namespace TxtAIEditor.Controls
             return attachments;
         }
 
+        private string BuildGlobalAgentsMdSection()
+        {
+            return BuildAgentsMdSection(
+                Path.Combine(AgentSkillDirectories.UserSettingsDirectory, "AGENTS.md"),
+                "[Global agent rules]");
+        }
+
         private string BuildWorkspaceAgentsMdSection()
         {
             string workspaceRoot = _fileTools.WorkspaceRoot;
@@ -230,7 +246,13 @@ namespace TxtAIEditor.Controls
                 return string.Empty;
             }
 
-            string agentsMdPath = Path.Combine(workspaceRoot, "AGENTS.md");
+            return BuildAgentsMdSection(
+                Path.Combine(workspaceRoot, "AGENTS.md"),
+                "[Workspace agent rules]");
+        }
+
+        private static string BuildAgentsMdSection(string agentsMdPath, string header)
+        {
             if (!File.Exists(agentsMdPath))
             {
                 return string.Empty;
@@ -245,7 +267,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 var builder = new StringBuilder();
-                builder.AppendLine("[Workspace agent rules]");
+                builder.AppendLine(header);
                 builder.AppendLine($"Source: {agentsMdPath}");
                 builder.AppendLine(content.Trim());
                 return builder.ToString().Trim();

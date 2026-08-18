@@ -554,13 +554,17 @@ namespace TxtAIEditor.Core.Services
                     throw new InvalidOperationException("The output archive cannot be inside a source folder.");
                 }
 
-                string sourceRootEntryPath = AddArchiveSourceEntry(
-                    entries,
-                    entryNames,
-                    new ArchiveSourceEntry(
-                        sourceDirectory.Name,
-                        fullSourcePath,
-                        IsDirectory: true));
+                string sourceRootEntryPath = string.Empty;
+                if (sourcePaths.Count != 1)
+                {
+                    sourceRootEntryPath = AddArchiveSourceEntry(
+                        entries,
+                        entryNames,
+                        new ArchiveSourceEntry(
+                            sourceDirectory.Name,
+                            fullSourcePath,
+                            IsDirectory: true));
+                }
 
                 foreach (string directoryPath in EnumerateArchiveDirectories(fullSourcePath))
                 {
@@ -670,6 +674,11 @@ namespace TxtAIEditor.Core.Services
         {
             string parent = NormalizeEntryPath(parentPath);
             string child = NormalizeEntryPath(childPath);
+            if (string.IsNullOrWhiteSpace(parent))
+            {
+                return child;
+            }
+
             return string.IsNullOrWhiteSpace(child) ? parent : parent + "/" + child;
         }
 
