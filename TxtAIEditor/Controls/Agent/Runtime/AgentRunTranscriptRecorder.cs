@@ -20,14 +20,16 @@ namespace TxtAIEditor.Controls
             AgentRunContext context,
             string instruction,
             string transcript,
-            string initialTranscript)
+            string initialTranscript,
+            string? modelTranscript = null)
         {
             AppendPromptTranscriptAndResponse(
                 context,
                 instruction,
                 transcript,
                 initialTranscript,
-                null);
+                null,
+                modelTranscript);
         }
 
         public static void AppendPromptTranscriptAndResponse(
@@ -35,7 +37,8 @@ namespace TxtAIEditor.Controls
             string instruction,
             string transcript,
             string initialTranscript,
-            string? responseLine)
+            string? responseLine,
+            string? modelTranscript = null)
         {
             if (!string.IsNullOrWhiteSpace(context.ApiType))
             {
@@ -47,7 +50,20 @@ namespace TxtAIEditor.Controls
             if (!string.IsNullOrWhiteSpace(runTranscript))
             {
                 AppendLine(context, runTranscript.Trim());
-                AppendModelLine(context, runTranscript.Trim());
+                if (modelTranscript == null)
+                {
+                    AppendModelLine(context, runTranscript.Trim());
+                }
+            }
+
+            if (modelTranscript != null)
+            {
+                context.ModelSessionHistory.Clear();
+                if (!string.IsNullOrWhiteSpace(modelTranscript))
+                {
+                    context.ModelSessionHistory.Append(modelTranscript.TrimEnd());
+                    context.ModelSessionHistory.AppendLine();
+                }
             }
 
             if (context.RetryDebugHistory.Length > 0)

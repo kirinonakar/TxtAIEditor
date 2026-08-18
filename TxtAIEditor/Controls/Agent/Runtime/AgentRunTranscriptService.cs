@@ -9,6 +9,10 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentRunTranscriptService
     {
+        public const string CompressedContextStartMarker =
+            "[Compressed context used for subsequent model requests]";
+        public const string CompressedContextEndMarker = "[End compressed context]";
+
         public static string ConvertToolCallTagsToLogTags(string text)
         {
             if (string.IsNullOrEmpty(text))

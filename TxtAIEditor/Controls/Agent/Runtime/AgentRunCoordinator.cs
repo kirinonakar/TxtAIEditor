@@ -362,7 +362,15 @@ namespace TxtAIEditor.Controls
                         string compressionNotice = _getString(
                             "AgentContextCompressedNotice",
                             "context 압축이 시행되었습니다.");
-                        transcript += Environment.NewLine + Environment.NewLine + compressionNotice;
+                        transcript +=
+                            Environment.NewLine + Environment.NewLine +
+                            compressionNotice +
+                            Environment.NewLine + Environment.NewLine +
+                            AgentRunTranscriptService.CompressedContextStartMarker +
+                            Environment.NewLine +
+                            modelTranscript.TrimEnd() +
+                            Environment.NewLine +
+                            AgentRunTranscriptService.CompressedContextEndMarker;
                         await _runOutputController.AppendRunOutputLineAsync(
                             runContext,
                             compressionNotice);
@@ -484,7 +492,8 @@ namespace TxtAIEditor.Controls
                             conversationTurn,
                             transcript + retainedThinkingTranscriptPart,
                             initialTranscript,
-                            $"[Agent Response]: {emptyResponseMessage}");
+                            $"[Agent Response]: {emptyResponseMessage}",
+                            modelTranscript);
                         _ = PersistRunSessionToHistoryAsync();
 
                         runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(emptyResponseMessage);
@@ -613,7 +622,8 @@ namespace TxtAIEditor.Controls
                                     conversationTurn,
                                     transcript,
                                     initialTranscript,
-                                    $"[Agent Response]: {limitMessage}");
+                                    $"[Agent Response]: {limitMessage}",
+                                    modelTranscript);
                                 _ = PersistRunSessionToHistoryAsync();
 
                                 runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(limitMessage);
@@ -663,7 +673,8 @@ namespace TxtAIEditor.Controls
                                     conversationTurn,
                                     transcript,
                                     initialTranscript,
-                                    $"[Agent Response]: {limitMessage}");
+                                    $"[Agent Response]: {limitMessage}",
+                                    modelTranscript);
                                 _ = PersistRunSessionToHistoryAsync();
 
                                 runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(limitMessage);
@@ -732,7 +743,8 @@ namespace TxtAIEditor.Controls
                             conversationTurn,
                             transcript,
                             initialTranscript,
-                            finalAnswerLog);
+                            finalAnswerLog,
+                            modelTranscript);
                         _ = PersistRunSessionToHistoryAsync();
 
                         runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(finalAnswerLog);
@@ -938,7 +950,8 @@ namespace TxtAIEditor.Controls
                             conversationTurn,
                             transcript,
                             initialTranscript,
-                            "[Agent Response]: Plan saved for user review.");
+                            "[Agent Response]: Plan saved for user review.",
+                            modelTranscript);
                         _ = PersistRunSessionToHistoryAsync();
 
                         completed = true;
@@ -958,7 +971,8 @@ namespace TxtAIEditor.Controls
                             conversationTurn,
                             transcript,
                             initialTranscript,
-                            $"[Agent Response]: {loopMessage}");
+                            $"[Agent Response]: {loopMessage}",
+                            modelTranscript);
                         _ = PersistRunSessionToHistoryAsync();
 
                         completed = true;
@@ -985,7 +999,8 @@ namespace TxtAIEditor.Controls
                                 runContext,
                                 conversationTurn,
                                 transcript,
-                                initialTranscript);
+                                initialTranscript,
+                                modelTranscript);
                             _ = PersistRunSessionToHistoryAsync();
 
                             completed = true;
@@ -1013,7 +1028,8 @@ namespace TxtAIEditor.Controls
                         conversationTurn,
                         transcript,
                         initialTranscript,
-                        "[Agent Response]: Tool step limit reached before a final answer.");
+                        "[Agent Response]: Tool step limit reached before a final answer.",
+                        modelTranscript);
                     _ = PersistRunSessionToHistoryAsync();
                 }
             }
@@ -1027,7 +1043,8 @@ namespace TxtAIEditor.Controls
                     conversationTurn,
                     transcript,
                     initialTranscript,
-                    "[Agent Response]: Agent execution was interrupted by the user.");
+                    "[Agent Response]: Agent execution was interrupted by the user.",
+                    modelTranscript);
                 _ = PersistRunSessionToHistoryAsync();
             }
             catch (Exception ex)
@@ -1041,7 +1058,8 @@ namespace TxtAIEditor.Controls
                     conversationTurn,
                     transcript,
                     initialTranscript,
-                    $"[Agent Response]: Agent execution encountered an exception: {ex.Message}");
+                    $"[Agent Response]: Agent execution encountered an exception: {ex.Message}",
+                    modelTranscript);
                 _ = PersistRunSessionToHistoryAsync();
             }
             finally

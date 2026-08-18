@@ -265,6 +265,7 @@ namespace TxtAIEditor.Controls
             bool inPlanningModeTaskDetails = false;
             bool inRetainedThinking = false;
             bool inGlobalAgentRules = false;
+            bool inCompressedContext = false;
             string? pendingToolResultToolName = null;
             var pendingToolResultBody = new StringBuilder();
             bool agentRunHeaderWritten = false;
@@ -311,6 +312,29 @@ namespace TxtAIEditor.Controls
 
             foreach (var line in lines)
             {
+                if (inCompressedContext)
+                {
+                    result.AppendLine(line);
+                    if (line.Trim().Equals(
+                            AgentRunTranscriptService.CompressedContextEndMarker,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        inCompressedContext = false;
+                    }
+
+                    continue;
+                }
+
+                if (line.Trim().Equals(
+                        AgentRunTranscriptService.CompressedContextStartMarker,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    EnsureAgentRunHeader();
+                    result.AppendLine(line);
+                    inCompressedContext = true;
+                    continue;
+                }
+
                 if (inGlobalAgentRules)
                 {
                     if (line.Trim().Equals("[End global agent rules]", StringComparison.OrdinalIgnoreCase))
@@ -620,6 +644,25 @@ namespace TxtAIEditor.Controls
             var normalized = new List<string>(lines.Length);
             for (int i = 0; i < lines.Length; i++)
             {
+                if (lines[i].Trim().Equals(
+                        AgentRunTranscriptService.CompressedContextStartMarker,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    normalized.Add(lines[i]);
+                    while (++i < lines.Length)
+                    {
+                        normalized.Add(lines[i]);
+                        if (lines[i].Trim().Equals(
+                                AgentRunTranscriptService.CompressedContextEndMarker,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
+                    }
+
+                    continue;
+                }
+
                 bool isUserRoleLine = lines[i].StartsWith("[user]", StringComparison.OrdinalIgnoreCase);
                 bool isUserPromptLine = lines[i].StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase);
                 if (!isUserRoleLine && !isUserPromptLine)
