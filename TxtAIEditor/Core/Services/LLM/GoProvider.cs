@@ -62,6 +62,24 @@ namespace TxtAIEditor.Core.Services.LLM
                    model.Contains("glm", StringComparison.OrdinalIgnoreCase);
         }
 
+        private static bool IsHy3Model(string model)
+        {
+            if (string.IsNullOrEmpty(model)) return false;
+            return model.StartsWith("hy3", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string? MapHy3ThinkingLevel(string thinkingLevel)
+        {
+            string level = (thinkingLevel ?? string.Empty).ToLowerInvariant();
+            return level switch
+            {
+                "none" or "disabled" => "no_think",
+                "low" or "medium" => "low",
+                "high" or "xhigh" or "max" => "high",
+                _ => null
+            };
+        }
+
         private static readonly HashSet<string> _anthropicModels = new(StringComparer.OrdinalIgnoreCase)
         {
             "claude-fable-5",
@@ -93,7 +111,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 attachments,
                 tools);
 
-            if (await LlmResponsesApiClient.SupportsAsync(
+            if (!IsHy3Model(model) &&
+                await LlmResponsesApiClient.SupportsAsync(
                     _httpClient,
                     endpoint,
                     apiKey,
@@ -153,7 +172,15 @@ namespace TxtAIEditor.Core.Services.LLM
                 payloadDict["tools"] = toolsList;
             }
 
-            if (HasThinking)
+            if (IsHy3Model(model))
+            {
+                string? hy3Effort = MapHy3ThinkingLevel(_thinkingLevel);
+                if (hy3Effort != null)
+                {
+                    payloadDict["reasoning_effort"] = hy3Effort;
+                }
+            }
+            else if (HasThinking)
             {
                 string effort = LlmThinkingLevelMapper.MapEffort(model, _thinkingLevel);
                 if (effort == "xhigh" && IsDeepSeekOrGlm(model))
@@ -266,7 +293,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 attachments,
                 tools);
 
-            if (await LlmResponsesApiClient.SupportsAsync(
+            if (!IsHy3Model(model) &&
+                await LlmResponsesApiClient.SupportsAsync(
                     _httpClient,
                     endpoint,
                     apiKey,
@@ -333,7 +361,15 @@ namespace TxtAIEditor.Core.Services.LLM
                 payloadDict["tools"] = toolsList;
             }
 
-            if (HasThinking)
+            if (IsHy3Model(model))
+            {
+                string? hy3Effort = MapHy3ThinkingLevel(_thinkingLevel);
+                if (hy3Effort != null)
+                {
+                    payloadDict["reasoning_effort"] = hy3Effort;
+                }
+            }
+            else if (HasThinking)
             {
                 string effort = LlmThinkingLevelMapper.MapEffort(model, _thinkingLevel);
                 if (effort == "xhigh" && IsDeepSeekOrGlm(model))
