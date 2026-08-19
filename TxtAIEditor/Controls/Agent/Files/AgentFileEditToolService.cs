@@ -545,6 +545,15 @@ namespace TxtAIEditor.Controls
                 return parseError ?? "apply_patch failed: patch content could not be parsed.";
             }
 
+            sections = sections
+                .GroupBy(section => section.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new FilePatchSection
+                {
+                    Path = group.First().Path,
+                    PatchText = string.Join("\n", group.Select(section => section.PatchText))
+                })
+                .ToList();
+
             if (sections.Count == 1)
             {
                 return await ApplySingleFilePatchAsync(sections[0].Path, sections[0].PatchText);
@@ -787,7 +796,6 @@ namespace TxtAIEditor.Controls
 
             string? currentPath = null;
             var currentLines = new List<string>();
-            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             void FlushCurrentSection()
             {
@@ -830,12 +838,6 @@ namespace TxtAIEditor.Controls
                     }
 
                     sectionPath = sectionPath.Replace('\\', '/');
-                    if (!seenPaths.Add(sectionPath))
-                    {
-                        error = $"apply_patch failed: the patch contains duplicate file sections for '{sectionPath}'.";
-                        return false;
-                    }
-
                     currentPath = sectionPath;
                     continue;
                 }
