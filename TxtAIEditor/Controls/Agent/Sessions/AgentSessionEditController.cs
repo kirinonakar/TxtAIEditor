@@ -267,7 +267,8 @@ namespace TxtAIEditor.Controls
 
         private void UpdateModifiedFilesList()
         {
-            if (!string.Equals(CurrentSessionId, _currentSessionIdProvider(), StringComparison.Ordinal))
+            string sessionId = CurrentSessionId ?? string.Empty;
+            if (!string.Equals(sessionId, _currentSessionIdProvider(), StringComparison.Ordinal))
             {
                 return;
             }
@@ -275,6 +276,14 @@ namespace TxtAIEditor.Controls
             var displayEdits = GetLatestEditsForDisplay();
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
+                // The callback can run after the user switches sessions. Do not let
+                // an older session's queued update overwrite the visible list.
+                if (!string.Equals(CurrentSessionId, sessionId, StringComparison.Ordinal) ||
+                    !string.Equals(_currentSessionIdProvider(), sessionId, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
                 _agentPane.UpdateModifiedFiles(displayEdits);
             });
         }

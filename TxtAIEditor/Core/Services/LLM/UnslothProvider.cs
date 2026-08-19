@@ -48,6 +48,7 @@ namespace TxtAIEditor.Core.Services.LLM
             else if (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
                      _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase))
             {
+                payloadDict["enable_thinking"] = false;
                 payloadDict["reasoning"] = new Dictionary<string, object>
                 {
                     ["effort"] = "none"
