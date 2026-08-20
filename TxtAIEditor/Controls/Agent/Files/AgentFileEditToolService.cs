@@ -540,6 +540,8 @@ namespace TxtAIEditor.Controls
                 return "apply_patch failed: patch content is empty.";
             }
 
+            patchText = AgentToolHelpers.SanitizeApplyPatchText(patchText);
+
             if (!TryParseFilePatchSections(path, patchText, out List<FilePatchSection> sections, out string? parseError))
             {
                 return parseError ?? "apply_patch failed: patch content could not be parsed.";

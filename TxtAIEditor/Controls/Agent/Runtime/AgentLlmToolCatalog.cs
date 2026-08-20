@@ -302,7 +302,7 @@ namespace TxtAIEditor.Controls
                         properties = new
                         {
                             path = new { type = "string", description = "Relative path to the file for a single-file patch; omit it when patch contains *** Update File: sections" },
-                            patch = new { type = "string", description = "Unified diff patch content. Multi-file format: *** Begin Patch, one or more *** Update File: relative/path sections, then *** End Patch." }
+                            patch = new { type = "string", description = "Unified diff patch content. Multi-file format: *** Begin Patch, one or more *** Update File: relative/path sections, then *** End Patch. The patch must end exactly at *** End Patch with no characters or text after the marker." }
                         },
                         required = new[] { "patch" }
                     }

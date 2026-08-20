@@ -11,10 +11,65 @@ namespace TxtAIEditor.Controls
     {
         public const string EditFailureContextStartMarker = "[Edit failure context]";
         public const string EditFailureContextEndMarker = "[End edit failure context]";
+        private const string ApplyPatchEndMarker = "*** End Patch";
 
         private static readonly Regex DangerousPowerShellCommandRegex = new(
             @"(?:\$home\b|\b(Remove\w*|rm\w*|Clear-Content|Clear-Disk|Initialize-Disk|Resize-Partition|Set-Disk|(?<!message-)format(?!-(?:table|list)\b|=)|diskpart|del|delete|erase|rd|ri)\b)",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        public static string SanitizeApplyPatchText(string patchText)
+        {
+            string[] lines = patchText
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace('\r', '\n')
+                .Split('\n');
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (!lines[i].StartsWith(ApplyPatchEndMarker, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var sanitizedLines = lines.Take(i).ToList();
+                sanitizedLines.Add(ApplyPatchEndMarker);
+                return string.Join("\n", sanitizedLines);
+            }
+
+            return patchText;
+        }
+
+        public static JsonElement SanitizeApplyPatchArguments(JsonElement arguments)
+        {
+            if (arguments.ValueKind != JsonValueKind.Object)
+            {
+                return arguments;
+            }
+
+            bool changed = false;
+            var sanitizedProperties = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            foreach (JsonProperty property in arguments.EnumerateObject())
+            {
+                JsonElement value = property.Value.Clone();
+                if (property.Value.ValueKind == JsonValueKind.String &&
+                    property.Name is "patch" or "patchText" or "diff" or "content")
+                {
+                    string original = property.Value.GetString() ?? string.Empty;
+                    string sanitized = SanitizeApplyPatchText(original);
+                    if (!string.Equals(original, sanitized, StringComparison.Ordinal))
+                    {
+                        value = JsonSerializer.SerializeToElement(sanitized);
+                        changed = true;
+                    }
+                }
+
+                sanitizedProperties[property.Name] = value;
+            }
+
+            return changed
+                ? JsonSerializer.SerializeToElement(sanitizedProperties)
+                : arguments;
+        }
 
         public static bool IsDangerousPowerShellCommand(string? command)
         {

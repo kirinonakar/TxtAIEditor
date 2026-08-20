@@ -765,6 +765,11 @@ namespace TxtAIEditor.Controls
                         JsonElement currentArguments = tc.Arguments;
 
                         string normalizedToolName = NormalizeToolName(currentToolName);
+                        if (normalizedToolName == "apply_patch")
+                        {
+                            currentArguments = SanitizeApplyPatchArguments(currentArguments);
+                        }
+
                         if (toolCalls.Count > 1 && normalizedToolName == "web_search_exa")
                         {
                             if (hasWebSearchCallInBatch)
