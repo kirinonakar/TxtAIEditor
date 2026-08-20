@@ -475,12 +475,17 @@ namespace TxtAIEditor.Core.Services
                 PopulateModelChoices(provider, SettingsLlmModelCatalog.GetModelForProviderChange(_settings, provider));
                 UpdateModelRefreshButtonVisibility();
 
-                if (SettingsLlmModelCatalog.SupportsRemoteModelFetch(provider))
+                string apiKey = await _llmService.GetApiKeyAsync(provider);
+                if (!provider.Equals(GetSelectedProviderName(), StringComparison.OrdinalIgnoreCase))
                 {
-                    _ = RefreshModelsAsync();
+                    return;
                 }
 
-                _llmApiKeyBox.Password = await _llmService.GetApiKeyAsync(provider);
+                _llmApiKeyBox.Password = apiKey;
+                if (SettingsLlmModelCatalog.SupportsRemoteModelFetch(provider))
+                {
+                    await RefreshModelsAsync();
+                }
             };
 
             _visionFallbackProviderCombo.SelectionChanged += (_, __) =>
