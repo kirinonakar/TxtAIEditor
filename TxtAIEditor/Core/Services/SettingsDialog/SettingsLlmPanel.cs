@@ -600,6 +600,9 @@ namespace TxtAIEditor.Core.Services
             details.AppendLine(summary);
             if (stats.LastUsage != null)
             {
+                object cachedTokens = stats.LastUsage.CachedTokens.HasValue
+                    ? stats.LastUsage.CachedTokens.Value
+                    : "null";
                 details.AppendLine(string.Format(
                     _getString("SettingsLlmTokenUsageStatsLastFormat", "마지막: {0} / {1} · 요청 {2:N0}회 · 입력 {3:N0} · 출력 {4:N0} · 전체 {5:N0} · cached {6:N0} 토큰"),
                     string.IsNullOrWhiteSpace(stats.LastUsage.Provider) ? _getString("SettingsLlmTokenUsageUnknownProvider", "알 수 없는 공급자") : stats.LastUsage.Provider,
@@ -608,7 +611,7 @@ namespace TxtAIEditor.Core.Services
                     stats.LastUsage.PromptTokens ?? 0,
                     stats.LastUsage.CompletionTokens ?? 0,
                     stats.LastUsage.TotalTokens ?? 0,
-                    stats.LastUsage.CachedTokens ?? 0));
+                    cachedTokens));
             }
 
             details.AppendLine();

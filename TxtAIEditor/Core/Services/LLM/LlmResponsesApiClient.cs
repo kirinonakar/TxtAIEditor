@@ -740,6 +740,22 @@ namespace TxtAIEditor.Core.Services.LLM
             return "txtaieditor:" + Convert.ToHexString(hash.AsSpan(0, 16)).ToLowerInvariant();
         }
 
+        internal static string BuildPromptCacheKey(
+            string model,
+            string systemPrompt,
+            string userContent)
+        {
+            if (TrySplitPromptSections(userContent, out PromptSections sections))
+            {
+                return BuildPromptCacheKey(model, systemPrompt, sections);
+            }
+
+            byte[] bytes = Encoding.UTF8.GetBytes(
+                model + "\n" + systemPrompt + "\n" + userContent);
+            byte[] hash = SHA256.HashData(bytes);
+            return "txtaieditor:" + Convert.ToHexString(hash.AsSpan(0, 16)).ToLowerInvariant();
+        }
+
         private static string GetInitialConversationAnchor(string conversation)
         {
             int firstRoleIndex = FindRoleHeader(conversation, 0);
@@ -749,9 +765,10 @@ namespace TxtAIEditor.Core.Services.LLM
             }
 
             int nextRoleIndex = FindRoleHeader(conversation, firstRoleIndex + 1);
-            return nextRoleIndex < 0
+            string anchor = nextRoleIndex < 0
                 ? conversation
                 : conversation.Substring(0, nextRoleIndex);
+            return anchor.TrimEnd();
         }
 
         private static int FindRoleHeader(string value, int startIndex)

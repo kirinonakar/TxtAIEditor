@@ -174,6 +174,10 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (IsHy3Model(model))
             {
+                payloadDict["prompt_cache_key"] = LlmResponsesApiClient.BuildPromptCacheKey(
+                    model,
+                    systemPrompt,
+                    userContent);
                 string? hy3Effort = MapHy3ThinkingLevel(_thinkingLevel);
                 if (hy3Effort != null)
                 {
@@ -363,6 +367,10 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (IsHy3Model(model))
             {
+                payloadDict["prompt_cache_key"] = LlmResponsesApiClient.BuildPromptCacheKey(
+                    model,
+                    systemPrompt,
+                    userContent);
                 string? hy3Effort = MapHy3ThinkingLevel(_thinkingLevel);
                 if (hy3Effort != null)
                 {
