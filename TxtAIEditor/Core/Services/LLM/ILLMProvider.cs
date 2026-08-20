@@ -45,15 +45,23 @@ namespace TxtAIEditor.Core.Services.LLM
 
             var result = new LlmTokenUsage
             {
-                PromptTokens = GetInt32(usage, "prompt_tokens") ?? GetInt32(usage, "input_tokens"),
-                CompletionTokens = GetInt32(usage, "completion_tokens") ?? GetInt32(usage, "output_tokens"),
-                TotalTokens = GetInt32(usage, "total_tokens"),
+                PromptTokens =
+                    GetInt32(usage, "prompt_tokens") ??
+                    GetInt32(usage, "input_tokens") ??
+                    GetInt32(usage, "promptTokenCount"),
+                CompletionTokens =
+                    GetInt32(usage, "completion_tokens") ??
+                    GetInt32(usage, "output_tokens") ??
+                    GetInt32(usage, "candidatesTokenCount"),
+                TotalTokens = GetInt32(usage, "total_tokens") ?? GetInt32(usage, "totalTokenCount"),
                 CachedTokens =
                     GetNestedInt32(usage, "prompt_tokens_details", "cached_tokens") ??
+                    GetNestedInt32(usage, "prompt_token_details", "cached_tokens") ??
                     GetNestedInt32(usage, "input_tokens_details", "cached_tokens") ??
                     GetInt32(usage, "cached_tokens") ??
                     GetInt32(usage, "prompt_cache_hit_tokens") ??
-                    GetInt32(usage, "cache_read_input_tokens")
+                    GetInt32(usage, "cache_read_input_tokens") ??
+                    GetInt32(usage, "cachedContentTokenCount")
             };
 
             return result.HasAny ? result : null;
@@ -162,6 +170,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
 
             if (!root.TryGetProperty("usage", out var usageElement) &&
+                !root.TryGetProperty("usageMetadata", out usageElement) &&
                 root.TryGetProperty("message", out var messageElement) &&
                 messageElement.ValueKind == JsonValueKind.Object)
             {

@@ -376,6 +376,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var doc = JsonDocument.Parse(responseBody))
                     {
                         var root = doc.RootElement;
+                        await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
                         // Extract candidates[0].content.parts[0].text
                         if (root.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
                         {
@@ -534,6 +535,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                 using (var doc = JsonDocument.Parse(data))
                                 {
                                     var root = doc.RootElement;
+                                    await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
                                     if (root.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
                                     {
                                         var firstCandidate = candidates[0];

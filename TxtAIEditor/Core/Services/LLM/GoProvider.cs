@@ -150,7 +150,11 @@ namespace TxtAIEditor.Core.Services.LLM
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
                 ["temperature"] = IsKimiModel(model) ? 1.0 : 0.5,
-                ["max_tokens"] = outputLimit
+                ["max_tokens"] = outputLimit,
+                ["prompt_cache_key"] = LlmResponsesApiClient.BuildPromptCacheKey(
+                    model,
+                    systemPrompt,
+                    userContent)
             };
 
             if (tools != null && tools.Count > 0)
@@ -174,10 +178,6 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (IsHy3Model(model))
             {
-                payloadDict["prompt_cache_key"] = LlmResponsesApiClient.BuildPromptCacheKey(
-                    model,
-                    systemPrompt,
-                    userContent);
                 string? hy3Effort = MapHy3ThinkingLevel(_thinkingLevel);
                 if (hy3Effort != null)
                 {
@@ -343,7 +343,11 @@ namespace TxtAIEditor.Core.Services.LLM
                 ["stream_options"] = new Dictionary<string, object>
                 {
                     ["include_usage"] = true
-                }
+                },
+                ["prompt_cache_key"] = LlmResponsesApiClient.BuildPromptCacheKey(
+                    model,
+                    systemPrompt,
+                    userContent)
             };
 
             if (tools != null && tools.Count > 0)
@@ -367,10 +371,6 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (IsHy3Model(model))
             {
-                payloadDict["prompt_cache_key"] = LlmResponsesApiClient.BuildPromptCacheKey(
-                    model,
-                    systemPrompt,
-                    userContent);
                 string? hy3Effort = MapHy3ThinkingLevel(_thinkingLevel);
                 if (hy3Effort != null)
                 {
@@ -579,7 +579,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (!string.IsNullOrEmpty(systemPrompt))
             {
-                payloadDict["system"] = systemPrompt;
+                payloadDict["system"] = BuildAnthropicCachedSystemPrompt(systemPrompt);
             }
 
             if (HasThinking)
@@ -671,7 +671,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (!string.IsNullOrEmpty(systemPrompt))
             {
-                payloadDict["system"] = systemPrompt;
+                payloadDict["system"] = BuildAnthropicCachedSystemPrompt(systemPrompt);
             }
 
             if (HasThinking)
@@ -809,6 +809,19 @@ namespace TxtAIEditor.Core.Services.LLM
                    _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase)
                 ? "none"
                 : null;
+        }
+
+        private static object BuildAnthropicCachedSystemPrompt(string systemPrompt)
+        {
+            return new[]
+            {
+                new
+                {
+                    type = "text",
+                    text = systemPrompt,
+                    cache_control = new { type = "ephemeral" }
+                }
+            };
         }
 
         private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)

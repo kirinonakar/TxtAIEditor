@@ -488,15 +488,15 @@ namespace TxtAIEditor.Core.Services.LLM
                 ["instructions"] = systemPrompt,
                 ["input"] = usePromptCaching
                     ? BuildPromptCachingInput(promptSections, attachments)
-                    : BuildInput(userContent, attachments)
+                    : BuildInput(userContent, attachments),
+                ["prompt_cache_key"] = BuildPromptCacheKey(
+                    model,
+                    systemPrompt,
+                    userContent)
             };
 
             if (usePromptCaching)
             {
-                payload["prompt_cache_key"] = BuildPromptCacheKey(
-                    model,
-                    systemPrompt,
-                    promptSections);
                 payload["prompt_cache_options"] = new Dictionary<string, object>
                 {
                     ["mode"] = "explicit"

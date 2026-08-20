@@ -62,6 +62,10 @@ namespace TxtAIEditor.Core.Services.LLM
                 userContent,
                 attachments,
                 tools);
+            string sessionId = LlmResponsesApiClient.BuildPromptCacheKey(
+                model,
+                systemPrompt,
+                userContent);
 
             if (await LlmResponsesApiClient.SupportsAsync(
                     _httpClient,
@@ -69,7 +73,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     apiKey,
                     model,
                     cancellationToken,
-                    ConfigureOpenRouterRequest))
+                    request => ConfigureOpenRouterRequest(request)))
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 await LlmResponsesApiClient.GenerateCompletionStreamAsync(
@@ -89,7 +93,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     onUsage,
                     onNativeToolCall,
                     _localizationService.GetString("OpenRouterErrorStreamCallFailed", "OpenRouter API 스트리밍 호출 실패 ({0}): {1}"),
-                    ConfigureOpenRouterRequest);
+                    request => ConfigureOpenRouterRequest(request, sessionId));
                 return;
             }
 
@@ -109,7 +113,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 ["stream_options"] = new Dictionary<string, object>
                 {
                     ["include_usage"] = true
-                }
+                },
+                ["session_id"] = sessionId
             };
 
             if (tools != null && tools.Count > 0)
@@ -315,11 +320,15 @@ namespace TxtAIEditor.Core.Services.LLM
                 : null;
         }
 
-        private static void ConfigureOpenRouterRequest(HttpRequestMessage request)
+        private static void ConfigureOpenRouterRequest(HttpRequestMessage request, string? sessionId = null)
         {
             request.Headers.Add("User-Agent", "TxtAIEditor/1.0.0");
             request.Headers.Add("HTTP-Referer", "https://github.com/kirinonakar/TxtAIEditor");
             request.Headers.Add("X-Title", "TxtAIEditor");
+            if (!string.IsNullOrWhiteSpace(sessionId))
+            {
+                request.Headers.Add("X-Session-Id", sessionId);
+            }
         }
 
         private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)

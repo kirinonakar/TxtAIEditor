@@ -40,6 +40,11 @@ namespace TxtAIEditor.Core.Services.LLM
                                     !_thinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase) &&
                                     !_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase);
 
+        private bool IsOpenAIService =>
+            _providerName.Equals("OpenAI", StringComparison.OrdinalIgnoreCase) ||
+            _providerName.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) ||
+            _providerName.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
+
         private async Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken)
         {
             var (context, output) = await ModelsDevCatalog.GetLimitsAsync(_providerName, model, cancellationToken);
@@ -103,6 +108,14 @@ namespace TxtAIEditor.Core.Services.LLM
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 }
             };
+
+            if (!isLocalEndpoint && IsOpenAIService)
+            {
+                payloadDict["prompt_cache_key"] = LlmResponsesApiClient.BuildPromptCacheKey(
+                    model,
+                    systemPrompt,
+                    userContent);
+            }
 
             if (tools != null && tools.Count > 0)
             {
@@ -262,6 +275,14 @@ namespace TxtAIEditor.Core.Services.LLM
                 },
                 ["stream"] = true
             };
+
+            if (!isLocalEndpoint && IsOpenAIService)
+            {
+                payloadDict["prompt_cache_key"] = LlmResponsesApiClient.BuildPromptCacheKey(
+                    model,
+                    systemPrompt,
+                    userContent);
+            }
 
             if (!isLocalEndpoint)
             {

@@ -388,7 +388,11 @@ namespace TxtAIEditor.Core.Services.LLM
                     new { role = "system", content = (object)systemPrompt },
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
-                ["temperature"] = IsGemmaModel(model) ? 1.0 : 0.5
+                ["temperature"] = IsGemmaModel(model) ? 1.0 : 0.5,
+                ["prompt_cache_key"] = LlmResponsesApiClient.BuildPromptCacheKey(
+                    model,
+                    systemPrompt,
+                    userContent)
             };
 
             if (stream)
