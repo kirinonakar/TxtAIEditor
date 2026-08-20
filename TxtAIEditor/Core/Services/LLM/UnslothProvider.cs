@@ -40,19 +40,14 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             if (HasThinking)
             {
-                payloadDict["reasoning"] = new Dictionary<string, object>
-                {
-                    ["effort"] = GetReasoningEffort()
-                };
+                payloadDict["enable_thinking"] = true;
+                payloadDict["reasoning_effort"] = GetReasoningEffort();
             }
             else if (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
                      _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase))
             {
                 payloadDict["enable_thinking"] = false;
-                payloadDict["reasoning"] = new Dictionary<string, object>
-                {
-                    ["effort"] = "none"
-                };
+                payloadDict["reasoning_effort"] = "none";
             }
         }
 
@@ -63,15 +58,15 @@ namespace TxtAIEditor.Core.Services.LLM
                 throw new ArgumentException(_localizationService.GetString("UnslothErrorNoModelSelected", "Unsloth Desktop 모델을 먼저 선택해 주십시오."));
 
             string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:8888/v1" : endpoint.Trim();
-            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
-            string requestUrl = baseEndpoint.TrimEnd('/') + "/responses";
+            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
+            string requestUrl = baseEndpoint.TrimEnd('/') + "/chat/completions";
 
             var payloadDict = new Dictionary<string, object>
             {
                 ["model"] = model,
-                ["instructions"] = systemPrompt,
-                ["input"] = BuildInput(userContent, attachments),
-                ["temperature"] = 0.5
+                ["messages"] = BuildMessages(systemPrompt, userContent, attachments),
+                ["temperature"] = 0.5,
+                ["stream"] = false
             };
             AddReasoning(payloadDict);
             AddTools(payloadDict, tools);
@@ -97,77 +92,53 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var doc = JsonDocument.Parse(responseBody))
                     {
                         var root = doc.RootElement;
-                        await ReportUsageIfPresentAsync(root, onUsage);
+                        await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
 
-                        if (root.TryGetProperty("output", out var output) &&
-                            output.ValueKind == JsonValueKind.Array)
+                        if (root.TryGetProperty("choices", out var choices) &&
+                            choices.ValueKind == JsonValueKind.Array &&
+                            choices.GetArrayLength() > 0)
                         {
-                            string? contentText = null;
-                            string? reasoningText = null;
-                            JsonElement? functionCall = null;
-
-                            foreach (var item in output.EnumerateArray())
+                            var firstChoice = choices[0];
+                            if (firstChoice.TryGetProperty("message", out var message) &&
+                                message.ValueKind == JsonValueKind.Object)
                             {
-                                if (item.ValueKind != JsonValueKind.Object ||
-                                    !item.TryGetProperty("type", out var typeProperty))
+                                string? contentText = null;
+                                if (message.TryGetProperty("content", out var content) &&
+                                    content.ValueKind == JsonValueKind.String)
                                 {
-                                    continue;
+                                    contentText = content.GetString();
                                 }
 
-                                string itemType = typeProperty.GetString() ?? string.Empty;
-                                if (itemType == "function_call")
+                                if (message.TryGetProperty("tool_calls", out var toolCalls) &&
+                                    toolCalls.ValueKind == JsonValueKind.Array &&
+                                    toolCalls.GetArrayLength() > 0)
                                 {
-                                    functionCall = item;
-                                }
-                                else if (itemType == "message")
-                                {
-                                    string? text = ReadOutputText(item);
-                                    if (!string.IsNullOrEmpty(text))
+                                    if (onNativeToolCall != null)
                                     {
-                                        contentText = (contentText ?? string.Empty) + text;
+                                        await onNativeToolCall();
                                     }
-                                }
-                                else if (itemType == "reasoning")
-                                {
-                                    string? summary = ReadReasoningSummary(item);
-                                    if (!string.IsNullOrEmpty(summary))
-                                    {
-                                        reasoningText = (reasoningText ?? string.Empty) + summary;
-                                    }
-                                }
-                            }
 
-                            if (functionCall.HasValue)
-                            {
-                                if (onNativeToolCall != null)
-                                {
-                                    await onNativeToolCall();
+                                    return LlmToolCallTextFormatter.FormatAssistantResponseWithFunctionToolCall(
+                                        contentText,
+                                        toolCalls[0]);
                                 }
-
-                                string toolName = functionCall.Value.TryGetProperty("name", out var nameProperty)
-                                    ? nameProperty.GetString() ?? string.Empty
-                                    : string.Empty;
-                                string toolArguments = functionCall.Value.TryGetProperty("arguments", out var argumentsProperty)
-                                    ? argumentsProperty.GetString() ?? string.Empty
-                                    : string.Empty;
-                                string toolCallText = LlmToolCallTextFormatter.FormatFunctionToolCall(toolName, toolArguments);
 
                                 if (!string.IsNullOrEmpty(contentText))
                                 {
-                                    return contentText.TrimEnd() + Environment.NewLine + Environment.NewLine + toolCallText;
+                                    return contentText;
                                 }
 
-                                return toolCallText;
+                                if (LlmReasoningContentReader.TryGetText(message, out string reasoningText))
+                                {
+                                    return reasoningText;
+                                }
                             }
 
-                            if (!string.IsNullOrEmpty(contentText))
+                            if (firstChoice.TryGetProperty("finish_reason", out var finishReason) &&
+                                finishReason.ValueKind == JsonValueKind.String &&
+                                finishReason.GetString() == "length")
                             {
-                                return contentText;
-                            }
-
-                            if (!string.IsNullOrEmpty(reasoningText))
-                            {
-                                return reasoningText;
+                                throw new ResponseTruncatedException();
                             }
                         }
                     }
@@ -184,16 +155,19 @@ namespace TxtAIEditor.Core.Services.LLM
                 throw new ArgumentException(_localizationService.GetString("UnslothErrorNoModelSelected", "Unsloth Desktop 모델을 먼저 선택해 주십시오."));
 
             string baseEndpoint = string.IsNullOrWhiteSpace(endpoint) ? "http://localhost:8888/v1" : endpoint.Trim();
-            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
-            string requestUrl = baseEndpoint.TrimEnd('/') + "/responses";
+            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
+            string requestUrl = baseEndpoint.TrimEnd('/') + "/chat/completions";
 
             var payloadDict = new Dictionary<string, object>
             {
                 ["model"] = model,
-                ["instructions"] = systemPrompt,
-                ["input"] = BuildInput(userContent, attachments),
+                ["messages"] = BuildMessages(systemPrompt, userContent, attachments),
                 ["temperature"] = 0.5,
-                ["stream"] = true
+                ["stream"] = true,
+                ["stream_options"] = new Dictionary<string, object>
+                {
+                    ["include_usage"] = true
+                }
             };
             AddReasoning(payloadDict);
             AddTools(payloadDict, tools);
@@ -221,16 +195,21 @@ namespace TxtAIEditor.Core.Services.LLM
                     {
                         var toolAccumulator = new StreamToolCallAccumulator();
                         bool hasToolCalls = false;
+                        bool truncated = false;
 
                         while (true)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             string? line = await reader.ReadLineAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
                             if (line == null) break;
-                            if (string.IsNullOrEmpty(line)) continue;
-                            if (!line.StartsWith("data: ")) continue;
+                            string trimmed = line.Trim();
+                            if (string.IsNullOrEmpty(trimmed) ||
+                                !trimmed.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
 
-                            string data = line.Substring(6).Trim();
+                            string data = trimmed.Substring(5).Trim();
                             if (data == "[DONE]") break;
 
                             try
@@ -238,106 +217,58 @@ namespace TxtAIEditor.Core.Services.LLM
                                 using (var doc = JsonDocument.Parse(data))
                                 {
                                     var root = doc.RootElement;
-                                    string eventType = root.TryGetProperty("type", out var typeProperty)
-                                        ? typeProperty.GetString() ?? string.Empty
-                                        : string.Empty;
-
-                                    switch (eventType)
+                                    await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
+                                    if (root.TryGetProperty("choices", out var choices) &&
+                                        choices.ValueKind == JsonValueKind.Array &&
+                                        choices.GetArrayLength() > 0)
                                     {
-                                        case "response.output_text.delta":
+                                        var firstChoice = choices[0];
+                                        if (firstChoice.TryGetProperty("delta", out var delta) &&
+                                            delta.ValueKind == JsonValueKind.Object)
+                                        {
+                                            if (onReasoning != null &&
+                                                LlmReasoningContentReader.TryGetText(delta, out string reasoningText))
                                             {
-                                                if (root.TryGetProperty("delta", out var deltaProperty) &&
-                                                    deltaProperty.ValueKind == JsonValueKind.String)
-                                                {
-                                                    string? text = deltaProperty.GetString();
-                                                    if (!string.IsNullOrEmpty(text))
-                                                    {
-                                                        cancellationToken.ThrowIfCancellationRequested();
-                                                        await onChunk(text);
-                                                    }
-                                                }
-                                                break;
+                                                cancellationToken.ThrowIfCancellationRequested();
+                                                await onReasoning(reasoningText);
                                             }
-                                        case "response.reasoning_summary_text.delta":
-                                        case "response.reasoning_text.delta":
-                                            {
-                                                if (onReasoning != null &&
-                                                    root.TryGetProperty("delta", out var deltaProperty) &&
-                                                    deltaProperty.ValueKind == JsonValueKind.String)
-                                                {
-                                                    string? reasoningText = deltaProperty.GetString();
-                                                    if (!string.IsNullOrEmpty(reasoningText))
-                                                    {
-                                                        cancellationToken.ThrowIfCancellationRequested();
-                                                        await onReasoning(reasoningText);
-                                                    }
-                                                }
-                                                break;
-                                            }
-                                        case "response.output_item.added":
-                                            {
-                                                if (root.TryGetProperty("item", out var item) &&
-                                                    item.ValueKind == JsonValueKind.Object &&
-                                                    item.TryGetProperty("type", out var itemType) &&
-                                                    itemType.GetString() == "function_call")
-                                                {
-                                                    if (!hasToolCalls)
-                                                    {
-                                                        hasToolCalls = true;
-                                                        if (onNativeToolCall != null)
-                                                        {
-                                                            await onNativeToolCall();
-                                                        }
-                                                    }
 
-                                                    string name = item.TryGetProperty("name", out var nameProperty)
-                                                        ? nameProperty.GetString() ?? string.Empty
-                                                        : string.Empty;
-                                                    if (!string.IsNullOrEmpty(name))
-                                                    {
-                                                        toolAccumulator.Name += name;
-                                                        if (!toolAccumulator.SentStartTag)
-                                                        {
-                                                            toolAccumulator.SentStartTag = true;
-                                                            await onChunk($"<tool_call>{{\"name\":{JsonSerializer.Serialize(name)}");
-                                                        }
-                                                        else
-                                                        {
-                                                            await onChunk(name);
-                                                        }
-                                                    }
-                                                }
-                                                break;
-                                            }
-                                        case "response.function_call_arguments.delta":
+                                            if (delta.TryGetProperty("tool_calls", out var toolCalls) &&
+                                                toolCalls.ValueKind == JsonValueKind.Array &&
+                                                toolCalls.GetArrayLength() > 0)
                                             {
-                                                if (root.TryGetProperty("delta", out var deltaProperty) &&
-                                                    deltaProperty.ValueKind == JsonValueKind.String)
+                                                if (!hasToolCalls)
                                                 {
-                                                    string argumentsChunk = deltaProperty.GetString() ?? string.Empty;
-                                                    if (!string.IsNullOrEmpty(argumentsChunk))
+                                                    hasToolCalls = true;
+                                                    if (onNativeToolCall != null)
                                                     {
-                                                        toolAccumulator.Arguments.Append(argumentsChunk);
-                                                        if (!toolAccumulator.SentStartTag)
-                                                        {
-                                                            toolAccumulator.SentStartTag = true;
-                                                            await onChunk("<tool_call>{\"name\":\"\",\"arguments\":");
-                                                            toolAccumulator.SentArgumentsHeader = true;
-                                                        }
-                                                        else if (!toolAccumulator.SentArgumentsHeader)
-                                                        {
-                                                            toolAccumulator.SentArgumentsHeader = true;
-                                                            await onChunk("\",\"arguments\":");
-                                                        }
-
-                                                        await onChunk(argumentsChunk);
+                                                        await onNativeToolCall();
                                                     }
                                                 }
-                                                break;
+
+                                                await AccumulateToolCallAsync(
+                                                    toolAccumulator,
+                                                    toolCalls[0],
+                                                    onChunk);
                                             }
-                                        default:
-                                            await ReportUsageIfPresentAsync(root, onUsage);
-                                            break;
+                                            else if (delta.TryGetProperty("content", out var content) &&
+                                                     content.ValueKind == JsonValueKind.String)
+                                            {
+                                                string? text = content.GetString();
+                                                if (!string.IsNullOrEmpty(text))
+                                                {
+                                                    cancellationToken.ThrowIfCancellationRequested();
+                                                    await onChunk(text);
+                                                }
+                                            }
+                                        }
+
+                                        if (firstChoice.TryGetProperty("finish_reason", out var finishReason) &&
+                                            finishReason.ValueKind == JsonValueKind.String &&
+                                            finishReason.GetString() == "length")
+                                        {
+                                            truncated = true;
+                                        }
                                     }
                                 }
                             }
@@ -359,82 +290,68 @@ namespace TxtAIEditor.Core.Services.LLM
 
                             await onChunk("}</tool_call>");
                         }
+
+                        if (truncated)
+                        {
+                            throw new ResponseTruncatedException();
+                        }
                     }
                 }
             }
         }
 
-        private static async Task ReportUsageIfPresentAsync(JsonElement root, Func<LlmTokenUsage, Task>? onUsage)
+        private static async Task AccumulateToolCallAsync(
+            StreamToolCallAccumulator toolAccumulator,
+            JsonElement toolCall,
+            Func<string, Task> onChunk)
         {
-            await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
-            if (root.TryGetProperty("response", out var nested) &&
-                nested.ValueKind == JsonValueKind.Object)
+            if (!toolCall.TryGetProperty("function", out var function) ||
+                function.ValueKind != JsonValueKind.Object)
             {
-                await LlmUsageReporter.TryReportUsageAsync(nested, onUsage);
-            }
-        }
-
-        private static string? ReadOutputText(JsonElement item)
-        {
-            if (!item.TryGetProperty("content", out var content))
-            {
-                return null;
+                return;
             }
 
-            if (content.ValueKind == JsonValueKind.String)
+            if (function.TryGetProperty("name", out var nameProperty) &&
+                nameProperty.ValueKind == JsonValueKind.String)
             {
-                string plainText = content.GetString() ?? string.Empty;
-                return string.IsNullOrEmpty(plainText) ? null : plainText;
-            }
-
-            if (content.ValueKind != JsonValueKind.Array)
-            {
-                return null;
-            }
-
-            var sb = new StringBuilder();
-            foreach (var part in content.EnumerateArray())
-            {
-                if (part.ValueKind != JsonValueKind.Object ||
-                    !part.TryGetProperty("type", out var typeProperty))
+                string nameChunk = nameProperty.GetString() ?? string.Empty;
+                if (!string.IsNullOrEmpty(nameChunk))
                 {
-                    continue;
-                }
-
-                string partType = typeProperty.GetString() ?? string.Empty;
-                if ((partType == "output_text" || partType == "text") &&
-                    part.TryGetProperty("text", out var textProperty) &&
-                    textProperty.ValueKind == JsonValueKind.String)
-                {
-                    sb.Append(textProperty.GetString());
+                    toolAccumulator.Name += nameChunk;
+                    if (!toolAccumulator.SentStartTag)
+                    {
+                        toolAccumulator.SentStartTag = true;
+                        await onChunk($"<tool_call>{{\"name\":\"{nameChunk}");
+                    }
+                    else
+                    {
+                        await onChunk(nameChunk);
+                    }
                 }
             }
 
-            return sb.Length > 0 ? sb.ToString() : null;
-        }
-
-        private static string? ReadReasoningSummary(JsonElement item)
-        {
-            if (!item.TryGetProperty("summary", out var summary) ||
-                summary.ValueKind != JsonValueKind.Array)
+            if (function.TryGetProperty("arguments", out var argumentsProperty) &&
+                argumentsProperty.ValueKind == JsonValueKind.String)
             {
-                return null;
-            }
-
-            var sb = new StringBuilder();
-            foreach (var entry in summary.EnumerateArray())
-            {
-                if (entry.ValueKind == JsonValueKind.Object &&
-                    entry.TryGetProperty("type", out var typeProperty) &&
-                    typeProperty.GetString() == "summary_text" &&
-                    entry.TryGetProperty("text", out var textProperty) &&
-                    textProperty.ValueKind == JsonValueKind.String)
+                string argumentsChunk = argumentsProperty.GetString() ?? string.Empty;
+                if (!string.IsNullOrEmpty(argumentsChunk))
                 {
-                    sb.Append(textProperty.GetString());
+                    toolAccumulator.Arguments.Append(argumentsChunk);
+                    if (!toolAccumulator.SentStartTag)
+                    {
+                        toolAccumulator.SentStartTag = true;
+                        await onChunk("<tool_call>{\"name\":\"\",\"arguments\":");
+                        toolAccumulator.SentArgumentsHeader = true;
+                    }
+                    else if (!toolAccumulator.SentArgumentsHeader)
+                    {
+                        toolAccumulator.SentArgumentsHeader = true;
+                        await onChunk("\",\"arguments\":");
+                    }
+
+                    await onChunk(argumentsChunk);
                 }
             }
-
-            return sb.Length > 0 ? sb.ToString() : null;
         }
 
         private static void AddTools(Dictionary<string, object> payloadDict, IReadOnlyList<LlmTool>? tools)
@@ -450,16 +367,33 @@ namespace TxtAIEditor.Core.Services.LLM
                 toolsList.Add(new
                 {
                     type = "function",
-                    name = tool.Name,
-                    description = tool.Description,
-                    parameters = tool.Parameters
+                    function = new
+                    {
+                        name = tool.Name,
+                        description = tool.Description,
+                        parameters = tool.Parameters
+                    }
                 });
             }
 
             payloadDict["tools"] = toolsList;
         }
 
-        private static object BuildInput(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)
+        private static object[] BuildMessages(
+            string systemPrompt,
+            string userContent,
+            IReadOnlyList<LlmMessageAttachment>? attachments)
+        {
+            return new[]
+            {
+                new { role = "system", content = (object)systemPrompt },
+                new { role = "user", content = BuildUserContent(userContent, attachments) }
+            };
+        }
+
+        private static object BuildUserContent(
+            string userContent,
+            IReadOnlyList<LlmMessageAttachment>? attachments)
         {
             var images = attachments?.Where(a => a.IsImage && !string.IsNullOrWhiteSpace(a.Base64Data)).ToList();
             if (images == null || images.Count == 0)
@@ -469,22 +403,23 @@ namespace TxtAIEditor.Core.Services.LLM
 
             var parts = new List<object>
             {
-                new { type = "input_text", text = userContent }
+                new { type = "text", text = userContent }
             };
 
             foreach (var image in images)
             {
                 parts.Add(new
                 {
-                    type = "input_image",
-                    image_url = $"data:{image.MimeType};base64,{image.Base64Data}"
+                    type = "image_url",
+                    image_url = new
+                    {
+                        url = $"data:{image.MimeType};base64,{image.Base64Data}"
+                    }
                 });
             }
 
-            return new[]
-            {
-                new { role = "user", content = (object)parts }
-            };
+            return parts;
         }
+
     }
 }
