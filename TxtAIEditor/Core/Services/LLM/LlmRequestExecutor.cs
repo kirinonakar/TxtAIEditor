@@ -187,14 +187,15 @@ namespace TxtAIEditor.Core.Services.LLM
                         fallbackSettings,
                         systemPrompt,
                         fallbackTaskContent,
-                        onChunk: null,
+                        onChunk: _ => Task.CompletedTask,
                         cancellationToken,
                         attachments,
-                        onReasoning: null,
+                        onReasoning: _ => Task.CompletedTask,
                         tools,
                         onUsage,
                         allowVisionFallback: false,
                         onVisionFallbackResult: null,
+                        onNativeToolCall: onNativeToolCall,
                         onApiType: onApiType);
 
                     if (IsLlmErrorResponse(fallbackAnalysis))
@@ -218,7 +219,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         "\n\n[Continuation after vision fallback]\n" +
                         "Use the visual analysis above as the result of the image read, preserve its surrounding context, " +
                         "and continue the original task with the normal tool-call or final-answer behavior.";
-                    return await ExecuteAsync(
+                    string continuationResponse = await ExecuteAsync(
                         settings,
                         systemPrompt,
                         originalModelContent,
@@ -232,6 +233,17 @@ namespace TxtAIEditor.Core.Services.LLM
                         onVisionFallbackResult: null,
                         onNativeToolCall: onNativeToolCall,
                         onApiType: onApiType);
+                    if (IsLlmEmptyResponse(continuationResponse))
+                    {
+                        if (onChunk != null)
+                        {
+                            await onChunk(fallbackAnalysis);
+                        }
+
+                        return fallbackAnalysis;
+                    }
+
+                    return continuationResponse;
                 }
 
                 string errorPrefix = _localizationService.GetString("LlmErrorCommunicationPrefix", "AI 통신 오류가 발생했습니다: ");
@@ -241,7 +253,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
         private bool IsLlmErrorResponse(string response)
         {
-            if (string.IsNullOrWhiteSpace(response))
+            if (IsLlmEmptyResponse(response))
             {
                 return true;
             }
@@ -254,6 +266,31 @@ namespace TxtAIEditor.Core.Services.LLM
                 "에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 자격 증명을 먼저 저장해 주십시오.");
             return response.StartsWith(communicationErrorPrefix, StringComparison.Ordinal) ||
                 response.Equals(missingCredentialError, StringComparison.Ordinal);
+        }
+
+        private bool IsLlmEmptyResponse(string response)
+        {
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                return true;
+            }
+
+            string emptyResponse = _localizationService.GetString(
+                "LlmErrorEmptyResponse",
+                "AI로부터 빈 응답을 수신했습니다.");
+            string geminiEmptyResponse = _localizationService.GetString(
+                "GeminiErrorEmptyResponse",
+                "Gemini AI로부터 빈 응답을 수신했습니다.");
+            string lmStudioEmptyResponse = _localizationService.GetString(
+                "LmStudioErrorEmptyResponse",
+                "LM Studio로부터 빈 응답을 수신했습니다.");
+            string unslothEmptyResponse = _localizationService.GetString(
+                "UnslothErrorEmptyResponse",
+                "Unsloth Desktop로부터 빈 응답을 수신했습니다.");
+            return response.Equals(emptyResponse, StringComparison.Ordinal) ||
+                response.Equals(geminiEmptyResponse, StringComparison.Ordinal) ||
+                response.Equals(lmStudioEmptyResponse, StringComparison.Ordinal) ||
+                response.Equals(unslothEmptyResponse, StringComparison.Ordinal);
         }
 
         private static bool TryCreateVisionFallbackSettings(

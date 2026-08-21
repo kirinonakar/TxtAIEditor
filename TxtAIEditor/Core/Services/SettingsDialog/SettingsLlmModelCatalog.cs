@@ -162,10 +162,23 @@ namespace TxtAIEditor.Core.Services
             {
                 return new[]
                 {
-                    "meta-llama/llama-3.3-70b-instruct:free",
-                    "deepseek/deepseek-chat",
-                    "google/gemini-2.5-flash",
-                    "anthropic/claude-3.5-sonnet"
+                    "openrouter/free",
+                    "stealth/ox-alpha",
+                    "nvidia/nemotron-3-ultra-550b-a55b:free",
+                    "nvidia/nemotron-3-super-120b-a12b:free",
+                    "nvidia/nemotron-3.5-lightning:free",
+                    "cohere/north-mini-code:free",
+                    "poolside/laguna-s-2.1:free",
+                    "poolside/laguna-xs-2.1:free",
+                    "dots-studio/dots-3-note-preview:free",
+                    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+                    "nvidia/nemotron-3-nano-30b-a3b:free",
+                    "nvidia/nemotron-nano-12b-v2-vl:free",
+                    "nvidia/nemotron-nano-9b-v2:free",
+                    "google/gemma-4-31b-it:free",
+                    "google/gemma-4-26b-a4b-it:free",
+                    "z-ai/glm-5.2:free",
+                    "openai/gpt-oss-20b:free"
                 };
             }
 
@@ -192,6 +205,7 @@ namespace TxtAIEditor.Core.Services
                     "qwen3.6-plus",
                     "deepseek-v4-pro",
                     "deepseek-v4-flash",
+                    "deepseek-v4-flash-vision-exp",
                     "hy3",
                     "muse-spark-1.2-contributor"
                 };
@@ -209,24 +223,11 @@ namespace TxtAIEditor.Core.Services
                     "gpt-5.4-nano",
                     "gpt-5.3-codex",
                     "gpt-5.3-codex-spark",
-                    "gpt-5.2",
-                    "gpt-5.2-codex",
-                    "gpt-5.1",
-                    "gpt-5.1-codex",
-                    "gpt-5.1-codex-max",
-                    "gpt-5.1-codex-mini",
-                    "gpt-5",
-                    "gpt-5-codex",
-                    "gpt-5-nano",
                     "claude-fable-5",
                     "claude-opus-4-8",
                     "claude-opus-4-7",
                     "claude-opus-4-6",
-                    "claude-opus-4-5",
-                    "claude-opus-4-1",
                     "claude-sonnet-4-6",
-                    "claude-sonnet-4-5",
-                    "claude-sonnet-4",
                     "claude-haiku-4-5",
                     "claude-3-5-haiku",
                     "gemini-3.5-flash",
@@ -238,6 +239,7 @@ namespace TxtAIEditor.Core.Services
                     "qwen3.5-plus",
                     "deepseek-v4-pro",
                     "deepseek-v4-flash",
+                    "deepseek-v4-flash-vision-exp",
                     "minimax-m2.7",
                     "minimax-m2.5",
                     "glm-5.2",
@@ -271,17 +273,12 @@ namespace TxtAIEditor.Core.Services
             {
                 return new[]
                 {
-                    "gpt-oss:20b",
                     "qwen3.5:397b",
                     "glm-5.2",
-                    "gpt-oss:120b",
                     "nemotron-3-nano:30b",
                     "ministral-3:14b",
                     "gemma3:4b",
                     "nemotron-3-super",
-                    "deepseek-v3.1:671b",
-                    "devstral-2:123b",
-                    "devstral-small-2:24b",
                     "gemini-3-flash-preview",
                     "minimax-m3",
                     "deepseek-v4-flash",
@@ -390,7 +387,7 @@ namespace TxtAIEditor.Core.Services
 
             if (provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase))
             {
-                return !string.IsNullOrEmpty(settings.LlmModelOpenRouter) ? settings.LlmModelOpenRouter : "meta-llama/llama-3.3-70b-instruct:free";
+                return !string.IsNullOrEmpty(settings.LlmModelOpenRouter) ? settings.LlmModelOpenRouter : "openrouter/free";
             }
 
             if (provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase))
