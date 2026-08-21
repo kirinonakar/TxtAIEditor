@@ -2,9 +2,11 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Interfaces;
@@ -153,7 +155,12 @@ namespace TxtAIEditor.Controls
             }
 
             // Update UI components in a single synchronous block to prevent duplicate display and empty states
-            SetBranchText(branchText, isGitNotDetected);
+            SetBranchText(
+                branchText,
+                isGitNotDetected,
+                changedCount,
+                unpushedCount,
+                localizedBranch);
             _leftSidebar.GitRepoPath.Text = $"{repoPath}";
             ToolTipService.SetToolTip(_leftSidebar.GitRepoPath, repoPath);
             UpdateInitButtonState(isGitNotDetected ? null : repoPath);
@@ -253,13 +260,53 @@ namespace TxtAIEditor.Controls
             return _getString("GitNotDetected", "Git: 감지 안됨");
         }
 
-        private void SetBranchText(string text, bool isNotDetected)
+        private void SetBranchText(
+            string text,
+            bool isNotDetected,
+            int? changedCount = null,
+            int unpushedCount = 0,
+            string? statusBranchText = null)
         {
             string? stateTag = isNotDetected ? GitBranchStatus.NotDetectedTag : null;
             _leftSidebar.GitPanelBranch.Text = text;
             _leftSidebar.GitPanelBranch.Tag = stateTag;
-            _statusGitBranch.Text = text;
             _statusGitBranch.Tag = stateTag;
+
+            _statusGitBranch.Inlines.Clear();
+            _statusGitBranch.Text = string.Empty;
+            if (isNotDetected || !changedCount.HasValue)
+            {
+                _statusGitBranch.Text = text;
+                return;
+            }
+
+            AddStatusBranchRun(statusBranchText ?? text);
+            AddStatusBranchRun(" (");
+            AddStatusBranchRun(
+                changedCount.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                highlight: changedCount.Value != 0);
+            if (unpushedCount > 0)
+            {
+                AddStatusBranchRun(", ↑ ");
+                AddStatusBranchRun(
+                    unpushedCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    highlight: unpushedCount != 0);
+            }
+
+            AddStatusBranchRun(")");
+        }
+
+        private void AddStatusBranchRun(string text, bool highlight = false)
+        {
+            var run = new Run { Text = text };
+            if (highlight)
+            {
+                run.Foreground = new SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 0, 120, 212));
+                run.FontWeight = FontWeights.Bold;
+            }
+
+            _statusGitBranch.Inlines.Add(run);
         }
 
         public async Task StageAllAsync(string repoPath)
