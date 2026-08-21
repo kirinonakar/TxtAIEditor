@@ -11,9 +11,6 @@ using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
 using TxtAIEditor.ViewModels;
 using Windows.Storage.Pickers;
-using System.Text.RegularExpressions;
-using System.Runtime.InteropServices;
-using System.Text;
  
 namespace TxtAIEditor.Controls
 {
@@ -35,6 +32,10 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, Task> _loadArchiveEntryIntoTabAsync;
         private readonly ILocalizationService _localizationService;
         private readonly Func<string> _homeFolderPathProvider;
+        private readonly ExplorerItemSorter _itemSorter = new();
+        private readonly ExplorerSearchService _searchService;
+        private readonly ExplorerGitStatusService _gitStatusService;
+        private readonly ExplorerBreadcrumbBuilder _breadcrumbBuilder;
         private System.Threading.CancellationTokenSource? _remoteCancellation;
         private System.Threading.CancellationTokenSource? _flatDirectoryLoadCancellation;
         private string _currentArchiveRemotePath = string.Empty;
@@ -47,13 +48,6 @@ namespace TxtAIEditor.Controls
         private bool _isForwardNavigation;
         private string _explorerStatusBaseText = string.Empty;
         private int _treeSelectionCount;
-
-        public enum ExplorerSortMode
-        {
-            Name,
-            Newest,
-            Oldest
-        }
 
         private sealed class ExplorerHistoryEntry
         {
@@ -68,8 +62,6 @@ namespace TxtAIEditor.Controls
             public string SecondaryPath { get; }
             public bool IsArchive { get; }
         }
-
-        private ExplorerSortMode _currentSortMode = ExplorerSortMode.Name;
 
         public ExplorerNavigationController(
             LeftSidebarPane leftSidebar,
@@ -105,6 +97,9 @@ namespace TxtAIEditor.Controls
             _loadArchiveEntryIntoTabAsync = loadArchiveEntryIntoTabAsync;
             _localizationService = localizationService;
             _homeFolderPathProvider = homeFolderPathProvider;
+            _searchService = new ExplorerSearchService(archiveExplorerService);
+            _gitStatusService = new ExplorerGitStatusService(gitService);
+            _breadcrumbBuilder = new ExplorerBreadcrumbBuilder(remoteWorkspaceService);
             _explorerStatusBaseText = _leftSidebar.ExplorerStatus.Text;
 
             WireEvents();
@@ -196,7 +191,7 @@ namespace TxtAIEditor.Controls
             SetCurrentFolderPath(folderPath);
 
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-            ExplorerSortMode sortMode = _currentSortMode;
+            ExplorerItemSorter.SortMode sortMode = _itemSorter.Mode;
             try
             {
                 List<ExplorerItem> items = await Task.Run(() =>
@@ -205,7 +200,9 @@ namespace TxtAIEditor.Controls
                     foreach (ExplorerItem item in _directoryService.CreateDirectoryItems(folderPath))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        if (_hideUnwantedFolders && item.IsFolder && IsHiddenFolderName(item.Name))
+                        if (_hideUnwantedFolders &&
+                            item.IsFolder &&
+                            ExplorerSearchService.IsHiddenFolderName(item.Name))
                         {
                             continue;
                         }
@@ -216,7 +213,7 @@ namespace TxtAIEditor.Controls
                         loadedItems.Add(item);
                     }
 
-                    return SortItems(loadedItems, sortMode).ToList();
+                    return _itemSorter.Sort(loadedItems, sortMode).ToList();
                 }, cancellationToken);
 
                 if (cancellation.IsCancellationRequested ||
@@ -305,10 +302,12 @@ namespace TxtAIEditor.Controls
                     _archiveExplorerService.CreateArchiveItems(archivePath, CurrentArchiveDirectory);
                 if (_hideUnwantedFolders)
                 {
-                    archiveItems = archiveItems.Where(item => !item.IsFolder || !IsHiddenFolderName(item.Name));
+                    archiveItems = archiveItems.Where(item =>
+                        !item.IsFolder ||
+                        !ExplorerSearchService.IsHiddenFolderName(item.Name));
                 }
 
-                foreach (var item in SortItems(archiveItems))
+                foreach (var item in _itemSorter.Sort(archiveItems))
                 {
                     item.IsDark = isDark;
                     ApplyArchiveDisplayPath(item);
@@ -527,7 +526,9 @@ namespace TxtAIEditor.Controls
                 bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
                 foreach (RemoteDirectoryEntry entry in entries)
                 {
-                    if (_hideUnwantedFolders && entry.IsDirectory && IsHiddenFolderName(entry.Name))
+                    if (_hideUnwantedFolders &&
+                        entry.IsDirectory &&
+                        ExplorerSearchService.IsHiddenFolderName(entry.Name))
                     {
                         continue;
                     }
@@ -558,9 +559,9 @@ namespace TxtAIEditor.Controls
                     _viewModel.ExplorerItems.Add(item);
                 }
 
-                if (_currentSortMode != ExplorerSortMode.Name)
+                if (_itemSorter.Mode != ExplorerItemSorter.SortMode.Name)
                 {
-                    var sorted = SortItems(_viewModel.ExplorerItems).ToList();
+                    var sorted = _itemSorter.Sort(_viewModel.ExplorerItems).ToList();
                     _viewModel.ExplorerItems.Clear();
                     foreach (ExplorerItem item in sorted)
                     {
@@ -591,7 +592,7 @@ namespace TxtAIEditor.Controls
             }
 
             var matched = _viewModel.ExplorerItems
-                .Where(item => MatchesPattern(item.Name, query))
+                .Where(item => ExplorerSearchService.MatchesPattern(item.Name, query))
                 .ToList();
             _viewModel.ExplorerItems.Clear();
             foreach (ExplorerItem item in matched)
@@ -853,7 +854,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (string.Equals(Path.GetExtension(item.Path), LnkExtension, StringComparison.OrdinalIgnoreCase))
+            if (ShellShortcutResolver.IsShortcut(item.Path))
             {
                 HandleLnkFile(lnkPath: item.Path);
                 return;
@@ -1004,7 +1005,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            foreach (var childItem in SortItems(childItems))
+            foreach (var childItem in _itemSorter.Sort(childItems))
             {
                 childItem.IsDark = isDark;
                 ApplyArchiveDisplayPath(childItem);
@@ -1042,7 +1043,7 @@ namespace TxtAIEditor.Controls
 
                 bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
                 node.Children.Clear();
-                foreach (ExplorerItem childItem in SortItems(
+                foreach (ExplorerItem childItem in _itemSorter.Sort(
                              _archiveExplorerService.CreateArchiveItems(
                                  localArchivePath,
                                  string.Empty)))
@@ -1401,7 +1402,7 @@ namespace TxtAIEditor.Controls
             else if (item.IsArchive || _archiveExplorerService.IsSupportedArchiveFile(item.Path))
             {
                 LoadArchiveDirectoryRoot(item.Path, string.Empty);
-            } else if (string.Equals(Path.GetExtension(item.Path), LnkExtension, StringComparison.OrdinalIgnoreCase))
+            } else if (ShellShortcutResolver.IsShortcut(item.Path))
             {
                 HandleLnkFile(lnkPath: item.Path);
             }
@@ -1437,25 +1438,20 @@ namespace TxtAIEditor.Controls
 
         private void UpdateExplorerBreadcrumb()
         {
-            var segments = new List<ExplorerBreadcrumbSegment>();
+            List<ExplorerBreadcrumbSegment> segments;
             try
             {
-                if (IsViewingArchive && !string.IsNullOrWhiteSpace(CurrentArchivePath))
-                {
-                    BuildArchiveBreadcrumb(segments);
-                }
-                else if (IsViewingRemote && _remoteWorkspaceService.IsActive)
-                {
-                    BuildRemoteBreadcrumb(segments, CurrentFolderPath);
-                }
-                else if (!string.IsNullOrWhiteSpace(CurrentFolderPath))
-                {
-                    BuildLocalBreadcrumb(segments, CurrentFolderPath);
-                }
+                segments = _breadcrumbBuilder.Build(
+                    CurrentFolderPath,
+                    CurrentArchivePath,
+                    CurrentArchiveDirectory,
+                    _currentArchiveRemotePath,
+                    IsViewingRemote);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed building explorer breadcrumb: {ex.Message}");
+                segments = new List<ExplorerBreadcrumbSegment>();
             }
 
             bool hasSegments = segments.Count > 0;
@@ -1463,125 +1459,6 @@ namespace TxtAIEditor.Controls
             // 바로 올바른 폭으로 그려 SizeChanged를 기다리지 않는다.
             _leftSidebar.ExplorerBreadcrumb.Visibility = hasSegments ? Visibility.Visible : Visibility.Collapsed;
             _leftSidebar.ExplorerBreadcrumb.ItemsSource = hasSegments ? segments : null;
-        }
-
-        private void BuildLocalBreadcrumb(List<ExplorerBreadcrumbSegment> segments, string folderPath)
-        {
-            string root = Path.GetPathRoot(folderPath) ?? string.Empty;
-            string remainder = string.IsNullOrEmpty(root) ? folderPath : folderPath[root.Length..];
-            if (!string.IsNullOrEmpty(root))
-            {
-                string rootName = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                segments.Add(new ExplorerBreadcrumbSegment(
-                    string.IsNullOrEmpty(rootName) ? root : rootName,
-                    root));
-            }
-
-            string current = root;
-            foreach (string part in remainder.Split(
-                new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
-                StringSplitOptions.RemoveEmptyEntries))
-            {
-                current = string.IsNullOrEmpty(current) ? part : Path.Combine(current, part);
-                segments.Add(new ExplorerBreadcrumbSegment(part, current));
-            }
-        }
-
-        private void BuildRemoteBreadcrumb(List<ExplorerBreadcrumbSegment> segments, string virtualPath)
-        {
-            if (!RemotePath.TryParse(virtualPath, out Guid serverId, out string remotePath))
-            {
-                return;
-            }
-
-            string serverName = RemotePath.GetServerNameHint(virtualPath)
-                ?? _remoteWorkspaceService.ActiveConnection?.Profile.Name
-                ?? "Remote";
-            segments.Add(new ExplorerBreadcrumbSegment(
-                serverName,
-                RemotePath.Create(serverId, "/", isDirectory: true, serverName)));
-
-            string current = string.Empty;
-            foreach (string part in remotePath.Split('/', StringSplitOptions.RemoveEmptyEntries))
-            {
-                current = $"{current}/{part}";
-                segments.Add(new ExplorerBreadcrumbSegment(
-                    part,
-                    RemotePath.Create(serverId, current, isDirectory: true, serverName)));
-            }
-        }
-
-        private void BuildArchiveBreadcrumb(List<ExplorerBreadcrumbSegment> segments)
-        {
-            string archivePath = CurrentArchivePath;
-            string entryDirectory = CurrentArchiveDirectory;
-
-            if (!string.IsNullOrWhiteSpace(_currentArchiveRemotePath) &&
-                RemotePath.TryParse(_currentArchiveRemotePath, out Guid serverId, out string remoteArchivePath))
-            {
-                string serverName = RemotePath.GetServerNameHint(_currentArchiveRemotePath) ?? "Remote";
-                segments.Add(new ExplorerBreadcrumbSegment(
-                    serverName,
-                    RemotePath.Create(serverId, "/", isDirectory: true, serverName)));
-
-                string current = string.Empty;
-                string[] archiveParts = remoteArchivePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-                for (int i = 0; i < archiveParts.Length; i++)
-                {
-                    current = $"{current}/{archiveParts[i]}";
-                    bool isLast = i == archiveParts.Length - 1;
-                    segments.Add(new ExplorerBreadcrumbSegment(
-                        archiveParts[i],
-                        isLast
-                            ? RemotePath.GetParent(_currentArchiveRemotePath)
-                            : RemotePath.Create(serverId, current, isDirectory: true, serverName)));
-                }
-            }
-            else
-            {
-                string root = Path.GetPathRoot(archivePath) ?? string.Empty;
-                string remainder = string.IsNullOrEmpty(root) ? archivePath : archivePath[root.Length..];
-                if (!string.IsNullOrEmpty(root))
-                {
-                    string rootName = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                    segments.Add(new ExplorerBreadcrumbSegment(
-                        string.IsNullOrEmpty(rootName) ? root : rootName,
-                        root));
-                }
-
-                string current = root;
-                string[] archiveParts = remainder.Split(
-                    new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
-                    StringSplitOptions.RemoveEmptyEntries);
-                for (int i = 0; i < archiveParts.Length; i++)
-                {
-                    current = string.IsNullOrEmpty(current) ? archiveParts[i] : Path.Combine(current, archiveParts[i]);
-                    bool isLast = i == archiveParts.Length - 1;
-                    segments.Add(new ExplorerBreadcrumbSegment(
-                        archiveParts[i],
-                        isLast ? (Path.GetDirectoryName(archivePath) ?? root) : current));
-                }
-            }
-
-            segments.Add(new ExplorerBreadcrumbSegment(
-                "!",
-                archivePath,
-                isArchive: true,
-                archivePath: archivePath));
-
-            if (!string.IsNullOrWhiteSpace(entryDirectory))
-            {
-                string currentEntry = string.Empty;
-                foreach (string part in entryDirectory.Split('/', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    currentEntry = string.IsNullOrEmpty(currentEntry) ? part : $"{currentEntry}/{part}";
-                    segments.Add(new ExplorerBreadcrumbSegment(
-                        part,
-                        currentEntry,
-                        isArchive: true,
-                        archivePath: archivePath));
-                }
-            }
         }
 
         private void OnExplorerBreadcrumbItemClicked(object? sender, ExplorerPathSegmentClickedEventArgs e)
@@ -1689,171 +1566,18 @@ namespace TxtAIEditor.Controls
         public async Task UpdateGitStatusesAsync()
         {
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-            if (IsViewingArchive)
-            {
-                _leftSidebar.DispatcherQueue.TryEnqueue(() =>
-                {
-                    foreach (var item in GetVisibleExplorerItems())
-                    {
-                        item.IsDark = isDark;
-                        item.GitStatus = ExplorerItem.GitStatusType.Clean;
-                    }
-                });
-                return;
-            }
-
-            string repoPath = _gitService.FindRepositoryRoot(CurrentFolderPath) ?? string.Empty;
-            if (string.IsNullOrEmpty(repoPath))
-            {
-                _leftSidebar.DispatcherQueue.TryEnqueue(() =>
-                {
-                    foreach (var item in GetVisibleExplorerItems())
-                    {
-                        item.IsDark = isDark;
-                        item.GitStatus = ExplorerItem.GitStatusType.Clean;
-                    }
-                });
-                return;
-            }
-
-            var statuses = await _gitService.GetFileStatusesAsync(
-                repoPath,
-                includeAllUntrackedFiles: true,
-                matchIgnoredDirectories: true);
+            Dictionary<string, string>? statuses = IsViewingArchive
+                ? null
+                : await _gitStatusService.GetStatusesAsync(CurrentFolderPath);
             _leftSidebar.DispatcherQueue.TryEnqueue(() =>
             {
-                UpdateItemsGitStatus(GetVisibleExplorerItems(), statuses, isDark);
+                _gitStatusService.ApplyStatuses(GetVisibleExplorerItems(), statuses, isDark);
             });
-        }
-
-        private bool IsPathIgnored(string path, System.Collections.Generic.Dictionary<string, string> statuses)
-        {
-            if (statuses.TryGetValue(path, out var status) && status.Trim() == "!!")
-            {
-                return true;
-            }
-
-            foreach (var kvp in statuses)
-            {
-                if (kvp.Value.Trim() == "!!")
-                {
-                    string ignoredDir = kvp.Key;
-                    string ignoredDirWithSlash = ignoredDir.EndsWith(Path.DirectorySeparatorChar)
-                        ? ignoredDir
-                        : ignoredDir + Path.DirectorySeparatorChar;
-
-                    if (path.StartsWith(ignoredDirWithSlash, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        private void UpdateItemsGitStatus(
-            System.Collections.Generic.IEnumerable<ExplorerItem> items,
-            System.Collections.Generic.Dictionary<string, string> statuses,
-            bool isDark)
-        {
-            foreach (var item in items)
-            {
-                item.IsDark = isDark;
-                if (item.IsFolder)
-                {
-                    bool hasModified = false;
-                    bool hasAdded = false;
-
-                    if (statuses.TryGetValue(item.Path, out string? folderStatus))
-                    {
-                        string trimmedFolderStatus = folderStatus.Trim();
-                        if (trimmedFolderStatus == "??")
-                        {
-                            hasAdded = true;
-                        }
-                        else if (trimmedFolderStatus != "!!")
-                        {
-                            hasModified = true;
-                        }
-                    }
-
-                    string folderPathWithSlash = item.Path.EndsWith(Path.DirectorySeparatorChar)
-                        ? item.Path
-                        : item.Path + Path.DirectorySeparatorChar;
-
-                    foreach (var kvp in statuses)
-                    {
-                        if (kvp.Key.StartsWith(folderPathWithSlash, StringComparison.OrdinalIgnoreCase))
-                        {
-                            string status = kvp.Value.Trim();
-                            if (status == "??")
-                            {
-                                hasAdded = true;
-                            }
-                            else if (status != "!!")
-                            {
-                                hasModified = true;
-                            }
-                        }
-                    }
-
-                    if (hasModified)
-                    {
-                        item.GitStatus = ExplorerItem.GitStatusType.Modified;
-                    }
-                    else if (hasAdded)
-                    {
-                        item.GitStatus = ExplorerItem.GitStatusType.Added;
-                    }
-                    else if (IsPathIgnored(item.Path, statuses))
-                    {
-                        item.GitStatus = ExplorerItem.GitStatusType.Ignored;
-                    }
-                    else
-                    {
-                        item.GitStatus = ExplorerItem.GitStatusType.Clean;
-                    }
-                }
-                else
-                {
-                    if (statuses.TryGetValue(item.Path, out string? status))
-                    {
-                        string trimmedStatus = status.Trim();
-                        if (trimmedStatus == "??")
-                        {
-                            item.GitStatus = ExplorerItem.GitStatusType.Added;
-                        }
-                        else if (trimmedStatus == "!!")
-                        {
-                            item.GitStatus = ExplorerItem.GitStatusType.Ignored;
-                        }
-                        else
-                        {
-                            item.GitStatus = ExplorerItem.GitStatusType.Modified;
-                        }
-                    }
-                    else if (IsPathIgnored(item.Path, statuses))
-                    {
-                        item.GitStatus = ExplorerItem.GitStatusType.Ignored;
-                    }
-                    else
-                    {
-                        item.GitStatus = ExplorerItem.GitStatusType.Clean;
-                    }
-                }
-            }
         }
 
         private void OnExplorerSortClick(object sender, RoutedEventArgs e)
         {
-            _currentSortMode = _currentSortMode switch
-            {
-                ExplorerSortMode.Name => ExplorerSortMode.Newest,
-                ExplorerSortMode.Newest => ExplorerSortMode.Oldest,
-                ExplorerSortMode.Oldest => ExplorerSortMode.Name,
-                _ => ExplorerSortMode.Name
-            };
+            _itemSorter.CycleMode();
 
             UpdateSortButtonVisuals();
 
@@ -1871,7 +1595,7 @@ namespace TxtAIEditor.Controls
 
             if (_viewModel.ExplorerItems.Count > 0)
             {
-                var sorted = SortItems(_viewModel.ExplorerItems).ToList();
+                var sorted = _itemSorter.Sort(_viewModel.ExplorerItems).ToList();
                 _viewModel.ExplorerItems.ReplaceAll(sorted);
             }
         }
@@ -1882,19 +1606,19 @@ namespace TxtAIEditor.Controls
             string fallback;
             string glyph;
 
-            switch (_currentSortMode)
+            switch (_itemSorter.Mode)
             {
-                case ExplorerSortMode.Name:
+                case ExplorerItemSorter.SortMode.Name:
                     key = "ExplorerSortName";
                     fallback = "이름순 정렬";
                     glyph = "\uE8CB"; // Standard sort glyph
                     break;
-                case ExplorerSortMode.Newest:
+                case ExplorerItemSorter.SortMode.Newest:
                     key = "ExplorerSortNewest";
                     fallback = "수정한 날짜 최신순 정렬";
                     glyph = "\uE74B"; // Down arrow
                     break;
-                case ExplorerSortMode.Oldest:
+                case ExplorerItemSorter.SortMode.Oldest:
                     key = "ExplorerSortOldest";
                     fallback = "수정한 날짜 오래된순 정렬";
                     glyph = "\uE74A"; // Up arrow
@@ -1913,43 +1637,6 @@ namespace TxtAIEditor.Controls
             {
                 fontIcon.Glyph = glyph;
             }
-        }
-
-        private System.Collections.Generic.IEnumerable<ExplorerItem> SortItems(
-            System.Collections.Generic.IEnumerable<ExplorerItem> items,
-            ExplorerSortMode? sortMode = null)
-        {
-            var folderList = new System.Collections.Generic.List<ExplorerItem>();
-            var fileList = new System.Collections.Generic.List<ExplorerItem>();
-
-            foreach (var item in items)
-            {
-                if (item.IsFolder)
-                    folderList.Add(item);
-                else
-                    fileList.Add(item);
-            }
-
-            switch (sortMode ?? _currentSortMode)
-            {
-                case ExplorerSortMode.Name:
-                    folderList.Sort((a, b) => StrCmpLogicalW(a.Name, b.Name));
-                    fileList.Sort((a, b) => StrCmpLogicalW(a.Name, b.Name));
-                    break;
-                case ExplorerSortMode.Newest:
-                    folderList.Sort((a, b) => b.ModifiedTime.CompareTo(a.ModifiedTime));
-                    fileList.Sort((a, b) => b.ModifiedTime.CompareTo(a.ModifiedTime));
-                    break;
-                case ExplorerSortMode.Oldest:
-                    folderList.Sort((a, b) => a.ModifiedTime.CompareTo(b.ModifiedTime));
-                    fileList.Sort((a, b) => a.ModifiedTime.CompareTo(b.ModifiedTime));
-                    break;
-            }
-
-            var sorted = new System.Collections.Generic.List<ExplorerItem>(folderList.Count + fileList.Count);
-            sorted.AddRange(folderList);
-            sorted.AddRange(fileList);
-            return sorted;
         }
 
         private string _lastFilterQuery = string.Empty;
@@ -2024,7 +1711,8 @@ namespace TxtAIEditor.Controls
             }
 
             string currentRoot = CurrentFolderPath;
-            var matchedItems = await Task.Run(() => PerformRecursiveSearch(currentRoot, query));
+            var matchedItems = await Task.Run(() =>
+                _searchService.SearchLocal(currentRoot, query, _hideUnwantedFolders));
 
             if (query == _lastFilterQuery && currentRoot == CurrentFolderPath)
             {
@@ -2032,7 +1720,7 @@ namespace TxtAIEditor.Controls
                 {
                     _viewModel.ExplorerItems.Clear();
                     bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-                    foreach (var item in SortItems(matchedItems))
+                    foreach (var item in _itemSorter.Sort(matchedItems))
                     {
                         item.IsDark = isDark;
                         ApplyArchiveDisplayPath(item);
@@ -2062,11 +1750,17 @@ namespace TxtAIEditor.Controls
             string archivePath = CurrentArchivePath;
             string archiveDirectory = CurrentArchiveDirectory;
             var matchedItems = await Task.Run(() =>
-                _archiveExplorerService.SearchArchiveItems(archivePath, archiveDirectory, query, MatchesPattern));
+                _archiveExplorerService.SearchArchiveItems(
+                    archivePath,
+                    archiveDirectory,
+                    query,
+                    ExplorerSearchService.MatchesPattern));
 
             if (_hideUnwantedFolders)
             {
-                matchedItems = matchedItems.Where(item => !item.IsFolder || !IsHiddenFolderName(item.Name)).ToList();
+                matchedItems = matchedItems.Where(item =>
+                    !item.IsFolder ||
+                    !ExplorerSearchService.IsHiddenFolderName(item.Name)).ToList();
             }
 
             if (query == _lastFilterQuery &&
@@ -2077,7 +1771,7 @@ namespace TxtAIEditor.Controls
                 {
                     _viewModel.ExplorerItems.Clear();
                     bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-                    foreach (var item in SortItems(matchedItems))
+                    foreach (var item in _itemSorter.Sort(matchedItems))
                     {
                         item.IsDark = isDark;
                         _viewModel.ExplorerItems.Add(item);
@@ -2086,145 +1780,6 @@ namespace TxtAIEditor.Controls
                     SetExplorerStatusText(FormatExplorerFilterResult(_viewModel.ExplorerItems.Count));
                 });
             }
-        }
-
-        private static bool IsHiddenFolderName(string name)
-        {
-            return name.StartsWith(".", StringComparison.Ordinal) ||
-                string.Equals(name, "node_modules", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(name, "obj", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool MatchesPattern(string name, string pattern)
-        {
-            if (string.IsNullOrEmpty(pattern))
-                return true;
-
-            if (pattern.Contains('*') || pattern.Contains('?'))
-            {
-                string regexPattern = "^" + Regex.Escape(pattern)
-                    .Replace("\\*", ".*")
-                    .Replace("\\?", ".") + "$";
-                return Regex.IsMatch(name, regexPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-            }
-
-            return name.Contains(pattern, StringComparison.OrdinalIgnoreCase);
-        }
-
-
-        private System.Collections.Generic.List<ExplorerItem> PerformRecursiveSearch(string rootPath, string query)
-        {
-            var results = new System.Collections.Generic.List<ExplorerItem>();
-            var dirsToProcess = new System.Collections.Generic.Stack<string>();
-            dirsToProcess.Push(rootPath);
-
-            var visited = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            try
-            {
-                visited.Add(Path.GetFullPath(rootPath));
-            }
-            catch
-            {
-                visited.Add(rootPath);
-            }
-
-            var ignoredFolderNames = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "node_modules", "obj", ".git", ".vs", ".idea", "dist", "build", "out"
-            };
-
-            while (dirsToProcess.Count > 0)
-            {
-                string currentDir = dirsToProcess.Pop();
-                try
-                {
-                    var dirInfo = new DirectoryInfo(currentDir);
-
-                    if (currentDir != rootPath)
-                    {
-                        if (dirInfo.Attributes.HasFlag(FileAttributes.Hidden) ||
-                            dirInfo.Attributes.HasFlag(FileAttributes.ReparsePoint) ||
-                            ignoredFolderNames.Contains(dirInfo.Name) ||
-                            (_hideUnwantedFolders && IsHiddenFolderName(dirInfo.Name)))
-                        {
-                            continue;
-                        }
-                    }
-
-                    foreach (var file in dirInfo.GetFiles())
-                    {
-                        if (file.Attributes.HasFlag(FileAttributes.Hidden))
-                        {
-                            continue;
-                        }
-
-                        if (MatchesPattern(file.Name, query))
-                        {
-                            string relPath = Path.GetRelativePath(rootPath, file.FullName);
-                            string? relativeDir = Path.GetDirectoryName(relPath);
-
-                            results.Add(new ExplorerItem
-                            {
-                                Name = file.Name,
-                                Path = file.FullName,
-                                IsFolder = false,
-                                IsArchive = _archiveExplorerService.IsSupportedArchiveFile(file.FullName),
-                                ModifiedTime = file.LastWriteTime,
-                                SubPath = relativeDir ?? string.Empty
-                            });
-                        }
-                    }
-
-                    foreach (var subDir in dirInfo.GetDirectories())
-                    {
-                        if (subDir.Attributes.HasFlag(FileAttributes.Hidden) ||
-                            subDir.Attributes.HasFlag(FileAttributes.ReparsePoint) ||
-                            ignoredFolderNames.Contains(subDir.Name) ||
-                            (_hideUnwantedFolders && IsHiddenFolderName(subDir.Name)))
-                        {
-                            continue;
-                        }
-
-                        string canonicalSubPath;
-                        try
-                        {
-                            canonicalSubPath = Path.GetFullPath(subDir.FullName);
-                        }
-                        catch
-                        {
-                            canonicalSubPath = subDir.FullName;
-                        }
-
-                        if (!visited.Add(canonicalSubPath))
-                        {
-                            continue;
-                        }
-
-                        if (MatchesPattern(subDir.Name, query))
-                        {
-                            string relPath = Path.GetRelativePath(rootPath, subDir.FullName);
-                            string? relativeDir = Path.GetDirectoryName(relPath);
-
-                            results.Add(new ExplorerItem
-                            {
-                                Name = subDir.Name,
-                                Path = subDir.FullName,
-                                IsFolder = true,
-                                ModifiedTime = subDir.LastWriteTime,
-                                SubPath = relativeDir ?? string.Empty
-                            });
-                        }
-
-                        dirsToProcess.Push(subDir.FullName);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Error scanning folder {currentDir}: {ex.Message}");
-                }
-            }
-
-            return results;
         }
 
         private string FormatExplorerFilterResult(int matchCount)
@@ -2268,90 +1823,13 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private const string LnkExtension = ".lnk";
-
-        private static string? ResolveShortcutTarget(string lnkPath)
-        {
-            if (!string.Equals(Path.GetExtension(lnkPath), LnkExtension, StringComparison.OrdinalIgnoreCase))
-                return null;
-
-            try
-            {
-                var shellLinkType = Type.GetTypeFromCLSID(new Guid("00021401-0000-0000-C000-000000000046"))
-                    ?? throw new InvalidOperationException("Failed to get ShellLink type");
-                object shellLink = Activator.CreateInstance(shellLinkType)!;
-
-                var persistFile = (IPersistFile)shellLink;
-                persistFile.Load(lnkPath, 0); // STGM_READ
-
-                var link = (IShellLinkW)shellLink;
-                // Resolve the link (SLR_NO_UI = 0x01 avoids showing error dialogs)
-                link.Resolve(IntPtr.Zero, 0x01);
-
-                var sb = new StringBuilder(1024);
-                link.GetPath(sb, sb.Capacity, IntPtr.Zero, 0x00);
-                string targetPath = sb.ToString();
-
-                if (string.IsNullOrWhiteSpace(targetPath))
-                {
-                    sb.Clear();
-                    link.GetPath(sb, sb.Capacity, IntPtr.Zero, 0x04); // SLGP_RAWPATH
-                    targetPath = sb.ToString();
-                }
-
-                if (string.IsNullOrWhiteSpace(targetPath))
-                {
-                    if (link.GetIDList(out IntPtr pidl) == 0 && pidl != IntPtr.Zero)
-                    {
-                        try
-                        {
-                            var idListSb = new StringBuilder(1024);
-                            if (SHGetPathFromIDListW(pidl, idListSb))
-                            {
-                                targetPath = idListSb.ToString();
-                            }
-                        }
-                        finally
-                        {
-                            Marshal.FreeCoTaskMem(pidl);
-                        }
-                    }
-                }
-
-                if (!string.IsNullOrWhiteSpace(targetPath))
-                {
-                    targetPath = Environment.ExpandEnvironmentVariables(targetPath);
-                }
-
-                return targetPath;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to resolve shortcut target for '{lnkPath}': {ex.Message}");
-                return null;
-            }
-        }
-
         private void HandleLnkFile(string lnkPath)
         {
-            string? target = ResolveShortcutTarget(lnkPath);
+            string? target = ShellShortcutResolver.ResolveTarget(lnkPath);
             if (string.IsNullOrWhiteSpace(target))
             {
                 _ = _loadFileIntoTabAsync(lnkPath);
                 return;
-            }
-
-            if (!Directory.Exists(target) && !File.Exists(target) && !Path.IsPathRooted(target))
-            {
-                string? lnkDir = Path.GetDirectoryName(lnkPath);
-                if (!string.IsNullOrEmpty(lnkDir))
-                {
-                    string combined = Path.GetFullPath(Path.Combine(lnkDir, target));
-                    if (Directory.Exists(combined) || File.Exists(combined))
-                    {
-                        target = combined;
-                    }
-                }
             }
 
             if (Directory.Exists(target))
@@ -2368,60 +1846,5 @@ namespace TxtAIEditor.Controls
                 _ = _loadFileIntoTabAsync(lnkPath);
             }
         }
-
-        [System.Runtime.InteropServices.DllImport("shlwapi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, ExactSpelling = true)]
-        private static extern int StrCmpLogicalW(string x, string y);
-
-        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, ExactSpelling = true)]
-        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-        private static extern bool SHGetPathFromIDListW(IntPtr pidl, [Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszPath);
     }
-}
-
-[ComImport]
-[Guid("00021401-0000-0000-C000-000000000046")]
-internal class ShellLink
-{
-}
-
-[ComImport]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-[Guid("000214F9-0000-0000-C000-000000000046")]
-internal interface IShellLinkW
-{
-    void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszFile, int cchMaxPath, IntPtr pfd, uint fFlags);
-    [PreserveSig]
-    int GetIDList(out IntPtr ppidl);
-    void SetIDList(IntPtr pidl);
-    void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszName, int cchMaxName);
-    void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string pszName);
-    void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszDir, int cchMaxPath);
-    void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string pszDir);
-    void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszArgs, int cchMaxPath);
-    void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string pszArgs);
-    void GetHotkey(out short pwHotkey);
-    void SetHotkey(short wHotkey);
-    void GetShowCmd(out int piShowCmd);
-    void SetShowCmd(int iShowCmd);
-    void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszIconPath, int cchIconPath, out int piIcon);
-    void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string pszIconPath, int iIcon);
-    void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string pszPathRel, uint dwReserved);
-    void Resolve(IntPtr hwnd, uint fFlags);
-    void SetPath([MarshalAs(UnmanagedType.LPWStr)] string pszFile);
-}
-
-[ComImport]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-[Guid("0000010B-0000-0000-C000-000000000046")]
-internal interface IPersistFile
-{
-    // IPersist
-    void GetClassID(out Guid pClassID);
-    // IPersistFile
-    [PreserveSig]
-    int IsDirty();
-    void Load([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, uint dwMode);
-    void Save([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, [MarshalAs(UnmanagedType.Bool)] bool fRemember);
-    void SaveCompleted([MarshalAs(UnmanagedType.LPWStr)] string pszFileName);
-    void GetCurFile([MarshalAs(UnmanagedType.LPWStr)] out string ppszFileName);
 }
