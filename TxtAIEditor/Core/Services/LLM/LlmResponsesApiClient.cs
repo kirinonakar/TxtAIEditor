@@ -34,6 +34,12 @@ namespace TxtAIEditor.Core.Services.LLM
 
         private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(8);
 
+        public static bool IsDeepSeekModel(string model)
+        {
+            if (string.IsNullOrEmpty(model)) return false;
+            return model.Contains("deepseek", StringComparison.OrdinalIgnoreCase);
+        }
+
         public static async Task<bool> SupportsAsync(
             HttpClient httpClient,
             string endpoint,
@@ -42,6 +48,12 @@ namespace TxtAIEditor.Core.Services.LLM
             CancellationToken cancellationToken = default,
             Action<HttpRequestMessage>? configureRequest = null)
         {
+            // DeepSeek models always use Chat Completions; skip the Responses API probe.
+            if (IsDeepSeekModel(model))
+            {
+                return false;
+            }
+
             string requestUrl = BuildRequestUrl(endpoint);
             if (string.IsNullOrWhiteSpace(requestUrl))
             {
