@@ -174,6 +174,7 @@ namespace TxtAIEditor.Core.Services
                 return new[]
                 {
                     "grok-4.5",
+                    "ox-alpha-free",
                     "glm-5.3",
                     "glm-5.2",
                     "glm-5.1",
@@ -191,7 +192,8 @@ namespace TxtAIEditor.Core.Services
                     "qwen3.6-plus",
                     "deepseek-v4-pro",
                     "deepseek-v4-flash",
-                    "hy3"
+                    "hy3",
+                    "muse-spark-1.2-contributor"
                 };
             }
 
@@ -245,10 +247,12 @@ namespace TxtAIEditor.Core.Services
                     "kimi-k2.6",
                     "grok-build-0.1",
                     "big-pickle",
+                    "x-preview-f-free",
                     "mimo-v2.5-free",
                     "north-mini-code-free",
                     "nemotron-3-ultra-free",
-                    "deepseek-v4-flash-free"
+                    "deepseek-v4-flash-free",
+                    "muse-spark-1.2-contributor-free"
                 };
             }
 

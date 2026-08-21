@@ -68,6 +68,14 @@ namespace TxtAIEditor.Core.Services.LLM
             return model.StartsWith("hy3", StringComparison.OrdinalIgnoreCase);
         }
 
+        private static bool UsesResponsesApi(string model)
+        {
+            if (string.IsNullOrEmpty(model)) return false;
+            return model.StartsWith("gpt-", StringComparison.OrdinalIgnoreCase) ||
+                   model.StartsWith("grok-", StringComparison.OrdinalIgnoreCase) ||
+                   model.StartsWith("muse-spark-", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static string? MapHy3ThinkingLevel(string thinkingLevel)
         {
             string level = (thinkingLevel ?? string.Empty).ToLowerInvariant();
@@ -111,13 +119,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 attachments,
                 tools);
 
-            if (!IsHy3Model(model) &&
-                await LlmResponsesApiClient.SupportsAsync(
-                    _httpClient,
-                    endpoint,
-                    apiKey,
-                    model,
-                    cancellationToken))
+            if (UsesResponsesApi(model))
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 return await LlmResponsesApiClient.GenerateCompletionAsync(
@@ -297,13 +299,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 attachments,
                 tools);
 
-            if (!IsHy3Model(model) &&
-                await LlmResponsesApiClient.SupportsAsync(
-                    _httpClient,
-                    endpoint,
-                    apiKey,
-                    model,
-                    cancellationToken))
+            if (UsesResponsesApi(model))
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 await LlmResponsesApiClient.GenerateCompletionStreamAsync(
