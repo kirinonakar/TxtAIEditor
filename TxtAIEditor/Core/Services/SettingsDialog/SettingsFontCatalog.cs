@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing.Text;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -53,19 +55,61 @@ namespace TxtAIEditor.Core.Services
 
         private static IEnumerable<string> GetFontFamiliesFromRegistryEntry(string valueName, string? fontFileName)
         {
+            if (fontFileName?.Trim().EndsWith(".ttc", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                IReadOnlyList<string> collectionFamilies = GetFontFamiliesFromCollectionFile(fontFileName);
+                if (collectionFamilies.Count > 0)
+                {
+                    return collectionFamilies;
+                }
+            }
+
             string registeredNames = Regex.Replace(valueName, @"\s*\([^)]+\)\s*;?\s*$", string.Empty).Trim();
             string[] names = fontFileName?.Trim().EndsWith(".ttc", StringComparison.OrdinalIgnoreCase) == true
                 ? Regex.Split(registeredNames, @"\s+&\s+")
                 : new[] { registeredNames };
 
-            foreach (string name in names)
+            return names
+                .Select(NormalizeFontFamilyName)
+                .Where(family => !string.IsNullOrWhiteSpace(family));
+        }
+
+        private static IReadOnlyList<string> GetFontFamiliesFromCollectionFile(string fontFileName)
+        {
+            try
             {
-                string family = Regex.Replace(name, @"\s+(Regular|Normal|Bold|Italic|Oblique|Light|Medium|SemiBold|Semibold|ExtraLight|ExtraBold|Black|Thin|Condensed|Narrow)$", string.Empty, RegexOptions.IgnoreCase).Trim();
-                if (!string.IsNullOrWhiteSpace(family))
+                string fontPath = Environment.ExpandEnvironmentVariables(fontFileName.Trim().Trim('"'));
+                if (!Path.IsPathFullyQualified(fontPath))
                 {
-                    yield return family;
+                    fontPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), fontPath);
                 }
+
+                if (!File.Exists(fontPath))
+                {
+                    return Array.Empty<string>();
+                }
+
+                using var collection = new PrivateFontCollection();
+                collection.AddFontFile(fontPath);
+                return collection.Families
+                    .Select(family => NormalizeFontFamilyName(family.Name))
+                    .Where(family => !string.IsNullOrWhiteSpace(family))
+                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
             }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+        private static string NormalizeFontFamilyName(string name)
+        {
+            return Regex.Replace(
+                name,
+                @"(?:\s+(?:Regular|Normal|Bold|Italic|Oblique|Light|Medium|SemiLight|DemiLight|SemiBold|DemiBold|ExtraLight|ExtraBold|UltraLight|UltraBold|Black|Heavy|Thin|Condensed|Narrow))+$",
+                string.Empty,
+                RegexOptions.IgnoreCase).Trim();
         }
     }
 }
