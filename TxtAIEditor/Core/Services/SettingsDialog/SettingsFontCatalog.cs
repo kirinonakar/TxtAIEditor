@@ -42,8 +42,8 @@ namespace TxtAIEditor.Core.Services
             {
                 foreach (string valueName in key.GetValueNames())
                 {
-                    string family = NormalizeFontRegistryName(valueName);
-                    if (!string.IsNullOrWhiteSpace(family))
+                    string? fontFileName = key.GetValue(valueName) as string;
+                    foreach (string family in GetFontFamiliesFromRegistryEntry(valueName, fontFileName))
                     {
                         fonts.Add(family);
                     }
@@ -51,11 +51,21 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static string NormalizeFontRegistryName(string valueName)
+        private static IEnumerable<string> GetFontFamiliesFromRegistryEntry(string valueName, string? fontFileName)
         {
-            string family = Regex.Replace(valueName, @"\s*\([^)]+\)\s*$", string.Empty).Trim();
-            family = Regex.Replace(family, @"\s+(Regular|Normal|Bold|Italic|Oblique|Light|Medium|SemiBold|Semibold|ExtraLight|ExtraBold|Black|Thin|Condensed|Narrow)$", string.Empty, RegexOptions.IgnoreCase).Trim();
-            return family;
+            string registeredNames = Regex.Replace(valueName, @"\s*\([^)]+\)\s*;?\s*$", string.Empty).Trim();
+            string[] names = fontFileName?.Trim().EndsWith(".ttc", StringComparison.OrdinalIgnoreCase) == true
+                ? Regex.Split(registeredNames, @"\s+&\s+")
+                : new[] { registeredNames };
+
+            foreach (string name in names)
+            {
+                string family = Regex.Replace(name, @"\s+(Regular|Normal|Bold|Italic|Oblique|Light|Medium|SemiBold|Semibold|ExtraLight|ExtraBold|Black|Thin|Condensed|Narrow)$", string.Empty, RegexOptions.IgnoreCase).Trim();
+                if (!string.IsNullOrWhiteSpace(family))
+                {
+                    yield return family;
+                }
+            }
         }
     }
 }
