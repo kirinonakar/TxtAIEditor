@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -53,6 +54,7 @@ namespace TxtAIEditor.Controls
             var selectedItems = _selection.GetSelectedItems(sender)
                 .Where(ExplorerItemCapabilities.IsRemote)
                 .ToList();
+            selectedItems = RemoveItemsCoveredBySelectedFolders(selectedItems);
             if (selectedItems.Count == 0)
             {
                 return;
@@ -278,6 +280,52 @@ namespace TxtAIEditor.Controls
                 return homeFolder;
             }
             return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        }
+
+        private static List<ExplorerItem> RemoveItemsCoveredBySelectedFolders(
+            IReadOnlyList<ExplorerItem> selectedItems)
+        {
+            var parsedItems = new List<(ExplorerItem Item, Guid ServerId, string RemotePath)>();
+            foreach (ExplorerItem item in selectedItems)
+            {
+                if (RemotePath.TryParse(item.Path, out Guid serverId, out string remotePath))
+                {
+                    parsedItems.Add((item, serverId, remotePath));
+                }
+            }
+
+            var selectedFolders = parsedItems
+                .Where(candidate => candidate.Item.IsFolder)
+                .ToList();
+
+            return selectedItems
+                .Where(item =>
+                {
+                    var candidate = parsedItems.FirstOrDefault(parsed => ReferenceEquals(parsed.Item, item));
+                    if (candidate.Item == null)
+                    {
+                        return true;
+                    }
+
+                    return !selectedFolders.Any(folder =>
+                        !ReferenceEquals(folder.Item, item) &&
+                        folder.ServerId == candidate.ServerId &&
+                        IsRemoteDescendant(candidate.RemotePath, folder.RemotePath));
+                })
+                .ToList();
+        }
+
+        private static bool IsRemoteDescendant(string candidatePath, string folderPath)
+        {
+            if (string.Equals(candidatePath, folderPath, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            string descendantPrefix = string.Equals(folderPath, "/", StringComparison.Ordinal)
+                ? "/"
+                : folderPath.TrimEnd('/') + "/";
+            return candidatePath.StartsWith(descendantPrefix, StringComparison.Ordinal);
         }
 
         private string FormatRemoteTransferStatus(
