@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -18,11 +17,10 @@ namespace TxtAIEditor.Core.Services
 
         public SettingsTerminalPanel(
             EditorSettings settings,
-            IReadOnlyList<string> fontFamilies,
             Func<string, string, string> getString)
         {
             _terminalProfileCombo = CreateProfileCombo(settings, getString);
-            _terminalFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.TerminalFontFamily, fontFamilies);
+            _terminalFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.TerminalFontFamily);
             _terminalSizeSlider = new Slider { Minimum = 8, Maximum = 36, Value = Math.Clamp(settings.TerminalFontSize, 8, 36), StepFrequency = 1 };
 
             var cardContent = new StackPanel { Spacing = 6 };

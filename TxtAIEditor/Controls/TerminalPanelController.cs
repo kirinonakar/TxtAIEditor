@@ -98,6 +98,7 @@ namespace TxtAIEditor.Controls
 
             string fileName = Path.GetFileName(filePath);
             string extension = Path.GetExtension(filePath);
+            bool activateVenv = extension.Equals(".py", StringComparison.OrdinalIgnoreCase);
             string command = extension.ToLowerInvariant() switch
             {
                 ".ps1" => fileName.Contains(' ') ? $".\\\"{fileName}\"" : $".\\{fileName}",
@@ -106,7 +107,7 @@ namespace TxtAIEditor.Controls
             };
 
             _topToolbar.TerminalIsChecked = true;
-            _editorWorkspace.ShowTerminalAndRunCommand(workingDirectory, command);
+            _editorWorkspace.ShowTerminalAndRunCommand(workingDirectory, command, activateVenv);
         }
 
         private string GetWorkingDirectory()

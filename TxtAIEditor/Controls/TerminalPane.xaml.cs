@@ -128,7 +128,7 @@ namespace TxtAIEditor.Controls
             _ = StartTerminalAsync(resolvedDirectory, shellProfile, authenticationPassword);
         }
 
-        public void OpenTerminalWithCommand(string workingDirectory, string command)
+        public void OpenTerminalWithCommand(string workingDirectory, string command, bool activateVenv = false)
         {
             if (string.IsNullOrWhiteSpace(workingDirectory) || string.IsNullOrWhiteSpace(command))
             {
@@ -151,7 +151,50 @@ namespace TxtAIEditor.Controls
             }
 
             var shellProfile = TerminalShellProfile.Resolve(_terminalProfileId);
-            _ = StartTerminalAsync(resolvedDirectory, shellProfile, null, command);
+            _ = StartTerminalAsync(resolvedDirectory, shellProfile, null, command, activateVenv);
+        }
+
+        public void RunCommandInWorkingDirectory(string workingDirectory, string command, bool activateVenv = false)
+        {
+            if (string.IsNullOrWhiteSpace(workingDirectory) || string.IsNullOrWhiteSpace(command))
+            {
+                return;
+            }
+
+            string resolvedDirectory;
+            try
+            {
+                resolvedDirectory = Path.GetFullPath(workingDirectory);
+            }
+            catch
+            {
+                return;
+            }
+
+            if (!Directory.Exists(resolvedDirectory))
+            {
+                return;
+            }
+
+            if (_activeTerminalSession?.Terminal == null ||
+                _activeTerminalSession.ShellProfile.Id.StartsWith("SSH:", StringComparison.OrdinalIgnoreCase))
+            {
+                OpenTerminalWithCommand(resolvedDirectory, command, activateVenv);
+                return;
+            }
+
+            string? activateCommand = activateVenv
+                ? GetVenvActivationCommand(resolvedDirectory, _activeTerminalSession.ShellProfile)
+                : null;
+            string commandLine = BuildCommandInWorkingDirectory(
+                resolvedDirectory,
+                command,
+                activateCommand,
+                _activeTerminalSession.ShellProfile);
+
+            _activeTerminalSession.SetWorkingDirectory(resolvedDirectory);
+            UpdateTitle();
+            WriteCommandToActiveSession(commandLine);
         }
 
         public void WriteCommandToActiveSession(string command)
@@ -270,7 +313,8 @@ namespace TxtAIEditor.Controls
             string workingDirectory,
             TerminalShellProfile shellProfile,
             string? authenticationPassword,
-            string? initialCommand = null)
+            string? initialCommand = null,
+            bool activateVenv = true)
         {
             await EnsureTerminalWebViewAsync();
 
@@ -322,7 +366,10 @@ namespace TxtAIEditor.Controls
                 };
                 terminal.Exited += () => CloseExitedTerminalSession(session);
 
-                TryAutoActivateVenv(terminal, workingDirectory, shellProfile);
+                if (activateVenv)
+                {
+                    TryAutoActivateVenv(terminal, workingDirectory, shellProfile);
+                }
 
                 if (!string.IsNullOrEmpty(initialCommand))
                 {
@@ -787,48 +834,94 @@ namespace TxtAIEditor.Controls
 
         private static void TryAutoActivateVenv(ConPtyTerminal terminal, string workingDirectory, TerminalShellProfile shellProfile)
         {
-            if (shellProfile.Id.StartsWith("SSH:", StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            string? venvPath = null;
-            foreach (string name in new[] { ".venv", "venv" })
-            {
-                string candidate = Path.Combine(workingDirectory, name);
-                if (Directory.Exists(candidate))
-                {
-                    venvPath = candidate;
-                    break;
-                }
-            }
-
-            if (venvPath == null)
-            {
-                return;
-            }
-
-            string? activateCommand = shellProfile.Id switch
-            {
-                "PowerShell" => File.Exists(Path.Combine(venvPath, "Scripts", "Activate.ps1"))
-                    ? $". '{Path.Combine(venvPath, "Scripts", "Activate.ps1")}'\r"
-                    : null,
-                "Cmd" => File.Exists(Path.Combine(venvPath, "Scripts", "activate.bat"))
-                    ? $"call \"{Path.Combine(venvPath, "Scripts", "activate.bat")}\"\r"
-                    : null,
-                "GitBash" => File.Exists(Path.Combine(venvPath, "Scripts", "activate"))
-                    ? $"source '{venvPath.Replace('\\', '/')}/Scripts/activate'\r"
-                    : null,
-                "WSL" => File.Exists(Path.Combine(venvPath, "bin", "activate"))
-                    ? $"source '{venvPath.Replace('\\', '/')}/bin/activate'\r"
-                    : null,
-                _ => null
-            };
+            string? activateCommand = GetVenvActivationCommand(workingDirectory, shellProfile);
 
             if (!string.IsNullOrEmpty(activateCommand))
             {
-                _ = terminal.WriteAsync(activateCommand);
+                _ = terminal.WriteAsync(activateCommand + "\r");
             }
+        }
+
+        private static string? GetVenvActivationCommand(string workingDirectory, TerminalShellProfile shellProfile)
+        {
+            if (shellProfile.Id.StartsWith("SSH:", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            foreach (string name in new[] { ".venv", "venv" })
+            {
+                string venvPath = Path.Combine(workingDirectory, name);
+                string? activateCommand = shellProfile.Id switch
+                {
+                    "PowerShell" => File.Exists(Path.Combine(venvPath, "Scripts", "Activate.ps1"))
+                        ? $". {QuotePowerShellLiteral(Path.Combine(venvPath, "Scripts", "Activate.ps1"))}"
+                        : null,
+                    "Cmd" => File.Exists(Path.Combine(venvPath, "Scripts", "activate.bat"))
+                        ? $"call {QuoteCmdArgument(Path.Combine(venvPath, "Scripts", "activate.bat"))}"
+                        : null,
+                    "GitBash" => File.Exists(Path.Combine(venvPath, "Scripts", "activate"))
+                        ? $"source {QuotePosixLiteral(venvPath.Replace('\\', '/') + "/Scripts/activate")}"
+                        : null,
+                    "WSL" => File.Exists(Path.Combine(venvPath, "bin", "activate"))
+                        ? $"source \"$(wslpath -u -- {QuotePosixLiteral(Path.Combine(venvPath, "bin", "activate"))})\""
+                        : null,
+                    _ => null
+                };
+
+                if (!string.IsNullOrEmpty(activateCommand))
+                {
+                    return activateCommand;
+                }
+            }
+
+            return null;
+        }
+
+        private static string BuildCommandInWorkingDirectory(
+            string workingDirectory,
+            string command,
+            string? activateCommand,
+            TerminalShellProfile shellProfile)
+        {
+            if (shellProfile.Id.Equals("PowerShell", StringComparison.OrdinalIgnoreCase))
+            {
+                string runCommand = string.IsNullOrEmpty(activateCommand)
+                    ? command
+                    : $"{activateCommand}; if ($?) {{ {command} }}";
+                return $"Set-Location -LiteralPath {QuotePowerShellLiteral(workingDirectory)}; if ($?) {{ {runCommand} }}";
+            }
+
+            if (shellProfile.Id.Equals("Cmd", StringComparison.OrdinalIgnoreCase))
+            {
+                string runCommand = string.IsNullOrEmpty(activateCommand)
+                    ? command
+                    : $"{activateCommand} && {command}";
+                return $"cd /d {QuoteCmdArgument(workingDirectory)} && {runCommand}";
+            }
+
+            string shellDirectory = shellProfile.Id.Equals("WSL", StringComparison.OrdinalIgnoreCase)
+                ? $"\"$(wslpath -u -- {QuotePosixLiteral(workingDirectory)})\""
+                : QuotePosixLiteral(workingDirectory.Replace('\\', '/'));
+            string shellRunCommand = string.IsNullOrEmpty(activateCommand)
+                ? command
+                : $"{activateCommand} && {command}";
+            return $"cd -- {shellDirectory} && {shellRunCommand}";
+        }
+
+        private static string QuotePowerShellLiteral(string value)
+        {
+            return "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
+        }
+
+        private static string QuoteCmdArgument(string value)
+        {
+            return "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        }
+
+        private static string QuotePosixLiteral(string value)
+        {
+            return "'" + value.Replace("'", "'\"'\"'", StringComparison.Ordinal) + "'";
         }
 
         private void OnActualThemeChanged(FrameworkElement sender, object args)

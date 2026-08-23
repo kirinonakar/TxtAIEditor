@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
@@ -49,6 +50,8 @@ namespace TxtAIEditor.Core.Services
                 Pivot.SelectedIndex = LlmTabIndex;
             }
 
+            Pivot.SelectionChanged += async (_, _) => await LoadLlmSecretsIfSelectedAsync();
+            Loaded += async (_, _) => await LoadLlmSecretsIfSelectedAsync();
             Content = Pivot;
         }
 
@@ -56,7 +59,7 @@ namespace TxtAIEditor.Core.Services
         public event EventHandler? SettingsImported;
         public event Action<string, string>? OpenTextInEditorRequested;
 
-        public static async Task<SettingsDialogView> CreateAsync(
+        public static SettingsDialogView Create(
             EditorSettings settings,
             ILLMService llmService,
             Func<string, string, string> getString,
@@ -64,12 +67,11 @@ namespace TxtAIEditor.Core.Services
             Action<object>? initializePickerWindow,
             string? initialTab)
         {
-            var fontFamilies = SettingsFontCatalog.GetInstalledFontFamilies();
-            var appearancePanel = new SettingsAppearancePanel(settings, fontFamilies, getString);
+            var appearancePanel = new SettingsAppearancePanel(settings, getString);
             var editingPanel = new SettingsEditingPanel(settings, getString, pickerWindowId, initializePickerWindow);
-            var terminalPanel = new SettingsTerminalPanel(settings, fontFamilies, getString);
+            var terminalPanel = new SettingsTerminalPanel(settings, getString);
             var toolbarPanel = new SettingsToolbarPanel(settings, getString);
-            var llmPanel = await SettingsLlmPanel.CreateAsync(settings, llmService, getString);
+            var llmPanel = SettingsLlmPanel.Create(settings, llmService, getString);
             var shortcutsPanel = new SettingsShortcutsPanel(getString);
             var aboutPanel = new SettingsAboutPanel(getString);
 
@@ -110,6 +112,23 @@ namespace TxtAIEditor.Core.Services
         public void RestoreCustomFontSizes()
         {
             _aboutPanel.RestoreCustomFontSizes();
+        }
+
+        private async Task LoadLlmSecretsIfSelectedAsync()
+        {
+            if (Pivot.SelectedIndex != LlmTabIndex)
+            {
+                return;
+            }
+
+            try
+            {
+                await _llmPanel.EnsureSecretsLoadedAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to load settings credentials: {ex.Message}");
+            }
         }
 
         private static PivotItem CreateTab(string header, UserControl content)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -208,7 +209,7 @@ namespace TxtAIEditor.Core.Services
             return tb;
         }
 
-        public static ComboBox CreateFontComboBox(string currentFontFamily, IReadOnlyList<string> fontFamilies)
+        public static ComboBox CreateFontComboBox(string currentFontFamily)
         {
             var comboBox = new ComboBox
             {
@@ -220,20 +221,60 @@ namespace TxtAIEditor.Core.Services
                 ? "Consolas"
                 : currentFontFamily.Trim();
 
-            if (!fontFamilies.Contains(current, StringComparer.OrdinalIgnoreCase))
-            {
-                comboBox.Items.Add(current);
-            }
+            comboBox.Items.Add(current);
+            comboBox.SelectedItem = current;
 
-            foreach (string family in fontFamilies)
+            bool fontFamiliesLoaded = false;
+            bool fontFamiliesLoading = false;
+            comboBox.DropDownOpened += async (_, _) =>
             {
-                comboBox.Items.Add(family);
-            }
+                if (fontFamiliesLoaded)
+                {
+                    return;
+                }
 
-            comboBox.SelectedItem = comboBox.Items
-                .OfType<string>()
-                .FirstOrDefault(item => item.Equals(current, StringComparison.OrdinalIgnoreCase))
-                ?? comboBox.Items.OfType<string>().FirstOrDefault();
+                // The popup is initially measured with only the selected font. Close it
+                // while loading so WinUI measures the completed list when it reopens.
+                comboBox.IsDropDownOpen = false;
+                if (fontFamiliesLoading)
+                {
+                    return;
+                }
+
+                fontFamiliesLoading = true;
+                try
+                {
+                    IReadOnlyList<string> fontFamilies = await SettingsFontCatalog.GetInstalledFontFamiliesAsync();
+                    var existingItems = new HashSet<string>(
+                        comboBox.Items.OfType<string>(),
+                        StringComparer.OrdinalIgnoreCase);
+
+                    foreach (string family in fontFamilies)
+                    {
+                        if (existingItems.Add(family))
+                        {
+                            comboBox.Items.Add(family);
+                        }
+                    }
+
+                    fontFamiliesLoaded = true;
+                    comboBox.DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (comboBox.IsLoaded)
+                        {
+                            comboBox.IsDropDownOpen = true;
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to load installed font families: {ex.Message}");
+                }
+                finally
+                {
+                    fontFamiliesLoading = false;
+                }
+            };
 
             return comboBox;
         }

@@ -25,7 +25,7 @@ namespace TxtAIEditor.Core.Services
             string? initialTab = null,
             Action<string, string>? openTextInEditor = null)
         {
-            var dialogView = await SettingsDialogView.CreateAsync(
+            var dialogView = SettingsDialogView.Create(
                 settings,
                 _llmService,
                 getString,

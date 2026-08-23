@@ -39,7 +39,6 @@ namespace TxtAIEditor.Core.Services
 
         public SettingsAppearancePanel(
             EditorSettings settings,
-            IReadOnlyList<string> fontFamilies,
             Func<string, string, string> getString)
         {
             _languageCombo = CreateLanguageCombo(settings, getString);
@@ -55,9 +54,9 @@ namespace TxtAIEditor.Core.Services
 
             _editorSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.FontSize, StepFrequency = 1 };
             _previewSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.PreviewFontSize, StepFrequency = 1 };
-            _editorFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.FontFamily, fontFamilies);
-            _uiFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.UiFontFamily, fontFamilies);
-            _previewFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.PreviewFontFamily, fontFamilies);
+            _editorFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.FontFamily);
+            _uiFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.UiFontFamily);
+            _previewFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.PreviewFontFamily);
 
             string defaultBg = settings.Theme == "Light" ? "#ffffff" : (settings.Theme == "PastelDark" ? "#24273a" : "#1e1e1e");
             string defaultFg = settings.Theme == "Light" ? "#111111" : (settings.Theme == "PastelDark" ? "#cad3f5" : "#d4d4d4");
@@ -88,7 +87,7 @@ namespace TxtAIEditor.Core.Services
             BindEnabled(_previewBgCheck, previewBgDropdown);
             BindEnabled(_previewFgCheck, previewFgDropdown);
 
-            _aozoraFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AozoraPreviewFontFamily, fontFamilies);
+            _aozoraFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AozoraPreviewFontFamily);
             _aozoraSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.AozoraPreviewFontSize, StepFrequency = 1 };
             _aozoraBgCheck = new CheckBox { Content = getString("SettingsAozoraUseCustomBg", "커스텀 Aozora 배경색 사용"), IsChecked = !string.IsNullOrWhiteSpace(settings.AozoraPreviewCustomBackgroundColor) };
             _aozoraFgCheck = new CheckBox { Content = getString("SettingsAozoraUseCustomFg", "커스텀 Aozora 글자색 사용"), IsChecked = !string.IsNullOrWhiteSpace(settings.AozoraPreviewCustomForegroundColor) };
@@ -103,9 +102,9 @@ namespace TxtAIEditor.Core.Services
             BindEnabled(_aozoraBgCheck, aozoraBgDropdown);
             BindEnabled(_aozoraFgCheck, aozoraFgDropdown);
 
-            _agentFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AgentFontFamily, fontFamilies);
+            _agentFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AgentFontFamily);
             _agentSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.AgentFontSize, StepFrequency = 1 };
-            _agentPromptFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AgentPromptFontFamily, fontFamilies);
+            _agentPromptFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AgentPromptFontFamily);
             _agentPromptSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.AgentPromptFontSize, StepFrequency = 1 };
             _rightPanelNormalWidthSlider = new Slider { Minimum = 150, Maximum = 1200, Value = settings.RightSidebarNormalWidth, StepFrequency = 10 };
             _rightPanelExpandedWidthSlider = new Slider { Minimum = 150, Maximum = 1200, Value = settings.RightSidebarExpandedWidth, StepFrequency = 10 };

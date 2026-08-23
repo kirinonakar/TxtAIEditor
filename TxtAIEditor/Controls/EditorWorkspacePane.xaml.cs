@@ -704,20 +704,13 @@ namespace TxtAIEditor.Controls
             return true;
         }
 
-        public void ShowTerminalAndRunCommand(string workingDirectory, string command)
+        public void ShowTerminalAndRunCommand(string workingDirectory, string command, bool activateVenv = false)
         {
             EnsureTerminalPanelVisible();
-            if (TerminalPane.HasSessions)
-            {
-                TerminalPane.WriteCommandToActiveSession(command);
-            }
-            else
-            {
-                string dir = string.IsNullOrWhiteSpace(workingDirectory) || !System.IO.Directory.Exists(workingDirectory)
-                    ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-                    : workingDirectory;
-                TerminalPane.OpenTerminalWithCommand(dir, command);
-            }
+            string dir = string.IsNullOrWhiteSpace(workingDirectory) || !System.IO.Directory.Exists(workingDirectory)
+                ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+                : workingDirectory;
+            TerminalPane.RunCommandInWorkingDirectory(dir, command, activateVenv);
         }
 
         public bool HideTerminalPanelIfEmpty()

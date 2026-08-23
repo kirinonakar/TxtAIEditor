@@ -4,20 +4,32 @@ using System.Drawing.Text;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace TxtAIEditor.Core.Services
 {
     internal static class SettingsFontCatalog
     {
-        private static IReadOnlyList<string>? _installedFontFamiliesCache;
+        private static readonly object CacheLock = new();
+        private static Task<IReadOnlyList<string>>? _installedFontFamiliesTask;
 
-        public static IReadOnlyList<string> GetInstalledFontFamilies()
+        public static Task<IReadOnlyList<string>> GetInstalledFontFamiliesAsync()
         {
-            if (_installedFontFamiliesCache != null)
+            lock (CacheLock)
             {
-                return _installedFontFamiliesCache;
-            }
+                if (_installedFontFamiliesTask == null ||
+                    _installedFontFamiliesTask.IsCanceled ||
+                    _installedFontFamiliesTask.IsFaulted)
+                {
+                    _installedFontFamiliesTask = Task.Run(LoadInstalledFontFamilies);
+                }
 
+                return _installedFontFamiliesTask;
+            }
+        }
+
+        private static IReadOnlyList<string> LoadInstalledFontFamilies()
+        {
             var fonts = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase)
             {
                 "Consolas",
@@ -29,8 +41,7 @@ namespace TxtAIEditor.Core.Services
             AddFontsFromRegistry(fonts, Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"));
             AddFontsFromRegistry(fonts, Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"));
 
-            _installedFontFamiliesCache = fonts.ToList();
-            return _installedFontFamiliesCache;
+            return fonts.ToList();
         }
 
         private static void AddFontsFromRegistry(ISet<string> fonts, Microsoft.Win32.RegistryKey? key)

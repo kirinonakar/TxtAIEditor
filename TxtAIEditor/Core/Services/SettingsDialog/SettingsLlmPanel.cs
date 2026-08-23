@@ -44,6 +44,8 @@ namespace TxtAIEditor.Core.Services
         private readonly TextBlock _tokenUsageSummaryHeaderTextBlock;
         private readonly TextBlock _tokenUsageSummaryText;
         private readonly Slider _maxToolCallsSlider;
+        private Task? _secretsLoadTask;
+        private bool _secretsLoadRequested;
 
         private SettingsLlmPanel(EditorSettings settings, ILLMService llmService, Func<string, string, string> getString)
         {
@@ -155,14 +157,23 @@ namespace TxtAIEditor.Core.Services
 
         public event Action<string, string>? OpenTextInEditorRequested;
 
-        public static async Task<SettingsLlmPanel> CreateAsync(
+        public static SettingsLlmPanel Create(
             EditorSettings settings,
             ILLMService llmService,
             Func<string, string, string> getString)
         {
-            var panel = new SettingsLlmPanel(settings, llmService, getString);
-            await panel.LoadSecretsAsync();
-            return panel;
+            return new SettingsLlmPanel(settings, llmService, getString);
+        }
+
+        public Task EnsureSecretsLoadedAsync()
+        {
+            _secretsLoadRequested = true;
+            if (_secretsLoadTask == null || _secretsLoadTask.IsCanceled || _secretsLoadTask.IsFaulted)
+            {
+                _secretsLoadTask = LoadSecretsAsync();
+            }
+
+            return _secretsLoadTask;
         }
 
         public void ApplyToSettings(EditorSettings settings)
@@ -238,12 +249,23 @@ namespace TxtAIEditor.Core.Services
 
         public async Task SaveSecretsAsync(EditorSettings settings)
         {
+            if (!_secretsLoadRequested)
+            {
+                return;
+            }
+
+            await EnsureSecretsLoadedAsync();
             await _llmService.SaveApiKeyAsync(settings.LlmProvider, _llmApiKeyBox.Password.Trim());
             await _llmService.SaveApiKeyAsync("Exa", _exaApiKeyBox.Password.Trim());
         }
 
         public string CreateApiKeyStatusMessage(EditorSettings settings)
         {
+            if (!_secretsLoadRequested)
+            {
+                return string.Empty;
+            }
+
             string newApiKey = _llmApiKeyBox.Password.Trim();
             string credentialLabel = settings.LlmProvider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase)
                 ? _getString("SettingsLlmOAuthAccessTokenName", "OAuth Access Token")
@@ -256,8 +278,17 @@ namespace TxtAIEditor.Core.Services
 
         private async Task LoadSecretsAsync()
         {
-            _llmApiKeyBox.Password = await _llmService.GetApiKeyAsync(GetSelectedProviderName());
-            _exaApiKeyBox.Password = await _llmService.GetApiKeyAsync("Exa");
+            string provider = GetSelectedProviderName();
+            Task<string> llmApiKeyTask = _llmService.GetApiKeyAsync(provider);
+            Task<string> exaApiKeyTask = _llmService.GetApiKeyAsync("Exa");
+            await Task.WhenAll(llmApiKeyTask, exaApiKeyTask);
+
+            if (provider.Equals(GetSelectedProviderName(), StringComparison.OrdinalIgnoreCase))
+            {
+                _llmApiKeyBox.Password = llmApiKeyTask.Result;
+            }
+
+            _exaApiKeyBox.Password = exaApiKeyTask.Result;
         }
 
         private StackPanel CreateSection()

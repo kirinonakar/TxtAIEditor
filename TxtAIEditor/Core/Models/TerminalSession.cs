@@ -37,7 +37,7 @@ namespace TxtAIEditor.Core.Models
             }
         }
 
-        public string WorkingDirectory { get; }
+        public string WorkingDirectory { get; private set; }
         public TerminalShellProfile ShellProfile { get; }
         public string WindowTitle { get; }
         public string DisplayTitle => $"{ShellProfile.ShortName}{Number}";
@@ -52,6 +52,17 @@ namespace TxtAIEditor.Core.Models
         public void SetDisplayNumber(int number)
         {
             Number = Math.Max(1, number);
+        }
+
+        public void SetWorkingDirectory(string workingDirectory)
+        {
+            if (string.Equals(WorkingDirectory, workingDirectory, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            WorkingDirectory = workingDirectory;
+            OnPropertyChanged(nameof(WorkingDirectory));
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
