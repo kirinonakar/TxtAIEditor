@@ -37,7 +37,7 @@
                                 <ListView x:Name="GitChangedFilesList" Grid.Row="1" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnGitFileItemClick">
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Padding="0,4,0,4">
+                                            <Grid Padding="0,4,0,4" ToolTipService.ToolTip="{Binding Tooltip}">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>

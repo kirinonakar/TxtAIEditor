@@ -66,6 +66,7 @@ namespace TxtAIEditor.Core.Models
         public string StatusText { get; set; } = string.Empty;
         public string ActionGlyph { get; set; } = string.Empty;
         public bool IsStaged { get; set; }
+        public string Tooltip => string.IsNullOrEmpty(Path) ? Name : $"{Name}\n{Path}";
     }
 
     public class SearchResultItem
