@@ -187,7 +187,7 @@ namespace TxtAIEditor.Core.Services
                 return new[]
                 {
                     "grok-4.5",
-                    "ox-alpha-free",
+                    "glm-5.3-flash",
                     "glm-5.3",
                     "glm-5.2",
                     "glm-5.1",
@@ -242,6 +242,7 @@ namespace TxtAIEditor.Core.Services
                     "deepseek-v4-flash-vision-exp",
                     "minimax-m2.7",
                     "minimax-m2.5",
+                    "glm-5.3-flash",
                     "glm-5.2",
                     "glm-5.1",
                     "glm-5",

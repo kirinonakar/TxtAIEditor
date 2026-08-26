@@ -24,6 +24,7 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 { ("opencode-go", "deepseek-v4-flash"), (1000000, 384000) },
                 { ("opencode-go", "deepseek-v4-pro"), (1000000, 384000) },
+                { ("opencode-go", "glm-5.3-flash"), (1000000, 131072) },
                 { ("opencode-go", "glm-5.2"), (1000000, 131072) },
                 { ("opencode-go", "grok-4.5"), (500000, 500000) },
                 { ("opencode-go", "kimi-k3"), (1000000, 131072) },
@@ -63,6 +64,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 { ("opencode", "deepseek-v4-pro"), (1000000, 384000) },
                 { ("opencode", "deepseek-v4-flash"), (1000000, 384000) },
                 { ("opencode", "deepseek-v4-flash-free"), (200000, 128000) },
+                { ("opencode", "glm-5.3-flash"), (1000000, 131072) },
                 { ("opencode", "glm-5.2"), (1000000, 131072) },
                 { ("opencode", "kimi-k2.5"), (262144, 65536) },
                 { ("opencode", "big-pickle"), (200000, 32000) },
