@@ -57,6 +57,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- MCP: if [Enabled MCP servers] lists mcp_* tools, call the exact listed alias with arguments matching its JSON schema. MCP tools are external Model Context Protocol tools.");
             builder.AppendLine();
             builder.AppendLine("- File edit semantics: use search_replace for text replacements; with maxReplacements: 0, it replaces all matches. Use apply_patch for structured or multi-hunk changes.");
+            builder.AppendLine("- apply_patch rule: every hunk must include an explicit unified-diff line range in the form @@ -oldStart,oldCount +newStart,newCount @@. Never emit a bare @@ hunk, even when its context appears unique.");
             builder.AppendLine("Tool choice and safety:");
             builder.AppendLine("- Prefer internal tools. Use search_text for simple search, run_rg for regex/large search, extract_document for document conversion, and run_rga only for specialized document search.");
             builder.AppendLine("- Treat list_files/search_text globs as tool arguments, not shell commands.");

@@ -295,14 +295,14 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "apply_patch",
-                    Description = "Apply a unified diff patch to one file, or a multi-file patch containing *** Update File: relative/path sections. For a multi-file patch, path may be omitted; hunk line ranges may be omitted when each hunk has a unique context or deleted block.",
+                    Description = "Apply a unified diff patch to one file, or a multi-file patch containing *** Update File: relative/path sections. For a multi-file patch, path may be omitted. Every hunk must include an explicit line range in the form @@ -oldStart,oldCount +newStart,newCount @@; bare @@ hunks are not allowed.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
                             path = new { type = "string", description = "Relative path to the file for a single-file patch; omit it when patch contains *** Update File: sections" },
-                            patch = new { type = "string", description = "Unified diff patch content. Multi-file format: *** Begin Patch, one or more *** Update File: relative/path sections, then *** End Patch. The patch must end exactly at *** End Patch with no characters or text after the marker." }
+                            patch = new { type = "string", description = "Unified diff patch content. Every hunk must include an explicit line range such as @@ -10,2 +10,2 @@; do not use bare @@. Multi-file format: *** Begin Patch, one or more *** Update File: relative/path sections, then *** End Patch. The patch must end exactly at *** End Patch with no characters or text after the marker." }
                         },
                         required = new[] { "patch" }
                     }
