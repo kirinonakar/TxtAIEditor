@@ -190,6 +190,15 @@ namespace TxtAIEditor.Controls
 
             bool successful = IsSuccessfulToolResult(toolResult);
 
+            if (!verbose && normalizedToolName == "apply_patch")
+            {
+                string partialSummary = ExtractPartialApplyPatchSummary(toolResult);
+                if (!string.IsNullOrWhiteSpace(partialSummary))
+                {
+                    return partialSummary;
+                }
+            }
+
             if (!verbose && !successful)
             {
                 if (normalizedToolName == "web_search_exa" &&

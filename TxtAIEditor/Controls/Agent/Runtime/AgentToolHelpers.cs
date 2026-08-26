@@ -339,6 +339,33 @@ namespace TxtAIEditor.Controls
             return exitCode == 0;
         }
 
+        public static string ExtractPartialApplyPatchSummary(string result)
+        {
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                return string.Empty;
+            }
+
+            const string marker = "apply_patch partial:";
+            var summaries = new List<string>();
+            foreach (string line in result.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
+            {
+                int markerIndex = line.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                if (markerIndex < 0)
+                {
+                    continue;
+                }
+
+                string summary = line.Substring(markerIndex).Trim();
+                if (summary.Length > 0 && !summaries.Contains(summary, StringComparer.OrdinalIgnoreCase))
+                {
+                    summaries.Add(summary);
+                }
+            }
+
+            return string.Join(Environment.NewLine, summaries);
+        }
+
         public static string HideEditFailureContext(string result)
         {
             if (string.IsNullOrEmpty(result))

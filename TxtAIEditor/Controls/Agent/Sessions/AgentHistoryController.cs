@@ -297,6 +297,9 @@ namespace TxtAIEditor.Controls
             void FlushPendingToolResult(bool failed)
             {
                 string toolName = pendingToolResultToolName ?? string.Empty;
+                string partialApplyPatchSummary = toolName.Equals("apply_patch", StringComparison.OrdinalIgnoreCase)
+                    ? AgentToolHelpers.ExtractPartialApplyPatchSummary(pendingToolResultBody.ToString())
+                    : string.Empty;
                 pendingToolResultToolName = null;
                 pendingToolResultBody.Clear();
                 if (string.IsNullOrEmpty(toolName))
@@ -308,6 +311,10 @@ namespace TxtAIEditor.Controls
                     ? getString?.Invoke("AgentHistoryToolFailedFormat", "[도구 실행 실패]: {0}") ?? "[도구 실행 실패]: {0}"
                     : getString?.Invoke("AgentHistoryToolCompletedFormat", "[도구 실행]: {0}") ?? "[도구 실행]: {0}";
                 result.AppendLine(string.Format(format, toolName));
+                if (!string.IsNullOrWhiteSpace(partialApplyPatchSummary))
+                {
+                    result.AppendLine(partialApplyPatchSummary);
+                }
             }
 
             foreach (var line in lines)
