@@ -207,6 +207,7 @@ namespace TxtAIEditor.Composition
                 callbacks.UpdateLanguageUi,
                 callbacks.UpdateWindowTitle,
                 tabContextMenu.ShowContextMenu,
+                tabContextMenu.OpenFolderAsync,
                 initialEditorLineWarmupCount,
                 callbacks.CloseTabAndCleanup);
 

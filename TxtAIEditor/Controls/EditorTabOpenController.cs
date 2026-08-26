@@ -61,6 +61,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<OpenedTab> _updateLanguageUi;
         private readonly Action _updateWindowTitle;
         private readonly Action<OpenedTab, TabViewItem, TabView, FrameworkElement, RightTappedRoutedEventArgs> _showTabContextMenu;
+        private readonly Func<OpenedTab, Task> _openTabFolderAsync;
         private readonly Action<OpenedTab, TabViewItem>? _closeTabAndCleanup;
         private readonly int _initialEditorLineWarmupCount;
 
@@ -133,6 +134,7 @@ namespace TxtAIEditor.Controls
             Action<OpenedTab> updateLanguageUi,
             Action updateWindowTitle,
             Action<OpenedTab, TabViewItem, TabView, FrameworkElement, RightTappedRoutedEventArgs> showTabContextMenu,
+            Func<OpenedTab, Task> openTabFolderAsync,
             int initialEditorLineWarmupCount,
             Action<OpenedTab, TabViewItem>? closeTabAndCleanup = null)
         {
@@ -174,6 +176,7 @@ namespace TxtAIEditor.Controls
             _updateLanguageUi = updateLanguageUi;
             _updateWindowTitle = updateWindowTitle;
             _showTabContextMenu = showTabContextMenu;
+            _openTabFolderAsync = openTabFolderAsync;
             _initialEditorLineWarmupCount = initialEditorLineWarmupCount;
             _closeTabAndCleanup = closeTabAndCleanup;
         }
@@ -1440,6 +1443,19 @@ namespace TxtAIEditor.Controls
             bool queueSurfaceRefresh,
             int targetIndex = -1)
         {
+            if (tabItem.Header is TabHeaderControl tabHeader)
+            {
+                tabHeader.DoubleTapped += async (_, args) =>
+                {
+                    args.Handled = true;
+                    if (tabItem.Tag is string tabId &&
+                        _viewModel.Tabs.FirstOrDefault(tab => tab.Id == tabId) is OpenedTab tab)
+                    {
+                        await _openTabFolderAsync(tab);
+                    }
+                };
+            }
+
             _editorWorkspace.DisableTabItemTransitions();
             if (targetIndex >= 0 && targetIndex <= targetTabView.TabItems.Count)
             {

@@ -337,7 +337,7 @@ namespace TxtAIEditor.Controls
             _showLeftSidebarPage(1);
         }
 
-        private async Task OpenFolderAsync(OpenedTab tab)
+        public async Task OpenFolderAsync(OpenedTab tab)
         {
             if (!string.IsNullOrWhiteSpace(tab.RemotePath))
             {
