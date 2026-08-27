@@ -1116,8 +1116,8 @@ namespace TxtAIEditor.Controls
 
                 if (_openSessionController.IsPendingClose(runContext.SessionId))
                 {
-                    string closingSessionId = _openSessionController.ConsumePendingCloseSessionId();
-                    _openSessionController.CloseSession(closingSessionId);
+                    _openSessionController.ConsumePendingClose(runContext.SessionId);
+                    _openSessionController.CloseSession(runContext.SessionId);
                 }
                 else
                 {

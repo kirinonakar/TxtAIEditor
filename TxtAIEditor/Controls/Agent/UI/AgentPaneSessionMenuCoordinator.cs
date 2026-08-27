@@ -38,6 +38,8 @@ namespace TxtAIEditor.Controls
         private Func<string, string, string> _getString = AgentDisplayLocalizer.CreateWithResourceLoader().GetString;
         private string _newSessionText = string.Empty;
         private bool _isBusy;
+        private bool _openSessionMenuRefreshPending;
+        private bool _historyMenuRefreshPending;
 
         public AgentPaneSessionMenuCoordinator(
             FrameworkElement resourceOwner,
@@ -65,6 +67,8 @@ namespace TxtAIEditor.Controls
             _openSessionsButton = openSessionsButton;
             _rewindSessionButton = rewindSessionButton;
             _callbacks = callbacks;
+            _openSessionsFlyout.Closed += (_, _) => QueuePendingOpenSessionMenuRefresh();
+            _historyFlyout.Closed += (_, _) => QueuePendingHistoryMenuRefresh();
         }
 
         public void Localize(Func<string, string, string> getString, string newSessionText)
@@ -98,6 +102,21 @@ namespace TxtAIEditor.Controls
         {
             int completedCount = _openSessionItems.Sum(item => Math.Max(0, item.CompletedNotificationCount));
             UpdateOpenSessionButtonChrome(completedCount);
+
+            // Background sessions can complete while this popup is processing input or
+            // layout. Keep its visual tree stable until WinUI has fully closed the flyout.
+            if (_openSessionsFlyout.IsOpen)
+            {
+                _openSessionMenuRefreshPending = true;
+                return;
+            }
+
+            _openSessionMenuRefreshPending = false;
+            RebuildOpenSessionMenuCore();
+        }
+
+        private void RebuildOpenSessionMenuCore()
+        {
             _openSessionsListPanel.Children.Clear();
             Style? buttonStyle = _resourceOwner.Resources["AgentButtonStyle"] as Style;
 
@@ -174,8 +193,8 @@ namespace TxtAIEditor.Controls
                 }
                 selectButton.Click += (_, _) =>
                 {
-                    _callbacks.OpenSessionSelected?.Invoke(currentId);
                     _openSessionsFlyout.Hide();
+                    _callbacks.OpenSessionSelected?.Invoke(currentId);
                 };
                 Grid.SetColumn(selectButton, 0);
                 rowGrid.Children.Add(selectButton);
@@ -190,7 +209,11 @@ namespace TxtAIEditor.Controls
                     IsEnabled = item.CanClose
                 };
                 ToolTipService.SetToolTip(closeButton, _getString("AgentOpenSessionCloseText", "세션 닫기"));
-                closeButton.Click += (_, _) => _callbacks.OpenSessionClosed?.Invoke(currentId);
+                closeButton.Click += (_, _) =>
+                {
+                    _openSessionsFlyout.Hide();
+                    _callbacks.OpenSessionClosed?.Invoke(currentId);
+                };
                 Grid.SetColumn(closeButton, 1);
                 rowGrid.Children.Add(closeButton);
                 _openSessionsListPanel.Children.Add(rowGrid);
@@ -198,6 +221,18 @@ namespace TxtAIEditor.Controls
         }
 
         public void RebuildHistoryMenu()
+        {
+            if (_historyFlyout.IsOpen)
+            {
+                _historyMenuRefreshPending = true;
+                return;
+            }
+
+            _historyMenuRefreshPending = false;
+            RebuildHistoryMenuCore();
+        }
+
+        private void RebuildHistoryMenuCore()
         {
             _historyListPanel.Children.Clear();
             Style? buttonStyle = _resourceOwner.Resources["AgentButtonStyle"] as Style;
@@ -238,8 +273,8 @@ namespace TxtAIEditor.Controls
                 }
                 selectButton.Click += (_, _) =>
                 {
-                    _callbacks.HistorySelected?.Invoke(currentId);
                     _historyFlyout.Hide();
+                    _callbacks.HistorySelected?.Invoke(currentId);
                 };
                 Grid.SetColumn(selectButton, 0);
                 rowGrid.Children.Add(selectButton);
@@ -259,6 +294,30 @@ namespace TxtAIEditor.Controls
                 rowGrid.Children.Add(deleteButton);
                 _historyListPanel.Children.Add(rowGrid);
             }
+        }
+
+        private void QueuePendingOpenSessionMenuRefresh()
+        {
+            if (!_openSessionMenuRefreshPending)
+            {
+                return;
+            }
+
+            _resourceOwner.DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                RebuildOpenSessionMenu);
+        }
+
+        private void QueuePendingHistoryMenuRefresh()
+        {
+            if (!_historyMenuRefreshPending)
+            {
+                return;
+            }
+
+            _resourceOwner.DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                RebuildHistoryMenu);
         }
 
         private void UpdateOpenSessionButtonChrome(int completedCount)

@@ -34,7 +34,7 @@ namespace TxtAIEditor.Controls
         private readonly List<AgentOpenSessionState> _openSessions = new();
         private readonly object _runOutputBufferGate = new();
         private readonly Dictionary<string, PendingRunOutputBuffer> _pendingRunOutputBuffers = new(StringComparer.Ordinal);
-        private string? _pendingCloseSessionId;
+        private readonly HashSet<string> _pendingCloseSessionIds = new(StringComparer.Ordinal);
         private bool _restoringOpenSession;
         private const int RunOutputFlushDelayMs = 75;
         private const int MaxRunOutputFlushChars = 8_000;
@@ -98,14 +98,12 @@ namespace TxtAIEditor.Controls
 
         public bool IsPendingClose(string sessionId)
         {
-            return string.Equals(_pendingCloseSessionId, sessionId, StringComparison.Ordinal);
+            return _pendingCloseSessionIds.Contains(sessionId);
         }
 
-        public string ConsumePendingCloseSessionId()
+        public bool ConsumePendingClose(string sessionId)
         {
-            string closingSessionId = _pendingCloseSessionId ?? string.Empty;
-            _pendingCloseSessionId = null;
-            return closingSessionId;
+            return !string.IsNullOrWhiteSpace(sessionId) && _pendingCloseSessionIds.Remove(sessionId);
         }
 
         public AgentOpenSessionState EnsureSession(string sessionId)
@@ -338,7 +336,7 @@ namespace TxtAIEditor.Controls
             bool isRunningSession = _runningSessions.TryGetValue(sessionId, out _);
             if (isRunningSession)
             {
-                _pendingCloseSessionId = sessionId;
+                _pendingCloseSessionIds.Add(sessionId);
                 _stopAgent(sessionId);
                 UpdateUI();
                 if (string.Equals(_currentSessionIdProvider(), sessionId, StringComparison.Ordinal))
