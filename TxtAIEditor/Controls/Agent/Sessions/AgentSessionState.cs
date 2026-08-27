@@ -64,6 +64,7 @@ namespace TxtAIEditor.Controls
         public string PlanWorkspaceContext { get; set; } = string.Empty;
         public string PlanSelectionContext { get; set; } = string.Empty;
         public string GeneratedPlanPath { get; set; } = string.Empty;
+        public string? QueuedFollowUpPrompt;
     }
 
     internal sealed class AgentSessionRewindSnapshot

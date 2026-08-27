@@ -54,7 +54,6 @@ namespace TxtAIEditor.Controls
         private bool _isRunning;
         private CancellationTokenSource? _runCancellation;
         private double _currentRunTranscriptTokens;
-        private string? _queuedFollowUpPrompt;
 
         public AgentRunCoordinator(
             ISettingsService settingsService,
@@ -310,7 +309,7 @@ namespace TxtAIEditor.Controls
                 for (int step = 0; step < maxToolSteps; step++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    string? queuedFollowUpPrompt = TakeQueuedFollowUpPrompt();
+                    string? queuedFollowUpPrompt = TakeQueuedFollowUpPrompt(runContext);
                     if (!string.IsNullOrWhiteSpace(queuedFollowUpPrompt))
                     {
                         string followUpTurn = _promptContextService.BuildConversationTurn(queuedFollowUpPrompt);
@@ -1139,13 +1138,22 @@ namespace TxtAIEditor.Controls
                 await StartApprovedPlanSessionAsync(approvedPlanExecutionPrompt, approvedPlanWorkspaceRoot);
             }
 
-            string? pendingFollowUp = TakeQueuedFollowUpPrompt();
+            string? pendingFollowUp = TakeQueuedFollowUpPrompt(runContext);
             if (!string.IsNullOrWhiteSpace(pendingFollowUp))
             {
                 await _uiDispatcher.RunAsync(async () =>
                 {
-                    _agentPane.Prompt.Text = pendingFollowUp;
-                    await RunAgentAsync();
+                    if (_openSessionController.IsSessionVisible(runContext.SessionId))
+                    {
+                        _agentPane.Prompt.Text = pendingFollowUp;
+                        await RunAgentAsync();
+                    }
+                    else
+                    {
+                        activeOpenSession.PromptText = pendingFollowUp;
+                        activeOpenSession.UpdatedAt = DateTime.Now;
+                        _openSessionController.UpdateUI();
+                    }
                 });
             }
         }
@@ -1357,18 +1365,16 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            _queuedFollowUpPrompt = trimmedPrompt;
+            Interlocked.Exchange(ref context.QueuedFollowUpPrompt, trimmedPrompt);
             string queuedNotice = _getString(
                 "AgentFollowUpQueued",
                 "추가 지시가 대기 중입니다. 다음 도구 호출이 끝나면 전송됩니다.");
             _ = _runOutputController.AppendRunActivityAsync(context, queuedNotice);
         }
 
-        private string? TakeQueuedFollowUpPrompt()
+        private static string? TakeQueuedFollowUpPrompt(AgentRunContext context)
         {
-            string? prompt = _queuedFollowUpPrompt;
-            _queuedFollowUpPrompt = null;
-            return prompt;
+            return Interlocked.Exchange(ref context.QueuedFollowUpPrompt, null);
         }
 
         public void StopAgent()
