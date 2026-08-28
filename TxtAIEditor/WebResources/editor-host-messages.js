@@ -26,11 +26,13 @@ import {
 import {
     applyMarkdownCommand,
     beginHostStreamInsert,
+    copySelectionToClipboard,
     endHostStreamInsert,
     flushPendingEditForSave,
     focusLine,
     insertHostStreamText,
     insertTextAtCaret,
+    pasteFromClipboard,
     runPendingLineActions
 } from './editor-commands.js';
 import { autocompleteState, hideAutocomplete, triggerAutocomplete } from './editor-autocomplete.js';
@@ -439,6 +441,13 @@ export function createHostMessageHandler({
                     hexLength: selInfo.hexLength
                 });
             }
+            break;
+        case 'copySelection':
+            void copySelectionToClipboard();
+            break;
+        case 'pasteFromClipboard':
+            hideAutocomplete(500);
+            void pasteFromClipboard();
             break;
         case 'flushForSave':
             hideAutocomplete();

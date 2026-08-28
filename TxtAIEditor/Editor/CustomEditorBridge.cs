@@ -506,6 +506,16 @@ namespace TxtAIEditor.Editor
             await SendMessageAsync(msg);
         }
 
+        public async Task CopySelectionAsync()
+        {
+            await SendMessageAsync(new { action = "copySelection" });
+        }
+
+        public async Task PasteFromClipboardAsync()
+        {
+            await SendMessageAsync(new { action = "pasteFromClipboard" });
+        }
+
         public async Task<long?> FlushPendingEditForSaveAsync(int timeoutMs = 700)
         {
             if (!_messageRouter.IsReady || _webView.CoreWebView2 == null)

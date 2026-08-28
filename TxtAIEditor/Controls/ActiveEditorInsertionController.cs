@@ -14,6 +14,7 @@ namespace TxtAIEditor.Controls
     {
         private readonly MainWindowViewModel _viewModel;
         private readonly Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
+        private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly Func<TabView> _activeTabViewProvider;
         private readonly TabDirtyStateController _tabDirtyStateController;
 
@@ -22,11 +23,13 @@ namespace TxtAIEditor.Controls
         public ActiveEditorInsertionController(
             MainWindowViewModel viewModel,
             Dictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
+            Dictionary<string, EditorDocumentSession> editorSessions,
             Func<TabView> activeTabViewProvider,
             TabDirtyStateController tabDirtyStateController)
         {
             _viewModel = viewModel;
             _tabBridges = tabBridges;
+            _editorSessions = editorSessions;
             _activeTabViewProvider = activeTabViewProvider;
             _tabDirtyStateController = tabDirtyStateController;
         }
@@ -52,6 +55,32 @@ namespace TxtAIEditor.Controls
                 _tabDirtyStateController.PropagateDirtyStateToOtherTabs(tab);
             }
 
+            return true;
+        }
+
+        public bool TryCopySelection()
+        {
+            if (!TryGetCurrentActiveEditorBridge(out _, out _, out var bridgeGroup))
+            {
+                return false;
+            }
+
+            _ = bridgeGroup.Bridge.CopySelectionAsync();
+            return true;
+        }
+
+        public bool TryPasteIntoEmptyEditor()
+        {
+            if (!TryGetCurrentActiveEditorBridge(out string tabId, out _, out var bridgeGroup) ||
+                !_editorSessions.TryGetValue(tabId, out EditorDocumentSession? session) ||
+                session.Tab.IsReadOnlyViewer ||
+                session.Model.LineCount != 1 ||
+                !string.IsNullOrEmpty(session.Model.GetLine(1)))
+            {
+                return false;
+            }
+
+            _ = bridgeGroup.Bridge.PasteFromClipboardAsync();
             return true;
         }
 

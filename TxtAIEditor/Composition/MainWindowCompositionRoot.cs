@@ -182,6 +182,8 @@ namespace TxtAIEditor.Composition
                     () => moduleBindings.ToolbarCommand?.SaveActiveAs(),
                     () => moduleBindings.ToolbarCommand?.OpenFile(),
                     () => moduleBindings.ToolbarCommand?.Find(),
+                    editorModule.Foundation.ActiveEditorInsertion.TryCopySelection,
+                    editorModule.Foundation.ActiveEditorInsertion.TryPasteIntoEmptyEditor,
                     () => moduleBindings.ToolbarCommand?.Print(),
                     shellModule.ToggleTopMostFromShortcut,
                     () => moduleBindings.ToolbarCommand?.ToggleTheme(),

@@ -16,6 +16,8 @@ namespace TxtAIEditor.Controls
         private readonly Action _saveActiveTabAs;
         private readonly Action _openFile;
         private readonly Action _find;
+        private readonly Func<bool> _tryCopyActiveSelection;
+        private readonly Func<bool> _tryPasteIntoEmptyEditor;
         private readonly Action _print;
         private readonly Action _toggleTopMost;
         private readonly Action _toggleTheme;
@@ -37,6 +39,8 @@ namespace TxtAIEditor.Controls
             Action saveActiveTabAs,
             Action openFile,
             Action find,
+            Func<bool> tryCopyActiveSelection,
+            Func<bool> tryPasteIntoEmptyEditor,
             Action print,
             Action toggleTopMost,
             Action toggleTheme,
@@ -57,6 +61,8 @@ namespace TxtAIEditor.Controls
             _saveActiveTabAs = saveActiveTabAs;
             _openFile = openFile;
             _find = find;
+            _tryCopyActiveSelection = tryCopyActiveSelection;
+            _tryPasteIntoEmptyEditor = tryPasteIntoEmptyEditor;
             _print = print;
             _toggleTopMost = toggleTopMost;
             _toggleTheme = toggleTheme;
@@ -85,7 +91,15 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (e.Key == Windows.System.VirtualKey.N)
+            if (e.Key == Windows.System.VirtualKey.C && _tryCopyActiveSelection())
+            {
+                e.Handled = true;
+            }
+            else if (e.Key == Windows.System.VirtualKey.V && _tryPasteIntoEmptyEditor())
+            {
+                e.Handled = true;
+            }
+            else if (e.Key == Windows.System.VirtualKey.N)
             {
                 e.Handled = true;
                 _openNewTab();

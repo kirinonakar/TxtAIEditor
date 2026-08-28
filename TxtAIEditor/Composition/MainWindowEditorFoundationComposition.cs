@@ -98,6 +98,7 @@ namespace TxtAIEditor.Composition
             var activeEditorInsertion = new ActiveEditorInsertionController(
                 viewModel,
                 tabBridges,
+                editorSessions,
                 tabNavigation.GetCurrentActiveTabView,
                 tabDirtyState);
 
