@@ -192,6 +192,7 @@ namespace TxtAIEditor.Controls
                 openSessionController,
                 callbacks.IsCurrentSessionRunning,
                 currentSessionIdProvider,
+                () => fileTools.WorkspaceRoot,
                 getString);
             var runOutputController = new AgentRunOutputController(
                 openSessionController,

@@ -205,6 +205,7 @@ namespace TxtAIEditor.Controls
 
         public event EventHandler<string>? HistorySelected;
         public event EventHandler<string>? HistoryDeleted;
+        public event RoutedEventHandler? HistoryToolbarSaveClicked;
         public event RoutedEventHandler? HistoryToolbarDeleteClicked;
         public event EventHandler? OpenSessionsFlyoutOpened;
         public event EventHandler<string>? OpenSessionSelected;
@@ -299,6 +300,9 @@ namespace TxtAIEditor.Controls
             AgentOpenSessionsTitleText.Text = getString("AgentOpenSessionsTitle", "열린 세션");
             ToolTipService.SetToolTip(AgentHistoryButton, getString("AgentHistoryTooltip", "세션 히스토리"));
             AgentHistoryTitleText.Text = getString("AgentHistoryTitle", "세션 히스토리 (최근 20개)");
+            string saveHistoryTooltip = getString("AgentSaveHistoryTooltip", "현재 세션의 verbose 히스토리를 현재 폴더에 저장");
+            ToolTipService.SetToolTip(AgentSaveHistoryButton, saveHistoryTooltip);
+            AutomationProperties.SetName(AgentSaveHistoryButton, saveHistoryTooltip);
             ToolTipService.SetToolTip(AgentDeleteHistoryButton, getString("AgentDeleteHistoryTooltip", "히스토리 삭제"));
             AgentInsertOutputButton.Content = getString("AgentLastAnswerButtonText", "마지막 답변");
             AgentActivityHeaderText.Text = getString("AgentActivityHeader", "진행 상황");
@@ -339,6 +343,7 @@ namespace TxtAIEditor.Controls
             UpdateRewindSessionButtonEnabled();
             AgentOpenSessionsButton.IsEnabled = true;
             AgentHistoryButton.IsEnabled = true;
+            AgentSaveHistoryButton.IsEnabled = !isBusy;
             AgentDeleteHistoryButton.IsEnabled = !isBusy;
             _sessionMenuCoordinator.SetBusy(isBusy);
 
@@ -579,6 +584,11 @@ private Style? _accentRunButtonStyle;
         private void OnDeleteHistoryClick(object sender, RoutedEventArgs e)
         {
             HistoryToolbarDeleteClicked?.Invoke(this, e);
+        }
+
+        private void OnSaveHistoryClick(object sender, RoutedEventArgs e)
+        {
+            HistoryToolbarSaveClicked?.Invoke(this, e);
         }
 
         private void OnInsertOutputClick(object sender, RoutedEventArgs e)

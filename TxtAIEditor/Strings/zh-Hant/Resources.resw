@@ -3946,4 +3946,8 @@
   <data name="ImageConvertBatchSourceInfo" xml:space="preserve"><value>已選取影像：{0} 個&#xA;參考影像：{1}&#xA;大小：{2} × {3}px · 畫格：{4}</value></data>
   <data name="ImageConvertBatchDialogTitle" xml:space="preserve"><value>批次轉換影像 - {0} 個</value></data>
   <data name="ImageConvertBatchOutputConflict" xml:space="preserve"><value>選取的影像會產生重複的輸出檔名。請檢查檔名後再試一次。</value></data>
+  <data name="AgentSaveHistoryTooltip" xml:space="preserve"><value>將目前工作階段的詳細歷史記錄儲存到目前資料夾</value></data>
+  <data name="AgentActivityHistorySaveEmpty" xml:space="preserve"><value>沒有可儲存的工作階段歷史記錄。</value></data>
+  <data name="AgentActivityHistorySavedFormat" xml:space="preserve"><value>已儲存詳細歷史記錄：{0}</value></data>
+  <data name="AgentActivityHistorySaveFailedFormat" xml:space="preserve"><value>儲存歷史記錄失敗：{0}</value></data>
 </root>

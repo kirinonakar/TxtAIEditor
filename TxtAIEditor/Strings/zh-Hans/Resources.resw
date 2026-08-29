@@ -3946,4 +3946,8 @@
   <data name="ImageConvertBatchSourceInfo" xml:space="preserve"><value>已选择图像：{0} 个&#xA;参考图像：{1}&#xA;尺寸：{2} × {3}px · 帧数：{4}</value></data>
   <data name="ImageConvertBatchDialogTitle" xml:space="preserve"><value>批量转换图像 - {0} 个</value></data>
   <data name="ImageConvertBatchOutputConflict" xml:space="preserve"><value>所选图像会生成重复的输出文件名。请检查文件名后重试。</value></data>
+  <data name="AgentSaveHistoryTooltip" xml:space="preserve"><value>将当前会话的详细历史记录保存到当前文件夹</value></data>
+  <data name="AgentActivityHistorySaveEmpty" xml:space="preserve"><value>没有可保存的会话历史记录。</value></data>
+  <data name="AgentActivityHistorySavedFormat" xml:space="preserve"><value>已保存详细历史记录：{0}</value></data>
+  <data name="AgentActivityHistorySaveFailedFormat" xml:space="preserve"><value>保存历史记录失败：{0}</value></data>
 </root>

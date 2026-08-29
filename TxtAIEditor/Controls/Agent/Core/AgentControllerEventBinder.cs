@@ -44,6 +44,7 @@ namespace TxtAIEditor.Controls
             agentPane.OpenSessionClosed += (_, sessionId) => openSessionController.CloseSession(sessionId);
             agentPane.HistorySelected += (_, historyId) => sessionHistoryCoordinator.LoadHistorySession(historyId);
             agentPane.HistoryDeleted += async (_, historyId) => await sessionHistoryCoordinator.DeleteHistorySessionAsync(historyId);
+            agentPane.HistoryToolbarSaveClicked += async (_, _) => await sessionHistoryCoordinator.SaveCurrentVerboseHistoryAsync();
             agentPane.HistoryToolbarDeleteClicked += async (_, _) => await sessionHistoryCoordinator.ClearAllHistoryAsync();
             agentPane.InsertOutputRequested += async (_, _) => await outputInsertController.InsertOutputAsync();
             agentPane.InsertNewTabOutputRequested += async (_, _) => await outputInsertController.InsertNewTabOutputAsync();

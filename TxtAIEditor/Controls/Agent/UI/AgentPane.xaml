@@ -226,6 +226,7 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="AgentHistoryTitleText"
                                            Grid.Column="0"
@@ -233,8 +234,18 @@
                                            FontWeight="SemiBold"
                                            FontSize="12"
                                            VerticalAlignment="Center"/>
-                                <Button x:Name="AgentDeleteHistoryButton"
+                                <Button x:Name="AgentSaveHistoryButton"
                                         Grid.Column="1"
+                                        Width="28"
+                                        Height="28"
+                                        Padding="0"
+                                        Click="OnSaveHistoryClick"
+                                        ToolTipService.ToolTip="verbose 히스토리 저장"
+                                        Style="{StaticResource AgentButtonStyle}">
+                                    <FontIcon Glyph="&#xE74E;" FontSize="12"/>
+                                </Button>
+                                <Button x:Name="AgentDeleteHistoryButton"
+                                        Grid.Column="2"
                                         Width="28"
                                         Height="28"
                                         Padding="0"

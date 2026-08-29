@@ -3988,4 +3988,8 @@ Plan: {0}</value>
   <data name="ImageConvertBatchSourceInfo" xml:space="preserve"><value>Selected images: {0}&#xA;Reference image: {1}&#xA;Size: {2} × {3}px · Frames: {4}</value></data>
   <data name="ImageConvertBatchDialogTitle" xml:space="preserve"><value>Batch Image Conversion - {0} items</value></data>
   <data name="ImageConvertBatchOutputConflict" xml:space="preserve"><value>The selected images produce duplicate output file names. Check the file names and try again.</value></data>
+  <data name="AgentSaveHistoryTooltip" xml:space="preserve"><value>Save the current session's verbose history to the current folder</value></data>
+  <data name="AgentActivityHistorySaveEmpty" xml:space="preserve"><value>There is no session history to save.</value></data>
+  <data name="AgentActivityHistorySavedFormat" xml:space="preserve"><value>Verbose history saved: {0}</value></data>
+  <data name="AgentActivityHistorySaveFailedFormat" xml:space="preserve"><value>Failed to save history: {0}</value></data>
 </root>

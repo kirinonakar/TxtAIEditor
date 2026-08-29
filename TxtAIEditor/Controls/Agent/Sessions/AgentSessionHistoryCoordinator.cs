@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
 
@@ -13,6 +15,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentOpenSessionController _openSessionController;
         private readonly Func<bool> _isCurrentSessionRunning;
         private readonly Func<string> _currentSessionIdProvider;
+        private readonly Func<string> _currentFolderProvider;
         private readonly Func<string, string, string> _getString;
         private readonly AgentHistoryTitleResolver _titleResolver = new();
 
@@ -23,6 +26,7 @@ namespace TxtAIEditor.Controls
             AgentOpenSessionController openSessionController,
             Func<bool> isCurrentSessionRunning,
             Func<string> currentSessionIdProvider,
+            Func<string> currentFolderProvider,
             Func<string, string, string> getString)
         {
             _agentPane = agentPane;
@@ -31,6 +35,7 @@ namespace TxtAIEditor.Controls
             _openSessionController = openSessionController;
             _isCurrentSessionRunning = isCurrentSessionRunning;
             _currentSessionIdProvider = currentSessionIdProvider;
+            _currentFolderProvider = currentFolderProvider;
             _getString = getString;
         }
 
@@ -134,6 +139,68 @@ namespace TxtAIEditor.Controls
             string currentSessionId = _currentSessionIdProvider();
             await _historyController.ClearAsync(currentSessionId);
             _openSessionController.CloseSession(currentSessionId);
+        }
+
+        public async Task SaveCurrentVerboseHistoryAsync()
+        {
+            if (_isCurrentSessionRunning())
+            {
+                return;
+            }
+
+            _openSessionController.SaveActiveFromUI();
+            AgentOpenSessionState session = _openSessionController.EnsureSession(_currentSessionIdProvider());
+            string verboseHistory = session.SessionHistoryText ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(verboseHistory))
+            {
+                _agentPane.ClearActivity(_getString(
+                    "AgentActivityHistorySaveEmpty",
+                    "저장할 세션 히스토리가 없습니다."));
+                return;
+            }
+
+            try
+            {
+                string currentFolder = _currentFolderProvider();
+                if (string.IsNullOrWhiteSpace(currentFolder) || !Directory.Exists(currentFolder))
+                {
+                    throw new DirectoryNotFoundException(currentFolder);
+                }
+
+                string fileName = BuildVerboseHistoryFileName(session);
+                string filePath = Path.Combine(currentFolder, fileName);
+                await File.WriteAllTextAsync(filePath, verboseHistory, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                _agentPane.ClearActivity(string.Format(
+                    _getString("AgentActivityHistorySavedFormat", "verbose 히스토리 저장됨: {0}"),
+                    fileName));
+            }
+            catch (Exception ex)
+            {
+                _agentPane.ClearActivity(string.Format(
+                    _getString("AgentActivityHistorySaveFailedFormat", "히스토리 저장 실패: {0}"),
+                    ex.Message));
+            }
+        }
+
+        private static string BuildVerboseHistoryFileName(AgentOpenSessionState session)
+        {
+            string title = string.IsNullOrWhiteSpace(session.Title) ? "session" : session.Title.Trim();
+            foreach (char invalidCharacter in Path.GetInvalidFileNameChars())
+            {
+                title = title.Replace(invalidCharacter, '_');
+            }
+
+            title = title.Trim('.', ' ');
+            if (title.Length == 0)
+            {
+                title = "session";
+            }
+            else if (title.Length > 80)
+            {
+                title = title.Substring(0, 80).TrimEnd('.', ' ');
+            }
+
+            return $"AgentHistory_{session.UpdatedAt:yyyyMMdd_HHmmss}_{title}.txt";
         }
 
         public void RefreshOutputDisplay()
