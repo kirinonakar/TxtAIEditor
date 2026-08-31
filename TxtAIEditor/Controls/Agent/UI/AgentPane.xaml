@@ -994,19 +994,6 @@
                            FontSize="11"
                            Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
             </HyperlinkButton>
-            <ToggleButton x:Name="AgentVerboseToggleButton"
-                          Grid.Row="2"
-                          Grid.Column="3"
-                          HorizontalAlignment="Right"
-                          VerticalAlignment="Center"
-                          Margin="0,1,0,-13"
-                          IsChecked="False"
-                          Click="OnVerboseToggleClick"
-                          ToolTipService.ToolTip="Agent 상세 출력(verbose) 켜기/끄기"
-                          AutomationProperties.Name="Agent 상세 출력(verbose) 켜기/끄기"
-                          Style="{StaticResource AgentGhostToggleButtonStyle}">
-                <TextBlock x:Name="AgentVerboseToggleText" Text="simple" FontSize="11"/>
-            </ToggleButton>
         </Grid>
 
         <Border x:Name="AgentActivityPanel"

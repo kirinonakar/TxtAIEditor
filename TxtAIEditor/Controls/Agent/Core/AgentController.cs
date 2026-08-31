@@ -186,13 +186,11 @@ namespace TxtAIEditor.Controls
             };
 
             _agentPane.HideHtmlCodeBlocks = !settingsService.CurrentSettings.LlmAgentVerbose;
-            _agentPane.UpdateVerboseToggle(settingsService.CurrentSettings.LlmAgentVerbose);
             AgentControllerEventBinder.Wire(
                 agentPane,
                 _runCoordinator.RunAgentAsync,
                 _runCoordinator.StopAgent,
                 prompt => _runCoordinator.QueueFollowUpPrompt(prompt),
-                SetVerboseState,
                 _openSessionController,
                 _sessionRewindController,
                 _sessionHistoryCoordinator,
@@ -210,26 +208,6 @@ namespace TxtAIEditor.Controls
             _openSessionController.UpdateUI();
             UpdateContextStatsImmediate();
             QueueDeferredStartupDataLoad();
-        }
-
-        private void SetVerboseState(bool verbose)
-        {
-            var settings = _settingsService.CurrentSettings;
-            var sessionSettings = _openSessionController.GetCurrentSessionSettings();
-            bool settingsChanged = settings.LlmAgentVerbose != verbose;
-            if (!settingsChanged && sessionSettings.LlmAgentVerbose == verbose)
-            {
-                return;
-            }
-
-            settings.LlmAgentVerbose = verbose;
-            sessionSettings.LlmAgentVerbose = verbose;
-            _agentPane.HideHtmlCodeBlocks = !verbose;
-            _sessionHistoryCoordinator.RefreshOutputDisplay();
-            if (settingsChanged)
-            {
-                _ = _settingsService.SaveSettingsAsync(settings);
-            }
         }
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEditController.SessionEdits;

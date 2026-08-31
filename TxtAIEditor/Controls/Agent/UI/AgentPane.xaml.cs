@@ -211,7 +211,6 @@ namespace TxtAIEditor.Controls
         public event EventHandler<string>? OpenSessionSelected;
         public event EventHandler<string>? OpenSessionClosed;
         public event RoutedEventHandler? ModelNameClick;
-        public event EventHandler<bool>? VerboseToggled;
 
         public AgentOutputWrapper Output => new AgentOutputWrapper(this);
         public TextBox Prompt => AgentPromptInput;
@@ -253,7 +252,6 @@ namespace TxtAIEditor.Controls
             AgentPromptInput.FontSize = Math.Clamp(settings.AgentPromptFontSize, 8.0, 36.0);
 
             HideHtmlCodeBlocks = !settings.LlmAgentVerbose;
-            UpdateVerboseToggle(settings.LlmAgentVerbose);
         }
 
         public void Localize(Func<string, string, string> getString)
@@ -268,10 +266,6 @@ namespace TxtAIEditor.Controls
             string streamToTabText = getString("AgentStreamToTab", "탭에 스트리밍");
             ToolTipService.SetToolTip(AgentStreamToTabToggleButton, streamToTabText);
             AutomationProperties.SetName(AgentStreamToTabToggleButton, streamToTabText);
-            UpdateVerboseToggleText();
-            string verboseToggleTooltip = getString("AgentVerboseToggleTooltip", "Agent 상세 출력(verbose) 켜기/끄기");
-            ToolTipService.SetToolTip(AgentVerboseToggleButton, verboseToggleTooltip);
-            AutomationProperties.SetName(AgentVerboseToggleButton, verboseToggleTooltip);
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
             ToolTipService.SetToolTip(AgentMcpButton, getString("AgentMcpButtonTooltip", "MCP 서버"));
             AgentMcpTitleText.Text = getString("AgentMcpTitle", "MCP");
@@ -798,20 +792,6 @@ private Style? _accentRunButtonStyle;
             ModelNameClick?.Invoke(sender, e);
         }
 
-        private void OnVerboseToggleClick(object sender, RoutedEventArgs e)
-        {
-            UpdateVerboseToggleText();
-            VerboseToggled?.Invoke(sender, AgentVerboseToggleButton.IsChecked == true);
-        }
-
-        private void UpdateVerboseToggleText()
-        {
-            bool isVerbose = AgentVerboseToggleButton.IsChecked == true;
-            string resourceKey = isVerbose ? "AgentVerboseToggleText" : "AgentSimpleToggleText";
-            string fallback = isVerbose ? "verbose" : "simple";
-            AgentVerboseToggleText.Text = _getString?.Invoke(resourceKey, fallback) ?? fallback;
-        }
-
         private void OnDiffCancelClick(object sender, RoutedEventArgs e)
         {
             DiffCancelled?.Invoke(sender, e);
@@ -949,16 +929,6 @@ private Style? _accentRunButtonStyle;
             {
                 AgentModelNameText.Text = text;
             }
-        }
-
-        public void UpdateVerboseToggle(bool verbose)
-        {
-            if (AgentVerboseToggleButton.IsChecked != verbose)
-            {
-                AgentVerboseToggleButton.IsChecked = verbose;
-            }
-
-            UpdateVerboseToggleText();
         }
 
         public void UpdateHistoryItems(List<AgentHistoryItemViewModel> items, string? selectedId)

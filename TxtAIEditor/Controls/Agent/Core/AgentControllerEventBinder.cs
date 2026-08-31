@@ -10,7 +10,6 @@ namespace TxtAIEditor.Controls
             Func<Task> runAgentAsync,
             Action stopAgent,
             Action<string> queueFollowUpPrompt,
-            Action<bool> onVerboseToggled,
             AgentOpenSessionController openSessionController,
             AgentSessionRewindController sessionRewindController,
             AgentSessionHistoryCoordinator sessionHistoryCoordinator,
@@ -26,7 +25,6 @@ namespace TxtAIEditor.Controls
             Action updatePromptTokenEstimate)
         {
             agentPane.RunRequested += async (_, _) => await runAgentAsync();
-            agentPane.VerboseToggled += (_, isVerbose) => onVerboseToggled(isVerbose);
             agentPane.StopRequested += (_, _) => stopAgent();
             agentPane.PromptQueued += (_, prompt) => queueFollowUpPrompt(prompt);
             agentPane.NewSessionRequested += (_, _) =>
