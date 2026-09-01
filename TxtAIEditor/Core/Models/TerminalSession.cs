@@ -9,6 +9,11 @@ namespace TxtAIEditor.Core.Models
 {
     public class TerminalSession : INotifyPropertyChanged
     {
+        private const int MaximumOutputLength = 1_000_000;
+        private const int RetainedOutputLength = 750_000;
+
+        private readonly object _outputLock = new object();
+        private readonly StringBuilder _output = new StringBuilder();
         private int _number;
 
         public TerminalSession(string workingDirectory, TerminalShellProfile shellProfile)
@@ -47,8 +52,6 @@ namespace TxtAIEditor.Core.Models
         public ConPtyTerminal? Terminal { get; set; }
         public int Columns { get; set; } = 80;
         public int Rows { get; set; } = 24;
-        public StringBuilder Output { get; } = new StringBuilder();
-
         public void SetDisplayNumber(int number)
         {
             Number = Math.Max(1, number);
@@ -63,6 +66,31 @@ namespace TxtAIEditor.Core.Models
 
             WorkingDirectory = workingDirectory;
             OnPropertyChanged(nameof(WorkingDirectory));
+        }
+
+        public void AppendOutput(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            lock (_outputLock)
+            {
+                _output.Append(text);
+                if (_output.Length > MaximumOutputLength)
+                {
+                    _output.Remove(0, _output.Length - RetainedOutputLength);
+                }
+            }
+        }
+
+        public string GetOutputSnapshot()
+        {
+            lock (_outputLock)
+            {
+                return _output.ToString();
+            }
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

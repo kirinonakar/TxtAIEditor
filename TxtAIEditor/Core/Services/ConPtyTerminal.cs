@@ -209,22 +209,39 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            byte[] bytes = Encoding.UTF8.GetBytes(data);
-            await _inputWriter.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
-            await _inputWriter.FlushAsync().ConfigureAwait(false);
+            try
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(data);
+                await _inputWriter.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+                await _inputWriter.FlushAsync().ConfigureAwait(false);
+            }
+            catch (ObjectDisposedException) when (_disposed)
+            {
+            }
+            catch (IOException) when (_disposed)
+            {
+            }
         }
 
         public void Resize(short columns, short rows)
         {
-            if (_disposed || _pseudoConsole == IntPtr.Zero || columns < 2 || rows < 1)
+            if (columns < 2 || rows < 1)
             {
                 return;
             }
 
-            int hr = ResizePseudoConsole(_pseudoConsole, new COORD { X = columns, Y = rows });
-            if (hr != 0 && hr != HPCON_INVALID)
+            lock (_disposeLock)
             {
-                Debug.WriteLine($"ResizePseudoConsole failed: 0x{hr:X8}");
+                if (_disposed || _pseudoConsole == IntPtr.Zero)
+                {
+                    return;
+                }
+
+                int hr = ResizePseudoConsole(_pseudoConsole, new COORD { X = columns, Y = rows });
+                if (hr != 0 && hr != HPCON_INVALID)
+                {
+                    Debug.WriteLine($"ResizePseudoConsole failed: 0x{hr:X8}");
+                }
             }
         }
 

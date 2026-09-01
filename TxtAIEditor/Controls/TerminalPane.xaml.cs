@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
@@ -21,6 +22,7 @@ namespace TxtAIEditor.Controls
         public event Action<Windows.System.VirtualKey>? FunctionKeyShortcutPressed;
 
         private readonly ObservableCollection<TerminalSession> _terminalSessions = new ObservableCollection<TerminalSession>();
+        private readonly DispatcherQueue _dispatcherQueue;
         private TerminalSession? _activeTerminalSession;
         private Func<string, string, string>? _getString;
         private bool _webViewReady;
@@ -33,6 +35,7 @@ namespace TxtAIEditor.Controls
         public TerminalPane()
         {
             InitializeComponent();
+            _dispatcherQueue = DispatcherQueue;
             TerminalSessionsList.ItemsSource = _terminalSessions;
             Unloaded += OnUnloaded;
             ActualThemeChanged += OnActualThemeChanged;
@@ -262,7 +265,7 @@ namespace TxtAIEditor.Controls
             }
 
             _resizeQueued = true;
-            bool queued = DispatcherQueue.TryEnqueue(() =>
+            bool queued = _dispatcherQueue.TryEnqueue(() =>
             {
                 try
                 {
@@ -565,8 +568,8 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            session.Output.Append(text);
-            DispatcherQueue.TryEnqueue(() =>
+            session.AppendOutput(text);
+            _dispatcherQueue.TryEnqueue(() =>
             {
                 if (_activeTerminalSession == session)
                 {
@@ -605,7 +608,7 @@ namespace TxtAIEditor.Controls
                 fontSize = _terminalFontSize
             });
 
-            string existingOutput = _activeTerminalSession.Output.ToString();
+            string existingOutput = _activeTerminalSession.GetOutputSnapshot();
             if (!string.IsNullOrEmpty(existingOutput))
             {
                 PostTerminalMessage(new { type = "output", sessionId = _activeTerminalSession.WindowTitle, data = existingOutput });
@@ -675,7 +678,7 @@ namespace TxtAIEditor.Controls
 
         private void CloseExitedTerminalSession(TerminalSession session)
         {
-            DispatcherQueue.TryEnqueue(() => CloseTerminalSession(session));
+            _dispatcherQueue.TryEnqueue(() => CloseTerminalSession(session));
         }
 
         private string GetWorkingDirectoryOrDefault()
