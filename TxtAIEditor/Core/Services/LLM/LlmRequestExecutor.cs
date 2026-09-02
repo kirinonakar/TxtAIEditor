@@ -37,11 +37,15 @@ namespace TxtAIEditor.Core.Services.LLM
             cancellationToken.ThrowIfCancellationRequested();
             string providerName = settings.LlmProvider;
             string apiKey = await _credentialStore.GetApiKeyAsync(providerName);
+            bool isOpenCodeZen = providerName.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase) ||
+                                 providerName.Equals("OpenCodeZen", StringComparison.OrdinalIgnoreCase) ||
+                                 providerName.Equals("Zen", StringComparison.OrdinalIgnoreCase);
             bool requiresApiKey = !providerName.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) &&
                                     !providerName.Equals("LMStudio", StringComparison.OrdinalIgnoreCase) &&
                                     !providerName.Equals("Ollama", StringComparison.OrdinalIgnoreCase) &&
                                     !providerName.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) &&
-                                    !providerName.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
+                                    !providerName.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase) &&
+                                    !isOpenCodeZen;
             if (providerName.Equals("Custom", StringComparison.OrdinalIgnoreCase))
             {
                 string customEndpoint = settings.LlmEndpoint?.Trim() ?? string.Empty;
@@ -53,6 +57,12 @@ namespace TxtAIEditor.Core.Services.LLM
             if (requiresApiKey && string.IsNullOrEmpty(apiKey))
             {
                 return _localizationService.GetString("LlmErrorNoApiKeyOrToken", "에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 자격 증명을 먼저 저장해 주십시오.");
+            }
+
+            // OpenCode Zen free models can be called without an API key; the gateway accepts the public stub token.
+            if (isOpenCodeZen && string.IsNullOrEmpty(apiKey))
+            {
+                apiKey = "public";
             }
 
             ILLMProvider provider = providerName.ToLower() switch
