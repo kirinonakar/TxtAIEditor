@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
@@ -14,7 +15,6 @@ namespace TxtAIEditor.Core.Services.LLM
         private static JsonDocument? _doc;
         private static DateTime _loadedAt = DateTime.MinValue;
         private static bool _loadFailed;
-        private static bool _priming;
         private static readonly TimeSpan _refreshInterval = TimeSpan.FromHours(24);
 
         private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
@@ -187,19 +187,12 @@ namespace TxtAIEditor.Core.Services.LLM
 
         public static async Task PrimeAsync(CancellationToken cancellationToken = default)
         {
-            if (_doc != null && (DateTime.Now - _loadedAt) < _refreshInterval) return;
-            if (_priming) return;
-            _priming = true;
             try
             {
                 await EnsureLoadedAsync(cancellationToken);
             }
             catch
             {
-            }
-            finally
-            {
-                _priming = false;
             }
         }
 
@@ -224,45 +217,179 @@ namespace TxtAIEditor.Core.Services.LLM
             return GetCachedLimits(appProvider, model);
         }
 
-        public static bool IsLoaded => _doc != null;
+        public static bool IsLoaded =>
+            _doc != null &&
+            (DateTime.Now - _loadedAt) < _refreshInterval &&
+            !_loadFailed;
 
         private static (int context, int output) Resolve(string appProvider, string model)
         {
-            if (string.IsNullOrEmpty(model)) return (0, 0);
+            if (string.IsNullOrWhiteSpace(model)) return (0, 0);
             string providerKey = MapProviderKey(appProvider);
-            string modelKey = model.ToLowerInvariant();
 
-            if (_doc != null)
+            if (TryResolveFromModelsDev(providerKey, model, out var modelsDevLimits))
             {
-                try
-                {
-                    if (_doc.RootElement.TryGetProperty(providerKey, out var prov) &&
-                        prov.TryGetProperty("models", out var models) &&
-                        models.ValueKind == JsonValueKind.Object)
-                    {
-                        foreach (var m in models.EnumerateObject())
-                        {
-                            if (!string.Equals(m.Name, model, StringComparison.OrdinalIgnoreCase)) continue;
-                            return ExtractLimit(m.Value);
-                        }
-                    }
-                }
-                catch { }
+                return modelsDevLimits;
             }
 
-            if (providerKey == "google" && modelKey == "gemini-pro-latest")
+            if (providerKey == "google" &&
+                string.Equals(model.Trim(), "gemini-pro-latest", StringComparison.OrdinalIgnoreCase))
             {
-                if (_fallback.TryGetValue((providerKey, "gemini-3.1-pro-preview"), out var proFb))
+                if (TryResolveFromModelsDev(providerKey, "gemini-3.1-pro-preview", out var proLimits))
+                {
+                    return proLimits;
+                }
+
+                if (TryGetFallbackLimits(providerKey, "gemini-3.1-pro-preview", out var proFb))
+                {
                     return proFb;
+                }
+
                 return (1048576, 65536);
             }
 
-            if (_fallback.TryGetValue((providerKey, modelKey), out var fb))
+            if (TryGetFallbackLimits(providerKey, model, out var fb))
             {
                 return fb;
             }
 
             return (0, 0);
+        }
+
+        private static bool TryResolveFromModelsDev(
+            string providerKey,
+            string model,
+            out (int context, int output) limits)
+        {
+            limits = (0, 0);
+            JsonDocument? document = _doc;
+            if (document == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                if (!document.RootElement.TryGetProperty(providerKey, out var provider) ||
+                    !provider.TryGetProperty("models", out var models) ||
+                    models.ValueKind != JsonValueKind.Object)
+                {
+                    return false;
+                }
+
+                string requestedModel = model.Trim();
+                JsonElement? equivalentMatch = null;
+                foreach (var modelEntry in models.EnumerateObject())
+                {
+                    if (string.Equals(modelEntry.Name, requestedModel, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var exactLimits = ExtractLimit(modelEntry.Value);
+                        if (HasLimits(exactLimits))
+                        {
+                            limits = exactLimits;
+                            return true;
+                        }
+
+                        continue;
+                    }
+
+                    if (!equivalentMatch.HasValue &&
+                        AreEquivalentModelIdentifiers(providerKey, requestedModel, modelEntry.Name, modelEntry.Value))
+                    {
+                        equivalentMatch = modelEntry.Value;
+                    }
+                }
+
+                if (equivalentMatch.HasValue)
+                {
+                    limits = ExtractLimit(equivalentMatch.Value);
+                    return HasLimits(limits);
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        private static bool AreEquivalentModelIdentifiers(
+            string providerKey,
+            string requestedModel,
+            string catalogModel,
+            JsonElement catalogModelElement)
+        {
+            string normalizedRequested = NormalizeModelIdentifier(providerKey, requestedModel);
+            if (string.Equals(
+                normalizedRequested,
+                NormalizeModelIdentifier(providerKey, catalogModel),
+                StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            foreach (string propertyName in new[] { "id", "slug", "model" })
+            {
+                if (catalogModelElement.TryGetProperty(propertyName, out var identifier) &&
+                    identifier.ValueKind == JsonValueKind.String &&
+                    string.Equals(
+                        normalizedRequested,
+                        NormalizeModelIdentifier(providerKey, identifier.GetString() ?? string.Empty),
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string NormalizeModelIdentifier(string providerKey, string model)
+        {
+            string normalized = (model ?? string.Empty).Trim();
+            if (providerKey.Equals("openrouter", StringComparison.OrdinalIgnoreCase))
+            {
+                if (normalized.StartsWith("~", StringComparison.Ordinal))
+                {
+                    normalized = normalized.Substring(1);
+                }
+
+                int slashIndex = normalized.LastIndexOf('/');
+                int suffixSeparatorIndex = normalized.LastIndexOf(':');
+                if (suffixSeparatorIndex > slashIndex)
+                {
+                    normalized = normalized.Substring(0, suffixSeparatorIndex);
+                }
+            }
+
+            return normalized.ToLowerInvariant();
+        }
+
+        private static bool TryGetFallbackLimits(
+            string providerKey,
+            string model,
+            out (int context, int output) limits)
+        {
+            string exactModelKey = (model ?? string.Empty).Trim().ToLowerInvariant();
+            if (_fallback.TryGetValue((providerKey, exactModelKey), out limits))
+            {
+                return true;
+            }
+
+            string normalizedModelKey = NormalizeModelIdentifier(providerKey, model ?? string.Empty);
+            if (!string.Equals(exactModelKey, normalizedModelKey, StringComparison.Ordinal) &&
+                _fallback.TryGetValue((providerKey, normalizedModelKey), out limits))
+            {
+                return true;
+            }
+
+            limits = (0, 0);
+            return false;
+        }
+
+        private static bool HasLimits((int context, int output) limits)
+        {
+            return limits.context > 0 || limits.output > 0;
         }
 
         private static (int context, int output) ExtractLimit(JsonElement modelEl)
@@ -271,10 +398,31 @@ namespace TxtAIEditor.Core.Services.LLM
             int output = 0;
             if (modelEl.TryGetProperty("limit", out var limit))
             {
-                if (limit.TryGetProperty("context", out var ctx) && ctx.TryGetInt32(out int c)) context = c;
-                if (limit.TryGetProperty("output", out var outEl) && outEl.TryGetInt32(out int o)) output = o;
+                if (TryGetJsonInt(limit, "context", out int c)) context = c;
+                if (TryGetJsonInt(limit, "output", out int o)) output = o;
             }
             return (context, output);
+        }
+
+        private static bool TryGetJsonInt(JsonElement parent, string propertyName, out int value)
+        {
+            value = 0;
+            if (!parent.TryGetProperty(propertyName, out var property))
+            {
+                return false;
+            }
+
+            if (property.ValueKind == JsonValueKind.Number)
+            {
+                return property.TryGetInt32(out value);
+            }
+
+            return property.ValueKind == JsonValueKind.String &&
+                int.TryParse(
+                    property.GetString(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out value);
         }
 
         private static async Task EnsureLoadedAsync(CancellationToken cancellationToken)

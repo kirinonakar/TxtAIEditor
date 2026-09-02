@@ -185,11 +185,8 @@ namespace TxtAIEditor.Core.Services
             {
                 return new[]
                 {
-                    "grok-4.5",
                     "glm-5.3-flash",
                     "glm-5.3",
-                    "glm-5.2",
-                    "glm-5.1",
                     "gpt-5.6-luna",
                     "kimi-k3",
                     "kimi-k2.7-code",
@@ -197,7 +194,6 @@ namespace TxtAIEditor.Core.Services
                     "mimo-v2.5",
                     "mimo-v2.5-pro",
                     "minimax-m3",
-                    "minimax-m2.7",
                     "qwen3.8-max",
                     "qwen3.7-max",
                     "qwen3.7-plus",
@@ -205,8 +201,7 @@ namespace TxtAIEditor.Core.Services
                     "deepseek-v4-pro",
                     "deepseek-v4-flash",
                     "deepseek-v4-flash-vision-exp",
-                    "hy3",
-                    "muse-spark-1.2-contributor"
+                    "hy3"
                 };
             }
 
@@ -216,12 +211,6 @@ namespace TxtAIEditor.Core.Services
                 {
                     "gpt-5.5",
                     "gpt-5.5-pro",
-                    "gpt-5.4",
-                    "gpt-5.4-pro",
-                    "gpt-5.4-mini",
-                    "gpt-5.4-nano",
-                    "gpt-5.3-codex",
-                    "gpt-5.3-codex-spark",
                     "claude-fable-5",
                     "claude-opus-4-8",
                     "claude-opus-4-7",
@@ -240,21 +229,16 @@ namespace TxtAIEditor.Core.Services
                     "deepseek-v4-flash",
                     "deepseek-v4-flash-vision-exp",
                     "minimax-m2.7",
-                    "minimax-m2.5",
                     "glm-5.3-flash",
                     "glm-5.2",
-                    "glm-5.1",
-                    "glm-5",
                     "kimi-k2.5",
                     "kimi-k2.6",
                     "grok-build-0.1",
                     "big-pickle",
-                    "x-preview-f-free",
                     "mimo-v2.5-free",
                     "north-mini-code-free",
                     "nemotron-3-ultra-free",
                     "deepseek-v4-flash-free",
-                    "muse-spark-1.2-contributor-free"
                 };
             }
 
