@@ -121,7 +121,8 @@ namespace TxtAIEditor.Core.Services
             Func<string, Task<bool>>? onVisionFallbackResult = null,
             string fixedContext = "",
             Func<Task>? onNativeToolCall = null,
-            Func<string, Task>? onApiType = null)
+            Func<string, Task>? onApiType = null,
+            string? sessionId = null)
         {
             return _agentService.RunAgentAsync(
                 instruction,
@@ -141,7 +142,8 @@ namespace TxtAIEditor.Core.Services
                 onVisionFallbackResult,
                 fixedContext,
                 onNativeToolCall,
-                onApiType);
+                onApiType,
+                sessionId);
         }
 
         public Task<string> RunAgentAsync(
@@ -163,7 +165,8 @@ namespace TxtAIEditor.Core.Services
             Func<string, Task<bool>>? onVisionFallbackResult = null,
             string fixedContext = "",
             Func<Task>? onNativeToolCall = null,
-            Func<string, Task>? onApiType = null)
+            Func<string, Task>? onApiType = null,
+            string? sessionId = null)
         {
             return _agentService.RunAgentAsync(
                 settings,
@@ -184,7 +187,8 @@ namespace TxtAIEditor.Core.Services
                 onVisionFallbackResult,
                 fixedContext,
                 onNativeToolCall,
-                onApiType);
+                onApiType,
+                sessionId);
         }
 
         public void ResetTokenUsageStats()

@@ -467,7 +467,8 @@ namespace TxtAIEditor.Controls
                     {
                         runContext.ApiType = apiType;
                         return Task.CompletedTask;
-                    });
+                    },
+                    sessionId: runContext.SessionId);
             }
             catch (ResponseTruncatedException)
             {

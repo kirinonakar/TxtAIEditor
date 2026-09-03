@@ -16,14 +16,25 @@ namespace TxtAIEditor.Core.Services.LLM
         private readonly ILocalizationService _localizationService;
 
         private static readonly HttpClient _httpClient = new HttpClient();
+        private const string ClientUserAgent = "TxtAIEditor/1.0.0";
         private readonly string _thinkingLevel;
         private readonly string _providerName;
+        private readonly string _openCodeSessionId;
 
-        public GoProvider(ILocalizationService localizationService, string thinkingLevel = "", string providerName = "OpenCode Go")
+        public GoProvider(ILocalizationService localizationService, string thinkingLevel = "", string providerName = "OpenCode Go", string? sessionId = null)
         {
             _localizationService = localizationService;
             _thinkingLevel = thinkingLevel ?? "";
             _providerName = providerName ?? "OpenCode Go";
+            _openCodeSessionId = string.IsNullOrWhiteSpace(sessionId)
+                ? Guid.NewGuid().ToString("N")
+                : sessionId.Trim();
+        }
+
+        private void ConfigureOpenCodeRequest(HttpRequestMessage request)
+        {
+            request.Headers.UserAgent.ParseAdd(ClientUserAgent);
+            request.Headers.TryAddWithoutValidation("x-opencode-session", _openCodeSessionId);
         }
 
         private static int GetThinkingBudget(string level) => level.ToLowerInvariant() switch
@@ -137,7 +148,8 @@ namespace TxtAIEditor.Core.Services.LLM
                     onUsage,
                     onNativeToolCall,
                     _localizationService.GetString("GoErrorApiCallFailed", "OpenCode Go API 호출 실패 ({0}): {1}"),
-                    _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."));
+                    _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."),
+                    request => ConfigureOpenCodeRequest(request));
             }
 
             await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
@@ -207,6 +219,7 @@ namespace TxtAIEditor.Core.Services.LLM
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                ConfigureOpenCodeRequest(request);
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
                 using (var response = await _httpClient.SendAsync(request, cancellationToken))
@@ -318,7 +331,8 @@ namespace TxtAIEditor.Core.Services.LLM
                     onReasoning,
                     onUsage,
                     onNativeToolCall,
-                    _localizationService.GetString("GoErrorStreamCallFailed", "OpenCode Go API 스트리밍 호출 실패 ({0}): {1}"));
+                    _localizationService.GetString("GoErrorStreamCallFailed", "OpenCode Go API 스트리밍 호출 실패 ({0}): {1}"),
+                    request => ConfigureOpenCodeRequest(request));
                 return;
             }
 
@@ -394,6 +408,7 @@ namespace TxtAIEditor.Core.Services.LLM
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                ConfigureOpenCodeRequest(request);
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
                 using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
@@ -600,6 +615,7 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
                 request.Headers.Add("anthropic-version", "2023-06-01");
+                ConfigureOpenCodeRequest(request);
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
                 using (var response = await _httpClient.SendAsync(request, cancellationToken))
@@ -692,6 +708,7 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
                 request.Headers.Add("anthropic-version", "2023-06-01");
+                ConfigureOpenCodeRequest(request);
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
                 using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))

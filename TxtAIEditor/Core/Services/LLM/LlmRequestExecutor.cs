@@ -27,12 +27,12 @@ namespace TxtAIEditor.Core.Services.LLM
             _tokenUsageTracker = tokenUsageTracker;
         }
 
-        public async Task<string> ExecuteAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
+        public async Task<string> ExecuteAsync(string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null, string? sessionId = null)
         {
-            return await ExecuteAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult, onNativeToolCall, onApiType);
+            return await ExecuteAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult, onNativeToolCall, onApiType, sessionId);
         }
 
-        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
+        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null, string? sessionId = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string providerName = settings.LlmProvider;
@@ -81,12 +81,12 @@ namespace TxtAIEditor.Core.Services.LLM
                 "unsloth desktop" => new UnslothProvider(_localizationService, settings.LlmThinkingLevel),
                 "unslothdesktop" => new UnslothProvider(_localizationService, settings.LlmThinkingLevel),
                 "unsloth" => new UnslothProvider(_localizationService, settings.LlmThinkingLevel),
-                "opencode go" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
-                "opencodego" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
-                "go" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
-                "opencode zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
-                "opencodezen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
-                "zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName),
+                "opencode go" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName, sessionId),
+                "opencodego" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName, sessionId),
+                "go" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName, sessionId),
+                "opencode zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName, sessionId),
+                "opencodezen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName, sessionId),
+                "zen" => new GoProvider(_localizationService, settings.LlmThinkingLevel, providerName, sessionId),
                 "custom" => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName),
                 _ => new OpenAIProvider(_localizationService, isOAuth: false, thinkingLevel: settings.LlmThinkingLevel, providerName: providerName)
             };
@@ -206,7 +206,8 @@ namespace TxtAIEditor.Core.Services.LLM
                         allowVisionFallback: false,
                         onVisionFallbackResult: null,
                         onNativeToolCall: onNativeToolCall,
-                        onApiType: onApiType);
+                        onApiType: onApiType,
+                        sessionId: sessionId);
 
                     if (IsLlmErrorResponse(fallbackAnalysis))
                     {
@@ -242,7 +243,8 @@ namespace TxtAIEditor.Core.Services.LLM
                         allowVisionFallback: false,
                         onVisionFallbackResult: null,
                         onNativeToolCall: onNativeToolCall,
-                        onApiType: onApiType);
+                        onApiType: onApiType,
+                        sessionId: sessionId);
                     if (IsLlmEmptyResponse(continuationResponse))
                     {
                         if (onChunk != null)
