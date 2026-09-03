@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -95,6 +96,16 @@ namespace TxtAIEditor.Controls
                 }
             };
             menu.Items.Add(openInNewWindowItem);
+
+            var openInWindowsExplorerItem = new MenuFlyoutItem
+            {
+                Text = _getString("ExplorerOpenInWindowsTooltip", "Windows 탐색기에서 열기"),
+                Icon = new FontIcon { Glyph = "\uE8DA" },
+                IsEnabled = GetWindowsExplorerFolderPath(tab) != null
+            };
+            openInWindowsExplorerItem.Click += (_, __) => OpenInWindowsExplorer(tab);
+            menu.Items.Add(openInWindowsExplorerItem);
+
             menu.Items.Add(new MenuFlyoutSeparator());
 
             var copyFileNameItem = new MenuFlyoutItem { Text = _getString("TabMenuCopyFileName", "파일이름 복사"), Icon = new SymbolIcon(Symbol.Copy) };
@@ -367,6 +378,59 @@ namespace TxtAIEditor.Controls
             return !string.IsNullOrWhiteSpace(tab.FilePath)
                 ? tab.FilePath
                 : tab.HexSourceFilePath;
+        }
+
+        private static string? GetWindowsExplorerFolderPath(OpenedTab tab)
+        {
+            if (tab.IsRemoteFile || tab.IsArchiveEntry)
+            {
+                return null;
+            }
+
+            string? filePath = GetFileActionPath(tab);
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return null;
+            }
+
+            if (Directory.Exists(filePath))
+            {
+                return filePath;
+            }
+
+            if (!File.Exists(filePath))
+            {
+                return null;
+            }
+
+            string? folderPath = Path.GetDirectoryName(filePath);
+            return !string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath)
+                ? folderPath
+                : null;
+        }
+
+        private static void OpenInWindowsExplorer(OpenedTab tab)
+        {
+            string? folderPath = GetWindowsExplorerFolderPath(tab);
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                return;
+            }
+
+            try
+            {
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    UseShellExecute = false
+                };
+                startInfo.ArgumentList.Add(folderPath);
+                Process.Start(startInfo);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to open tab path in Windows Explorer: {ex.Message}");
+            }
         }
 
         private static bool SupportsCsvTableView(OpenedTab tab)

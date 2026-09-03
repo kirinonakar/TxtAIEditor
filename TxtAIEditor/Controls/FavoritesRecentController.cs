@@ -359,11 +359,25 @@ private static bool InferFolderWithoutTouchingFileSystem(string path)
 
         private void OnFavoriteItemRightTapped(object sender, RightTappedRoutedEventArgs e)
         {
-            if (sender is FrameworkElement element &&
-                element.DataContext is FavoriteItem item &&
-                item.IsFolder)
+            if (sender is not FrameworkElement element ||
+                element.DataContext is not FavoriteItem item)
+            {
+                return;
+            }
+
+            if (item.IsFolder)
             {
                 ShowOpenFolderContextMenu(element, e, item.Path);
+                return;
+            }
+
+            if (!RemotePath.IsRemote(item.Path))
+            {
+                string? folderPath = Path.GetDirectoryName(item.Path);
+                if (!string.IsNullOrWhiteSpace(folderPath))
+                {
+                    ShowOpenFolderContextMenu(element, e, folderPath);
+                }
             }
         }
 
