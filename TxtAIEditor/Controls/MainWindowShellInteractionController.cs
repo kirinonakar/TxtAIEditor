@@ -14,6 +14,8 @@ namespace TxtAIEditor.Controls
         private readonly ShellPanelLayoutService _shellPanelLayoutService;
         private readonly RootKeyboardShortcutController _rootKeyboardShortcutController;
         private readonly KeyboardAccelerator _wordWrapKeyboardAccelerator;
+        private readonly KeyboardAccelerator _previousTabKeyboardAccelerator;
+        private readonly KeyboardAccelerator _nextTabKeyboardAccelerator;
 
         public MainWindowShellInteractionController(
             UIElement root,
@@ -36,6 +38,16 @@ namespace TxtAIEditor.Controls
                 Key = Windows.System.VirtualKey.Z,
                 Modifiers = Windows.System.VirtualKeyModifiers.Menu
             };
+            _previousTabKeyboardAccelerator = new KeyboardAccelerator
+            {
+                Key = Windows.System.VirtualKey.Left,
+                Modifiers = Windows.System.VirtualKeyModifiers.Menu
+            };
+            _nextTabKeyboardAccelerator = new KeyboardAccelerator
+            {
+                Key = Windows.System.VirtualKey.Right,
+                Modifiers = Windows.System.VirtualKeyModifiers.Menu
+            };
 
             WireEvents();
         }
@@ -45,9 +57,14 @@ namespace TxtAIEditor.Controls
             _root.DragOver += OnRootDragOver;
             _root.DragLeave += OnRootDragLeave;
             _root.Drop += OnRootDrop;
+            _root.PreviewKeyDown += OnRootPreviewKeyDown;
             _root.KeyDown += OnRootKeyDown;
             _wordWrapKeyboardAccelerator.Invoked += OnWordWrapKeyboardAcceleratorInvoked;
+            _previousTabKeyboardAccelerator.Invoked += OnPreviousTabKeyboardAcceleratorInvoked;
+            _nextTabKeyboardAccelerator.Invoked += OnNextTabKeyboardAcceleratorInvoked;
             _root.KeyboardAccelerators.Add(_wordWrapKeyboardAccelerator);
+            _root.KeyboardAccelerators.Add(_previousTabKeyboardAccelerator);
+            _root.KeyboardAccelerators.Add(_nextTabKeyboardAccelerator);
             _root.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
 
             _dragOverlay.DragOver += OnDragOverlayOver;
@@ -130,6 +147,11 @@ namespace TxtAIEditor.Controls
             _shellPanelLayoutService.OnRightSplitterPointerReleased(sender, e);
         }
 
+        private void OnRootPreviewKeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            _rootKeyboardShortcutController.HandlePreviewKeyDown(e);
+        }
+
         private void OnRootKeyDown(object sender, KeyRoutedEventArgs e)
         {
             _rootKeyboardShortcutController.HandleKeyDown(e);
@@ -138,6 +160,16 @@ namespace TxtAIEditor.Controls
         private void OnWordWrapKeyboardAcceleratorInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
         {
             _rootKeyboardShortcutController.HandleWordWrapKeyboardAccelerator(e);
+        }
+
+        private void OnPreviousTabKeyboardAcceleratorInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
+        {
+            _rootKeyboardShortcutController.HandlePreviousTabKeyboardAccelerator(e);
+        }
+
+        private void OnNextTabKeyboardAcceleratorInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
+        {
+            _rootKeyboardShortcutController.HandleNextTabKeyboardAccelerator(e);
         }
     }
 }

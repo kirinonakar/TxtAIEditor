@@ -42,6 +42,8 @@ namespace TxtAIEditor.Controls
         private const int AltVirtualKey = 0x12;
         private const int LeftAltVirtualKey = 0xA4;
         private const int RightAltVirtualKey = 0xA5;
+        private const int LeftArrowVirtualKey = 0x25;
+        private const int RightArrowVirtualKey = 0x27;
         private const int KeyboardHookType = 2;
         private const int KeyTransitionStateMask = unchecked((int)0x80000000);
         private const short KeyDownMask = unchecked((short)0x8000);
@@ -339,6 +341,19 @@ namespace TxtAIEditor.Controls
             bool shift = IsShiftDown();
             bool alt = IsAltDown();
 
+            if (alt && !ctrl && !shift)
+            {
+                if (virtualKey == LeftArrowVirtualKey)
+                {
+                    return "previousTab";
+                }
+
+                if (virtualKey == RightArrowVirtualKey)
+                {
+                    return "nextTab";
+                }
+            }
+
             if (alt && !ctrl && virtualKey == WordWrapVirtualKey)
             {
                 return "wordWrap";
@@ -578,7 +593,21 @@ namespace TxtAIEditor.Controls
 
     function handleKeyDown(event) {
         const ctrl = event.ctrlKey || event.metaKey;
+        const alt = !!event.altKey;
+        const shift = !!event.shiftKey;
         const key = event.key ? event.key.toLowerCase() : '';
+        if (alt && !ctrl && !shift && (key === 'arrowleft' || key === 'arrowright')) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation?.();
+            try {
+                chrome.webview.postMessage({
+                    type: 'shortcut',
+                    name: key === 'arrowleft' ? 'previousTab' : 'nextTab'
+                });
+            } catch {}
+            return;
+        }
         if (!ctrl && key === 'f7') {
             event.preventDefault();
             event.stopPropagation();

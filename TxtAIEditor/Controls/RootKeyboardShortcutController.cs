@@ -12,6 +12,8 @@ namespace TxtAIEditor.Controls
         private readonly Func<Task> _toggleRightPanelAsync;
         private readonly Action _focusSearchPanel;
         private readonly Action _closeActiveTab;
+        private readonly Action _moveActiveTabLeft;
+        private readonly Action _moveActiveTabRight;
         private readonly Action _saveActiveTab;
         private readonly Action _saveActiveTabAs;
         private readonly Action _openFile;
@@ -35,6 +37,8 @@ namespace TxtAIEditor.Controls
             Func<Task> toggleRightPanelAsync,
             Action focusSearchPanel,
             Action closeActiveTab,
+            Action moveActiveTabLeft,
+            Action moveActiveTabRight,
             Action saveActiveTab,
             Action saveActiveTabAs,
             Action openFile,
@@ -57,6 +61,8 @@ namespace TxtAIEditor.Controls
             _toggleRightPanelAsync = toggleRightPanelAsync;
             _focusSearchPanel = focusSearchPanel;
             _closeActiveTab = closeActiveTab;
+            _moveActiveTabLeft = moveActiveTabLeft;
+            _moveActiveTabRight = moveActiveTabRight;
             _saveActiveTab = saveActiveTab;
             _saveActiveTabAs = saveActiveTabAs;
             _openFile = openFile;
@@ -73,6 +79,34 @@ namespace TxtAIEditor.Controls
             _togglePreviewWidth = togglePreviewWidth;
             _toggleMaximize = toggleMaximize;
             _toggleWordWrap = toggleWordWrap;
+        }
+
+        public void HandlePreviewKeyDown(KeyRoutedEventArgs e)
+        {
+            if (e.Handled ||
+                (e.Key != Windows.System.VirtualKey.Left && e.Key != Windows.System.VirtualKey.Right))
+            {
+                return;
+            }
+
+            var alt = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Menu) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+            var ctrl = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+            var shift = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+            if (!alt || ctrl || shift)
+            {
+                return;
+            }
+
+            // Consume this before TabView moves focus between the header and close button.
+            e.Handled = true;
+            if (e.Key == Windows.System.VirtualKey.Left)
+            {
+                _moveActiveTabLeft();
+            }
+            else
+            {
+                _moveActiveTabRight();
+            }
         }
 
         public void HandleKeyDown(KeyRoutedEventArgs e)
@@ -167,6 +201,18 @@ namespace TxtAIEditor.Controls
         {
             e.Handled = true;
             _toggleWordWrap();
+        }
+
+        public void HandlePreviousTabKeyboardAccelerator(KeyboardAcceleratorInvokedEventArgs e)
+        {
+            e.Handled = true;
+            _moveActiveTabLeft();
+        }
+
+        public void HandleNextTabKeyboardAccelerator(KeyboardAcceleratorInvokedEventArgs e)
+        {
+            e.Handled = true;
+            _moveActiveTabRight();
         }
 
         public void HandleFunctionKeyShortcut(Windows.System.VirtualKey key)

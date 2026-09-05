@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using WinRT.Interop;
 using TxtAIEditor.Controls;
 using TxtAIEditor.Core.Models;
@@ -408,9 +410,77 @@ namespace TxtAIEditor.Composition
             Controllers.Documents.CloseActive(Controllers.Shell.GetCurrentActiveTabView());
         }
 
-        public void MoveActiveTabLeft() => Controllers.Documents.MoveActiveTabLeft();
+        public void MoveActiveTabLeft()
+        {
+            Controllers.Documents.MoveActiveTabLeft();
+            FocusActiveTabBody();
+        }
 
-        public void MoveActiveTabRight() => Controllers.Documents.MoveActiveTabRight();
+        public void MoveActiveTabRight()
+        {
+            Controllers.Documents.MoveActiveTabRight();
+            FocusActiveTabBody();
+        }
+
+        private void FocusActiveTabBody()
+        {
+            var activeTabView = Controllers.Shell.GetCurrentActiveTabView();
+            if (activeTabView.SelectedItem is not TabViewItem tabItem ||
+                tabItem.Tag is not string tabId)
+            {
+                return;
+            }
+
+            FocusTabBody(activeTabView, tabItem, tabId);
+            _window.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+            {
+                FocusTabBody(activeTabView, tabItem, tabId);
+                _window.DispatcherQueue.TryEnqueue(
+                    DispatcherQueuePriority.Low,
+                    () => FocusTabBody(activeTabView, tabItem, tabId));
+            });
+        }
+
+        private void FocusTabBody(TabView tabView, TabViewItem tabItem, string tabId)
+        {
+            if (!ReferenceEquals(tabView.SelectedItem, tabItem) ||
+                tabItem.Tag is not string selectedTabId ||
+                !string.Equals(selectedTabId, tabId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (_state.TabBridges.TryGetValue(tabId, out var bridgeGroup))
+            {
+                bridgeGroup.WebView.Focus(FocusState.Programmatic);
+                _ = bridgeGroup.Bridge.FocusAsync();
+                return;
+            }
+
+            if (tabItem.Content is DependencyObject content && FindWebView(content) is WebView2 webView)
+            {
+                webView.Focus(FocusState.Programmatic);
+            }
+        }
+
+        private static WebView2? FindWebView(DependencyObject root)
+        {
+            if (root is WebView2 webView)
+            {
+                return webView;
+            }
+
+            int childCount = VisualTreeHelper.GetChildrenCount(root);
+            for (int index = 0; index < childCount; index++)
+            {
+                if (FindWebView(VisualTreeHelper.GetChild(root, index)) is WebView2 childWebView)
+                {
+                    return childWebView;
+                }
+            }
+
+            return null;
+        }
 
         public async Task HandleAppWindowClosingAsync(
             Microsoft.UI.Windowing.AppWindowClosingEventArgs args,

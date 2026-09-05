@@ -307,7 +307,11 @@ namespace TxtAIEditor.Controls
 
         let name = '';
 
-        if (!ctrl && !alt) {
+        if (alt && !ctrl && !shift && (key === 'arrowleft' || code === 'ArrowLeft')) {
+            name = 'previousTab';
+        } else if (alt && !ctrl && !shift && (key === 'arrowright' || code === 'ArrowRight')) {
+            name = 'nextTab';
+        } else if (!ctrl && !alt) {
             if (key === 'f3' || code === 'F3') {
                 name = 'f3';
             } else if (key === 'f4' || code === 'F4') {

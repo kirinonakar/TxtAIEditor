@@ -178,6 +178,8 @@ namespace TxtAIEditor.Composition
                     ToggleRightPanelAsync,
                     shellFacade.FocusSearchPanel,
                     documentFacade.CloseActiveTab,
+                    documentFacade.MoveActiveTabLeft,
+                    documentFacade.MoveActiveTabRight,
                     () => moduleBindings.ToolbarCommand?.SaveActive(),
                     () => moduleBindings.ToolbarCommand?.SaveActiveAs(),
                     () => moduleBindings.ToolbarCommand?.OpenFile(),
