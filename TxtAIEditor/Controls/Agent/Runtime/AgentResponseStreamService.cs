@@ -262,7 +262,9 @@ namespace TxtAIEditor.Controls
                             rawProcessedLength = rawSafeLength;
                         }
 
-                        string streamedText = runContext.LlmSettings.LlmAgentVerbose ? rawStreamedText : cleanStreamTextBuilder.ToString();
+                        string streamedText = runContext.LlmSettings.LlmAgentVerbose
+                            ? rawStreamedText
+                            : AgentNonVerboseTextFilter.Filter(cleanStreamTextBuilder.ToString());
 
                         if (isJsonToolCall == null)
                         {
@@ -611,7 +613,9 @@ namespace TxtAIEditor.Controls
             return new AgentResponseStreamResult
             {
                 Response = response,
-                CleanResponse = runContext.LlmSettings.LlmAgentVerbose ? response : cleanStreamTextBuilder.ToString(),
+                CleanResponse = runContext.LlmSettings.LlmAgentVerbose
+                    ? response
+                    : AgentNonVerboseTextFilter.Filter(cleanStreamTextBuilder.ToString(), isComplete: true),
                 ResponseWithoutThinking = responseWithoutThinking,
                 ThinkingText = thinkingText,
                 Truncated = truncated,

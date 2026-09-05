@@ -28,11 +28,6 @@ namespace TxtAIEditor.Controls
         public static string BuildLastAnswerText(string response, string cleanResponse, bool verbose)
         {
             string answer = verbose ? response : cleanResponse;
-            if (string.IsNullOrWhiteSpace(answer))
-            {
-                answer = response;
-            }
-
             return (answer ?? string.Empty).Trim();
         }
     }
