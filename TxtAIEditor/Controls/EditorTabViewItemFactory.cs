@@ -1070,6 +1070,10 @@ audio {{
             } else if (key === 'f12' || code === 'F12') {
                 name = 'f12';
             }
+        } else if (alt && !ctrl && !shift && (key === 'arrowleft' || code === 'ArrowLeft')) {
+            name = 'previousTab';
+        } else if (alt && !ctrl && !shift && (key === 'arrowright' || code === 'ArrowRight')) {
+            name = 'nextTab';
         } else if (alt && !ctrl && !shift && (key === 'z' || code === 'KeyZ')) {
             name = 'wordWrap';
         } else if (ctrl && !alt) {

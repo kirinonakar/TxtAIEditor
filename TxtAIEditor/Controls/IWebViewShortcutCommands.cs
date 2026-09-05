@@ -41,5 +41,9 @@ namespace TxtAIEditor.Controls
         void TogglePreviewWidth();
 
         void CloseActiveTab();
+
+        void MoveActiveTabLeft();
+
+        void MoveActiveTabRight();
     }
 }

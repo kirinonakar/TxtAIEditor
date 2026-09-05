@@ -30,6 +30,8 @@ namespace TxtAIEditor.Composition
         Action ToggleWordWrapRequested,
         Action TogglePreviewWidthRequested,
         Action CloseActiveTabRequested,
+        Action MoveActiveTabLeftRequested,
+        Action MoveActiveTabRightRequested,
         Func<string, Task> LoadFileAsync,
         Func<CoreWebView2WebMessageReceivedEventArgs, string> NormalizeWebMessageJson,
         Func<string> GetCurrentFolderPath,
@@ -201,6 +203,10 @@ namespace TxtAIEditor.Composition
             public void TogglePreviewWidth() => _callbacks.TogglePreviewWidthRequested();
 
             public void CloseActiveTab() => _callbacks.CloseActiveTabRequested();
+
+            public void MoveActiveTabLeft() => _callbacks.MoveActiveTabLeftRequested();
+
+            public void MoveActiveTabRight() => _callbacks.MoveActiveTabRightRequested();
         }
     }
 }

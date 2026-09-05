@@ -65,6 +65,8 @@ namespace TxtAIEditor.Composition
                 () => getToolbarCommand()?.SaveActiveAs(),
                 () => getToolbarCommand()?.OpenFile(),
                 documentFacade.CloseActiveTab,
+                documentFacade.MoveActiveTabLeft,
+                documentFacade.MoveActiveTabRight,
                 () => getToolbarCommand()?.Print(),
                 shellFacade.FocusSearchPanel,
                 editorFacade.UpdateLivePreview,

@@ -24,6 +24,8 @@ namespace TxtAIEditor.Controls
         private readonly Action _openFile;
         private readonly Action _requestTerminalToggle;
         private readonly Action _closeActiveTab;
+        private readonly Action _moveActiveTabLeft;
+        private readonly Action _moveActiveTabRight;
         private readonly Action _print;
         private readonly Action _focusSearchPanel;
         private readonly TabDirtyStateController _tabDirtyStateController;
@@ -49,6 +51,8 @@ namespace TxtAIEditor.Controls
             Action openFile,
             Action requestTerminalToggle,
             Action closeActiveTab,
+            Action moveActiveTabLeft,
+            Action moveActiveTabRight,
             Action print,
             Action focusSearchPanel,
             TabDirtyStateController tabDirtyStateController,
@@ -72,6 +76,8 @@ namespace TxtAIEditor.Controls
             _openFile = openFile;
             _requestTerminalToggle = requestTerminalToggle;
             _closeActiveTab = closeActiveTab;
+            _moveActiveTabLeft = moveActiveTabLeft;
+            _moveActiveTabRight = moveActiveTabRight;
             _print = print;
             _focusSearchPanel = focusSearchPanel;
             _tabDirtyStateController = tabDirtyStateController;
@@ -136,6 +142,12 @@ namespace TxtAIEditor.Controls
                     break;
                 case "closeTab":
                     _closeActiveTab();
+                    break;
+                case "previousTab":
+                    _moveActiveTabLeft();
+                    break;
+                case "nextTab":
+                    _moveActiveTabRight();
                     break;
                 case "print":
                     _print();

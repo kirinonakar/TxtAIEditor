@@ -65,6 +65,8 @@ namespace TxtAIEditor.Composition
                     () => getToolbarCommand()?.ToggleWordWrap(),
                     shell.ShellPanelLayout.TogglePreviewWidth,
                     documentFacade.CloseActiveTab,
+                    documentFacade.MoveActiveTabLeft,
+                    documentFacade.MoveActiveTabRight,
                     documentFacade.LoadFileIntoTabAsync,
                     MainWindowMessageJson.Normalize,
                     () => state.CurrentFolderPath,

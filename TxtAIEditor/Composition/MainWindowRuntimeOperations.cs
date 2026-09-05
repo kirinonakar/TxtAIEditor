@@ -408,6 +408,10 @@ namespace TxtAIEditor.Composition
             Controllers.Documents.CloseActive(Controllers.Shell.GetCurrentActiveTabView());
         }
 
+        public void MoveActiveTabLeft() => Controllers.Documents.MoveActiveTabLeft();
+
+        public void MoveActiveTabRight() => Controllers.Documents.MoveActiveTabRight();
+
         public async Task HandleAppWindowClosingAsync(
             Microsoft.UI.Windowing.AppWindowClosingEventArgs args,
             bool saveUiLayoutSettings = true)

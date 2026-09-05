@@ -1034,6 +1034,132 @@ function replaceColumnSelectionWith(selection, text, skipRender = false) {
     }
 }
 
+function moveSelectedLines(direction) {
+    if (direction !== -1 && direction !== 1) return false;
+
+    const element = activeEditableElement();
+    if (!element || element.getAttribute('contenteditable') !== 'true' || imeController.isComposing) {
+        return false;
+    }
+
+    const normalizedSelection = hasCustomSelection() ? normalizeSelection() : null;
+    if (normalizedSelection?.isColumn) return false;
+
+    commitLine(element);
+
+    const currentLine = Math.min(
+        state.lineCount,
+        Math.max(1, Number(element.dataset.line || state.currentLine || 1)));
+    const lineRange = selectedLineRange();
+    const startLine = Math.min(
+        state.lineCount,
+        Math.max(1, Number(lineRange.startLine || currentLine)));
+    const endLine = Math.min(
+        state.lineCount,
+        Math.max(startLine, Number(lineRange.endLine || startLine)));
+
+    if ((direction < 0 && startLine <= 1) ||
+        (direction > 0 && endLine >= state.lineCount)) {
+        return false;
+    }
+
+    const getLineText = line => {
+        if (state.cache.has(line)) return state.cache.get(line) ?? '';
+        const lineElement = viewport.querySelector(`.line-text[data-line="${line}"]`);
+        return lineElement ? lineTextFromElement(lineElement) : null;
+    };
+
+    const affectedStartLine = direction < 0 ? startLine - 1 : startLine;
+    const affectedEndLine = direction < 0 ? endLine : endLine + 1;
+    const affectedLines = new Map();
+    for (let line = affectedStartLine; line <= affectedEndLine; line++) {
+        const text = getLineText(line);
+        if (text === null) {
+            requestLines(affectedStartLine, affectedEndLine - affectedStartLine + 1);
+            return false;
+        }
+        affectedLines.set(line, text);
+        state.cache.set(line, text);
+    }
+
+    const movedBlock = [];
+    for (let line = startLine; line <= endLine; line++) {
+        movedBlock.push(affectedLines.get(line) ?? '');
+    }
+
+    const adjacentLine = direction < 0 ? startLine - 1 : endLine + 1;
+    const adjacentText = affectedLines.get(adjacentLine) ?? '';
+    const replacementLines = direction < 0
+        ? [...movedBlock, adjacentText]
+        : [adjacentText, ...movedBlock];
+    const replacementText = replacementLines.join('\n');
+    const editStartLine = affectedStartLine;
+    const editEndLine = affectedEndLine;
+    const range = {
+        start: { line: editStartLine, column: 0 },
+        end: { line: editEndLine, column: affectedLines.get(editEndLine)?.length ?? 0 }
+    };
+
+    const caretColumn = Math.max(
+        0,
+        Math.min(getCaretOffset(element), affectedLines.get(currentLine)?.length ?? 0));
+    const caretPosition = { line: currentLine, column: caretColumn };
+    const hasSelection = !!normalizedSelection && !normalizedSelection.isColumn;
+    const selectionStart = hasSelection
+        ? { ...normalizedSelection.start }
+        : caretPosition;
+    const selectionEnd = hasSelection
+        ? { ...normalizedSelection.end }
+        : caretPosition;
+    const selectionAnchor = hasSelection && selectionController.anchor
+        ? { ...selectionController.anchor }
+        : selectionStart;
+    const selectionFocus = hasSelection
+        ? (selectionAnchor.line === selectionStart.line && selectionAnchor.column === selectionStart.column
+            ? selectionEnd
+            : selectionAnchor.line === selectionEnd.line && selectionAnchor.column === selectionEnd.column
+                ? selectionStart
+                : selectionEnd)
+        : caretPosition;
+
+    const mapPosition = position => {
+        const line = Number(position?.line || currentLine);
+        const column = Math.max(0, Number(position?.column || 0));
+        if (line >= startLine && line <= endLine) {
+            return { line: line + direction, column };
+        }
+        if (line === endLine + 1 && column === 0) {
+            return { line: line + direction, column: 0 };
+        }
+        return { line, column };
+    };
+
+    const offsetForPosition = position => {
+        const mapped = mapPosition(position);
+        const lineIndex = mapped.line - editStartLine;
+        if (lineIndex >= replacementLines.length) {
+            return replacementText.length + (mapped.column === 0 ? 1 : 0);
+        }
+
+        const safeLineIndex = Math.max(0, lineIndex);
+        let offset = 0;
+        for (let index = 0; index < safeLineIndex; index++) {
+            offset += replacementLines[index].length + 1;
+        }
+
+        const lineText = replacementLines[safeLineIndex] || '';
+        return offset + Math.min(Math.max(0, mapped.column), lineText.length);
+    };
+
+    replaceSelectionWith(range, replacementText, {
+        startOffset: offsetForPosition(selectionStart),
+        endOffset: offsetForPosition(selectionEnd),
+        anchorOffset: offsetForPosition(selectionAnchor),
+        focusOffset: offsetForPosition(selectionFocus)
+    });
+    return true;
+}
+
 function replaceSelectionWith(selection, text, editSelection = null) {
     if (selection.isColumn) {
         replaceColumnSelectionWith(selection, text);
@@ -1138,21 +1264,37 @@ function replaceSelectionWith(selection, text, editSelection = null) {
     }
     if (editSelection) {
         const positionFromOffset = offset => {
-            const safeOffset = Math.max(0, Math.min(offset, replacementText.length));
+            const safeOffset = Math.max(0, Math.min(offset, replacementText.length + 1));
+            if (safeOffset > replacementText.length) {
+                const afterReplacementLine = start.line + parts.length;
+                if (afterReplacementLine <= state.lineCount) {
+                    return { line: afterReplacementLine, column: 0 };
+                }
+                const lastLineText = state.cache.get(state.lineCount) || '';
+                return { line: state.lineCount, column: lastLineText.length };
+            }
             const before = replacementText.slice(0, safeOffset).split('\n');
             if (before.length === 1) {
                 return { line: start.line, column: start.column + before[0].length };
             }
             return { line: start.line + before.length - 1, column: before[before.length - 1].length };
         };
-        const selectionStart = positionFromOffset(editSelection.startOffset ?? 0);
-        const selectionEnd = positionFromOffset(editSelection.endOffset ?? editSelection.startOffset ?? 0);
-        selectionController.anchor = selectionStart;
-        selectionController.selection = editSelection.startOffset === editSelection.endOffset
+        const startOffset = editSelection.startOffset ?? 0;
+        const endOffset = editSelection.endOffset ?? startOffset;
+        const selectionStart = positionFromOffset(startOffset);
+        const selectionEnd = positionFromOffset(endOffset);
+        const selectionAnchor = positionFromOffset(editSelection.anchorOffset ?? startOffset);
+        const selectionFocus = positionFromOffset(editSelection.focusOffset ?? endOffset);
+        selectionController.anchor = selectionAnchor;
+        selectionController.selection = startOffset === endOffset
             ? null
             : { start: selectionStart, end: selectionEnd };
-        state.currentLine = selectionEnd.line;
-        state.currentColumn = selectionEnd.column + 1;
+        state.currentLine = selectionFocus.line;
+        state.currentColumn = selectionFocus.column + 1;
+        if (startOffset === endOffset) {
+            clearCustomSelectionVisuals();
+        }
+        syncCustomSelectionClass();
     } else {
         selectionController.selection = null;
         syncCustomSelectionClass();
@@ -1485,6 +1627,7 @@ export {
     markNativeBeforeInputHandled,
     mergeLineBackward,
     mergeLineForward,
+    moveSelectedLines,
     moveCaretHorizontal,
     moveCaretVertical,
     moveCaretWord,

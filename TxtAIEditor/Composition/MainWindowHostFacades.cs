@@ -44,6 +44,8 @@ namespace TxtAIEditor.Composition
         OpenedTab OpenNewTab(FileTabOpenRequest request);
         OpenedTab OpenGeneratedTab(string content);
         void CloseActiveTab();
+        void MoveActiveTabLeft();
+        void MoveActiveTabRight();
         void CloseTabAndCleanup(OpenedTab tab, TabViewItem tabItem);
         Task<bool> SaveTabAsync(OpenedTab tab);
     }

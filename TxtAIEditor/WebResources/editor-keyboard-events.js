@@ -45,6 +45,7 @@ import {
     moveCaretHorizontal,
     moveCaretVertical,
     moveCaretWord,
+    moveSelectedLines,
     normalizedModelRepeatKey,
     pasteFromClipboard,
     prepareMultilineCompositionHost,
@@ -641,6 +642,22 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
 
         const element = activeEditableElement();
         if (csvTableMode.isEnabled || !element || element.getAttribute('contenteditable') !== 'true') return;
+
+        if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey &&
+            (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+            event.preventDefault();
+            hideAutocomplete(300);
+            moveSelectedLines(event.key === 'ArrowUp' ? -1 : 1);
+            return;
+        }
+
+        if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey &&
+            (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+            event.preventDefault();
+            hideAutocomplete(300);
+            post({ type: 'shortcut', name: event.key === 'ArrowLeft' ? 'previousTab' : 'nextTab' });
+            return;
+        }
 
         if (ctrl && !event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
             event.preventDefault();

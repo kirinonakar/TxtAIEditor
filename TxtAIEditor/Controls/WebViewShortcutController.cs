@@ -70,6 +70,12 @@ namespace TxtAIEditor.Controls
                 case "closeTab":
                     _commands.CloseActiveTab();
                     break;
+                case "previousTab":
+                    _commands.MoveActiveTabLeft();
+                    break;
+                case "nextTab":
+                    _commands.MoveActiveTabRight();
+                    break;
             }
         }
     }
