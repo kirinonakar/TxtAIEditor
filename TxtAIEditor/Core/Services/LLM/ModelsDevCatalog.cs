@@ -175,7 +175,7 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 "opencode go" or "opencodego" or "go" => "opencode-go",
                 "opencode zen" or "opencodezen" or "zen" => "opencode",
-                "gemini" => "google",
+                "gemini" or "google" => "google",
                 "openai" or "openai oauth" or "openaioauth" => "openai",
                 "cerebras" => "cerebras",
                 "ollama" => "ollama",

@@ -425,6 +425,24 @@
   <data name="SettingsLlmUpstageInfo" xml:space="preserve">
     <value>Upstage 从 https://api.upstage.ai/v1/models. 加载模型列表</value>
   </data>
+  <data name="SettingsLlmLoadGoogleModels" xml:space="preserve">
+    <value>加载 Google 模型</value>
+  </data>
+  <data name="SettingsLlmGoogleInfo" xml:space="preserve">
+    <value>Google 从 https://generativelanguage.googleapis.com/v1beta/models 加载模型列表</value>
+  </data>
+  <data name="SettingsLlmLoadOpenAIModels" xml:space="preserve">
+    <value>加载 OpenAI 模型</value>
+  </data>
+  <data name="SettingsLlmOpenAIInfo" xml:space="preserve">
+    <value>OpenAI 从 https://api.openai.com/v1/models 加载模型列表</value>
+  </data>
+  <data name="SettingsLlmLoadOpenAIOAuthModels" xml:space="preserve">
+    <value>加载 OpenAI OAuth 模型</value>
+  </data>
+  <data name="SettingsLlmOpenAIOAuthInfo" xml:space="preserve">
+    <value>OpenAI OAuth 从指定的 endpoint 加载模型列表</value>
+  </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>思考级别 (Thinking Level)</value>
   </data>

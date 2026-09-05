@@ -374,7 +374,7 @@ namespace TxtAIEditor.Controls
 
             // Gemini uses its own function declaration path here; LM Studio and Ollama
             // receive the catalog through their OpenAI-compatible tools field.
-            if (provider is "gemini")
+            if (provider is "gemini" or "google")
             {
                 return false;
             }

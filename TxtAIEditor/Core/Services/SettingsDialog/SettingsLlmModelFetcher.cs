@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -15,6 +16,12 @@ namespace TxtAIEditor.Core.Services
             {
                 baseEndpoint = "https://ollama.com/v1";
             }
+
+            if (IsGoogleEndpoint(baseEndpoint))
+            {
+                return await FetchGoogleModelsAsync(baseEndpoint, apiKey);
+            }
+
             string requestUrl = baseEndpoint.TrimEnd('/') + "/models";
 
             var models = new List<string>();
@@ -134,6 +141,122 @@ namespace TxtAIEditor.Core.Services
                         if (!response.IsSuccessStatusCode)
                         {
                             throw new HttpRequestException($"모델 목록 요청 실패 ({response.StatusCode}): {responseBody}");
+                        }
+                    }
+                }
+            }
+
+            return models;
+        }
+
+        private static bool IsGoogleEndpoint(string endpoint)
+        {
+            return endpoint.Contains("generativelanguage.googleapis.com", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Google (Gemini) API lists models at /v1beta/models with the API key in the
+        // x-goog-api-key header, names prefixed with "models/", and paginated results.
+        private static async Task<IReadOnlyList<string>> FetchGoogleModelsAsync(string baseEndpoint, string? apiKey)
+        {
+            string root = baseEndpoint.TrimEnd('/');
+            foreach (string suffix in new[] { "/v1beta", "/v1alpha", "/v1" })
+            {
+                if (root.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    root = root.Substring(0, root.Length - suffix.Length).TrimEnd('/');
+                    break;
+                }
+            }
+
+            var models = new List<string>();
+            string? pageToken = null;
+
+            using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
+            {
+                if (!string.IsNullOrEmpty(apiKey))
+                {
+                    client.DefaultRequestHeaders.Add("x-goog-api-key", apiKey);
+                }
+
+                for (int page = 0; page < 20; page++)
+                {
+                    string requestUrl = root + "/v1beta/models?pageSize=200";
+                    if (!string.IsNullOrEmpty(pageToken))
+                    {
+                        requestUrl += "&pageToken=" + Uri.EscapeDataString(pageToken);
+                    }
+
+                    using (var response = await client.GetAsync(requestUrl))
+                    {
+                        string responseBody = await response.Content.ReadAsStringAsync();
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            throw new HttpRequestException($"모델 목록 요청 실패 ({response.StatusCode}): {responseBody}");
+                        }
+
+                        using (var doc = JsonDocument.Parse(responseBody))
+                        {
+                            if (doc.RootElement.TryGetProperty("models", out var modelsArray) && modelsArray.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var item in modelsArray.EnumerateArray())
+                                {
+                                    if (!item.TryGetProperty("name", out var nameElement))
+                                    {
+                                        continue;
+                                    }
+
+                                    string? name = nameElement.GetString();
+                                    if (string.IsNullOrWhiteSpace(name))
+                                    {
+                                        continue;
+                                    }
+
+                                    if (name.StartsWith("models/", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        name = name.Substring("models/".Length);
+                                    }
+
+                                    if (models.Contains(name, StringComparer.Ordinal))
+                                    {
+                                        continue;
+                                    }
+
+                                    if (item.TryGetProperty("supportedGenerationMethods", out var methods) &&
+                                        methods.ValueKind == JsonValueKind.Array)
+                                    {
+                                        bool supportsGenerateContent = false;
+                                        foreach (var method in methods.EnumerateArray())
+                                        {
+                                            if (string.Equals(method.GetString(), "generateContent", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                supportsGenerateContent = true;
+                                                break;
+                                            }
+                                        }
+
+                                        if (!supportsGenerateContent)
+                                        {
+                                            continue;
+                                        }
+                                    }
+
+                                    models.Add(name);
+                                }
+                            }
+
+                            if (doc.RootElement.TryGetProperty("nextPageToken", out var nextToken) &&
+                                nextToken.ValueKind == JsonValueKind.String)
+                            {
+                                pageToken = nextToken.GetString();
+                                if (string.IsNullOrEmpty(pageToken))
+                                {
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                break;
+                            }
                         }
                     }
                 }

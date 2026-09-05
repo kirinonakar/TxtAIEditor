@@ -425,6 +425,24 @@
   <data name="SettingsLlmUpstageInfo" xml:space="preserve">
     <value>Upstage loads the list of models from https://api.upstage.ai/v1/models.</value>
   </data>
+  <data name="SettingsLlmLoadGoogleModels" xml:space="preserve">
+    <value>Load Google Models</value>
+  </data>
+  <data name="SettingsLlmGoogleInfo" xml:space="preserve">
+    <value>Google loads the list of models from https://generativelanguage.googleapis.com/v1beta/models.</value>
+  </data>
+  <data name="SettingsLlmLoadOpenAIModels" xml:space="preserve">
+    <value>Load OpenAI Models</value>
+  </data>
+  <data name="SettingsLlmOpenAIInfo" xml:space="preserve">
+    <value>OpenAI loads the list of models from https://api.openai.com/v1/models.</value>
+  </data>
+  <data name="SettingsLlmLoadOpenAIOAuthModels" xml:space="preserve">
+    <value>Load OpenAI OAuth Models</value>
+  </data>
+  <data name="SettingsLlmOpenAIOAuthInfo" xml:space="preserve">
+    <value>OpenAI OAuth loads the list of models from the specified endpoint.</value>
+  </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>Thinking Level</value>
   </data>

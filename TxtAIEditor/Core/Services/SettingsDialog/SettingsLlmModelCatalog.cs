@@ -8,7 +8,7 @@ namespace TxtAIEditor.Core.Services
     {
         public static IReadOnlyList<string> ProviderNames { get; } = new[]
         {
-            "Gemini",
+            "Google",
             "OpenAI",
             "OpenAI OAuth",
             "Cerebras",
@@ -25,15 +25,18 @@ namespace TxtAIEditor.Core.Services
 
         public static int GetProviderIndex(string provider)
         {
+            string target = IsGoogleProvider(provider) ? "Google" : provider;
             int providerIndex = Array.FindIndex(
                 ProviderNames as string[] ?? new List<string>(ProviderNames).ToArray(),
-                p => p.Equals(provider, StringComparison.OrdinalIgnoreCase));
+                p => p.Equals(target, StringComparison.OrdinalIgnoreCase));
             return providerIndex < 0 ? 1 : providerIndex;
         }
 
         public static bool SupportsRemoteModelFetch(string provider)
         {
-            return provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) ||
+            return IsGoogleProvider(provider) ||
+                IsOpenAIProvider(provider) ||
+                provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Upstage", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenRouter", StringComparison.OrdinalIgnoreCase) ||
@@ -54,7 +57,7 @@ namespace TxtAIEditor.Core.Services
                 provider.Equals("Cerebras", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Upstage", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase) ||
-                provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase) ||
+                IsGoogleProvider(provider) ||
                 provider.Equals("Ollama Cloud", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OllamaCloud", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase) ||
@@ -102,7 +105,7 @@ namespace TxtAIEditor.Core.Services
                 "Cerebras" => "https://api.cerebras.ai/v1",
                 "Upstage" => "https://api.upstage.ai/v1",
                 "OpenRouter" => "https://openrouter.ai/api/v1",
-                "Gemini" => "https://generativelanguage.googleapis.com",
+                "Google" or "Gemini" => "https://generativelanguage.googleapis.com",
                 "OpenCode Go" => "https://opencode.ai/zen/go/v1",
                 "OpenCode Zen" => "https://opencode.ai/zen/v1",
                 "Ollama" => "http://localhost:11434/v1",
@@ -114,7 +117,7 @@ namespace TxtAIEditor.Core.Services
 
         public static IReadOnlyList<string> GetStaticModels(string provider)
         {
-            if (provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase))
+            if (IsGoogleProvider(provider))
             {
                 return new[]
                 {
@@ -282,7 +285,7 @@ namespace TxtAIEditor.Core.Services
 
         public static string GetInitialModel(EditorSettings settings, string provider, string selectedModel)
         {
-            if (provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase))
+            if (IsGoogleProvider(provider))
             {
                 return EnsureKnownModel(settings.LlmModelGemini, selectedModel, GetStaticModels(provider), "gemini-flash-lite-latest");
             }
@@ -349,7 +352,7 @@ namespace TxtAIEditor.Core.Services
 
         public static string GetModelForProviderChange(EditorSettings settings, string provider)
         {
-            if (provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase))
+            if (IsGoogleProvider(provider))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelGemini) ? settings.LlmModelGemini : "gemini-flash-lite-latest";
             }
@@ -414,6 +417,16 @@ namespace TxtAIEditor.Core.Services
 
         public static string GetRemoteFetchSelection(EditorSettings settings, string provider)
         {
+            if (IsGoogleProvider(provider))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelGemini) ? settings.LlmModelGemini : settings.LlmModel;
+            }
+
+            if (IsOpenAIProvider(provider))
+            {
+                return !string.IsNullOrEmpty(settings.LlmModelOpenAI) ? settings.LlmModelOpenAI : settings.LlmModel;
+            }
+
             if (provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelLmStudio) ? settings.LlmModelLmStudio : settings.LlmModel;
@@ -464,7 +477,7 @@ namespace TxtAIEditor.Core.Services
 
         public static void SaveProviderModel(EditorSettings settings)
         {
-            if (settings.LlmProvider.Equals("Gemini", StringComparison.OrdinalIgnoreCase))
+            if (IsGoogleProvider(settings.LlmProvider))
             {
                 settings.LlmModelGemini = settings.LlmModel;
             }
@@ -537,6 +550,13 @@ namespace TxtAIEditor.Core.Services
         {
             return provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static bool IsGoogleProvider(string provider)
+        {
+            return provider != null &&
+                (provider.Equals("Google", StringComparison.OrdinalIgnoreCase) ||
+                    provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase));
         }
     }
 }

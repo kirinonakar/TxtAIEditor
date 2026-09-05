@@ -425,6 +425,24 @@
   <data name="SettingsLlmUpstageInfo" xml:space="preserve">
     <value>Upstage는 https://api.upstage.ai/v1/models 에서 모델 목록을 불러옵니다.</value>
   </data>
+  <data name="SettingsLlmLoadGoogleModels" xml:space="preserve">
+    <value>Google 모델 불러오기</value>
+  </data>
+  <data name="SettingsLlmGoogleInfo" xml:space="preserve">
+    <value>Google은 https://generativelanguage.googleapis.com/v1beta/models 에서 모델 목록을 불러옵니다.</value>
+  </data>
+  <data name="SettingsLlmLoadOpenAIModels" xml:space="preserve">
+    <value>OpenAI 모델 불러오기</value>
+  </data>
+  <data name="SettingsLlmOpenAIInfo" xml:space="preserve">
+    <value>OpenAI는 https://api.openai.com/v1/models 에서 모델 목록을 불러옵니다.</value>
+  </data>
+  <data name="SettingsLlmLoadOpenAIOAuthModels" xml:space="preserve">
+    <value>OpenAI OAuth 모델 불러오기</value>
+  </data>
+  <data name="SettingsLlmOpenAIOAuthInfo" xml:space="preserve">
+    <value>OpenAI OAuth는 지정된 endpoint에서 모델 목록을 불러옵니다.</value>
+  </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>Thinking Level</value>
   </data>

@@ -137,7 +137,7 @@ namespace TxtAIEditor.Controls
                 return 1000000;
             }
 
-            if (provider.Contains("gemini"))
+            if (provider.Contains("gemini") || provider.Contains("google"))
             {
                 return 1000000;
             }

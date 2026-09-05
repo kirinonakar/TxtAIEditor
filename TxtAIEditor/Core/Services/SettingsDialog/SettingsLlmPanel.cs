@@ -945,6 +945,27 @@ namespace TxtAIEditor.Core.Services
                 _modelStatusText.Text = _getString("SettingsLlmUnslothInfo", "Unsloth Desktop는 서버가 켜져 있을 때 http://localhost:8888/v1/models 에서 모델 목록을 불러옵니다.");
                 _modelStatusText.Visibility = Visibility.Visible;
             }
+            else if (SettingsLlmModelCatalog.IsGoogleProvider(provider))
+            {
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadGoogleModels", "Google 모델 불러오기"));
+                _refreshModelsButton.Visibility = Visibility.Visible;
+                _modelStatusText.Text = _getString("SettingsLlmGoogleInfo", "Google은 https://generativelanguage.googleapis.com/v1beta/models 에서 모델 목록을 불러옵니다.");
+                _modelStatusText.Visibility = Visibility.Visible;
+            }
+            else if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
+            {
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadOpenAIModels", "OpenAI 모델 불러오기"));
+                _refreshModelsButton.Visibility = Visibility.Visible;
+                _modelStatusText.Text = _getString("SettingsLlmOpenAIInfo", "OpenAI는 https://api.openai.com/v1/models 에서 모델 목록을 불러옵니다.");
+                _modelStatusText.Visibility = Visibility.Visible;
+            }
+            else if (provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase))
+            {
+                ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadOpenAIOAuthModels", "OpenAI OAuth 모델 불러오기"));
+                _refreshModelsButton.Visibility = Visibility.Visible;
+                _modelStatusText.Text = _getString("SettingsLlmOpenAIOAuthInfo", "OpenAI OAuth는 지정된 endpoint에서 모델 목록을 불러옵니다.");
+                _modelStatusText.Visibility = Visibility.Visible;
+            }
             else
             {
                 _refreshModelsButton.Visibility = Visibility.Collapsed;
@@ -995,6 +1016,18 @@ namespace TxtAIEditor.Core.Services
             else if (provider.Equals("Unsloth Desktop", StringComparison.OrdinalIgnoreCase))
             {
                 ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadUnslothModels", "Unsloth Desktop 모델 불러오기"));
+            }
+            else if (SettingsLlmModelCatalog.IsGoogleProvider(provider))
+            {
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadGoogleModels", "Google 모델 불러오기"));
+            }
+            else if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
+            {
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadOpenAIModels", "OpenAI 모델 불러오기"));
+            }
+            else if (provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase))
+            {
+                ToolTipService.SetToolTip(_visionFallbackRefreshModelsButton, _getString("SettingsLlmLoadOpenAIOAuthModels", "OpenAI OAuth 모델 불러오기"));
             }
             else
             {

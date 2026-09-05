@@ -425,6 +425,24 @@
   <data name="SettingsLlmUpstageInfo" xml:space="preserve">
     <value>Upstageは https://api.upstage.ai/v1/models からモデルリストを取得します。</value>
   </data>
+  <data name="SettingsLlmLoadGoogleModels" xml:space="preserve">
+    <value>Googleモデルを取得</value>
+  </data>
+  <data name="SettingsLlmGoogleInfo" xml:space="preserve">
+    <value>Googleは https://generativelanguage.googleapis.com/v1beta/models からモデルリストを取得します。</value>
+  </data>
+  <data name="SettingsLlmLoadOpenAIModels" xml:space="preserve">
+    <value>OpenAIモデルを取得</value>
+  </data>
+  <data name="SettingsLlmOpenAIInfo" xml:space="preserve">
+    <value>OpenAIは https://api.openai.com/v1/models からモデルリストを取得します。</value>
+  </data>
+  <data name="SettingsLlmLoadOpenAIOAuthModels" xml:space="preserve">
+    <value>OpenAI OAuthモデルを取得</value>
+  </data>
+  <data name="SettingsLlmOpenAIOAuthInfo" xml:space="preserve">
+    <value>OpenAI OAuthは指定されたendpointからモデルリストを取得します。</value>
+  </data>
   <data name="SettingsLlmThinkingLevel" xml:space="preserve">
     <value>Thinking Level</value>
   </data>

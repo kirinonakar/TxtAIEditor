@@ -17,7 +17,7 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             try
             {
-                string targetName = $"TxtAIEditor_LLM_{provider}";
+                string targetName = $"TxtAIEditor_LLM_{GetCredentialProvider(provider)}";
                 if (string.IsNullOrEmpty(apiKey))
                 {
                     _credentialService.DeleteCredential(targetName);
@@ -38,7 +38,7 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             try
             {
-                string targetName = $"TxtAIEditor_LLM_{provider}";
+                string targetName = $"TxtAIEditor_LLM_{GetCredentialProvider(provider)}";
                 string? key = _credentialService.ReadCredential(targetName);
                 return Task.FromResult(key ?? string.Empty);
             }
@@ -47,6 +47,17 @@ namespace TxtAIEditor.Core.Services.LLM
                 System.Diagnostics.Debug.WriteLine($"Failed reading secure API Key: {ex.Message}");
                 return Task.FromResult(string.Empty);
             }
+        }
+
+        // The "Gemini" provider was renamed to "Google"; keep using the legacy
+        // credential target name so previously saved API keys continue to resolve.
+        private static string GetCredentialProvider(string provider)
+        {
+            return provider != null &&
+                (provider.Equals("Google", StringComparison.OrdinalIgnoreCase) ||
+                    provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase))
+                ? "Gemini"
+                : provider ?? string.Empty;
         }
 
         // ----------------------------------------------------
