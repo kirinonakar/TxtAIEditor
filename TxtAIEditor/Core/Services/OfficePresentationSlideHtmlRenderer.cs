@@ -1273,17 +1273,7 @@ namespace TxtAIEditor.Core.Services
                 }
             }
 
-            string? presetGeometry = shapeProperties.Elements()
-                .FirstOrDefault(e => e.Name.LocalName == "prstGeom")
-                ?.Attribute("prst")?.Value;
-            if (string.Equals(presetGeometry, "roundRect", StringComparison.OrdinalIgnoreCase))
-            {
-                style.Append("border-radius:8%;");
-            }
-            else if (string.Equals(presetGeometry, "rightArrow", StringComparison.OrdinalIgnoreCase))
-            {
-                style.Append("clip-path:polygon(0 25%,60% 25%,60% 0,100% 50%,60% 100%,60% 75%,0 75%);");
-            }
+            style.Append(OfficePresentationPresetGeometry.ReadStyle(shapeProperties));
 
             XElement? shadow = shapeProperties.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "effectLst")?
