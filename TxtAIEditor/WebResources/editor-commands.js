@@ -1341,7 +1341,8 @@ const {
 
 const {
     moveCaretHorizontal,
-    moveCaretVertical
+    moveCaretVertical,
+    moveCaretWord
 } = createCaretNavigationCommands({
     caretRectForOffset,
     changedTextBetween,
@@ -1486,6 +1487,7 @@ export {
     mergeLineForward,
     moveCaretHorizontal,
     moveCaretVertical,
+    moveCaretWord,
     normalizedModelRepeatKey,
     pasteFromClipboard,
     prepareMultilineCompositionHost,

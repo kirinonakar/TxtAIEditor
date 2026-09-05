@@ -20,6 +20,8 @@ import {
     selectionController,
     state,
     syncCustomSelectionClass,
+    usesCompressedScroll,
+    visualScrollDeltaToScrollTopDelta,
     viewportController
 } from './editor-core.js';
 import {
@@ -42,6 +44,7 @@ import {
     markNativeBeforeInputHandled,
     moveCaretHorizontal,
     moveCaretVertical,
+    moveCaretWord,
     normalizedModelRepeatKey,
     pasteFromClipboard,
     prepareMultilineCompositionHost,
@@ -292,6 +295,17 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
         };
     }
 
+    function scrollEditorVertically(direction) {
+        const visualDelta = direction * Math.max(1, Number(viewportController.lineHeight || 1));
+        const scrollDelta = usesCompressedScroll()
+            ? visualScrollDeltaToScrollTopDelta(visualDelta)
+            : visualDelta;
+        const maximumScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+        scrollContainer.scrollTop = Math.min(
+            maximumScrollTop,
+            Math.max(0, scrollContainer.scrollTop + scrollDelta));
+    }
+
     function editableElementForKeyboardVerticalRepeat() {
         const currentLineElement = viewport.querySelector(`.line-text[data-line="${state.currentLine}"]`);
         if (currentLineElement && currentLineElement.getAttribute('contenteditable') === 'true') {
@@ -391,7 +405,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
             if ((event.key === ' ' || event.code === 'Space') && !event.ctrlKey && !event.metaKey && !event.altKey) {
                 hideAutocomplete(300);
             }
-            if (event.key === 'ArrowDown') {
+            if (event.key === 'ArrowDown' && !earlyCtrl && !event.altKey) {
                 event.preventDefault();
                 event.stopImmediatePropagation();
                 if (!isDuplicateAutocompleteNavigationKey(event)) {
@@ -399,7 +413,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
                 }
                 return;
             }
-            if (event.key === 'ArrowUp') {
+            if (event.key === 'ArrowUp' && !earlyCtrl && !event.altKey) {
                 event.preventDefault();
                 event.stopImmediatePropagation();
                 if (!isDuplicateAutocompleteNavigationKey(event)) {
@@ -627,6 +641,19 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
 
         const element = activeEditableElement();
         if (csvTableMode.isEnabled || !element || element.getAttribute('contenteditable') !== 'true') return;
+
+        if (ctrl && !event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+            event.preventDefault();
+            hideAutocomplete(300);
+            scrollEditorVertically(event.key === 'ArrowUp' ? -1 : 1);
+            return;
+        }
+
+        if (ctrl && !event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+            event.preventDefault();
+            moveCaretWord(element, event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
+            return;
+        }
 
         if ((event.key === 'Home' || event.key === 'End') && event.ctrlKey) {
             event.preventDefault();

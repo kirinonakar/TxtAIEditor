@@ -148,6 +148,28 @@ export function createCaretNavigationCommands({
         return selectionController.selection.end || fallbackPosition;
     }
 
+    function isWordCharacter(char) {
+        return /[\p{L}\p{N}_-]/u.test(char || '');
+    }
+
+    function previousWordBoundary(text, column) {
+        const value = String(text ?? '');
+        let offset = Math.max(0, Math.min(Number(column || 0), value.length));
+
+        while (offset > 0 && !isWordCharacter(value[offset - 1])) offset--;
+        while (offset > 0 && isWordCharacter(value[offset - 1])) offset--;
+        return offset;
+    }
+
+    function nextWordBoundary(text, column) {
+        const value = String(text ?? '');
+        let offset = Math.max(0, Math.min(Number(column || 0), value.length));
+
+        while (offset < value.length && isWordCharacter(value[offset])) offset++;
+        while (offset < value.length && !isWordCharacter(value[offset])) offset++;
+        return offset;
+    }
+
     function editableElementForLine(lineNumber, fallbackElement) {
         if (Number(fallbackElement?.dataset?.line || 0) === lineNumber &&
             fallbackElement.getAttribute?.('contenteditable') === 'true') {
@@ -156,6 +178,49 @@ export function createCaretNavigationCommands({
 
         const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
         return element?.getAttribute?.('contenteditable') === 'true' ? element : null;
+    }
+
+    function textForLine(lineNumber, fallbackElement = null) {
+        const element = editableElementForLine(lineNumber, fallbackElement);
+        return {
+            element,
+            text: element ? lineTextFromElement(element) : (state.cache.get(lineNumber) || '')
+        };
+    }
+
+    function wordMoveTarget(lineNumber, column, direction, fallbackElement) {
+        const current = textForLine(lineNumber, fallbackElement);
+        const safeColumn = Math.max(0, Math.min(Number(column || 0), current.text.length));
+
+        if (direction < 0) {
+            if (safeColumn > 0) {
+                return {
+                    line: lineNumber,
+                    column: previousWordBoundary(current.text, safeColumn)
+                };
+            }
+
+            if (lineNumber > 1) {
+                const previous = textForLine(lineNumber - 1);
+                return {
+                    line: lineNumber - 1,
+                    column: previousWordBoundary(previous.text, previous.text.length)
+                };
+            }
+        } else {
+            if (safeColumn < current.text.length) {
+                return {
+                    line: lineNumber,
+                    column: nextWordBoundary(current.text, safeColumn)
+                };
+            }
+
+            if (lineNumber < state.lineCount) {
+                return { line: lineNumber + 1, column: 0 };
+            }
+        }
+
+        return { line: lineNumber, column: safeColumn };
     }
 
     function visualLineBoundsForElement(element) {
@@ -411,8 +476,80 @@ export function createCaretNavigationCommands({
         return true;
     }
 
+    function moveCaretWord(element, direction, extendSelection = false) {
+        if (!element || element.getAttribute('contenteditable') !== 'true') return false;
+        if (finishPendingImeBeforeCaretNavigation(element)) return true;
+        clearVerticalCaretVisualAnchor();
+
+        let lineNumber = Number(element.dataset.line || state.currentLine || 1);
+        let moveElement = element;
+        let text = lineTextFromElement(moveElement);
+        let caret = Math.max(0, Math.min(getCaretOffset(moveElement), text.length));
+
+        if (extendSelection) {
+            const focusPosition = selectionFocusPosition({ line: lineNumber, column: caret });
+            lineNumber = Math.min(Math.max(1, Number(focusPosition.line || lineNumber)), state.lineCount);
+            moveElement = editableElementForLine(lineNumber, element) || moveElement;
+            text = Number(moveElement.dataset.line || 0) === lineNumber
+                ? lineTextFromElement(moveElement)
+                : (state.cache.get(lineNumber) || '');
+            caret = Math.max(0, Math.min(Number(focusPosition.column || 0), text.length));
+        }
+
+        let target;
+        let collapsedCustomSelection = false;
+        if (!extendSelection && hasCustomSelection()) {
+            const selection = normalizeSelection();
+            if (selection) {
+                collapsedCustomSelection = true;
+                target = direction < 0
+                    ? { line: selection.start.line, column: selection.start.column }
+                    : { line: selection.end.line, column: selection.end.column };
+            }
+        }
+
+        if (!target) {
+            target = wordMoveTarget(lineNumber, caret, direction, moveElement);
+        }
+
+        if (extendSelection) {
+            const anchor = selectionController.anchor || { line: lineNumber, column: caret };
+            selectionController.anchor = anchor;
+            selectionController.selection = (anchor.line === target.line && anchor.column === target.column)
+                ? null
+                : { start: anchor, end: target };
+            state.currentLine = target.line;
+            state.currentColumn = target.column + 1;
+            syncCustomSelectionClass();
+            clearCustomSelectionVisuals();
+            if (target.line === lineNumber &&
+                Number(moveElement?.dataset?.line || 0) === target.line) {
+                setCaret(moveElement, target.column, 3 * viewportController.lineHeight, false);
+            } else {
+                queueRender(true);
+                setTimeout(() => focusLine(target.line, target.column, 3 * viewportController.lineHeight), 0);
+            }
+        } else {
+            selectionController.selection = null;
+            selectionController.anchor = { line: target.line, column: target.column };
+            syncCustomSelectionClass();
+            if (collapsedCustomSelection) {
+                clearCustomSelectionVisuals();
+            }
+            if (target.line === lineNumber &&
+                Number(moveElement?.dataset?.line || 0) === target.line) {
+                setCaret(moveElement, target.column, 3 * viewportController.lineHeight);
+            } else {
+                focusLine(target.line, target.column, 3 * viewportController.lineHeight);
+            }
+        }
+
+        return true;
+    }
+
     return {
         moveCaretHorizontal,
-        moveCaretVertical
+        moveCaretVertical,
+        moveCaretWord
     };
 }
