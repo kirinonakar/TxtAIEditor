@@ -2491,6 +2491,9 @@
   <data name="AgentExaApiKeyFallbackUsed" xml:space="preserve">
     <value>Exa API Key fallback을 사용했습니다.</value>
   </data>
+  <data name="AgentExaNoApiKeyDuckDuckGoFallbackUsed" xml:space="preserve">
+    <value>Exa API Key가 없어 DuckDuckGo로 우회 검색했습니다.</value>
+  </data>
   <data name="AgentExaApiKeyFallbackFailedToDuckDuckGo" xml:space="preserve">
     <value>Exa API Key fallback 실패 -&gt; DuckDuckGo fallback을 사용했습니다.</value>
   </data>

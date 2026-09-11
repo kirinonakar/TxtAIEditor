@@ -182,7 +182,7 @@ namespace TxtAIEditor.Core.Services.LLM
         private async Task<string> GetExaApiKeyAsync()
         {
             string apiKey = await _credentialStore.GetApiKeyAsync("Exa");
-            return string.IsNullOrEmpty(apiKey)
+            return string.IsNullOrWhiteSpace(apiKey)
                 ? Environment.GetEnvironmentVariable("EXA_API_KEY") ?? string.Empty
                 : apiKey;
         }
@@ -335,7 +335,8 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             return BuildExaMcpRateLimitNotice(
                 exception,
-                McpToolRateLimitException.ExaDuckDuckGoFallbackMarker);
+                McpToolRateLimitException.ExaDuckDuckGoFallbackMarker + Environment.NewLine +
+                "No Exa API key is configured; using DuckDuckGo search.");
         }
 
         private static string BuildExaMcpRateLimitNotice(
@@ -407,6 +408,10 @@ namespace TxtAIEditor.Core.Services.LLM
                         return sb.ToString().TrimEnd();
                     }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {

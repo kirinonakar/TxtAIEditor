@@ -2491,6 +2491,9 @@ Plan: {0}</value>
   <data name="AgentExaApiKeyFallbackUsed" xml:space="preserve">
     <value>Exa API key fallback was used.</value>
   </data>
+  <data name="AgentExaNoApiKeyDuckDuckGoFallbackUsed" xml:space="preserve">
+    <value>No Exa API key is configured; DuckDuckGo fallback was used.</value>
+  </data>
   <data name="AgentExaApiKeyFallbackFailedToDuckDuckGo" xml:space="preserve">
     <value>Exa API key fallback failed -&gt; DuckDuckGo fallback was used.</value>
   </data>

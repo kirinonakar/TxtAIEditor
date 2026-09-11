@@ -199,16 +199,16 @@ namespace TxtAIEditor.Controls
                 }
             }
 
+            if (!verbose && normalizedToolName == "web_search_exa" &&
+                toolResult.Contains(
+                    McpToolRateLimitException.ExaFreeMcpRateLimitMarker,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return BuildExaRateLimitDisplayResult(toolResult);
+            }
+
             if (!verbose && !successful)
             {
-                if (normalizedToolName == "web_search_exa" &&
-                    toolResult.Contains(
-                        McpToolRateLimitException.ExaFreeMcpRateLimitMarker,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    return BuildExaRateLimitDisplayResult(toolResult);
-                }
-
                 return _getString("AgentVerboseToolFailedOnly", "도구 실행에 실패했습니다");
             }
 
@@ -281,7 +281,9 @@ namespace TxtAIEditor.Controls
                     McpToolRateLimitException.ExaApiKeyFallbackMarker,
                     StringComparison.OrdinalIgnoreCase)
                     ? _getString("AgentExaApiKeyFallbackUsed", "Exa API key fallback was used.")
-                    : "DuckDuckGo fallback was used.";
+                    : toolResult.Contains(McpToolRateLimitException.ExaDuckDuckGoFallbackMarker, StringComparison.OrdinalIgnoreCase)
+                        ? _getString("AgentExaNoApiKeyDuckDuckGoFallbackUsed", "No Exa API key is configured; DuckDuckGo fallback was used.")
+                        : string.Empty;
 
             return string.Join(
                 Environment.NewLine,

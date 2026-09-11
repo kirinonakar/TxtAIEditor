@@ -2491,6 +2491,9 @@
   <data name="AgentExaApiKeyFallbackUsed" xml:space="preserve">
     <value>已使用 Exa API Key fallback。</value>
   </data>
+  <data name="AgentExaNoApiKeyDuckDuckGoFallbackUsed" xml:space="preserve">
+    <value>未設定 Exa API Key，已改用 DuckDuckGo 搜尋。</value>
+  </data>
   <data name="AgentExaApiKeyFallbackFailedToDuckDuckGo" xml:space="preserve">
     <value>Exa API Key fallback 失敗 -&gt; 已使用 DuckDuckGo fallback。</value>
   </data>

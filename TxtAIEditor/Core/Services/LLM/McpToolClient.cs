@@ -32,6 +32,10 @@ namespace TxtAIEditor.Core.Services.LLM
                 {
                     throw;
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"MCP HTTP transport failed, falling back to SSE transport: {ex.Message}");
@@ -170,6 +174,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                         if (currentEvent == "message" && currentData.Length > 0)
                                         {
                                             string dataValue = currentData.ToString().Trim();
+                                            ThrowIfExaFreeLimitReached(dataValue);
                                             using (var doc = JsonDocument.Parse(dataValue))
                                             {
                                                 var root = doc.RootElement;
@@ -250,6 +255,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                     if (!callResponse.IsSuccessStatusCode)
                                     {
                                         string errBody = await callResponse.Content.ReadAsStringAsync(cancellationToken);
+                                        ThrowIfExaFreeLimitReached(errBody, callResponse);
                                         if (callResponse.StatusCode == HttpStatusCode.TooManyRequests)
                                         {
                                             throw CreateRateLimitException(callResponse, errBody);
@@ -273,6 +279,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                         if (currentEvent == "message" && currentData.Length > 0)
                                         {
                                             string dataValue = currentData.ToString().Trim();
+                                            ThrowIfExaFreeLimitReached(dataValue);
                                             using (var doc = JsonDocument.Parse(dataValue))
                                             {
                                                 var root = doc.RootElement;
@@ -352,6 +359,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 using (var initResponse = await SendMcpHttpRequestAsync(client, endpointUrl, apiKey, null, initPayload, cancellationToken))
                 {
                     string initBody = await initResponse.Content.ReadAsStringAsync(cancellationToken);
+                    ThrowIfExaFreeLimitReached(initBody, initResponse);
                     if (!initResponse.IsSuccessStatusCode)
                     {
                         throw new HttpRequestException($"MCP HTTP initialize failed: {initResponse.StatusCode}\n{initBody}");
@@ -364,10 +372,6 @@ namespace TxtAIEditor.Core.Services.LLM
                     }
 
                     string sessionId = GetMcpSessionId(initResponse);
-                    if (string.IsNullOrWhiteSpace(sessionId))
-                    {
-                        throw new InvalidOperationException("MCP HTTP server did not return Mcp-Session-Id.");
-                    }
 
                     var initializedNotification = new
                     {
@@ -399,6 +403,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var callResponse = await SendMcpHttpRequestAsync(client, endpointUrl, apiKey, sessionId, callPayload, cancellationToken))
                     {
                         string callBody = await callResponse.Content.ReadAsStringAsync(cancellationToken);
+                        ThrowIfExaFreeLimitReached(callBody, callResponse);
                         if (!callResponse.IsSuccessStatusCode)
                         {
                             if (callResponse.StatusCode == HttpStatusCode.TooManyRequests)
@@ -463,6 +468,19 @@ namespace TxtAIEditor.Core.Services.LLM
             }
 
             return string.Empty;
+        }
+
+        private static void ThrowIfExaFreeLimitReached(string text, HttpResponseMessage? response = null)
+        {
+            // MCP can report the free limit inside an HTTP 200 result or JSON-RPC error.
+            string normalized = text.Replace("\\u0027", "'", StringComparison.OrdinalIgnoreCase)
+                .Replace('\u2019', '\'');
+            if (normalized.Contains(McpToolRateLimitException.ExaFreeMcpRateLimitMarker, StringComparison.OrdinalIgnoreCase))
+            {
+                throw response != null
+                    ? CreateRateLimitException(response, text)
+                    : new McpToolRateLimitException(HttpStatusCode.TooManyRequests, text, null, null);
+            }
         }
 
         private static McpToolRateLimitException CreateRateLimitException(
@@ -645,6 +663,12 @@ namespace TxtAIEditor.Core.Services.LLM
 
         private string FormatMcpSearchResult(JsonElement resultProp)
         {
+            ThrowIfExaFreeLimitReached(resultProp.GetRawText());
+            if (resultProp.TryGetProperty("isError", out var isError) && isError.ValueKind == JsonValueKind.True)
+            {
+                throw new InvalidOperationException($"MCP tool execution failed: {resultProp.GetRawText()}");
+            }
+
             if (!resultProp.TryGetProperty("content", out var contentProp) || contentProp.ValueKind != JsonValueKind.Array)
             {
                 return resultProp.GetRawText();
