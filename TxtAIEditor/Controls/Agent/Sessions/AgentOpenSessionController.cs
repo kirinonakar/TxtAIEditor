@@ -397,7 +397,7 @@ namespace TxtAIEditor.Controls
                         IsRunning = isRunning,
                         CompletedNotificationCount = session.CompletedNotificationCount,
                         CanSelect = true,
-                        CanClose = true
+                        CanClose = !IsPendingClose(session.Id)
                     };
                 })
                 .ToList();

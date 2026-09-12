@@ -40,6 +40,8 @@ namespace TxtAIEditor.Controls
         private bool _isBusy;
         private bool _openSessionMenuRefreshPending;
         private bool _historyMenuRefreshPending;
+        private bool _openSessionCloseRequested;
+        private bool _openSessionMenuLiveRefreshQueued;
 
         public AgentPaneSessionMenuCoordinator(
             FrameworkElement resourceOwner,
@@ -67,7 +69,11 @@ namespace TxtAIEditor.Controls
             _openSessionsButton = openSessionsButton;
             _rewindSessionButton = rewindSessionButton;
             _callbacks = callbacks;
-            _openSessionsFlyout.Closed += (_, _) => QueuePendingOpenSessionMenuRefresh();
+            _openSessionsFlyout.Closed += (_, _) =>
+            {
+                _openSessionCloseRequested = false;
+                QueuePendingOpenSessionMenuRefresh();
+            };
             _historyFlyout.Closed += (_, _) => QueuePendingHistoryMenuRefresh();
         }
 
@@ -105,9 +111,16 @@ namespace TxtAIEditor.Controls
 
             // Background sessions can complete while this popup is processing input or
             // layout. Keep its visual tree stable until WinUI has fully closed the flyout.
+            // Exception: when the user closes a session from this list, refresh the list
+            // in place so the remaining sessions can be closed one after another.
             if (_openSessionsFlyout.IsOpen)
             {
                 _openSessionMenuRefreshPending = true;
+                if (_openSessionCloseRequested)
+                {
+                    QueueLiveOpenSessionMenuRefresh();
+                }
+
                 return;
             }
 
@@ -211,7 +224,8 @@ namespace TxtAIEditor.Controls
                 ToolTipService.SetToolTip(closeButton, _getString("AgentOpenSessionCloseText", "세션 닫기"));
                 closeButton.Click += (_, _) =>
                 {
-                    _openSessionsFlyout.Hide();
+                    // Keep the flyout open so the user can close several sessions in a row.
+                    _openSessionCloseRequested = true;
                     _callbacks.OpenSessionClosed?.Invoke(currentId);
                 };
                 Grid.SetColumn(closeButton, 1);
@@ -306,6 +320,27 @@ namespace TxtAIEditor.Controls
             _resourceOwner.DispatcherQueue.TryEnqueue(
                 Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
                 RebuildOpenSessionMenu);
+        }
+
+        // The flyout stays open while sessions are closed, so its list must be
+        // refreshed in place. Queue at low priority so WinUI finishes the click
+        // input and layout work before the visual tree changes.
+        private void QueueLiveOpenSessionMenuRefresh()
+        {
+            if (_openSessionMenuLiveRefreshQueued)
+            {
+                return;
+            }
+
+            _openSessionMenuLiveRefreshQueued = true;
+            _resourceOwner.DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                () =>
+                {
+                    _openSessionMenuLiveRefreshQueued = false;
+                    _openSessionMenuRefreshPending = false;
+                    RebuildOpenSessionMenuCore();
+                });
         }
 
         private void QueuePendingHistoryMenuRefresh()
