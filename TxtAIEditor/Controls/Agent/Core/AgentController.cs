@@ -119,6 +119,7 @@ namespace TxtAIEditor.Controls
                     CaptureActiveSelectionSnapshot,
                     GetCurrentSessionSettings,
                     () => _runCoordinator?.GetCurrentRunTranscriptTokens() ?? 0,
+                    () => _runCoordinator?.GetActualRequestTokens() ?? 0,
                     RestoreSessionHistoryState,
                     sessionId => _runCoordinator?.StopAgent(sessionId),
                     attachment => _runCoordinator?.AddCurrentRunImageToolAttachment(attachment),

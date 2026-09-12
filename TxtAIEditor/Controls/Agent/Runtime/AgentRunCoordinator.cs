@@ -142,6 +142,21 @@ namespace TxtAIEditor.Controls
             _currentRunTranscriptTokens = currentRunTranscriptTokens;
         }
 
+        // Estimated tokens of the request that is actually sent to the model for the current
+        // session after context compression. 0 means the session has no active run or
+        // compression has not occurred yet, so callers should keep their own estimate.
+        public double GetActualRequestTokens()
+        {
+            if (!_runningSessions.TryGetValue(_currentSessionIdProvider(), out AgentRunContext? context) ||
+                context.ActualRequestTokens <= 0)
+            {
+                return 0;
+            }
+
+            double addedTokens = context.CurrentRunTranscriptTokens - context.ActualRequestTokensBase;
+            return addedTokens > 0 ? context.ActualRequestTokens + addedTokens : context.ActualRequestTokens;
+        }
+
         private Task<OpenedTab?> CaptureActiveTabForRunAsync()
         {
             return _uiDispatcher.RunAsync(() =>
@@ -358,6 +373,20 @@ namespace TxtAIEditor.Controls
                             modelTranscript,
                             currentTaskStartEditIndex,
                             runContext.SessionEdits);
+                        // The panel token display must show the compressed request that is
+                        // actually sent to the model, not the pre-compression transcript size.
+                        runContext.ActualRequestTokens = AgentContextCompressionService.EstimateModelRequestTokens(
+                            runContext.LlmSettings,
+                            fixedPromptContext,
+                            currentTranscript,
+                            currentWorkspaceContext,
+                            runSelectionContext,
+                            planningMode,
+                            runContext.HasEnabledSkills,
+                            runContext.HasEnabledMcp,
+                            agentTools,
+                            imageAttachments);
+                        runContext.ActualRequestTokensBase = runContext.CurrentRunTranscriptTokens;
                         string compressionNotice = _getString(
                             "AgentContextCompressedNotice",
                             "context 압축이 시행되었습니다.");

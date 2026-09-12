@@ -43,6 +43,13 @@ namespace TxtAIEditor.Controls
         public StringBuilder RetryDebugHistory { get; } = new();
         public double SessionHistoryTokenCount { get; set; }
         public double CurrentRunTranscriptTokens { get; set; }
+        // Tokens of the request that is actually sent to the model, measured right after
+        // context compression with the same estimator as the compression threshold.
+        // 0 means no measurement has been taken for this run yet.
+        public double ActualRequestTokens { get; set; }
+        // CurrentRunTranscriptTokens when ActualRequestTokens was measured. The difference
+        // since then is added on top so the display keeps tracking the growing transcript.
+        public double ActualRequestTokensBase { get; set; }
         public List<AgentAttachmentState> Attachments { get; set; } = new();
         public List<LlmMessageAttachment> ImageToolAttachments { get; } = new();
         public bool VisionFallbackPending { get; set; }

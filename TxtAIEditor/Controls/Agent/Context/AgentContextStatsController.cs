@@ -22,6 +22,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string> _buildWorkspaceContext;
         private readonly Func<string, string, string, string> _buildSessionHistoryForPrompt;
         private readonly Func<double> _currentRunTranscriptTokensProvider;
+        private readonly Func<double> _actualRequestTokensProvider;
         private readonly Action _refreshOutputDisplay;
         private readonly Func<string, string, string> _getString;
         private readonly AgentModelContextLimitProvider _modelContextLimits;
@@ -46,6 +47,7 @@ namespace TxtAIEditor.Controls
             Func<string, string> buildWorkspaceContext,
             Func<string, string, string, string> buildSessionHistoryForPrompt,
             Func<double> currentRunTranscriptTokensProvider,
+            Func<double> actualRequestTokensProvider,
             Action refreshOutputDisplay,
             Func<string, string, string> getString,
             AgentModelContextLimitProvider modelContextLimits,
@@ -67,6 +69,7 @@ namespace TxtAIEditor.Controls
             _buildWorkspaceContext = buildWorkspaceContext;
             _buildSessionHistoryForPrompt = buildSessionHistoryForPrompt;
             _currentRunTranscriptTokensProvider = currentRunTranscriptTokensProvider;
+            _actualRequestTokensProvider = actualRequestTokensProvider;
             _refreshOutputDisplay = refreshOutputDisplay;
             _getString = getString;
             _modelContextLimits = modelContextLimits;
@@ -128,11 +131,16 @@ namespace TxtAIEditor.Controls
 
             string promptText = GetPromptText();
             double estimatedTokens = EstimateContextTokens(promptText);
+            // After context compression the run reports the tokens that are actually sent to
+            // the model, so prefer that value over the estimate that still contains the
+            // uncompressed transcript.
+            double actualRequestTokens = _actualRequestTokensProvider();
+            double displayTokens = actualRequestTokens > 0 ? actualRequestTokens : estimatedTokens;
             _estimatedTokensExcludingPrompt = Math.Max(
                 0,
-                estimatedTokens - AgentTokenEstimator.Estimate(promptText));
+                displayTokens - AgentTokenEstimator.Estimate(promptText));
             _hasFullTokenEstimate = true;
-            UpdateTokenCount(estimatedTokens);
+            UpdateTokenCount(displayTokens);
 
             UpdateModelDisplay();
         }

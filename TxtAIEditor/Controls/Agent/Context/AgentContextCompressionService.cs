@@ -58,26 +58,17 @@ namespace TxtAIEditor.Controls
             int outputLimit = ResolveOutputLimit(settings, contextLimit);
             int inputBudget = Math.Max(MinimumInputBudgetTokens, contextLimit - outputLimit);
 
-            string languageCode = LlmLanguageResolver.Resolve(settings);
-            string targetLanguage = ResolveTargetLanguage(settings, languageCode);
-            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(
-                languageCode,
-                planningMode,
-                targetLanguage,
-                hasEnabledSkills,
-                hasEnabledMcp);
-            string userContent = AgentPromptBuilder.BuildUserContent(
+            int requestTokens = EstimateModelRequestTokens(
+                settings,
                 fixedPromptContext,
                 requestTranscript,
                 workspaceContext,
                 selectedText,
-                string.Empty,
-                languageCode);
-            int requestTokens = LlmTokenBudget.EstimateRequestTokens(
-                systemPrompt,
-                userContent,
-                attachments,
-                AgentPromptContextService.SupportsNativeToolCatalog(settings) ? tools : null);
+                planningMode,
+                hasEnabledSkills,
+                hasEnabledMcp,
+                tools,
+                attachments);
 
             if (requestTokens <= Math.Floor(inputBudget * CompressionThresholdRatio))
             {
@@ -119,6 +110,47 @@ namespace TxtAIEditor.Controls
             }
 
             return new AgentContextCompressionResult(compressedPrefix + tail, true);
+        }
+
+        /// <summary>
+        /// Estimates the tokens of the request that is actually sent to the model: the system
+        /// prompt plus the user content built from the given transcript, workspace context,
+        /// selection, attachments, and native tool catalog. The compression threshold and the
+        /// AgentPanel token display both use this measure.
+        /// </summary>
+        public static int EstimateModelRequestTokens(
+            EditorSettings settings,
+            string fixedPromptContext,
+            string requestTranscript,
+            string workspaceContext,
+            string selectedText,
+            bool planningMode,
+            bool hasEnabledSkills,
+            bool hasEnabledMcp,
+            IReadOnlyList<LlmTool>? tools,
+            IReadOnlyList<LlmMessageAttachment>? attachments)
+        {
+            string languageCode = LlmLanguageResolver.Resolve(settings);
+            string targetLanguage = ResolveTargetLanguage(settings, languageCode);
+            string systemPrompt = AgentPromptBuilder.BuildSystemPrompt(
+                languageCode,
+                planningMode,
+                targetLanguage,
+                hasEnabledSkills,
+                hasEnabledMcp);
+            string userContent = AgentPromptBuilder.BuildUserContent(
+                fixedPromptContext,
+                requestTranscript,
+                workspaceContext,
+                selectedText,
+                string.Empty,
+                languageCode);
+
+            return LlmTokenBudget.EstimateRequestTokens(
+                systemPrompt,
+                userContent,
+                attachments,
+                AgentPromptContextService.SupportsNativeToolCatalog(settings) ? tools : null);
         }
 
         private static int ResolveOutputLimit(EditorSettings settings, int contextLimit)

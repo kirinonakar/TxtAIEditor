@@ -321,7 +321,6 @@ namespace TxtAIEditor.Controls
             {
                 if (inCompressedContext)
                 {
-                    result.AppendLine(line);
                     if (line.Trim().Equals(
                             AgentRunTranscriptService.CompressedContextEndMarker,
                             StringComparison.OrdinalIgnoreCase))
@@ -336,8 +335,8 @@ namespace TxtAIEditor.Controls
                         AgentRunTranscriptService.CompressedContextStartMarker,
                         StringComparison.OrdinalIgnoreCase))
                 {
-                    EnsureAgentRunHeader();
-                    result.AppendLine(line);
+                    // The compressed context block contains the raw model transcript
+                    // (tool calls, tool results) that must stay hidden in non-verbose mode.
                     inCompressedContext = true;
                     continue;
                 }

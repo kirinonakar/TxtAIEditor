@@ -94,9 +94,30 @@ namespace TxtAIEditor.Controls
         {
             var visibleLines = new List<string>(lines.Count);
             bool inGlobalAgentRules = false;
+            bool inCompressedContext = false;
             foreach (string line in lines)
             {
                 string trimmed = line.Trim();
+                if (inCompressedContext)
+                {
+                    if (trimmed.Equals(
+                            AgentRunTranscriptService.CompressedContextEndMarker,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        inCompressedContext = false;
+                    }
+
+                    continue;
+                }
+
+                if (trimmed.Equals(
+                        AgentRunTranscriptService.CompressedContextStartMarker,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    inCompressedContext = true;
+                    continue;
+                }
+
                 if (inGlobalAgentRules)
                 {
                     if (trimmed.Equals("[End global agent rules]", StringComparison.OrdinalIgnoreCase))
