@@ -23,6 +23,7 @@ namespace TxtAIEditor.Core.Services.LLM
             new()
             {
                 { ("opencode-go", "deepseek-v4-flash"), (1000000, 384000) },
+                { ("opencode-go", "deepseek-v4.1-flash"), (1000000, 384000) },
                 { ("opencode-go", "deepseek-v4-pro"), (1000000, 384000) },
                 { ("opencode-go", "glm-5.3-flash"), (1000000, 131072) },
                 { ("opencode-go", "glm-5.2"), (1000000, 131072) },

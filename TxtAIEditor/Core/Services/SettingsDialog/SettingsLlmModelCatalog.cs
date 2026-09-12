@@ -203,6 +203,7 @@ namespace TxtAIEditor.Core.Services
                     "qwen3.6-plus",
                     "deepseek-v4-pro",
                     "deepseek-v4-flash",
+                    "deepseek-v4.1-flash",
                     "deepseek-v4-flash-vision-exp",
                     "hy3"
                 };
