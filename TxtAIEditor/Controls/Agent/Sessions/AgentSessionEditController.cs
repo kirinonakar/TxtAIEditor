@@ -17,10 +17,12 @@ namespace TxtAIEditor.Controls
         private readonly Action<string> _appendActivity;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
-        private readonly List<AgentFileEditPreview> _sessionEdits = new();
+        // Edits are tracked per session so the review list can never show another
+        // session's changed files. The panel always displays the visible session's
+        // list; Track() records into the session whose tool call is executing.
+        private readonly Dictionary<string, List<AgentFileEditPreview>> _sessionEditsBySession = new(StringComparer.Ordinal);
         private readonly Func<string> _currentSessionIdProvider;
-
-        public string? CurrentSessionId { get; set; }
+        private string? _recordingSessionId;
 
         public AgentSessionEditController(
             AgentPane agentPane,
@@ -42,11 +44,10 @@ namespace TxtAIEditor.Controls
             _showError = showError;
             _getString = getString;
             _currentSessionIdProvider = currentSessionIdProvider;
-            CurrentSessionId = currentSessionIdProvider();
         }
 
-        public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEdits;
-        public int EditCount => _sessionEdits.Count;
+        public IReadOnlyList<AgentFileEditPreview> SessionEdits => GetVisibleSessionEdits();
+        public int EditCount => GetVisibleSessionEdits().Count;
 
         public void Track(AgentFileEditPreview preview)
         {
@@ -55,34 +56,64 @@ namespace TxtAIEditor.Controls
             // entry and the original IsNewFile flag is kept, restore can jump to the
             // wrong state, especially for files created and then edited in the same
             // agent session.
-            _sessionEdits.Add(Clone(preview));
-            UpdateModificationNumbers();
-            UpdateModifiedFilesList();
+            string sessionId = ResolveRecordingSessionId();
+            var sessionEdits = GetOrCreateSessionEdits(sessionId);
+            sessionEdits.Add(Clone(preview));
+            UpdateModificationNumbers(sessionEdits);
+            if (IsVisibleSession(sessionId))
+            {
+                UpdateModifiedFilesList();
+            }
         }
 
         public void Clear()
         {
-            _sessionEdits.Clear();
-            UpdateModificationNumbers();
+            var sessionEdits = GetVisibleSessionEdits();
+            sessionEdits.Clear();
+            UpdateModificationNumbers(sessionEdits);
             UpdateModifiedFilesList();
+        }
+
+        // A tool call can run for a session that is not currently visible. While it is
+        // executing, Track() must record into that session's list instead of the
+        // visible session's list so the review panel never mixes sessions.
+        public void BeginToolRecording(string sessionId)
+        {
+            _recordingSessionId = sessionId;
+        }
+
+        public List<AgentFileEditPreview> EndToolRecording(string sessionId)
+        {
+            if (string.Equals(_recordingSessionId, sessionId, StringComparison.Ordinal))
+            {
+                _recordingSessionId = null;
+            }
+
+            return GetOrCreateSessionEdits(sessionId).ToList();
+        }
+
+        public IReadOnlyList<AgentFileEditPreview> GetSessionEdits(string sessionId)
+        {
+            return GetOrCreateSessionEdits(sessionId);
         }
 
         public void Replace(IEnumerable<AgentFileEditPreview>? edits, string sessionId)
         {
             var replacementEdits = edits?.Select(Clone).ToList() ?? new List<AgentFileEditPreview>();
-            bool sessionChanged = !string.Equals(CurrentSessionId, sessionId, StringComparison.Ordinal);
 
-            CurrentSessionId = sessionId;
-
-            if (!sessionChanged && AreEquivalent(_sessionEdits, replacementEdits))
+            // While a tool call for this session is in flight the live list already
+            // holds the newest edits; do not overwrite it with a stale snapshot.
+            if (!string.Equals(_recordingSessionId, sessionId, StringComparison.Ordinal))
             {
-                return;
+                var sessionEdits = GetOrCreateSessionEdits(sessionId);
+                if (!AreEquivalent(sessionEdits, replacementEdits))
+                {
+                    sessionEdits.Clear();
+                    sessionEdits.AddRange(replacementEdits);
+                    UpdateModificationNumbers(sessionEdits);
+                }
             }
 
-            _sessionEdits.Clear();
-            _sessionEdits.AddRange(replacementEdits);
-
-            UpdateModificationNumbers();
             UpdateModifiedFilesList();
         }
 
@@ -90,13 +121,15 @@ namespace TxtAIEditor.Controls
         {
             try
             {
-                int editIndex = FindLatestEditIndex(preview.FullPath, preview.RelativePath);
+                string sessionId = _currentSessionIdProvider() ?? string.Empty;
+                var sessionEdits = GetOrCreateSessionEdits(sessionId);
+                int editIndex = FindLatestEditIndex(sessionEdits, preview.FullPath, preview.RelativePath);
                 if (editIndex < 0)
                 {
                     return;
                 }
 
-                AgentFileEditPreview editToRevert = _sessionEdits[editIndex];
+                AgentFileEditPreview editToRevert = sessionEdits[editIndex];
                 bool isFileBackedPath = IsFileBackedSessionPath(editToRevert.FullPath);
 
                 // Make the durable source match the restored state before notifying
@@ -134,9 +167,12 @@ namespace TxtAIEditor.Controls
                     });
                 }
 
-                _sessionEdits.RemoveAt(editIndex);
-                UpdateModificationNumbers();
-                UpdateModifiedFilesList();
+                sessionEdits.RemoveAt(editIndex);
+                UpdateModificationNumbers(sessionEdits);
+                if (IsVisibleSession(sessionId))
+                {
+                    UpdateModifiedFilesList();
+                }
 
                 _appendActivity(string.Format(
                     _getString("AgentActivityFileReverted", "파일 변경 취소 완료: {0}"),
@@ -152,20 +188,21 @@ namespace TxtAIEditor.Controls
 
         public string BuildDiffLog()
         {
-            return BuildDiffLog(0, _sessionEdits.Count);
+            return BuildDiffLog(0, GetVisibleSessionEdits().Count);
         }
 
         public string BuildDiffLog(int startIndex, int endIndex)
         {
+            IReadOnlyList<AgentFileEditPreview> sessionEdits = GetVisibleSessionEdits();
             startIndex = Math.Max(0, startIndex);
-            endIndex = Math.Min(_sessionEdits.Count, Math.Max(startIndex, endIndex));
+            endIndex = Math.Min(sessionEdits.Count, Math.Max(startIndex, endIndex));
             if (startIndex >= endIndex)
             {
                 return string.Empty;
             }
 
             var builder = new StringBuilder();
-            foreach (var edit in _sessionEdits.Skip(startIndex).Take(endIndex - startIndex))
+            foreach (var edit in sessionEdits.Skip(startIndex).Take(endIndex - startIndex))
             {
                 builder.AppendLine($"--- File: {edit.RelativePath} (Action: {edit.ActionName}) ---");
                 if (edit.IsNewFile)
@@ -217,12 +254,15 @@ namespace TxtAIEditor.Controls
             return count;
         }
 
-        private int FindLatestEditIndex(string fullPath, string relativePath)
+        private static int FindLatestEditIndex(
+            IReadOnlyList<AgentFileEditPreview> sessionEdits,
+            string fullPath,
+            string relativePath)
         {
             string targetKey = GetSessionEditKey(fullPath, relativePath);
-            for (int i = _sessionEdits.Count - 1; i >= 0; i--)
+            for (int i = sessionEdits.Count - 1; i >= 0; i--)
             {
-                AgentFileEditPreview edit = _sessionEdits[i];
+                AgentFileEditPreview edit = sessionEdits[i];
                 if (string.Equals(GetSessionEditKey(edit.FullPath, edit.RelativePath), targetKey, StringComparison.OrdinalIgnoreCase))
                 {
                     return i;
@@ -232,10 +272,10 @@ namespace TxtAIEditor.Controls
             return -1;
         }
 
-        private void UpdateModificationNumbers()
+        private static void UpdateModificationNumbers(IReadOnlyList<AgentFileEditPreview> sessionEdits)
         {
             var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            foreach (var edit in _sessionEdits)
+            foreach (var edit in sessionEdits)
             {
                 string key = GetSessionEditKey(edit.FullPath, edit.RelativePath);
                 if (!counts.TryGetValue(key, out int count))
@@ -247,17 +287,17 @@ namespace TxtAIEditor.Controls
                 edit.ModificationNumber = count;
             }
 
-            foreach (var edit in _sessionEdits)
+            foreach (var edit in sessionEdits)
             {
                 string key = GetSessionEditKey(edit.FullPath, edit.RelativePath);
                 edit.TotalModifications = counts[key];
             }
         }
 
-        private List<AgentFileEditPreview> GetLatestEditsForDisplay()
+        private static List<AgentFileEditPreview> GetLatestEditsForDisplay(IReadOnlyList<AgentFileEditPreview> sessionEdits)
         {
             var latestByPath = new Dictionary<string, AgentFileEditPreview>(StringComparer.OrdinalIgnoreCase);
-            foreach (AgentFileEditPreview edit in _sessionEdits)
+            foreach (AgentFileEditPreview edit in sessionEdits)
             {
                 latestByPath[GetSessionEditKey(edit.FullPath, edit.RelativePath)] = edit;
             }
@@ -265,21 +305,47 @@ namespace TxtAIEditor.Controls
             return latestByPath.Values.ToList();
         }
 
-        private void UpdateModifiedFilesList()
+        private string ResolveRecordingSessionId()
         {
-            string sessionId = CurrentSessionId ?? string.Empty;
-            if (!string.Equals(sessionId, _currentSessionIdProvider(), StringComparison.Ordinal))
+            if (!string.IsNullOrEmpty(_recordingSessionId))
             {
-                return;
+                return _recordingSessionId;
             }
 
-            var displayEdits = GetLatestEditsForDisplay();
+            return _currentSessionIdProvider() ?? string.Empty;
+        }
+
+        private bool IsVisibleSession(string sessionId)
+        {
+            return string.Equals(_currentSessionIdProvider(), sessionId, StringComparison.Ordinal);
+        }
+
+        private List<AgentFileEditPreview> GetVisibleSessionEdits()
+        {
+            return GetOrCreateSessionEdits(_currentSessionIdProvider());
+        }
+
+        private List<AgentFileEditPreview> GetOrCreateSessionEdits(string? sessionId)
+        {
+            string key = sessionId ?? string.Empty;
+            if (!_sessionEditsBySession.TryGetValue(key, out List<AgentFileEditPreview>? sessionEdits))
+            {
+                sessionEdits = new List<AgentFileEditPreview>();
+                _sessionEditsBySession[key] = sessionEdits;
+            }
+
+            return sessionEdits;
+        }
+
+        private void UpdateModifiedFilesList()
+        {
+            string sessionId = _currentSessionIdProvider() ?? string.Empty;
+            var displayEdits = GetLatestEditsForDisplay(GetOrCreateSessionEdits(sessionId));
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
                 // The callback can run after the user switches sessions. Do not let
                 // an older session's queued update overwrite the visible list.
-                if (!string.Equals(CurrentSessionId, sessionId, StringComparison.Ordinal) ||
-                    !string.Equals(_currentSessionIdProvider(), sessionId, StringComparison.Ordinal))
+                if (!string.Equals(_currentSessionIdProvider(), sessionId, StringComparison.Ordinal))
                 {
                     return;
                 }

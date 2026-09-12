@@ -204,7 +204,7 @@ namespace TxtAIEditor.Controls
                 session.SessionHistoryTokenCount = _sessionHistoryTokenCountProvider();
                 session.CurrentRunTranscriptTokens = _currentRunTranscriptTokensProvider();
                 session.Attachments = _attachmentController.GetState();
-                session.SessionEdits = _sessionEditController.SessionEdits.ToList();
+                session.SessionEdits = _sessionEditController.GetSessionEdits(session.Id).ToList();
             }
             session.UpdatedAt = DateTime.Now;
             UpdateSessionTitle(session, session.PromptText);

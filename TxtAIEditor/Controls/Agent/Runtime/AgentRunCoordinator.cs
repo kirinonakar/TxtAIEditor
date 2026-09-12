@@ -834,24 +834,24 @@ namespace TxtAIEditor.Controls
                             try
                             {
                                 _activeToolRunContext.Value = runContext;
-                                await _uiDispatcher.RunAsync(() =>
+                                await _uiDispatcher.RunAsync(() => _sessionEditController.BeginToolRecording(runContext.SessionId));
+                                try
                                 {
-                                    _sessionEditController.Replace(runContext.SessionEdits, runContext.SessionId);
-                                });
-                                toolResult = await _toolExecutionController.ExecuteAsync(
-                                    currentToolName,
-                                    currentArguments,
-                                    runContext.LlmSettings.LlmAgentVerbose,
-                                    cancellationToken);
-                                runContext.SessionEdits = _sessionEditController.SessionEdits.ToList();
-                                _openSessionController.EnsureSession(runContext.SessionId).SessionEdits = runContext.SessionEdits.ToList();
-                                if (!_runOutputController.IsSessionVisible(runContext.SessionId))
+                                    toolResult = await _toolExecutionController.ExecuteAsync(
+                                        currentToolName,
+                                        currentArguments,
+                                        runContext.LlmSettings.LlmAgentVerbose,
+                                        cancellationToken);
+                                }
+                                finally
                                 {
-                                    await _uiDispatcher.RunAsync(() =>
+                                    // Edits committed by this tool call belong to the session
+                                    // that executed it, even when another session is visible.
+                                    runContext.SessionEdits = await _uiDispatcher.RunAsync(() =>
                                     {
-                                        var visibleSession = _openSessionController.EnsureSession(_currentSessionIdProvider());
-                                        _sessionEditController.Replace(visibleSession.SessionEdits, _currentSessionIdProvider());
+                                        return _sessionEditController.EndToolRecording(runContext.SessionId);
                                     });
+                                    _openSessionController.EnsureSession(runContext.SessionId).SessionEdits = runContext.SessionEdits.ToList();
                                 }
                             }
                             finally
