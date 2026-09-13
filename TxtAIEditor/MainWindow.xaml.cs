@@ -30,6 +30,7 @@ namespace TxtAIEditor
             new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private bool _exitRequestedFromTray;
         private bool _hideToTrayPending;
+        private int _trayRestoreVersion;
         private bool _trayClosePending;
 
         internal bool IsHiddenToTray { get; private set; }
@@ -161,10 +162,17 @@ namespace TxtAIEditor
                 if (!_hideToTrayPending && EnsureTrayIcon())
                 {
                     _hideToTrayPending = true;
+                    int restoreVersion = _trayRestoreVersion;
                     if (!DispatcherQueue.TryEnqueue(() =>
                     {
                         try
                         {
+                            // A shell/tray activation supersedes a previously queued close-to-tray.
+                            if (restoreVersion != _trayRestoreVersion)
+                            {
+                                return;
+                            }
+
                             AppWindow.Hide();
                             IsHiddenToTray = true;
                             (Application.Current as App)?.UpdateTrayIconVisibility();
@@ -207,6 +215,7 @@ namespace TxtAIEditor
 
         internal void RestoreAndActivate()
         {
+            _trayRestoreVersion++;
             IsHiddenToTray = false;
             AppWindow.Show();
             if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter &&

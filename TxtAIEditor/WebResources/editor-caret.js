@@ -20,6 +20,17 @@ import {
     normalizeSelection
 } from './editor-selection.js';
 
+let caretVisualAffinity = null;
+document.addEventListener('pointerdown', () => { caretVisualAffinity = null; }, true);
+
+function hasUpstreamCaretAffinity(element, offset) {
+    const selection = window.getSelection();
+    return caretVisualAffinity?.line === Number(element.dataset.line) &&
+        caretVisualAffinity.column === offset &&
+        selection?.focusNode === caretVisualAffinity.node &&
+        selection?.focusOffset === caretVisualAffinity.offset;
+}
+
 function lineTextFromElement(element) {
     const onlyTextNode = element?.childNodes?.length === 1 &&
         element.firstChild?.nodeType === Node.TEXT_NODE
@@ -294,7 +305,9 @@ function selectWordAtPointer(event) {
     return true;
 }
 
-function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = true, revealHorizontally = true) {
+function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = true, revealHorizontally = true, affinity = null) {
+    const upstream = affinity === 'upstream' || (affinity === null &&
+        caretVisualAffinity?.line === Number(element.dataset.line) && caretVisualAffinity.column === offset);
     const oldActiveElement = document.activeElement?.closest?.('.line-text');
     const oldActiveLine = oldActiveElement ? Number(oldActiveElement.dataset.line || 0) : null;
 
@@ -335,6 +348,21 @@ function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = tr
 
     selection.removeAllRanges();
     selection.addRange(range);
+    if (upstream && offset > 0 && typeof selection.modify === 'function') {
+        // A collapsed Range loses the upstream side of a soft wrap. Moving to
+        // the visual line end preserves that side in Chromium's native caret.
+        const previous = textPositionForOffset(element, offset - 1);
+        selection.collapse(previous.node, previous.offset);
+        selection.modify('move', 'forward', 'lineboundary');
+        if (getCaretOffset(element) !== offset) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+    }
+    caretVisualAffinity = upstream ? {
+        line: Number(element.dataset.line), column: offset,
+        node: selection.focusNode, offset: selection.focusOffset
+    } : null;
     if (revealHorizontally) {
         revealCaretHorizontally(element, offset);
     }
@@ -428,7 +456,7 @@ function textPositionForOffset(element, offset) {
     };
 }
 
-function caretRectForOffset(element, offset) {
+function caretRectForOffset(element, offset, visualY = null) {
     if (!element) return null;
     const textLength = lineTextFromElement(element).length;
     if (textLength === 0) {
@@ -450,6 +478,36 @@ function caretRectForOffset(element, offset) {
         range.setStart(position.node, position.offset);
         range.collapse(true);
         const maxCaretHeight = Math.max(viewportController.lineHeight * 1.75, viewportController.lineHeight + 8);
+        // At a soft wrap a collapsed range has two rectangles. Its bounding
+        // box spans both rows and the full text width, so it is not a caret.
+        const caretRects = Array.from(range.getClientRects());
+        // Highlighted tokens may put the downstream side in another text node,
+        // so the range at the preceding token's end only reports the upstream side.
+        if (position.node.nodeType === Node.TEXT_NODE &&
+            position.offset === position.node.textContent.length && offset < textLength) {
+            const next = textPositionForOffset(element, offset + 1);
+            if (next.node !== position.node && next.offset > 0) {
+                range.setStart(next.node, next.offset - 1);
+                range.collapse(true);
+                caretRects.push(...range.getClientRects());
+            }
+        }
+        const rects = caretRects.filter(rect =>
+            rect.height > 0 && rect.height <= maxCaretHeight);
+        if (rects.length > 0) {
+            let index = hasUpstreamCaretAffinity(element, offset) ? 0 : rects.length - 1;
+            if (Number.isFinite(visualY)) {
+                index = rects.reduce((best, rect, candidate) =>
+                    Math.abs(rect.top + rect.height / 2 - visualY) <
+                    Math.abs(rects[best].top + rects[best].height / 2 - visualY) ? candidate : best, 0);
+            }
+            const rect = rects[index];
+            return {
+                left: rect.left, right: rect.right, top: rect.top,
+                bottom: rect.bottom, height: rect.height,
+                affinity: rect.top + rect.height / 2 < rects[rects.length - 1].top ? 'upstream' : 'downstream'
+            };
+        }
         let rect = range.getBoundingClientRect();
         if (rect && (rect.width > 0 || rect.height > 0) && rect.height <= maxCaretHeight) return rect;
 
@@ -514,10 +572,13 @@ function isRectOnAdjacentVisualLine(referenceRect, candidateRect, direction, lin
 }
 
 function offsetFromPointInElement(element, clientX, clientY, referenceRect = null, direction = 0, lineStep = viewportController.lineHeight) {
+    const isOnTargetRow = rect => rect &&
+        Math.abs(rect.top + rect.height / 2 - clientY) <= lineStep / 2 &&
+        isRectOnAdjacentVisualLine(referenceRect, rect, direction, lineStep);
     const nativeOffset = nativeOffsetFromPointInElement(element, clientX, clientY);
     if (nativeOffset !== null) {
-        const nativeRect = caretRectForOffset(element, nativeOffset);
-        if (isRectOnAdjacentVisualLine(referenceRect, nativeRect, direction, lineStep)) {
+        const nativeRect = caretRectForOffset(element, nativeOffset, clientY);
+        if (isOnTargetRow(nativeRect)) {
             return nativeOffset;
         }
     }
@@ -526,9 +587,8 @@ function offsetFromPointInElement(element, clientX, clientY, referenceRect = nul
     let bestOffset = null;
     let bestDistance = Infinity;
     for (let offset = 0; offset <= textLength; offset++) {
-        const rect = caretRectForOffset(element, offset);
-        if (!rect) continue;
-        if (!isRectOnAdjacentVisualLine(referenceRect, rect, direction, lineStep)) continue;
+        const rect = caretRectForOffset(element, offset, clientY);
+        if (!isOnTargetRow(rect)) continue;
         const x = rect.left;
         const y = rect.top + (rect.height || viewportController.lineHeight) / 2;
         const dx = x - clientX;
@@ -558,7 +618,7 @@ function updateFullDocumentEditingRow(previousLine, nextLine) {
     return true;
 }
 
-function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
+function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0, affinity = null) {
     if (_focusRetryTimer) {
         clearTimeout(_focusRetryTimer);
         _focusRetryTimer = 0;
@@ -576,7 +636,7 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
         requestAnimationFrame(() => {
             const element = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
             if (element && element.getAttribute('contenteditable') === 'true') {
-                setCaret(element, targetColumn);
+                setCaret(element, targetColumn, 0, true, true, affinity);
                 keepElementInView(element);
             }
         });
@@ -657,7 +717,7 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0) {
     function tryFocus() {
         const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
         if (element && element.getAttribute('contenteditable') === 'true') {
-            setCaret(element, columnZeroBased);
+            setCaret(element, columnZeroBased, 0, true, true, affinity);
             _focusRetryTimer = 0;
         } else if (retries > 0) {
             retries--;

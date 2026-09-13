@@ -27,6 +27,7 @@ export function createCaretNavigationCommands({
     viewport
 }) {
     let verticalCaretVisualAnchor = null;
+    document.addEventListener('pointerdown', clearVerticalCaretVisualAnchor, true);
 
     function commitDomLineBeforeCaretNavigation(element) {
         if (!element || element.getAttribute?.('contenteditable') !== 'true') return false;
@@ -276,15 +277,14 @@ export function createCaretNavigationCommands({
             : targetBounds.top + lineStep / 2;
         const column = offsetFromPointInElement(targetElement, x, y);
         const targetColumn = column === null ? fallback.column : column;
-        const visualTop = direction < 0
-            ? Math.max(targetBounds.top, targetBounds.bottom - lineStep)
-            : targetBounds.top;
+        const targetRect = caretRectForOffset(targetElement, targetColumn, y);
         return {
             line: targetLine,
             column: targetColumn,
-            visualLeft: x,
-            visualTop,
-            visualHeight: lineStep
+            visualLeft: preferredX,
+            visualTop: targetRect?.top,
+            visualHeight: targetRect?.height,
+            affinity: targetRect?.affinity
         };
     }
 
@@ -327,19 +327,19 @@ export function createCaretNavigationCommands({
             const parsedLineHeight = Number.parseFloat(styles.lineHeight);
             lineStep = Math.max(1, Number.isFinite(parsedLineHeight) ? parsedLineHeight : (caretRect.height || viewportController.lineHeight));
             preferredX = Math.max(elementRect.left + 1, Math.min(caretRect.left, elementRect.right - 1));
-            const targetY = direction < 0
-                ? caretRect.top - lineStep / 2
-                : caretRect.bottom + lineStep / 2;
+            const targetY = caretRect.top + caretRect.height / 2 + direction * lineStep;
 
             if (targetY >= visualBounds.top - 1 && targetY <= visualBounds.bottom + 1) {
                 const targetColumn = offsetFromPointInElement(moveElement, preferredX, targetY, caretRect, direction, lineStep);
                 if (targetColumn !== null) {
+                    const targetRect = caretRectForOffset(moveElement, targetColumn, targetY);
                     target = {
                         line: lineNumber,
                         column: targetColumn,
                         visualLeft: preferredX,
-                        visualTop: targetY - lineStep / 2,
-                        visualHeight: lineStep
+                        visualTop: targetRect?.top,
+                        visualHeight: targetRect?.height,
+                        affinity: targetRect?.affinity
                     };
                 }
             }
@@ -372,10 +372,10 @@ export function createCaretNavigationCommands({
                 clearCustomSelectionVisuals();
                 if (target.line === lineNumber &&
                     Number(moveElement?.dataset?.line || 0) === target.line) {
-                    setCaret(moveElement, target.column, 3 * viewportController.lineHeight, false);
+                    setCaret(moveElement, target.column, 3 * viewportController.lineHeight, false, true, target.affinity);
                 } else {
                     queueRender(true);
-                    setTimeout(() => focusLine(target.line, target.column, 3 * viewportController.lineHeight), 0);
+                    setTimeout(() => focusLine(target.line, target.column, 3 * viewportController.lineHeight, target.affinity), 0);
                 }
             } else {
                 selectionController.selection = null;
@@ -384,9 +384,9 @@ export function createCaretNavigationCommands({
                 state.currentColumn = target.column + 1;
                 syncCustomSelectionClass();
                 if (target.line === lineNumber) {
-                    setCaret(moveElement, target.column, 3 * viewportController.lineHeight);
+                    setCaret(moveElement, target.column, 3 * viewportController.lineHeight, true, true, target.affinity);
                 } else {
-                    focusLine(target.line, target.column, 3 * viewportController.lineHeight);
+                    focusLine(target.line, target.column, 3 * viewportController.lineHeight, target.affinity);
                 }
             }
             return true;

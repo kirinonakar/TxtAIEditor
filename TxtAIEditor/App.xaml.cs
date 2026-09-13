@@ -25,7 +25,7 @@ namespace TxtAIEditor
         private MainWindow? _trayOwnerWindow;
         private bool _trayExitInProgress;
         private static Mutex? _singleInstanceMutex;
-        private FileSystemWatcher? _ipcWatcher;
+        private ShellActivationService? _shellActivationService;
         private uint _comCookie;
         private static bool _isComActivation;
         private static Timer? _idleExitTimer;
@@ -90,29 +90,24 @@ namespace TxtAIEditor
                 var cmdArgs = Environment.GetCommandLineArgs();
                 try
                 {
-                    Directory.CreateDirectory(IpcDir);
-                    var ipcFile = Path.Combine(IpcDir, $"ipc_{Guid.NewGuid():N}.txt");
-                    if (cmdArgs.Length > 1)
-                    {
-                        File.WriteAllLines(ipcFile, cmdArgs.Skip(1));
-                    }
-                    else
-                    {
-                        File.WriteAllText(ipcFile, "ACTIVATE");
-                    }
+                    ShellActivationService.Publish(IpcDir, cmdArgs.Skip(1).ToArray());
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to forward shell activation: {ex.Message}");
+                    Environment.Exit(1);
+                    return;
+                }
                 Environment.Exit(0);
                 return;
             }
-
-            StartIpcWatcher();
 
             var mainWindow = new MainWindow();
             RegisterWindow(mainWindow);
             await mainWindow.PrepareForInitialActivationAsync();
             mainWindow.Activate();
             UpdateTrayIconVisibility();
+            _shellActivationService = new ShellActivationService(IpcDir, HandleShellActivationAsync);
 
             _ = Task.Run(FileAssociationService.RegisterUnpackagedFileAssociations);
         }
@@ -687,13 +682,8 @@ namespace TxtAIEditor
             _trayIconService = null;
             _trayOwnerWindow = null;
 
-            if (_ipcWatcher != null)
-            {
-                _ipcWatcher.EnableRaisingEvents = false;
-                _ipcWatcher.Created -= OnIpcFileCreated;
-                _ipcWatcher.Dispose();
-                _ipcWatcher = null;
-            }
+            _shellActivationService?.Dispose();
+            _shellActivationService = null;
 
             if (_singleInstanceMutex != null)
             {
@@ -772,56 +762,58 @@ namespace TxtAIEditor
             }
         }
 
-        private void StartIpcWatcher()
+        private Task<bool> HandleShellActivationAsync(string[] arguments)
         {
-            try
+            var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            bool queued = _dispatcherQueue?.TryEnqueue(async () =>
             {
-                Directory.CreateDirectory(IpcDir);
-                _ipcWatcher = new FileSystemWatcher(IpcDir, "ipc_*.txt")
+                try
                 {
-                    NotifyFilter = NotifyFilters.CreationTime | NotifyFilters.FileName,
-                    EnableRaisingEvents = true
-                };
-                _ipcWatcher.Created += OnIpcFileCreated;
-            }
-            catch { }
-        }
-
-        private void OnIpcFileCreated(object sender, FileSystemEventArgs e)
-        {
-            try
-            {
-                // Wait briefly for file write to complete
-                Thread.Sleep(100);
-                string[] lines = File.ReadAllLines(e.FullPath);
-                if (_window is MainWindow mainWindow)
-                {
-                    mainWindow.DispatcherQueue.TryEnqueue(async () =>
+                    if (_window is not MainWindow mainWindow || Volatile.Read(ref _appCleanupStarted) != 0)
                     {
-                        try
-                        {
-                            // Bring window to foreground
-                            mainWindow.RestoreAndActivate();
+                        completion.TrySetResult(false);
+                        return;
+                    }
 
-                            foreach (var line in lines)
+                    mainWindow.RestoreAndActivate();
+                    await mainWindow.WaitForStartupAsync();
+                    if (!_windows.Contains(mainWindow))
+                    {
+                        completion.TrySetResult(false);
+                        return;
+                    }
+
+                    foreach (string argument in arguments)
+                    {
+                        if (argument == "ACTIVATE") continue;
+                        string path = argument.Trim().Trim('"', '\'');
+                        if (!string.IsNullOrWhiteSpace(path) && (File.Exists(path) || Directory.Exists(path)))
+                        {
+                            try
                             {
-                                if (line == "ACTIVATE") continue;
-                                string path = line.Trim().Trim('"', '\'');
-                                if (!string.IsNullOrWhiteSpace(path) && (File.Exists(path) || Directory.Exists(path)))
-                                {
-                                    await mainWindow.OpenShellPathAsync(path);
-                                }
+                                await mainWindow.OpenShellPathAsync(path);
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Failed to open shell path '{path}': {ex.Message}");
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Failed to handle IPC file open: {ex.Message}");
-                        }
-                    });
+                    }
+
+                    completion.TrySetResult(true);
                 }
-                try { File.Delete(e.FullPath); } catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to handle shell activation: {ex.Message}");
+                    completion.TrySetResult(false);
+                }
+            }) == true;
+            if (!queued)
+            {
+                completion.TrySetResult(false);
             }
-            catch { }
+
+            return completion.Task;
         }
 
         private void ApplyLanguageSettings()
