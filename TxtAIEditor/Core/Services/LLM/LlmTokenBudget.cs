@@ -9,8 +9,26 @@ namespace TxtAIEditor.Core.Services.LLM
         private const int MinimumMaxOutputTokens = 1;
         private const int MinimumSafetyReserveTokens = 1024;
         private const double SafetyReserveRatio = 0.02;
+
+        /// <summary>
+        /// The character based estimator runs below the real tokenizer for mixed Korean and
+        /// code transcripts (measured around 15 percent low), so any comparison against a
+        /// hard token limit pads the estimate with this factor.
+        /// </summary>
+        internal const double EstimationSafetyMultiplier = 1.25;
+
         private const int MessageOverheadTokens = 16;
         private const int DefaultImageTokens = 1024;
+
+        internal static int ApplyEstimationSafetyMargin(int estimatedTokens)
+        {
+            if (estimatedTokens <= 0)
+            {
+                return estimatedTokens;
+            }
+
+            return (int)Math.Ceiling(estimatedTokens * EstimationSafetyMultiplier);
+        }
 
         public static int GetSafeMaxOutputTokens(
             int contextLimit,
@@ -30,7 +48,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 return outputLimit;
             }
 
-            int inputTokens = EstimateRequestTokens(systemPrompt, userContent, attachments, tools);
+            int inputTokens = ApplyEstimationSafetyMargin(
+                EstimateRequestTokens(systemPrompt, userContent, attachments, tools));
             int reserveTokens = Math.Max(
                 MinimumSafetyReserveTokens,
                 (int)Math.Ceiling(contextLimit * SafetyReserveRatio));

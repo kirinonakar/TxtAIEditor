@@ -88,8 +88,9 @@ namespace TxtAIEditor.Controls
 
             // Some model-limit callbacks invoke this controller directly. Keep the focus
             // guard here as well so no full workspace/history calculation can slip through
-            // while the user is typing.
-            if (_agentPane.IsPromptInputFocused)
+            // while the user is typing. Forced updates during a run are exempt so the token
+            // count keeps refreshing while the model streams thinking tokens.
+            if (_agentPane.IsPromptInputFocused && !(force && _isRunningProvider()))
             {
                 UpdatePromptTokenEstimate();
                 return;

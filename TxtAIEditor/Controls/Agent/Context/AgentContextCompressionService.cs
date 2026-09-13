@@ -70,7 +70,11 @@ namespace TxtAIEditor.Controls
                 tools,
                 attachments);
 
-            if (requestTokens <= Math.Floor(inputBudget * CompressionThresholdRatio))
+            // The provider counts the requested completion budget against the context
+            // window, and the character based estimate runs below the real tokenizer, so
+            // compare a padded estimate against the padded input budget.
+            int budgetedRequestTokens = LlmTokenBudget.ApplyEstimationSafetyMargin(requestTokens);
+            if (budgetedRequestTokens <= Math.Floor(inputBudget * CompressionThresholdRatio))
             {
                 return AgentContextCompressionResult.Unchanged(modelTranscript);
             }
@@ -115,8 +119,9 @@ namespace TxtAIEditor.Controls
         /// <summary>
         /// Estimates the tokens of the request that is actually sent to the model: the system
         /// prompt plus the user content built from the given transcript, workspace context,
-        /// selection, attachments, and native tool catalog. The compression threshold and the
-        /// AgentPanel token display both use this measure.
+        /// selection, attachments, and native tool catalog. The AgentPanel token display uses
+        /// this raw measure; budget checks pad it with the estimation safety margin before
+        /// comparing it against hard limits.
         /// </summary>
         public static int EstimateModelRequestTokens(
             EditorSettings settings,
@@ -155,19 +160,23 @@ namespace TxtAIEditor.Controls
 
         private static int ResolveOutputLimit(EditorSettings settings, int contextLimit)
         {
+            int contextRatioLimit = (int)Math.Floor(contextLimit * DefaultOutputReserveRatio);
             var limits = ModelsDevCatalog.GetBestCachedLimits(
                 settings.LlmProvider ?? string.Empty,
                 settings.LlmModel ?? string.Empty);
+
+            // The provider counts the requested completion budget (max_tokens) against the
+            // context window, so the input budget must reserve the output headroom that the
+            // request path can actually request. A fixed small reserve under-counts models
+            // whose output limit is large (for example 384000 on a 1M context model) and let
+            // input grow until the provider rejected the request with a context length error.
             if (limits.output > 0 && limits.output < contextLimit)
             {
-                return Math.Min(
-                    Math.Min(limits.output, MaximumOutputReserveTokens),
-                    (int)Math.Floor(contextLimit * DefaultOutputReserveRatio));
+                return Math.Max(1, Math.Min(limits.output, contextRatioLimit));
             }
 
-            return Math.Min(
-                (int)Math.Floor(contextLimit * DefaultOutputReserveRatio),
-                MaximumOutputReserveTokens);
+            // Output limit unknown: keep a modest reserve that also covers provider fallbacks.
+            return Math.Max(1, Math.Min(contextRatioLimit, MaximumOutputReserveTokens));
         }
 
         private static int FindPrefixLengthByTokenRatio(string text, double ratio)

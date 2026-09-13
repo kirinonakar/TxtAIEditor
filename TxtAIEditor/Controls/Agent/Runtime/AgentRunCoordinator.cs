@@ -134,7 +134,15 @@ namespace TxtAIEditor.Controls
 
         public double GetCurrentRunTranscriptTokens()
         {
-            return GetActiveRunContext()?.CurrentRunTranscriptTokens ?? _currentRunTranscriptTokens;
+            AgentRunContext? context = GetActiveRunContext();
+            if (context == null)
+            {
+                return _currentRunTranscriptTokens;
+            }
+
+            // The panel token display must keep growing while the model is thinking,
+            // so include the reasoning tokens that are still streaming.
+            return context.CurrentRunTranscriptTokens + context.InFlightReasoningTokens;
         }
 
         public void RestoreCurrentRunTranscriptTokens(double currentRunTranscriptTokens)
@@ -153,7 +161,8 @@ namespace TxtAIEditor.Controls
                 return 0;
             }
 
-            double addedTokens = context.CurrentRunTranscriptTokens - context.ActualRequestTokensBase;
+            double addedTokens = context.CurrentRunTranscriptTokens - context.ActualRequestTokensBase +
+                context.InFlightReasoningTokens;
             return addedTokens > 0 ? context.ActualRequestTokens + addedTokens : context.ActualRequestTokens;
         }
 

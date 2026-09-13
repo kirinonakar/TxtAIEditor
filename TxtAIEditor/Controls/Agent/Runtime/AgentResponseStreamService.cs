@@ -10,6 +10,10 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentResponseStreamService
     {
+        // Cadence for refreshing the panel context token count while reasoning tokens
+        // are still streaming.
+        private const long InFlightContextStatsIntervalMs = 500;
+
         private readonly ILLMService _llmService;
         private readonly AgentPane _agentPane;
         private readonly AgentUiDispatcher _uiDispatcher;
@@ -74,6 +78,27 @@ namespace TxtAIEditor.Controls
             int rawProcessedLength = 0;
 
             var stepReasoningBuilder = new StringBuilder();
+            long lastInFlightStatsUpdateTicks = 0;
+
+            void UpdateInFlightReasoningTokens()
+            {
+                // Keep the in-flight reasoning estimate in the run context so the panel
+                // token count keeps growing while the model is thinking.
+                runContext.InFlightReasoningTokens = AgentTokenEstimator.Estimate(stepReasoningBuilder.ToString());
+            }
+
+            async Task RefreshContextStatsAsync()
+            {
+                long nowTicks = Environment.TickCount64;
+                if (nowTicks - lastInFlightStatsUpdateTicks < InFlightContextStatsIntervalMs)
+                {
+                    return;
+                }
+
+                lastInFlightStatsUpdateTicks = nowTicks;
+                await _uiDispatcher.RunAsync(() => _updateContextStatsImmediate(true));
+            }
+
             Func<string, Task>? onReasoning = null;
             if (runContext.LlmSettings.LlmAgentVerbose)
             {
@@ -82,7 +107,9 @@ namespace TxtAIEditor.Controls
                     cancellationToken.ThrowIfCancellationRequested();
                     stepReasoningBuilder.Append(reasoningChunk);
                     runContext.StreamingReasoningText = stepReasoningBuilder.ToString();
+                    UpdateInFlightReasoningTokens();
                     await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, reasoningChunk);
+                    await RefreshContextStatsAsync();
                 };
             }
             else
@@ -92,7 +119,8 @@ namespace TxtAIEditor.Controls
                     cancellationToken.ThrowIfCancellationRequested();
                     stepReasoningBuilder.Append(reasoningChunk);
                     runContext.StreamingReasoningText = stepReasoningBuilder.ToString();
-                    int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(stepReasoningBuilder.ToString()));
+                    UpdateInFlightReasoningTokens();
+                    int tokenCount = (int)Math.Round(runContext.InFlightReasoningTokens);
                     string label = string.Format(
                         _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
                         _getString("AgentActivityThinking", "생각중"),
@@ -102,7 +130,7 @@ namespace TxtAIEditor.Controls
                         runContext,
                         () => _agentPane.UpdateThinkingActivity(label),
                         session => _openSessionController.UpdateThinkingInSession(session, label));
-                    await Task.CompletedTask;
+                    await RefreshContextStatsAsync();
                 };
             }
 
@@ -478,6 +506,7 @@ namespace TxtAIEditor.Controls
             }
             finally
             {
+                runContext.InFlightReasoningTokens = 0;
                 if (visionFallbackPending)
                 {
                     runContext.VisionFallbackPending = false;

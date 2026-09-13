@@ -64,6 +64,10 @@ namespace TxtAIEditor.Controls
         public string ApiType { get; set; } = string.Empty;
         public string StreamingResponseText { get; set; } = string.Empty;
         public string StreamingReasoningText { get; set; } = string.Empty;
+        // Estimated tokens of the reasoning text that is still streaming and is not yet
+        // committed to CurrentRunTranscriptTokens. Display-only overlay so the panel
+        // token count keeps updating while the model is thinking.
+        public double InFlightReasoningTokens { get; set; }
         public bool IsPlanningMode { get; set; }
         public bool HasEnabledSkills { get; set; }
         public bool HasEnabledMcp { get; set; }
