@@ -642,7 +642,6 @@ function insertTextAtCaret(text, options = {}) {
             }
             beginEditTransaction();
             try {
-                post({ type: 'lineChanged', lineNumber: targetLine, text: firstLine });
                 for (let i = 1; i < parts.length; i++) {
                     const nextText = i === parts.length - 1 ? parts[i] + after : parts[i];
                     const nextLineNumber = targetLine + i;
@@ -650,8 +649,10 @@ function insertTextAtCaret(text, options = {}) {
                     if (state.showDirtyLines) {
                         state.dirtyLines.set(nextLineNumber, 'add');
                     }
-                    post({ type: 'insertLine', lineNumber: nextLineNumber, text: nextText });
                 }
+                // Keep large pastes atomic instead of flooding the host with one edit per line.
+                post({ type: 'rangeEdit', startLine: targetLine, startColumn: caret + 1,
+                    endLine: targetLine, endColumn: caret + 1, text: normalized });
                 post({ type: 'contentChanged' });
             } finally {
                 endEditTransaction();
@@ -704,7 +705,6 @@ function insertTextAtCaret(text, options = {}) {
         }
         beginEditTransaction();
         try {
-            post({ type: 'lineChanged', lineNumber, text: firstLine });
             for (let i = 1; i < parts.length; i++) {
                 const nextText = i === parts.length - 1 ? parts[i] + after : parts[i];
                 const nextLineNumber = lineNumber + i;
@@ -712,9 +712,11 @@ function insertTextAtCaret(text, options = {}) {
                 if (state.showDirtyLines) {
                     state.dirtyLines.set(nextLineNumber, 'add');
                 }
-                post({ type: 'insertLine', lineNumber: nextLineNumber, text: nextText });
             }
 
+            // Use the same bulk edit protocol as multi-line selection replacement.
+            post({ type: 'rangeEdit', startLine: lineNumber, startColumn: caret + 1,
+                endLine: lineNumber, endColumn: caret + 1, text: normalized });
             post({ type: 'contentChanged' });
         } finally {
             endEditTransaction();
