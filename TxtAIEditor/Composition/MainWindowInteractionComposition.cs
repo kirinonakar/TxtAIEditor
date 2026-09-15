@@ -219,6 +219,7 @@ namespace TxtAIEditor.Composition
                 callbacks.Find,
                 callbacks.TryCopyActiveSelection,
                 callbacks.TryPasteIntoEmptyEditor,
+                () => ui.PreviewGrid.AgentPane.IsPromptInputFocused,
                 callbacks.Print,
                 callbacks.ToggleTopMost,
                 callbacks.ToggleTheme,

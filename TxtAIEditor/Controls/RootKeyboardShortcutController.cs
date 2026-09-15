@@ -20,6 +20,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _find;
         private readonly Func<bool> _tryCopyActiveSelection;
         private readonly Func<bool> _tryPasteIntoEmptyEditor;
+        private readonly Func<bool> _isAgentPromptInputFocused;
         private readonly Action _print;
         private readonly Action _toggleTopMost;
         private readonly Action _toggleTheme;
@@ -45,6 +46,7 @@ namespace TxtAIEditor.Controls
             Action find,
             Func<bool> tryCopyActiveSelection,
             Func<bool> tryPasteIntoEmptyEditor,
+            Func<bool> isAgentPromptInputFocused,
             Action print,
             Action toggleTopMost,
             Action toggleTheme,
@@ -69,6 +71,7 @@ namespace TxtAIEditor.Controls
             _find = find;
             _tryCopyActiveSelection = tryCopyActiveSelection;
             _tryPasteIntoEmptyEditor = tryPasteIntoEmptyEditor;
+            _isAgentPromptInputFocused = isAgentPromptInputFocused;
             _print = print;
             _toggleTopMost = toggleTopMost;
             _toggleTheme = toggleTheme;
@@ -125,11 +128,17 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (e.Key == Windows.System.VirtualKey.C && _tryCopyActiveSelection())
+            // When the agent prompt input has focus, Ctrl+C/X/V must act on the prompt text.
+            // Skip the editor routing so the focused prompt TextBox keeps its clipboard behavior.
+            bool isAgentPromptInputFocused = _isAgentPromptInputFocused();
+
+            if (!isAgentPromptInputFocused &&
+                e.Key == Windows.System.VirtualKey.C && _tryCopyActiveSelection())
             {
                 e.Handled = true;
             }
-            else if (e.Key == Windows.System.VirtualKey.V && _tryPasteIntoEmptyEditor())
+            else if (!isAgentPromptInputFocused &&
+                e.Key == Windows.System.VirtualKey.V && _tryPasteIntoEmptyEditor())
             {
                 e.Handled = true;
             }
