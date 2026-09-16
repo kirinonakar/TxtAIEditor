@@ -608,6 +608,7 @@ namespace TxtAIEditor.Controls
             bool hideUnwantedFolders = _hideUnwantedFolders;
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
             _remoteFilterMatchCount = 0;
+            _isRemoteFilterSearching = true;
 
             _viewModel.ExplorerItems.Clear();
             SetExplorerStatusText(_localizationService.GetString(
@@ -663,6 +664,8 @@ namespace TxtAIEditor.Controls
                 if (ReferenceEquals(_remoteFilterCancellation, cancellation))
                 {
                     _remoteFilterCancellation = null;
+                    _isRemoteFilterSearching = false;
+                    SetExplorerStatusText(FormatExplorerFilterResult(_remoteFilterMatchCount));
                 }
 
                 cancellation.Dispose();
@@ -1737,11 +1740,13 @@ namespace TxtAIEditor.Controls
         private bool _hideUnwantedFolders = true;
         private bool _isClearingExplorerFilter;
         private int _remoteFilterMatchCount;
+        private bool _isRemoteFilterSearching;
 
         private void CancelRemoteFilterSearch()
         {
             System.Threading.CancellationTokenSource? pendingSearch = _remoteFilterCancellation;
             _remoteFilterCancellation = null;
+            _isRemoteFilterSearching = false;
             pendingSearch?.Cancel();
         }
 
@@ -1890,7 +1895,17 @@ namespace TxtAIEditor.Controls
             string key = "ExplorerFilterResultFormat";
             string fallback = "{0:N0}개 결과";
             string format = _localizationService.GetString(key, fallback);
-            return string.Format(format, matchCount);
+            string result = string.Format(format, matchCount);
+            if (!_isRemoteFilterSearching)
+            {
+                return result;
+            }
+
+            // 원격 재귀 검색이 아직 진행 중이면 결과 뒤에 진행 표시를 붙인다.
+            string searchingFormat = _localizationService.GetString(
+                "ExplorerFilterResultSearchingFormat",
+                "{0} (검색중...)");
+            return string.Format(searchingFormat, result);
         }
 
         private System.Collections.Generic.IEnumerable<ExplorerItem> GetVisibleExplorerItems()

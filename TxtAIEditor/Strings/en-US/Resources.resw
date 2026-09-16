@@ -3045,6 +3045,9 @@ Plan: {0}</value>
   <data name="ExplorerFilterResultFormat" xml:space="preserve">
     <value>{0:N0} results</value>
   </data>
+  <data name="ExplorerFilterResultSearchingFormat" xml:space="preserve">
+    <value>{0} (searching...)</value>
+  </data>
   <data name="ExplorerArchiveStatusFormat" xml:space="preserve">
     <value>{0}!/{1}&#10;{2}</value>
   </data>
