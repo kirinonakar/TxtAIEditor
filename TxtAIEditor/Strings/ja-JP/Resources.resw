@@ -3688,6 +3688,7 @@
   <data name="RemoteDownloadingFile" xml:space="preserve"><value>ファイルを開いています...</value></data>
   <data name="RemoteFileOpenedFormat" xml:space="preserve"><value>{0} の一時ローカル コピーを開きました。</value></data>
   <data name="RemoteLoadingDirectory" xml:space="preserve"><value>フォルダーを読み込んでいます...</value></data>
+  <data name="RemoteSearchingFiles" xml:space="preserve"><value>ファイルを検索しています...</value></data>
   <data name="RemoteItemCountFormat" xml:space="preserve"><value>{0:N0} 項目</value></data>
   <data name="RemoteOperationFailedFormat" xml:space="preserve"><value>操作に失敗しました: {0}</value></data>
   <data name="RemoteServerRequiredFields" xml:space="preserve"><value>サーバー名、アドレス、ID、パスワードを入力してください。</value></data>

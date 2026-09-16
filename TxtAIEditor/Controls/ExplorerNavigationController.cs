@@ -37,6 +37,7 @@ namespace TxtAIEditor.Controls
         private readonly ExplorerGitStatusService _gitStatusService;
         private readonly ExplorerBreadcrumbBuilder _breadcrumbBuilder;
         private System.Threading.CancellationTokenSource? _remoteCancellation;
+        private System.Threading.CancellationTokenSource? _remoteFilterCancellation;
         private System.Threading.CancellationTokenSource? _flatDirectoryLoadCancellation;
         private string _currentArchiveRemotePath = string.Empty;
         private readonly HashSet<string> _loadingRemoteArchivePaths =
@@ -492,6 +493,7 @@ namespace TxtAIEditor.Controls
 
         private async Task LoadRemoteDirectoryAsync(bool clearFilter = true)
         {
+            CancelRemoteFilterSearch();
             if (!IsViewingRemote || _remoteWorkspaceService.ActiveConnection == null)
             {
                 return;
@@ -585,22 +587,114 @@ namespace TxtAIEditor.Controls
 
         private async Task ApplyRemoteFilterAsync(string query)
         {
-            await LoadRemoteDirectoryAsync(clearFilter: false);
-            if (string.IsNullOrWhiteSpace(query))
+            if (!IsViewingRemote || _remoteWorkspaceService.ActiveConnection == null)
             {
                 return;
             }
 
-            var matched = _viewModel.ExplorerItems
-                .Where(item => ExplorerSearchService.MatchesPattern(item.Name, query))
-                .ToList();
-            _viewModel.ExplorerItems.Clear();
-            foreach (ExplorerItem item in matched)
+            CancelRemoteFilterSearch();
+
+            if (string.IsNullOrWhiteSpace(query))
             {
-                _viewModel.ExplorerItems.Add(item);
+                await LoadRemoteDirectoryAsync(clearFilter: false);
+                return;
             }
 
-            SetExplorerStatusText(FormatExplorerFilterResult(matched.Count));
+            RemoteConnectionSettings connection = _remoteWorkspaceService.ActiveConnection;
+            string rootPath = _remoteWorkspaceService.ActiveDirectoryPath;
+            var cancellation = new System.Threading.CancellationTokenSource();
+            _remoteFilterCancellation = cancellation;
+            System.Threading.CancellationToken cancellationToken = cancellation.Token;
+            bool hideUnwantedFolders = _hideUnwantedFolders;
+            bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+            _remoteFilterMatchCount = 0;
+
+            _viewModel.ExplorerItems.Clear();
+            SetExplorerStatusText(_localizationService.GetString(
+                "RemoteSearchingFiles",
+                "파일을 검색하는 중..."));
+
+            try
+            {
+                await _remoteWorkspaceService.SearchDirectoryRecursiveAsync(
+                    rootPath,
+                    entry => !(hideUnwantedFolders &&
+                        entry.IsDirectory &&
+                        ExplorerSearchService.IsHiddenFolderName(entry.Name)),
+                    entry => ExplorerSearchService.MatchesPattern(entry.Name, query),
+                    (entry, relativeDirectory) =>
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            return;
+                        }
+
+                        ExplorerItem item = CreateRemoteExplorerItem(
+                            connection,
+                            entry,
+                            relativeDirectory,
+                            isDark);
+                        _leftSidebar.DispatcherQueue.TryEnqueue(() =>
+                        {
+                            if (cancellationToken.IsCancellationRequested ||
+                                !string.Equals(query, _lastFilterQuery, StringComparison.Ordinal))
+                            {
+                                return;
+                            }
+
+                            _viewModel.ExplorerItems.Add(item);
+                            _remoteFilterMatchCount++;
+                            SetExplorerStatusText(FormatExplorerFilterResult(_remoteFilterMatchCount));
+                        });
+                    },
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                SetExplorerStatusText(string.Format(
+                    _localizationService.GetString("RemoteOperationFailedFormat", "작업 실패: {0}"),
+                    ex.Message));
+            }
+            finally
+            {
+                if (ReferenceEquals(_remoteFilterCancellation, cancellation))
+                {
+                    _remoteFilterCancellation = null;
+                }
+
+                cancellation.Dispose();
+            }
+        }
+
+        private ExplorerItem CreateRemoteExplorerItem(
+            RemoteConnectionSettings connection,
+            RemoteDirectoryEntry entry,
+            string subPath,
+            bool isDark)
+        {
+            string virtualPath = RemotePath.Create(
+                connection.Profile.Id,
+                entry.FullPath,
+                entry.IsDirectory,
+                connection.Profile.Name);
+            return new ExplorerItem
+            {
+                Name = entry.Name,
+                Path = virtualPath,
+                DisplayPath = _remoteWorkspaceService.GetDisplayPath(virtualPath),
+                SubPath = subPath,
+                IsFolder = entry.IsDirectory,
+                ModifiedTime = entry.ModifiedTime?.LocalDateTime ?? DateTime.MinValue,
+                IsRemote = true,
+                RemoteServerId = connection.Profile.Id,
+                RemotePath = entry.FullPath,
+                IsArchive = !entry.IsDirectory &&
+                    ArchiveExplorerService.IsSupportedArchivePath(entry.Name),
+                IsDark = isDark
+            };
         }
 
         public void RefreshCurrentFolder()
@@ -1642,9 +1736,18 @@ namespace TxtAIEditor.Controls
         private string _lastFilterQuery = string.Empty;
         private bool _hideUnwantedFolders = true;
         private bool _isClearingExplorerFilter;
+        private int _remoteFilterMatchCount;
+
+        private void CancelRemoteFilterSearch()
+        {
+            System.Threading.CancellationTokenSource? pendingSearch = _remoteFilterCancellation;
+            _remoteFilterCancellation = null;
+            pendingSearch?.Cancel();
+        }
 
         private void ClearExplorerFilterState()
         {
+            CancelRemoteFilterSearch();
             _isClearingExplorerFilter = true;
             try
             {

@@ -3730,6 +3730,7 @@
   <data name="RemoteDownloadingFile" xml:space="preserve"><value>파일을 여는 중...</value></data>
   <data name="RemoteFileOpenedFormat" xml:space="preserve"><value>{0}의 임시 로컬 복사본을 열었습니다.</value></data>
   <data name="RemoteLoadingDirectory" xml:space="preserve"><value>폴더를 불러오는 중...</value></data>
+  <data name="RemoteSearchingFiles" xml:space="preserve"><value>파일을 검색하는 중...</value></data>
   <data name="RemoteItemCountFormat" xml:space="preserve"><value>{0:N0}개 항목</value></data>
   <data name="RemoteOperationFailedFormat" xml:space="preserve"><value>작업 실패: {0}</value></data>
   <data name="RemoteServerRequiredFields" xml:space="preserve"><value>서버 이름, 주소, ID, 비밀번호를 모두 입력하세요.</value></data>

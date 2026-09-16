@@ -3688,6 +3688,7 @@
   <data name="RemoteDownloadingFile" xml:space="preserve"><value>正在開啟檔案...</value></data>
   <data name="RemoteFileOpenedFormat" xml:space="preserve"><value>已開啟 {0} 的暫存本機複本。</value></data>
   <data name="RemoteLoadingDirectory" xml:space="preserve"><value>正在載入資料夾...</value></data>
+  <data name="RemoteSearchingFiles" xml:space="preserve"><value>正在搜尋檔案...</value></data>
   <data name="RemoteItemCountFormat" xml:space="preserve"><value>{0:N0} 個項目</value></data>
   <data name="RemoteOperationFailedFormat" xml:space="preserve"><value>作業失敗: {0}</value></data>
   <data name="RemoteServerRequiredFields" xml:space="preserve"><value>請輸入伺服器名稱、位址、ID 與密碼。</value></data>

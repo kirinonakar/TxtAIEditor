@@ -3688,6 +3688,7 @@
   <data name="RemoteDownloadingFile" xml:space="preserve"><value>正在打开文件...</value></data>
   <data name="RemoteFileOpenedFormat" xml:space="preserve"><value>已打开 {0} 的临时本地副本。</value></data>
   <data name="RemoteLoadingDirectory" xml:space="preserve"><value>正在加载文件夹...</value></data>
+  <data name="RemoteSearchingFiles" xml:space="preserve"><value>正在搜索文件...</value></data>
   <data name="RemoteItemCountFormat" xml:space="preserve"><value>{0:N0} 个项目</value></data>
   <data name="RemoteOperationFailedFormat" xml:space="preserve"><value>操作失败: {0}</value></data>
   <data name="RemoteServerRequiredFields" xml:space="preserve"><value>请输入服务器名称、地址、ID 和密码。</value></data>

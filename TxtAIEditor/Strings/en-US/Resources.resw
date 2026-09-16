@@ -3730,6 +3730,7 @@ Plan: {0}</value>
   <data name="RemoteDownloadingFile" xml:space="preserve"><value>Opening file...</value></data>
   <data name="RemoteFileOpenedFormat" xml:space="preserve"><value>Opened a temporary local copy of {0}.</value></data>
   <data name="RemoteLoadingDirectory" xml:space="preserve"><value>Loading folder...</value></data>
+  <data name="RemoteSearchingFiles" xml:space="preserve"><value>Searching files...</value></data>
   <data name="RemoteItemCountFormat" xml:space="preserve"><value>{0:N0} items</value></data>
   <data name="RemoteOperationFailedFormat" xml:space="preserve"><value>Operation failed: {0}</value></data>
   <data name="RemoteServerRequiredFields" xml:space="preserve"><value>Enter the server name, address, ID, and password.</value></data>

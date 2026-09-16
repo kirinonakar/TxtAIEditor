@@ -104,6 +104,123 @@ namespace TxtAIEditor.Core.Services
                 cancellationToken);
         }
 
+        private const int RemoteSearchMaxConcurrency = 8;
+
+        /// <summary>
+        /// Recursively walks the remote directory tree starting at
+        /// <paramref name="rootPath"/> with bounded parallelism and reports each
+        /// match through <paramref name="onMatch"/> (entry, relative directory)
+        /// as soon as it is discovered.
+        /// </summary>
+        public async Task SearchDirectoryRecursiveAsync(
+            string rootPath,
+            Func<RemoteDirectoryEntry, bool> shouldDescend,
+            Func<RemoteDirectoryEntry, bool> isMatch,
+            Action<RemoteDirectoryEntry, string> onMatch,
+            CancellationToken cancellationToken)
+        {
+            if (!IsActive || string.IsNullOrWhiteSpace(rootPath))
+            {
+                return;
+            }
+
+            string normalizedRoot = NormalizeSearchPath(rootPath);
+            using var throttler = new SemaphoreSlim(
+                RemoteSearchMaxConcurrency,
+                RemoteSearchMaxConcurrency);
+            var visitedDirectories = new ConcurrentDictionary<string, byte>(
+                StringComparer.OrdinalIgnoreCase);
+            visitedDirectories.TryAdd(normalizedRoot, 0);
+
+            async Task ScanAsync(string directory, bool isRoot)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                IReadOnlyList<RemoteDirectoryEntry> entries;
+                await throttler.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    entries = await ListDirectoryAsync(directory, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // Unreadable subfolder: skip it and keep searching the rest.
+                    if (isRoot)
+                    {
+                        throw;
+                    }
+
+                    return;
+                }
+                finally
+                {
+                    throttler.Release();
+                }
+
+                var childDirectories = new List<Task>();
+                foreach (RemoteDirectoryEntry entry in entries)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    bool isDirectory = entry.IsDirectory;
+                    if (isDirectory && !shouldDescend(entry))
+                    {
+                        continue;
+                    }
+
+                    if (isMatch(entry))
+                    {
+                        onMatch(entry, GetRelativeDirectory(normalizedRoot, entry.FullPath));
+                    }
+
+                    if (isDirectory &&
+                        visitedDirectories.TryAdd(NormalizeSearchPath(entry.FullPath), 0))
+                    {
+                        childDirectories.Add(ScanAsync(entry.FullPath, isRoot: false));
+                    }
+                }
+
+                if (childDirectories.Count > 0)
+                {
+                    await Task.WhenAll(childDirectories).ConfigureAwait(false);
+                }
+            }
+
+            await ScanAsync(normalizedRoot, isRoot: true).ConfigureAwait(false);
+        }
+
+        private static string NormalizeSearchPath(string path)
+        {
+            string normalized = (path ?? string.Empty).Replace('\\', '/').Trim();
+            if (normalized.Length == 0)
+            {
+                return "/";
+            }
+
+            normalized = "/" + normalized.Trim('/');
+            return normalized.Length > 1 ? normalized.TrimEnd('/') : normalized;
+        }
+
+        private static string GetRelativeDirectory(string normalizedRoot, string fullPath)
+        {
+            string normalizedFullPath = NormalizeSearchPath(fullPath);
+            int separator = normalizedFullPath.LastIndexOf('/');
+            string directory = separator <= 0 ? string.Empty : normalizedFullPath[..separator];
+            string rootPrefix = normalizedRoot.Length > 1 ? normalizedRoot : string.Empty;
+            if (rootPrefix.Length > 0 &&
+                directory.StartsWith(rootPrefix, StringComparison.Ordinal))
+            {
+                directory = directory[rootPrefix.Length..];
+            }
+
+            return directory.Trim('/');
+        }
+
         public void NavigateTo(string remotePath)
         {
             ActiveDirectoryPath = remotePath;
