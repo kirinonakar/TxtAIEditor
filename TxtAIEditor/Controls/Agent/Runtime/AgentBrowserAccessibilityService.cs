@@ -46,9 +46,15 @@ namespace TxtAIEditor.Controls
 
         public bool TryResolveRef(string elementRef, IntPtr window, out AccessibilityTarget target)
         {
-            if (TryGetCurrentTarget(elementRef, window, out target))
+            if (TryGetCurrentTarget(elementRef, window, requireCurrentGeneration: true, out target))
             {
                 return true;
+            }
+
+            if (!_elementsByRef.TryGetValue(elementRef, out AccessibilityRef? entry) ||
+                entry.Window != window)
+            {
+                return false;
             }
 
             try
@@ -57,10 +63,10 @@ namespace TxtAIEditor.Controls
             }
             catch
             {
-                return false;
+                // Fall back to the last known bounds so the ref does not expire.
             }
 
-            return TryGetCurrentTarget(elementRef, window, out target);
+            return TryGetCurrentTarget(elementRef, window, requireCurrentGeneration: false, out target);
         }
 
         public bool TryCollapseTextSelection(IntPtr window)
@@ -209,11 +215,15 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private bool TryGetCurrentTarget(string elementRef, IntPtr window, out AccessibilityTarget target)
+        private bool TryGetCurrentTarget(
+            string elementRef,
+            IntPtr window,
+            bool requireCurrentGeneration,
+            out AccessibilityTarget target)
         {
             target = default;
             if (!_elementsByRef.TryGetValue(elementRef, out AccessibilityRef? entry) ||
-                entry.Generation != _generation ||
+                (requireCurrentGeneration && entry.Generation != _generation) ||
                 entry.Window != window ||
                 entry.Bounds.Right - entry.Bounds.Left <= 1 ||
                 entry.Bounds.Bottom - entry.Bounds.Top <= 1)
@@ -319,7 +329,6 @@ namespace TxtAIEditor.Controls
                     }
                 }
 
-                PruneOldRefs();
                 var builder = new StringBuilder();
                 builder.AppendLine("MCP tool result: Browser Use accessibility snapshot.");
                 builder.AppendLine("Use ref with mcp_browser_use_click or mcp_browser_use_drag. Refs remain stable while the matching accessible element remains available.");
@@ -361,20 +370,6 @@ namespace TxtAIEditor.Controls
             string elementRef = "e" + _nextRef++.ToString(CultureInfo.InvariantCulture);
             _refByIdentity[identity] = elementRef;
             return elementRef;
-        }
-
-        private void PruneOldRefs()
-        {
-            int oldestGeneration = _generation - 3;
-            foreach (string elementRef in _elementsByRef
-                .Where(pair => pair.Value.Generation < oldestGeneration)
-                .Select(pair => pair.Key)
-                .ToArray())
-            {
-                AccessibilityRef entry = _elementsByRef[elementRef];
-                _elementsByRef.Remove(elementRef);
-                _refByIdentity.Remove(entry.Identity);
-            }
         }
 
         private static bool TryReadElement(IUIAutomationElement element, out ElementData data)

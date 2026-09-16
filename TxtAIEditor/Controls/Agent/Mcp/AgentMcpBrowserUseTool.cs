@@ -892,7 +892,8 @@ namespace TxtAIEditor.Controls
 
         private string BuildPostActionContext(IntPtr browserWindow)
         {
-            _lastCapture = null;
+            // Keep the last explicit capture so screenshot coordinates stay valid after interactions.
+            // It is replaced by a new capture and cleared only when the controlled window changes.
             string context;
             try
             {
