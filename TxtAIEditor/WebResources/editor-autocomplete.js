@@ -16,7 +16,6 @@ import {
     focusLine,
     getCaretOffset,
     lineTextFromElement,
-    makeEditablePlainText,
     setCaret,
     updateSingleLine
 } from './editor-commands.js';
@@ -476,11 +475,8 @@ function replaceWordWithAutocompleteText(element, wordStart, replaceEnd, insertT
         const nextCaret = wordStart + normalized.length;
         const lineNumber = Number(element.dataset.line || 1);
         updateSingleLine(element, nextText, nextCaret);
-        // Syntax-highlight spans can retain the native selection at the end of the
-        // typed prefix (for example after "ao") even though the model caret moved.
-        // Keep the actively edited row as one text node so the completion end and
-        // the next IME composition share the same unambiguous DOM position.
-        makeEditablePlainText(element, nextCaret);
+        // Preserve the highlighted DOM from updateSingleLine. Restore the native
+        // caret through its text nodes without flattening the syntax spans.
         restoreAutocompleteCaretAfterCommit(lineNumber, nextCaret, nextText);
         return;
     }
