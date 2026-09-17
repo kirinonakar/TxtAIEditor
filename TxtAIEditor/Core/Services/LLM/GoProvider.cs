@@ -101,6 +101,8 @@ namespace TxtAIEditor.Core.Services.LLM
 
         private static readonly HashSet<string> _anthropicModels = new(StringComparer.OrdinalIgnoreCase)
         {
+            // union-alpha is only served through the Anthropic Messages API (/messages).
+            "union-alpha",
             "claude-fable-5",
             "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "claude-opus-4-5", "claude-opus-4-1",
             "claude-sonnet-4-6", "claude-sonnet-4-5", "claude-sonnet-4",
@@ -118,7 +120,7 @@ namespace TxtAIEditor.Core.Services.LLM
             if (IsAnthropicModel(model))
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.AnthropicMessages);
-                return await GenerateAnthropicCompletionAsync(endpoint, apiKey, model, systemPrompt, userContent, cancellationToken, attachments, onUsage);
+                return await GenerateAnthropicCompletionAsync(endpoint, apiKey, model, systemPrompt, userContent, cancellationToken, attachments, tools, onUsage, onNativeToolCall);
             }
 
             var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
@@ -299,7 +301,7 @@ namespace TxtAIEditor.Core.Services.LLM
             if (IsAnthropicModel(model))
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.AnthropicMessages);
-                await GenerateAnthropicCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, onUsage);
+                await GenerateAnthropicCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, onNativeToolCall);
                 return;
             }
 
@@ -560,7 +562,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        private async Task<string> GenerateAnthropicCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments, Func<LlmTokenUsage, Task>? onUsage)
+        private async Task<string> GenerateAnthropicCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null)
         {
             string requestUrl = endpoint.TrimEnd('/') + "/messages";
 
@@ -588,6 +590,11 @@ namespace TxtAIEditor.Core.Services.LLM
                 ["messages"] = messagesList
             };
 
+            if (tools != null && tools.Count > 0)
+            {
+                payloadDict["tools"] = BuildAnthropicTools(tools);
+            }
+
             if (!string.IsNullOrEmpty(systemPrompt))
             {
                 payloadDict["system"] = BuildAnthropicCachedSystemPrompt(systemPrompt);
@@ -613,7 +620,9 @@ namespace TxtAIEditor.Core.Services.LLM
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                // OpenCode Go/Zen's Anthropic-compatible /messages endpoint authenticates
+                // via x-api-key only; a Bearer token yields 401 "Missing API key."
+                request.Headers.Add("x-api-key", apiKey);
                 request.Headers.Add("anthropic-version", "2023-06-01");
                 ConfigureOpenCodeRequest(request);
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -630,18 +639,60 @@ namespace TxtAIEditor.Core.Services.LLM
                     {
                         var root = doc.RootElement;
                         await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
-                        if (root.TryGetProperty("content", out var content) && content.GetArrayLength() > 0)
+                        if (root.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array && content.GetArrayLength() > 0)
                         {
+                            string? textResult = null;
+                            string? toolCallText = null;
                             foreach (var block in content.EnumerateArray())
                             {
-                                if (block.TryGetProperty("type", out var blockType) &&
-                                    blockType.ValueKind == JsonValueKind.String &&
-                                    blockType.GetString() == "text" &&
-                                    block.TryGetProperty("text", out var text))
+                                if (!block.TryGetProperty("type", out var blockType) ||
+                                    blockType.ValueKind != JsonValueKind.String)
+                                {
+                                    continue;
+                                }
+
+                                string? blockTypeName = blockType.GetString();
+                                if (blockTypeName == "text" && block.TryGetProperty("text", out var text))
                                 {
                                     string? textValue = text.GetString();
-                                    if (!string.IsNullOrEmpty(textValue)) return textValue;
+                                    if (textResult == null && !string.IsNullOrEmpty(textValue))
+                                    {
+                                        textResult = textValue;
+                                    }
                                 }
+                                else if (blockTypeName == "tool_use" && toolCallText == null)
+                                {
+                                    string toolName = block.TryGetProperty("name", out var nameProperty) &&
+                                                      nameProperty.ValueKind == JsonValueKind.String
+                                        ? nameProperty.GetString() ?? string.Empty
+                                        : string.Empty;
+                                    string inputJson = block.TryGetProperty("input", out var inputProperty) &&
+                                                       inputProperty.ValueKind != JsonValueKind.Null &&
+                                                       inputProperty.ValueKind != JsonValueKind.Undefined
+                                        ? inputProperty.GetRawText()
+                                        : "{}";
+                                    toolCallText = LlmToolCallTextFormatter.FormatFunctionToolCall(toolName, inputJson);
+                                }
+                            }
+
+                            if (!string.IsNullOrEmpty(toolCallText))
+                            {
+                                if (onNativeToolCall != null)
+                                {
+                                    await onNativeToolCall();
+                                }
+
+                                if (string.IsNullOrWhiteSpace(textResult))
+                                {
+                                    return toolCallText;
+                                }
+
+                                return textResult.TrimEnd() + Environment.NewLine + Environment.NewLine + toolCallText;
+                            }
+
+                            if (!string.IsNullOrEmpty(textResult))
+                            {
+                                return textResult;
                             }
 
                             var firstBlock = content[0];
@@ -657,7 +708,7 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        private async Task GenerateAnthropicCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments, Func<string, Task>? onReasoning, Func<LlmTokenUsage, Task>? onUsage)
+        private async Task GenerateAnthropicCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken, IReadOnlyList<LlmMessageAttachment>? attachments, Func<string, Task>? onReasoning, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null)
         {
             string requestUrl = endpoint.TrimEnd('/') + "/messages";
 
@@ -681,6 +732,11 @@ namespace TxtAIEditor.Core.Services.LLM
                 ["stream"] = true
             };
 
+            if (tools != null && tools.Count > 0)
+            {
+                payloadDict["tools"] = BuildAnthropicTools(tools);
+            }
+
             if (!string.IsNullOrEmpty(systemPrompt))
             {
                 payloadDict["system"] = BuildAnthropicCachedSystemPrompt(systemPrompt);
@@ -706,7 +762,9 @@ namespace TxtAIEditor.Core.Services.LLM
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                // OpenCode Go/Zen's Anthropic-compatible /messages endpoint authenticates
+                // via x-api-key only; a Bearer token yields 401 "Missing API key."
+                request.Headers.Add("x-api-key", apiKey);
                 request.Headers.Add("anthropic-version", "2023-06-01");
                 ConfigureOpenCodeRequest(request);
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -723,6 +781,9 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var reader = new System.IO.StreamReader(stream))
                     {
                         string? currentEvent = null;
+                        bool hasNativeToolCall = false;
+                        int? toolUseBlockIndex = null;
+                        bool toolArgumentsEmitted = false;
                         while (true)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -747,14 +808,60 @@ namespace TxtAIEditor.Core.Services.LLM
                                         var root = doc.RootElement;
                                         await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
 
-                                        if (currentEvent == "content_block_delta" &&
+                                        string? eventName = currentEvent;
+                                        if (eventName == null &&
+                                            root.TryGetProperty("type", out var eventTypeProperty) &&
+                                            eventTypeProperty.ValueKind == JsonValueKind.String)
+                                        {
+                                            eventName = eventTypeProperty.GetString();
+                                        }
+
+                                        if (eventName == "content_block_start" &&
+                                            root.TryGetProperty("content_block", out var contentBlock) &&
+                                            contentBlock.TryGetProperty("type", out var contentBlockType) &&
+                                            contentBlockType.ValueKind == JsonValueKind.String &&
+                                            contentBlockType.GetString() == "tool_use")
+                                        {
+                                            toolUseBlockIndex = root.TryGetProperty("index", out var startIndex) && startIndex.ValueKind == JsonValueKind.Number
+                                                ? startIndex.GetInt32()
+                                                : (int?)null;
+                                            toolArgumentsEmitted = false;
+
+                                            string toolName = contentBlock.TryGetProperty("name", out var toolNameProperty) &&
+                                                              toolNameProperty.ValueKind == JsonValueKind.String
+                                                ? toolNameProperty.GetString() ?? string.Empty
+                                                : string.Empty;
+
+                                            if (!hasNativeToolCall)
+                                            {
+                                                hasNativeToolCall = true;
+                                                if (onNativeToolCall != null)
+                                                {
+                                                    await onNativeToolCall();
+                                                }
+                                            }
+
+                                            await onChunk($"<tool_call>{{\"name\":{JsonSerializer.Serialize(toolName)},\"arguments\":");
+                                        }
+                                        else if (eventName == "content_block_delta" &&
                                             root.TryGetProperty("delta", out var delta))
                                         {
                                             string? deltaType = delta.TryGetProperty("type", out var dt) && dt.ValueKind == JsonValueKind.String
                                                 ? dt.GetString()
                                                 : null;
 
-                                            if (deltaType == "text_delta" &&
+                                            if (deltaType == "input_json_delta" &&
+                                                delta.TryGetProperty("partial_json", out var partialJson))
+                                            {
+                                                string? argsChunk = partialJson.GetString();
+                                                if (!string.IsNullOrEmpty(argsChunk))
+                                                {
+                                                    cancellationToken.ThrowIfCancellationRequested();
+                                                    toolArgumentsEmitted = true;
+                                                    await onChunk(argsChunk);
+                                                }
+                                            }
+                                            else if (deltaType == "text_delta" &&
                                                 delta.TryGetProperty("text", out var text))
                                             {
                                                 string? chunk = text.GetString();
@@ -785,6 +892,20 @@ namespace TxtAIEditor.Core.Services.LLM
                                                     await onChunk(chunk);
                                                 }
                                             }
+                                        }
+                                        else if (eventName == "content_block_stop" &&
+                                            toolUseBlockIndex.HasValue &&
+                                            (!root.TryGetProperty("index", out var stopIndex) ||
+                                             (stopIndex.ValueKind == JsonValueKind.Number &&
+                                              stopIndex.GetInt32() == toolUseBlockIndex.Value)))
+                                        {
+                                            if (!toolArgumentsEmitted)
+                                            {
+                                                await onChunk("{}");
+                                            }
+
+                                            await onChunk("}</tool_call>");
+                                            toolUseBlockIndex = null;
                                         }
                                     }
                                 }
@@ -822,6 +943,22 @@ namespace TxtAIEditor.Core.Services.LLM
                    _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase)
                 ? "none"
                 : null;
+        }
+
+        private static List<object> BuildAnthropicTools(IReadOnlyList<LlmTool> tools)
+        {
+            var toolsList = new List<object>();
+            foreach (var tool in tools)
+            {
+                toolsList.Add(new
+                {
+                    name = tool.Name,
+                    description = tool.Description,
+                    input_schema = tool.Parameters
+                });
+            }
+
+            return toolsList;
         }
 
         private static object BuildAnthropicCachedSystemPrompt(string systemPrompt)
