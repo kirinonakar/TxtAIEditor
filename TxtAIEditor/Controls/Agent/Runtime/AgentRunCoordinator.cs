@@ -134,6 +134,15 @@ namespace TxtAIEditor.Controls
 
         public double GetCurrentRunTranscriptTokens()
         {
+            // The panel shows the current session, so the current session's running context is
+            // authoritative. AsyncLocal run contexts are not visible from dispatcher-queued
+            // callbacks, which previously froze the panel token count until the session was
+            // re-opened (or another session was restored).
+            if (_runningSessions.TryGetValue(_currentSessionIdProvider(), out AgentRunContext? sessionContext))
+            {
+                return sessionContext.CurrentRunTranscriptTokens + sessionContext.InFlightReasoningTokens;
+            }
+
             AgentRunContext? context = GetActiveRunContext();
             if (context == null)
             {
@@ -1159,7 +1168,9 @@ namespace TxtAIEditor.Controls
                 }
                 else
                 {
-                    _updateContextStatsImmediate(false);
+                    // Force the refresh so the finished run's final token/context count is shown
+                    // even while the prompt input still owns focus.
+                    _updateContextStatsImmediate(true);
                     if (completedInBackground)
                     {
                         _openSessionController.MarkBackgroundSessionCompleted(runContext.SessionId);

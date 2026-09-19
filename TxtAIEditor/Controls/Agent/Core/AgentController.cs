@@ -340,10 +340,11 @@ namespace TxtAIEditor.Controls
 
         private void UpdateContextStatsImmediate(bool force = false)
         {
-            // The focus guard keeps heavy context calculations out of keystroke handling,
-            // but forced updates during a run (streaming thinking, step commits) must pass
-            // through even when the prompt input still has focus from starting the run.
-            if (_agentPane.IsPromptInputFocused && !(force && IsCurrentSessionRunning()))
+            // The focus guard keeps heavy context calculations out of keystroke handling.
+            // Forced updates (streaming thinking, step commits, run completion, session
+            // restore) must pass through even when the prompt input still has focus,
+            // otherwise the token/context display stays stale until focus leaves the prompt.
+            if (!force && _agentPane.IsPromptInputFocused)
             {
                 return;
             }

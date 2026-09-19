@@ -14,6 +14,7 @@ namespace TxtAIEditor.Controls
         private const int OutputFlushIntervalMs = 100;
         private const int ThinkingLabelMinIntervalMs = 200;
         private const int OutputRenderResumeIntervalMs = 150;
+        private const int AutoCopySelectionDelayMs = 200;
 
         private readonly RichTextBlock _outputText;
         private readonly ScrollViewer _outputScrollViewer;
@@ -44,6 +45,7 @@ namespace TxtAIEditor.Controls
         private bool _outputRenderDeferred;
         private bool _outputSelectionLostByRender;
         private DispatcherTimer? _outputRenderResumeTimer;
+        private DispatcherTimer? _autoCopySelectionTimer;
 
         public AgentPaneOutputController(
             RichTextBlock outputText,
@@ -60,8 +62,10 @@ namespace TxtAIEditor.Controls
                 {
                     _hasExplicitOutputSelection = true;
                     _explicitSelectedOutputText = text;
+                    QueueSelectionAutoCopy();
                 });
 
+            _outputText.SelectionChanged += OnOutputSelectionChanged;
             _outputText.SizeChanged += (_, _) => QueueOutputScrollToEnd();
             _outputText.AddHandler(
                 UIElement.PointerPressedEvent,
@@ -300,6 +304,53 @@ namespace TxtAIEditor.Controls
         {
             _hasExplicitOutputSelection = true;
             QueueCaptureExplicitOutputSelection();
+        }
+
+        private void OnOutputSelectionChanged(object sender, RoutedEventArgs e)
+        {
+            string selectedText = _outputText.SelectedText;
+            if (string.IsNullOrEmpty(selectedText))
+            {
+                return;
+            }
+
+            _hasExplicitOutputSelection = true;
+            _explicitSelectedOutputText = selectedText;
+            QueueSelectionAutoCopy();
+        }
+
+        private void QueueSelectionAutoCopy()
+        {
+            _autoCopySelectionTimer ??= CreateSelectionAutoCopyTimer();
+            _autoCopySelectionTimer.Stop();
+            _autoCopySelectionTimer.Start();
+        }
+
+        private DispatcherTimer CreateSelectionAutoCopyTimer()
+        {
+            var timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(AutoCopySelectionDelayMs)
+            };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                CopySelectedOutputToClipboard();
+            };
+            return timer;
+        }
+
+        private void CopySelectedOutputToClipboard()
+        {
+            if (string.IsNullOrEmpty(_explicitSelectedOutputText))
+            {
+                return;
+            }
+
+            var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dataPackage.SetText(_explicitSelectedOutputText);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+            Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
         }
 
         public void CopySelectionOrAll(KeyRoutedEventArgs e)
@@ -720,6 +771,7 @@ namespace TxtAIEditor.Controls
             _outputSelectionLostByRender = false;
             _outputPointerDownPoint = null;
             _outputPointerSelectionGesture = false;
+            _autoCopySelectionTimer?.Stop();
         }
 
         private static bool IsControlDown()
