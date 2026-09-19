@@ -5,6 +5,7 @@ import {
 import {
     clearMeasuredLineHeights,
     clearPreservedScrollTop,
+    configureEditorCoreRuntime,
     lineAt,
     lineTop,
     maximumVirtualScrollTop,
@@ -16,6 +17,7 @@ import {
     setupVirtualHeight,
     state,
     usesCompressedScroll,
+    usesFullDocumentRender,
     visualScrollDeltaToScrollTopDelta,
     viewportController
 } from './editor-core.js';
@@ -92,7 +94,7 @@ export function bindEditorEvents({
     let lastProgrammaticScrollTime = 0;
     let scrollWorkFrame = 0;
 
-    scrollContainer.addEventListener('wheel', event => {
+    function handleCompressedWheel(event) {
         if (!usesCompressedScroll() || event.ctrlKey || event.deltaY === 0) return;
 
         event.preventDefault();
@@ -108,7 +110,24 @@ export function bindEditorEvents({
         if (event.deltaX !== 0) {
             scrollContainer.scrollLeft = Math.max(0, scrollContainer.scrollLeft + event.deltaX);
         }
-    }, { passive: false });
+    }
+
+    let interceptsWheel = false;
+    function syncWheelScrollMode() {
+        const shouldIntercept = usesCompressedScroll();
+        if (interceptsWheel === shouldIntercept) return;
+        interceptsWheel = shouldIntercept;
+        // A non-passive wheel listener blocks native scrolling even if its
+        // callback immediately returns. Only huge, compressed documents need
+        // custom wheel distances; ordinary files must stay compositor-scrollable.
+        if (shouldIntercept) {
+            scrollContainer.addEventListener('wheel', handleCompressedWheel, { passive: false });
+        } else {
+            scrollContainer.removeEventListener('wheel', handleCompressedWheel);
+        }
+    }
+    configureEditorCoreRuntime({ syncWheelScrollMode });
+    syncWheelScrollMode();
 
     scrollContainer.addEventListener('scroll', () => {
         const maximumScrollTop = maximumVirtualScrollTop();
@@ -127,8 +146,12 @@ export function bindEditorEvents({
         scrollWorkFrame = requestAnimationFrame(() => {
             scrollWorkFrame = 0;
             syncCsvHeaderScroll();
-            prefetchAround(scrollContainer.scrollTop);
-            queueRender();
+            // All rows of small documents are already loaded and in normal flow.
+            // Scrolling them needs neither a cache scan nor another render frame.
+            if (!usesFullDocumentRender()) {
+                prefetchAround(scrollContainer.scrollTop);
+                queueRender();
+            }
 
             if (lastSetScrollTop !== -1 && Math.abs(scrollContainer.scrollTop - lastSetScrollTop) <= 1) {
                 return;

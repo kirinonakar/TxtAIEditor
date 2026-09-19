@@ -33,7 +33,8 @@ const runtime = {
     hasCustomSelection: () => false,
     isLineInColumnComposition: () => false,
     normalizeSelection: () => null,
-    render: () => { }
+    render: () => { },
+    syncWheelScrollMode: () => { }
 };
 
 function configureEditorCoreRuntime(deps) {
@@ -683,6 +684,7 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
 }
 
 function setupVirtualHeight() {
+    runtime.syncWheelScrollMode();
     const savedScroll = scrollContainer.scrollTop;
 
     // Small documents are rendered in normal flow. Let the browser derive the

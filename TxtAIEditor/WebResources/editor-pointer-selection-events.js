@@ -1530,7 +1530,7 @@ export function bindPointerSelectionEvents({
 
         cancelLivePreviewPointer({ render: false });
         cancelActiveSelectionInteraction({ render: false });
-    }, { capture: true });
+    }, { capture: true, passive: true });
 
     scrollContainer.addEventListener('scroll', () => {
         cancelOpenableHoverValidation();
