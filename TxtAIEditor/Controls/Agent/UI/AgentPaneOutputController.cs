@@ -13,6 +13,7 @@ namespace TxtAIEditor.Controls
         private const int MaxOutputFlushChars = 8_000;
         private const int OutputFlushIntervalMs = 100;
         private const int ThinkingLabelMinIntervalMs = 200;
+        private const int OutputRenderResumeIntervalMs = 150;
 
         private readonly RichTextBlock _outputText;
         private readonly ScrollViewer _outputScrollViewer;
@@ -40,6 +41,9 @@ namespace TxtAIEditor.Controls
         private string _thinkingLineTimestamp = string.Empty;
         private string? _pendingThinkingLabel;
         private DateTimeOffset _lastThinkingLabelRender = DateTimeOffset.MinValue;
+        private bool _outputRenderDeferred;
+        private bool _outputSelectionLostByRender;
+        private DispatcherTimer? _outputRenderResumeTimer;
 
         public AgentPaneOutputController(
             RichTextBlock outputText,
@@ -71,7 +75,7 @@ namespace TxtAIEditor.Controls
                 UIElement.PointerReleasedEvent,
                 new PointerEventHandler(OnOutputPointerReleased),
                 true);
-            _resourceOwner.ActualThemeChanged += (_, _) => _renderer.UpdateRichText(_rawOutputText);
+            _resourceOwner.ActualThemeChanged += (_, _) => RenderFullOutputText();
         }
 
         public string RawOutputText
@@ -108,7 +112,7 @@ namespace TxtAIEditor.Controls
 
                 FlushAllPendingOutputText();
                 _renderer.HideHtmlCodeBlocks = value;
-                _renderer.UpdateRichText(_rawOutputText);
+                RenderFullOutputText();
             }
         }
 
@@ -258,6 +262,9 @@ namespace TxtAIEditor.Controls
             ClearPendingOutputText();
             ClearExplicitOutputSelection();
             _rawOutputText = text ?? string.Empty;
+            _outputRenderDeferred = false;
+            _outputSelectionLostByRender = false;
+            _outputRenderResumeTimer?.Stop();
             _renderer.UpdateRichText(_rawOutputText);
             _outputLength = _rawOutputText.Length;
         }
@@ -344,18 +351,18 @@ namespace TxtAIEditor.Controls
                 _outputLength += text.Length;
                 if (!HideHtmlCodeBlocks)
                 {
-                    _renderer.AppendText(text);
+                    RenderAppendedOutputText(text);
                 }
                 else
                 {
-                    _renderer.UpdateRichText(_rawOutputText);
+                    RenderFullOutputText();
                 }
             }
             else
             {
                 _rawOutputText = _rawOutputText.Insert(_outputLength, text);
                 _outputLength += text.Length;
-                _renderer.UpdateRichText(_rawOutputText);
+                RenderFullOutputText();
             }
         }
 
@@ -369,7 +376,7 @@ namespace TxtAIEditor.Controls
             if (_displayText.IsOutputPlaceholder(_rawOutputText.TrimStart()))
             {
                 _rawOutputText = string.Empty;
-                _renderer.UpdateRichText(_rawOutputText);
+                RenderFullOutputText();
                 _outputLength = 0;
             }
             else
@@ -514,6 +521,11 @@ namespace TxtAIEditor.Controls
 
         private void ChangeOutputViewToEnd()
         {
+            if (IsOutputSelectionInteractionActive())
+            {
+                return;
+            }
+
             _outputScrollViewer.ChangeView(null, double.MaxValue, null, true);
         }
 
@@ -618,10 +630,14 @@ namespace TxtAIEditor.Controls
 
             _rawOutputText = _rawOutputText.Substring(0, _thinkingLineStart) + text;
             _outputLength = _thinkingLineStart + text.Length;
-            if (!_renderer.TrySetLastLine(text))
+            if (!TryDeferOutputRenderForSelection())
             {
-                _renderer.UpdateRichText(_rawOutputText);
+                if (!_renderer.TrySetLastLine(text))
+                {
+                    _renderer.UpdateRichText(_rawOutputText);
+                }
             }
+
             ScrollOutputToEnd();
         }
 
@@ -629,6 +645,7 @@ namespace TxtAIEditor.Controls
         {
             _outputPointerDownPoint = e.GetCurrentPoint(_outputText).Position;
             _outputPointerSelectionGesture = false;
+            _outputSelectionLostByRender = false;
         }
 
         private void OnOutputPointerMoved(object sender, PointerRoutedEventArgs e)
@@ -641,6 +658,9 @@ namespace TxtAIEditor.Controls
             var currentPoint = e.GetCurrentPoint(_outputText);
             if (!currentPoint.Properties.IsLeftButtonPressed)
             {
+                // A release outside the output can leave the pressed state behind.
+                _outputPointerDownPoint = null;
+                ResumeDeferredOutputRender(false);
                 return;
             }
 
@@ -678,15 +698,26 @@ namespace TxtAIEditor.Controls
 
         private void CaptureExplicitOutputSelection()
         {
-            _explicitSelectedOutputText = _hasExplicitOutputSelection
-                ? _outputText.SelectedText
-                : string.Empty;
+            if (!_hasExplicitOutputSelection)
+            {
+                return;
+            }
+
+            string selectedText = _outputText.SelectedText;
+            if (string.IsNullOrEmpty(selectedText) && _outputSelectionLostByRender)
+            {
+                // Keep the last capture when a streaming re-render consumed the live selection.
+                return;
+            }
+
+            _explicitSelectedOutputText = selectedText;
         }
 
         private void ClearExplicitOutputSelection()
         {
             _explicitSelectedOutputText = string.Empty;
             _hasExplicitOutputSelection = false;
+            _outputSelectionLostByRender = false;
             _outputPointerDownPoint = null;
             _outputPointerSelectionGesture = false;
         }
@@ -811,6 +842,111 @@ namespace TxtAIEditor.Controls
             }
 
             return count;
+        }
+
+        private bool TryDeferOutputRenderForSelection()
+        {
+            if (!IsOutputSelectionInteractionActive())
+            {
+                return false;
+            }
+
+            _outputRenderDeferred = true;
+            EnsureOutputRenderResumeTimer();
+            return true;
+        }
+
+        private void RenderAppendedOutputText(string text)
+        {
+            if (TryDeferOutputRenderForSelection())
+            {
+                return;
+            }
+
+            _renderer.AppendText(text);
+        }
+
+        private void RenderFullOutputText()
+        {
+            if (TryDeferOutputRenderForSelection())
+            {
+                return;
+            }
+
+            _renderer.UpdateRichText(_rawOutputText);
+        }
+
+        private bool IsOutputSelectionInteractionActive()
+        {
+            if (_outputPointerDownPoint != null || _outputPointerSelectionGesture)
+            {
+                return true;
+            }
+
+            return HasLiveOutputSelection();
+        }
+
+        private bool HasLiveOutputSelection()
+        {
+            // Rebuilding the blocks resets the selection anchor, so only defer while the
+            // output still owns keyboard focus and the user's selection is alive.
+            XamlRoot? xamlRoot = _outputText.XamlRoot;
+            if (xamlRoot == null ||
+                !ReferenceEquals(FocusManager.GetFocusedElement(xamlRoot), _outputText))
+            {
+                return false;
+            }
+
+            return !string.IsNullOrEmpty(_outputText.SelectedText);
+        }
+
+        private void EnsureOutputRenderResumeTimer()
+        {
+            if (_outputRenderResumeTimer == null)
+            {
+                var timer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(OutputRenderResumeIntervalMs)
+                };
+                timer.Tick += (_, _) => ResumeDeferredOutputRender(false);
+                _outputRenderResumeTimer = timer;
+            }
+
+            if (!_outputRenderResumeTimer.IsEnabled)
+            {
+                _outputRenderResumeTimer.Start();
+            }
+        }
+
+        private void ResumeDeferredOutputRender(bool force)
+        {
+            if (!_outputRenderDeferred)
+            {
+                _outputRenderResumeTimer?.Stop();
+                return;
+            }
+
+            if (_outputPointerDownPoint != null || _outputPointerSelectionGesture)
+            {
+                return;
+            }
+
+            if (!force && HasLiveOutputSelection())
+            {
+                return;
+            }
+
+            _outputSelectionLostByRender = HasLiveOutputSelection();
+            _outputRenderDeferred = false;
+            _outputRenderResumeTimer?.Stop();
+            _renderer.UpdateRichText(_rawOutputText);
+            _outputLength = _rawOutputText.Length;
+            ScrollOutputToEnd();
+        }
+
+        public void ResumeDeferredOutputRendering()
+        {
+            ResumeDeferredOutputRender(true);
         }
     }
 }

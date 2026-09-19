@@ -595,6 +595,7 @@ namespace TxtAIEditor.Controls
                 IsMutedNonVerboseActivityLine(line)
                 ? GetBrushResource("AgentActivityForeground", Microsoft.UI.Colors.Gray)
                 : null;
+            double activityFontSize = activityForeground != null ? GetMutedActivityFontSize() : 0;
 
             if (string.IsNullOrEmpty(line))
             {
@@ -673,13 +674,18 @@ namespace TxtAIEditor.Controls
                     Text = listBullet,
                     FontWeight = Microsoft.UI.Text.FontWeights.Bold
                 };
+                if (activityFontSize > 0)
+                {
+                    bulletRun.FontSize = activityFontSize;
+                }
+
                 paragraph.Inlines.Add(bulletRun);
 
-                ParseLineToInlines(itemText, paragraph.Inlines, activityForeground);
+                ParseLineToInlines(itemText, paragraph.Inlines, activityForeground, activityFontSize);
             }
             else
             {
-                ParseLineToInlines(line, paragraph.Inlines, activityForeground);
+                ParseLineToInlines(line, paragraph.Inlines, activityForeground, activityFontSize);
             }
 
             return paragraph;
@@ -828,7 +834,7 @@ namespace TxtAIEditor.Controls
             UpdateRichText(raw);
         }
 
-        private void ParseLineToInlines(string line, InlineCollection inlines, Brush? defaultForeground = null)
+        private void ParseLineToInlines(string line, InlineCollection inlines, Brush? defaultForeground = null, double defaultFontSize = 0)
         {
             if (string.IsNullOrEmpty(line))
             {
@@ -838,12 +844,18 @@ namespace TxtAIEditor.Controls
                     emptyRun.Foreground = defaultForeground;
                 }
 
+                if (defaultFontSize > 0)
+                {
+                    emptyRun.FontSize = defaultFontSize;
+                }
+
                 inlines.Add(emptyRun);
                 return;
             }
 
             bool isHeading = TryParseMarkdownHeading(line, out int headingLevel, out string displayLine);
             double headingFontSize = GetMarkdownHeadingFontSize(headingLevel);
+            double runFontSize = defaultFontSize > 0 ? defaultFontSize : headingFontSize;
             line = displayLine;
 
             if (string.IsNullOrEmpty(line))
@@ -852,7 +864,7 @@ namespace TxtAIEditor.Controls
                     string.Empty,
                     inlines,
                     isHeading,
-                    headingFontSize,
+                    runFontSize,
                     foreground: defaultForeground);
                 return;
             }
@@ -874,7 +886,7 @@ namespace TxtAIEditor.Controls
 
                 if (isCode)
                 {
-                    AddTextRunsWithEmojiSupport($"[{text}]", inlines, isHeading || isBold, headingFontSize,
+                    AddTextRunsWithEmojiSupport($"[{text}]", inlines, isHeading || isBold, runFontSize,
                         new FontFamily("Consolas, Cascadia Mono, Segoe UI Emoji, Segoe UI Symbol"),
                         GetBrushResource("AgentCodeForeground", Microsoft.UI.Colors.DarkRed));
                 }
@@ -884,7 +896,7 @@ namespace TxtAIEditor.Controls
                         text,
                         inlines,
                         isHeading || isBold,
-                        headingFontSize,
+                        runFontSize,
                         foreground: defaultForeground);
                 }
             }
@@ -1151,6 +1163,18 @@ namespace TxtAIEditor.Controls
             {
                 _explicitSelectionChanged(tb.SelectedText);
             }
+        }
+
+        private double GetMutedActivityFontSize()
+        {
+            // Gray (muted) activity lines render one point smaller than the normal output text.
+            double baseFontSize = _outputText.FontSize;
+            if (double.IsNaN(baseFontSize) || baseFontSize <= 0)
+            {
+                return 0;
+            }
+
+            return Math.Max(1, baseFontSize - 1);
         }
     }
 }

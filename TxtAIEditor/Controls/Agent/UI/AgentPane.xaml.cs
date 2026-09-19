@@ -328,6 +328,7 @@ namespace TxtAIEditor.Controls
             if (!isBusy)
             {
                 _outputController.FlushPendingOutput();
+                _outputController.ResumeDeferredOutputRendering();
             }
 
             _isBusy = isBusy;
