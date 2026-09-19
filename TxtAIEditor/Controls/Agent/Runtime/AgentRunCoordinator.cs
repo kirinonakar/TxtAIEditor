@@ -334,6 +334,9 @@ namespace TxtAIEditor.Controls
                 const int maxMakePlanRetries = 2;
                 int skillMentionRetryCount = 0;
                 const int maxSkillMentionRetries = 2;
+                bool hasEmittedToolCall = false;
+                int pendingToolIntentRetryCount = 0;
+                const int maxPendingToolIntentRetries = 2;
                 bool planningMode = requestedPlanningMode;
                 int maxToolSteps = runContext.LlmSettings.LlmMaxToolCalls >= 50 ? runContext.LlmSettings.LlmMaxToolCalls : 100;
                 var toolInvocationCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -768,6 +771,35 @@ namespace TxtAIEditor.Controls
                             continue;
                         }
 
+                        if (!planningMode &&
+                            hasEmittedToolCall &&
+                            pendingToolIntentRetryCount < maxPendingToolIntentRetries &&
+                            _responseInspector.LooksLikeUnfinishedToolIntent(response))
+                        {
+                            pendingToolIntentRetryCount++;
+                            string retryNote = _responseInspector.BuildPendingToolIntentRetryNote();
+                            string retryDetail = _runTranscriptService.BuildRetryDetail(
+                                "pending_tool_intent",
+                                responseForTranscript,
+                                retryNote);
+                            retryDetail = retainedThinkingTranscriptPart + retryDetail;
+
+                            await _uiDispatcher.RunAsync(() =>
+                            {
+                                transcript += retryDetail;
+                                modelTranscript += retryDetail;
+                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
+                                _updateContextStatsImmediate(true);
+                            });
+
+                            string retryMessage = _getString(
+                                "AgentPendingToolIntentRetry",
+                                "다음 동작을 설명만 하고 도구 호출을 하지 않았습니다. 도구 호출을 다시 요청합니다.");
+                            await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
+                            await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
+                            continue;
+                        }
+
                         if (!visibleTextFlushed && !string.IsNullOrWhiteSpace(response))
                         {
                             await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, response);
@@ -800,6 +832,7 @@ namespace TxtAIEditor.Controls
 
                     bool stopAfterLoopGuard = false;
                     toolCalls = OrderToolCallsForExecution(toolCalls, runContext.WorkspaceRoot);
+                    hasEmittedToolCall = true;
                     var toolCallResults = new List<(string Name, JsonElement Args, string Result, string ResultForTranscript, bool Skipped, string NormalizedName)>();
                     bool hasWebSearchCallInBatch = false;
 

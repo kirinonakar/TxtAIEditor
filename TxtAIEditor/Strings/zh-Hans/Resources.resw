@@ -2156,6 +2156,9 @@
   <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
     <value>工具调用格式重复出现错误，因此 Agent 执行被停止。请再次运行该任务。</value>
   </data>
+  <data name="AgentPendingToolIntentRetry" xml:space="preserve">
+    <value>模型只描述了下一步操作，但没有发出工具调用。正在重新请求工具调用。</value>
+  </data>
   <data name="AgentSkillNotCalledRetry" xml:space="preserve">
     <value>该模型描述了该技能，但没有调用它。重试工具调用。</value>
   </data>

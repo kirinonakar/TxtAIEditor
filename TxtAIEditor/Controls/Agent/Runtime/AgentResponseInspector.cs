@@ -88,6 +88,72 @@ namespace TxtAIEditor.Controls
             return false;
         }
 
+        public string BuildPendingToolIntentRetryNote()
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("[Agent tool call missing]");
+            builder.AppendLine("The previous assistant response described the next action in prose but emitted no tool call, so nothing was executed and the turn would have ended before the work finished.");
+            builder.AppendLine("If the task is not complete, emit the actual tool call for that action now, using the same tool call format as the previous turns.");
+            builder.AppendLine("If the task is already complete, restate the final answer without announcing further actions.");
+            return builder.ToString().TrimEnd();
+        }
+
+        public bool LooksLikeUnfinishedToolIntent(string response)
+        {
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                return false;
+            }
+
+            string lower = response.ToLowerInvariant();
+
+            string[] intentMarkers =
+            {
+                "클릭하겠",
+                "클릭합니다",
+                "선택하겠",
+                "선택합니다",
+                "입력하겠",
+                "입력합니다",
+                "드래그하겠",
+                "눌러서",
+                "실행하겠",
+                "호출하겠",
+                "적용하겠",
+                "저장하겠",
+                "작성하겠",
+                "i'll click",
+                "i will click",
+                "let me click",
+                "i'll type",
+                "i will type",
+                "let me type",
+                "i'll press",
+                "let me press",
+                "i'll drag",
+                "let me drag",
+                "i'll call",
+                "i will call",
+                "let me call",
+                "i'll run",
+                "let me run",
+                "i'll select",
+                "let me select",
+                "next, i'll",
+                "next, i will",
+            };
+
+            foreach (string marker in intentMarkers)
+            {
+                if (lower.Contains(marker))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool StartsWithFenceLanguage(string fenceInfo, string language)
         {
             if (!fenceInfo.StartsWith(language, StringComparison.OrdinalIgnoreCase))
