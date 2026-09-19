@@ -289,7 +289,14 @@
 
                         <!-- Tab 3: Agent -->
                         <TabViewItem x:Name="AgentTab" Header="Agent" IsClosable="False" Tag="Agent">
-                            <controls:AgentPane x:Name="AgentPaneControl"/>
+                            <!-- Sticky note mode re-hosts the agent pane into the editor
+                                 area. Keep this tab's own content object stable so the
+                                 TabView never has to re-realize its content. -->
+                            <ContentControl x:Name="AgentContentHostControl"
+                                            HorizontalContentAlignment="Stretch"
+                                            VerticalContentAlignment="Stretch">
+                                <controls:AgentPane x:Name="AgentPaneControl"/>
+                            </ContentControl>
                         </TabViewItem>
     
                     </TabView>

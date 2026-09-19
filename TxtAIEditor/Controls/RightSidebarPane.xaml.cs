@@ -50,6 +50,7 @@ namespace TxtAIEditor.Controls
         public TextBox LlmFileContext => LlmFileContextInput;
         public TextBox LlmCustomPrompt => LlmCustomPromptInput;
         public AgentPane AgentPane => AgentPaneControl;
+        public ContentControl AgentContentHost => AgentContentHostControl;
 
         public string SelectedTabKey =>
             RightTabView.SelectedItem is TabViewItem { Tag: string key } ? key : "LivePreview";

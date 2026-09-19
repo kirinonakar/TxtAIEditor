@@ -200,6 +200,9 @@ namespace TxtAIEditor.Controls
             _stickyNoteService.ApplyTopMost(_window, topMost);
 
             _stickyNoteBar.AgentIsChecked = false;
+            // Tear the editor-side host down first: if anything below throws, the agent
+            // pane must not be left hidden behind the collapsed editor host.
+            HideStickyAgentPanelFromEditor();
             _stickyNoteBar.Visibility = Visibility.Collapsed;
             _stickyNoteDragHandle.Visibility = Visibility.Collapsed;
             _titleBarRow.Height = _normalTitleBarHeight;
@@ -346,7 +349,7 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                _rightSidebar.AgentTabItem.Content = null;
+                _rightSidebar.AgentContentHost.Content = null;
 
                 if (!_editorWorkspace.ShowStickyAgentPanel(content))
                 {
@@ -359,7 +362,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to show the sticky agent panel: {ex}");
+                LogStickyAgentPanelFailure($"Failed to show the agent pane in the editor: {ex}");
                 RestoreAgentPaneIntoRightSidebar();
                 _stickyNoteBar.AgentIsChecked = false;
             }
@@ -375,7 +378,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to hide the sticky agent panel: {ex}");
+                LogStickyAgentPanelFailure($"Failed to hide the agent pane from the editor: {ex}");
             }
 
             _isStickyAgentPanelInEditor = false;
@@ -390,7 +393,8 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (ReferenceEquals(_rightSidebar.AgentTabItem.Content, content))
+            ContentControl host = _rightSidebar.AgentContentHost;
+            if (ReferenceEquals(host.Content, content))
             {
                 return;
             }
@@ -398,22 +402,24 @@ namespace TxtAIEditor.Controls
             try
             {
                 _editorWorkspace.ReleaseStickyAgentPanelContent();
-                _rightSidebar.AgentTabItem.Content = null;
-                _rightSidebar.AgentTabItem.Content = content;
+                host.Content = null;
+                host.Content = content;
 
-                if (ReferenceEquals(_rightSidebar.AgentTabItem.Content, content))
+                if (ReferenceEquals(host.Content, content))
                 {
                     return;
                 }
+
+                LogStickyAgentPanelFailure("Agent pane content was not accepted by the right sidebar host.");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to restore the agent pane: {ex.Message}");
+                LogStickyAgentPanelFailure($"Failed to restore the agent pane: {ex.Message}");
             }
 
             // The editor-side host may still be releasing the pane during this pass;
-            // retry once on the next dispatcher pass so the Agent tab cannot stay
-            // empty after leaving sticky note mode.
+            // retry on the next dispatcher passes so the Agent tab cannot stay empty
+            // after leaving sticky note mode.
             if (_stickyAgentPaneRestoreQueued)
             {
                 return;
@@ -427,6 +433,28 @@ namespace TxtAIEditor.Controls
             }))
             {
                 _stickyAgentPaneRestoreQueued = false;
+            }
+        }
+
+        // Diagnostics for the sticky-note agent pane re-hosting. The pane must never
+        // be left outside the right sidebar, so failures are recorded to a log file
+        // that survives the session.
+        private static void LogStickyAgentPanelFailure(string message)
+        {
+            System.Diagnostics.Debug.WriteLine(message);
+            try
+            {
+                string directory = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "TxtAIEditor");
+                System.IO.Directory.CreateDirectory(directory);
+                System.IO.File.AppendAllText(
+                    System.IO.Path.Combine(directory, "sticky-agent-panel.log"),
+                    $"{DateTime.Now:O} {message}{Environment.NewLine}");
+            }
+            catch
+            {
+                // Diagnostics must never surface as user-visible failures.
             }
         }
 
