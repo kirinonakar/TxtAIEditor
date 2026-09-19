@@ -319,14 +319,14 @@
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
             <ToggleButton x:Name="AgentStreamToTabToggleButton"
-                          Width="36"
-                          Height="32"
+                          Width="32"
+                          Height="28"
                           IsChecked="False"
                           VerticalAlignment="Center"
                           ToolTipService.ToolTip="탭에 스트리밍"
                           AutomationProperties.Name="탭에 스트리밍"
                           Style="{StaticResource AgentToggleButtonStyle}">
-                <FontIcon Glyph="&#xE8A7;" FontSize="14" RenderTransformOrigin="0.5,0.5">
+                <FontIcon Glyph="&#xE8A7;" FontSize="12" RenderTransformOrigin="0.5,0.5">
                     <FontIcon.RenderTransform>
                         <ScaleTransform ScaleX="-1"/>
                     </FontIcon.RenderTransform>
@@ -335,13 +335,15 @@
             <Button x:Name="AgentInsertOutputButton"
                     Content="마지막 답변"
                     HorizontalAlignment="Stretch"
-                    Height="32"
+                    Height="28"
+                    FontSize="11"
                     Click="OnInsertOutputClick"
                     ToolTipService.ToolTip="마지막 Agent 답변을 새 탭에 입력"
                     Style="{StaticResource AccentButtonStyle}"/>
             <Button x:Name="AgentInsertNewTabOutputButton"
                     HorizontalAlignment="Stretch"
-                    Height="32"
+                    Height="28"
+                    FontSize="11"
                     Click="OnInsertNewTabOutputClick"
                     Style="{StaticResource AgentButtonStyle}"/>
         </StackPanel>
