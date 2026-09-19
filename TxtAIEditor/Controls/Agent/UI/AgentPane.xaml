@@ -372,7 +372,8 @@
                     <CheckBox x:Name="AgentPlanningModeCheckBox"
                               Content="계획 모드 (Planning mode)"
                               IsChecked="False"
-                              FontSize="12"/>
+                              FontSize="12"
+                              MinHeight="0"/>
                 </StackPanel>
 
                 <Button x:Name="AgentMcpButton"
@@ -623,7 +624,7 @@
                     Padding="10,4,10,4"
                     CornerRadius="4"
                     Visibility="Collapsed">
-                <Grid RowSpacing="6">
+                <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
@@ -671,6 +672,7 @@
                     
                     <StackPanel x:Name="AgentModifiedFilesContent"
                                 Grid.Row="1"
+                                Margin="0,6,0,0"
                                 Spacing="6">
                         <TextBlock x:Name="AgentModifiedFilesDescription"
                                    Text="수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요."

@@ -8,6 +8,8 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentPaneReviewController
     {
+        private const double MinimizedPanelVerticalPadding = 2;
+
         private readonly FrameworkElement _resourceOwner;
         private readonly StackPanel _reviewPanelsHost;
         private readonly Border _diffConfirmPanel;
@@ -19,6 +21,8 @@ namespace TxtAIEditor.Controls
         private readonly StackPanel _modifiedFilesContent;
         private readonly ListView _modifiedFilesList;
         private readonly FontIcon _modifiedFilesToggleIcon;
+        private readonly Thickness _modifiedFilesNormalPadding;
+        private readonly Thickness _modifiedFilesMinimizedPadding;
         private readonly Action<AgentFileEditPreview> _fileDiffRequested;
         private readonly Action<AgentFileEditPreview> _fileRevertRequested;
 
@@ -50,6 +54,12 @@ namespace TxtAIEditor.Controls
             _modifiedFilesContent = modifiedFilesContent;
             _modifiedFilesList = modifiedFilesList;
             _modifiedFilesToggleIcon = modifiedFilesToggleIcon;
+            _modifiedFilesNormalPadding = modifiedFilesPanel.Padding;
+            _modifiedFilesMinimizedPadding = new Thickness(
+                modifiedFilesPanel.Padding.Left,
+                MinimizedPanelVerticalPadding,
+                modifiedFilesPanel.Padding.Right,
+                MinimizedPanelVerticalPadding);
             _fileDiffRequested = fileDiffRequested;
             _fileRevertRequested = fileRevertRequested;
         }
@@ -121,6 +131,9 @@ namespace TxtAIEditor.Controls
             _modifiedFilesContent.Visibility = IsModifiedFilesMinimized
                 ? Visibility.Collapsed
                 : Visibility.Visible;
+            _modifiedFilesPanel.Padding = IsModifiedFilesMinimized
+                ? _modifiedFilesMinimizedPadding
+                : _modifiedFilesNormalPadding;
             _modifiedFilesToggleIcon.Glyph = IsModifiedFilesMinimized
                 ? "\uE70E"
                 : "\uE70D";
