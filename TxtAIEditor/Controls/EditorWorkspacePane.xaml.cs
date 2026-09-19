@@ -103,7 +103,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 ApplyStickyAgentPanelHostOffset();
-                StickyAgentPanelHost.Visibility = Visibility.Visible;
+                StickyAgentPanelSurface.Visibility = Visibility.Visible;
                 return true;
             }
             catch (Exception ex)
@@ -113,19 +113,40 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public void HideStickyAgentPanel()
+        // Releases the hosted pane and returns it so the caller can restore it.
+        // The content is cleared before the host is hidden: a collapsed
+        // ContentControl can keep its presenter child alive, and that stale parent
+        // then blocks re-hosting the pane anywhere else (leaving tabs empty).
+        public UIElement? HideStickyAgentPanel()
         {
+            UIElement? content = StickyAgentPanelHost.Content as UIElement;
+            ReleaseStickyAgentPanelContent();
+
             try
             {
-                StickyAgentPanelHost.Visibility = Visibility.Collapsed;
-                if (StickyAgentPanelHost.Content != null)
-                {
-                    StickyAgentPanelHost.Content = null;
-                }
+                StickyAgentPanelSurface.Visibility = Visibility.Collapsed;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to hide the sticky agent panel: {ex.Message}");
+            }
+
+            return content;
+        }
+
+        public void ReleaseStickyAgentPanelContent()
+        {
+            try
+            {
+                if (StickyAgentPanelHost.Content is UIElement content)
+                {
+                    StickyAgentPanelHost.Content = null;
+                    DetachFromParent(content);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to release the sticky agent panel: {ex.Message}");
             }
         }
 
@@ -155,7 +176,7 @@ namespace TxtAIEditor.Controls
                 top = 0;
             }
 
-            StickyAgentPanelHost.Margin = new Thickness(0, top, 0, 0);
+            StickyAgentPanelSurface.Margin = new Thickness(0, top, 0, 0);
         }
 
         private double MeasureTabStripHeight()

@@ -69,11 +69,18 @@
                     </TabView.TabStripFooter>
                 </TabView>
 
-                <ContentControl x:Name="StickyAgentPanelHost"
-                                Background="{ThemeResource EditorSurfaceBackgroundBrush}"
-                                HorizontalContentAlignment="Stretch"
-                                VerticalContentAlignment="Stretch"
-                                Visibility="Collapsed"/>
+                <!-- An opaque Grid paints the background behind the hosted agent pane.
+                     A ContentControl's default template only hosts content and does not
+                     render its Background, which let the editor bleed through. -->
+                <Grid x:Name="StickyAgentPanelSurface"
+                      Background="{ThemeResource SidebarBackgroundBrush}"
+                      Visibility="Collapsed"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch">
+                    <ContentControl x:Name="StickyAgentPanelHost"
+                                    HorizontalContentAlignment="Stretch"
+                                    VerticalContentAlignment="Stretch"/>
+                </Grid>
 
                 <StackPanel x:Name="PrimaryTabActions"
                             Orientation="Horizontal"

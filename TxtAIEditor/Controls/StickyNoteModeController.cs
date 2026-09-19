@@ -49,8 +49,8 @@ namespace TxtAIEditor.Controls
         private uint _dragPointerId;
         private PointInt32 _dragStartWindowPosition;
         private ScreenPoint _dragStartCursorPosition;
-        private UIElement? _stickyAgentPaneContent;
         private bool _isStickyAgentPanelInEditor;
+        private bool _stickyAgentPaneRestoreQueued;
 
         public StickyNoteModeController(
             Window window,
@@ -159,6 +159,8 @@ namespace TxtAIEditor.Controls
 
             _stickyNoteBar.TopMostIsChecked = _topToolbar.TopMostIsChecked;
             _stickyNoteBar.AgentIsChecked = false;
+            _isStickyAgentPanelInEditor = false;
+            RestoreAgentPaneIntoRightSidebar();
             _normalTitleBar.Visibility = Visibility.Collapsed;
             _titleBarRow.Height = new GridLength(0);
             _stickyNoteBar.Visibility = Visibility.Visible;
@@ -198,7 +200,6 @@ namespace TxtAIEditor.Controls
             _stickyNoteService.ApplyTopMost(_window, topMost);
 
             _stickyNoteBar.AgentIsChecked = false;
-            ApplyEditorAgentPanelVisibility(false);
             _stickyNoteBar.Visibility = Visibility.Collapsed;
             _stickyNoteDragHandle.Visibility = Visibility.Collapsed;
             _titleBarRow.Height = _normalTitleBarHeight;
@@ -214,6 +215,10 @@ namespace TxtAIEditor.Controls
             _leftPanelToggle.IsChecked = _wasLeftSidebarVisible;
             _applyLeftSidebarVisibility(_wasLeftSidebarVisible);
             _applyPreviewVisibility(_wasRightSidebarVisible);
+
+            // Restore the agent pane only after the right sidebar is visible again so
+            // its Agent tab realizes and renders the restored content.
+            HideStickyAgentPanelFromEditor();
 
             if (_hasNormalWindowSize)
             {
@@ -315,67 +320,114 @@ namespace TxtAIEditor.Controls
         // exception escape the click handler (which WinUI turns into a crash).
         private void ApplyEditorAgentPanelVisibility(bool visible)
         {
-            if (_isStickyAgentPanelInEditor == visible)
+            if (visible)
+            {
+                ShowStickyAgentPanelInEditor();
+            }
+            else
+            {
+                HideStickyAgentPanelFromEditor();
+            }
+        }
+
+        private void ShowStickyAgentPanelInEditor()
+        {
+            if (_isStickyAgentPanelInEditor)
             {
                 return;
             }
 
             try
             {
-                if (visible)
+                UIElement? content = _rightSidebar.AgentPane;
+                if (content == null)
                 {
-                    UIElement? content = _rightSidebar.AgentTabItem.Content as UIElement ?? _rightSidebar.AgentPane;
-                    if (content == null)
-                    {
-                        _stickyNoteBar.AgentIsChecked = false;
-                        return;
-                    }
-
-                    _stickyAgentPaneContent = content;
-                    _rightSidebar.AgentTabItem.Content = null;
-
-                    if (!_editorWorkspace.ShowStickyAgentPanel(content))
-                    {
-                        RestoreStickyAgentPane();
-                        _stickyNoteBar.AgentIsChecked = false;
-                        return;
-                    }
-
-                    _isStickyAgentPanelInEditor = true;
+                    _stickyNoteBar.AgentIsChecked = false;
                     return;
                 }
 
-                _editorWorkspace.HideStickyAgentPanel();
-                RestoreStickyAgentPane();
-                _isStickyAgentPanelInEditor = false;
+                _rightSidebar.AgentTabItem.Content = null;
+
+                if (!_editorWorkspace.ShowStickyAgentPanel(content))
+                {
+                    RestoreAgentPaneIntoRightSidebar();
+                    _stickyNoteBar.AgentIsChecked = false;
+                    return;
+                }
+
+                _isStickyAgentPanelInEditor = true;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to toggle the sticky agent panel: {ex}");
-                _editorWorkspace.HideStickyAgentPanel();
-                RestoreStickyAgentPane();
-                _isStickyAgentPanelInEditor = false;
+                System.Diagnostics.Debug.WriteLine($"Failed to show the sticky agent panel: {ex}");
+                RestoreAgentPaneIntoRightSidebar();
                 _stickyNoteBar.AgentIsChecked = false;
             }
         }
 
-        private void RestoreStickyAgentPane()
+        // Tears the editor-side panel down and always leaves the agent pane back in
+        // the right sidebar's Agent tab, which must never be left empty.
+        private void HideStickyAgentPanelFromEditor()
         {
-            if (_stickyAgentPaneContent == null)
+            try
+            {
+                _editorWorkspace.HideStickyAgentPanel();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to hide the sticky agent panel: {ex}");
+            }
+
+            _isStickyAgentPanelInEditor = false;
+            RestoreAgentPaneIntoRightSidebar();
+        }
+
+        private void RestoreAgentPaneIntoRightSidebar()
+        {
+            UIElement? content = _rightSidebar.AgentPane;
+            if (content == null)
+            {
+                return;
+            }
+
+            if (ReferenceEquals(_rightSidebar.AgentTabItem.Content, content))
             {
                 return;
             }
 
             try
             {
-                _rightSidebar.AgentTabItem.Content = _stickyAgentPaneContent;
+                _editorWorkspace.ReleaseStickyAgentPanelContent();
+                _rightSidebar.AgentTabItem.Content = null;
+                _rightSidebar.AgentTabItem.Content = content;
+
+                if (ReferenceEquals(_rightSidebar.AgentTabItem.Content, content))
+                {
+                    return;
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to restore the agent pane: {ex.Message}");
             }
 
-            _stickyAgentPaneContent = null;
+            // The editor-side host may still be releasing the pane during this pass;
+            // retry once on the next dispatcher pass so the Agent tab cannot stay
+            // empty after leaving sticky note mode.
+            if (_stickyAgentPaneRestoreQueued)
+            {
+                return;
+            }
+
+            _stickyAgentPaneRestoreQueued = true;
+            if (!_editorWorkspace.DispatcherQueue.TryEnqueue(() =>
+            {
+                _stickyAgentPaneRestoreQueued = false;
+                RestoreAgentPaneIntoRightSidebar();
+            }))
+            {
+                _stickyAgentPaneRestoreQueued = false;
+            }
         }
 
         private void ApplyTopMost(bool topMost)

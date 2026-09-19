@@ -73,6 +73,7 @@ namespace TxtAIEditor.Composition
         {
             var workspace = workspaceModule.Composition;
             var explorerNavigation = workspace.ExplorerNavigation;
+            var shellPanelLayout = dependencies.Shell.Composition.ShellPanelLayout;
             return Compose(
                 window,
                 ui,
@@ -92,7 +93,7 @@ namespace TxtAIEditor.Composition
                     workspace.GitStatusRefresh.QueueRefresh,
                     agentFacade.GetAgentSessionEdits,
                     agentFacade.LoadFileIntoTabForAgentAsync,
-                    folderPath => explorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel: true),
+                    folderPath => explorerNavigation.NavigateToFolderAsync(folderPath, revealInLeftPanel: shellPanelLayout.IsLeftSidebarVisible),
                     documentFacade.OpenGeneratedTab,
                     documentFacade.SaveTabAsync,
                     shellFacade.InitializePickerWindow,
