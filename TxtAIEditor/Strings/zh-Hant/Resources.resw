@@ -1889,6 +1889,9 @@
   <data name="ExitStickyNoteText" xml:space="preserve">
     <value>退出</value>
   </data>
+  <data name="StickyNoteAgentTooltip" xml:space="preserve">
+    <value>顯示代理面板</value>
+  </data>
   <data name="StickyNoteDragTooltip" xml:space="preserve">
     <value>移動視窗</value>
   </data>

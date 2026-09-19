@@ -1889,6 +1889,9 @@
   <data name="ExitStickyNoteText" xml:space="preserve">
     <value>나가기</value>
   </data>
+  <data name="StickyNoteAgentTooltip" xml:space="preserve">
+    <value>에이전트 패널 표시</value>
+  </data>
   <data name="StickyNoteDragTooltip" xml:space="preserve">
     <value>창 이동</value>
   </data>

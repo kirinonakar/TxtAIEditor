@@ -10,6 +10,34 @@
         <StackPanel Orientation="Horizontal"
                     VerticalAlignment="Center"
                     Spacing="4">
+            <ToggleButton x:Name="AgentToggleButton"
+                          Click="OnAgentToggleClick"
+                          ToolTipService.ToolTip="에이전트 패널 표시"
+                          Width="28"
+                          Height="28"
+                          Padding="0"
+                          CornerRadius="4"
+                          BorderThickness="0"
+                          Foreground="{ThemeResource TitleBarForegroundBrush}"
+                          FontSize="12"
+                          FontWeight="SemiBold">
+                <ToggleButton.Resources>
+                    <SolidColorBrush x:Key="ToggleButtonBackground" Color="Transparent"/>
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#15808080"/>
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#30808080"/>
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#0078D4"/>
+                    <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="White"/>
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#106EBE"/>
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="White"/>
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="#005A9E"/>
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="White"/>
+                </ToggleButton.Resources>
+                <ToggleButton.Content>
+                    <FontIcon Glyph="&#xE99A;" FontSize="12"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </ToggleButton.Content>
+            </ToggleButton>
+
             <ToggleButton x:Name="TopMostButton"
                           Click="OnTopMostClick"
                           ToolTipService.ToolTip="항상 위 (F9)"

@@ -1889,6 +1889,9 @@
   <data name="ExitStickyNoteText" xml:space="preserve">
     <value>終了</value>
   </data>
+  <data name="StickyNoteAgentTooltip" xml:space="preserve">
+    <value>エージェントパネルを表示</value>
+  </data>
   <data name="StickyNoteDragTooltip" xml:space="preserve">
     <value>ウィンドウを移動</value>
   </data>

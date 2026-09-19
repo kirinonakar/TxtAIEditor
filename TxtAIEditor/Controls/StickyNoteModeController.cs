@@ -21,6 +21,7 @@ namespace TxtAIEditor.Controls
         private readonly RowDefinition _titleBarRow;
         private readonly StickyNoteBar _stickyNoteBar;
         private readonly UIElement _stickyNoteDragHandle;
+        private readonly RightSidebarPane _rightSidebar;
         private readonly TopCommandBarPane _topToolbar;
         private readonly FrameworkElement _markdownToolbar;
         private readonly FrameworkElement _statusBar;
@@ -47,12 +48,14 @@ namespace TxtAIEditor.Controls
         private uint _dragPointerId;
         private PointInt32 _dragStartWindowPosition;
         private ScreenPoint _dragStartCursorPosition;
+        private string? _previousRightTabKey;
 
         public StickyNoteModeController(
             Window window,
             UIElement normalTitleBar,
             RowDefinition titleBarRow,
             StickyNoteBar stickyNoteBar,
+            RightSidebarPane rightSidebar,
             UIElement stickyNoteDragHandle,
             TopCommandBarPane topToolbar,
             FrameworkElement markdownToolbar,
@@ -71,6 +74,7 @@ namespace TxtAIEditor.Controls
             _titleBarRow = titleBarRow;
             _stickyNoteBar = stickyNoteBar;
             _stickyNoteDragHandle = stickyNoteDragHandle;
+            _rightSidebar = rightSidebar;
             _topToolbar = topToolbar;
             _markdownToolbar = markdownToolbar;
             _statusBar = statusBar;
@@ -84,6 +88,7 @@ namespace TxtAIEditor.Controls
 
             _stickyNoteBar.ExitClick += (_, _) => Exit();
             _stickyNoteBar.TopMostClick += (_, _) => ApplyTopMostFromStickyBar();
+            _stickyNoteBar.AgentToggleClick += (_, _) => ApplyAgentPanelFromStickyBar();
             _stickyNoteDragHandle.PointerPressed += OnDragHandlePointerPressed;
             _stickyNoteDragHandle.PointerMoved += OnDragHandlePointerMoved;
             _stickyNoteDragHandle.PointerReleased += OnDragHandlePointerReleased;
@@ -149,6 +154,8 @@ namespace TxtAIEditor.Controls
             _restoreExtendsContentIntoTitleBar = _window.ExtendsContentIntoTitleBar;
 
             _stickyNoteBar.TopMostIsChecked = _topToolbar.TopMostIsChecked;
+            _stickyNoteBar.AgentIsChecked = false;
+            _previousRightTabKey = null;
             _normalTitleBar.Visibility = Visibility.Collapsed;
             _titleBarRow.Height = new GridLength(0);
             _stickyNoteBar.Visibility = Visibility.Visible;
@@ -187,6 +194,9 @@ namespace TxtAIEditor.Controls
             _topToolbar.TopMostIsChecked = topMost;
             _stickyNoteService.ApplyTopMost(_window, topMost);
 
+            string? previousRightTabKey = _previousRightTabKey;
+            _previousRightTabKey = null;
+            _stickyNoteBar.AgentIsChecked = false;
             _stickyNoteBar.Visibility = Visibility.Collapsed;
             _stickyNoteDragHandle.Visibility = Visibility.Collapsed;
             _titleBarRow.Height = _normalTitleBarHeight;
@@ -202,6 +212,11 @@ namespace TxtAIEditor.Controls
             _leftPanelToggle.IsChecked = _wasLeftSidebarVisible;
             _applyLeftSidebarVisibility(_wasLeftSidebarVisible);
             _applyPreviewVisibility(_wasRightSidebarVisible);
+
+            if (!string.IsNullOrEmpty(previousRightTabKey))
+            {
+                _rightSidebar.RestoreSelectedTab(previousRightTabKey);
+            }
 
             if (_hasNormalWindowSize)
             {
@@ -290,6 +305,25 @@ namespace TxtAIEditor.Controls
             bool topMost = _stickyNoteBar.TopMostIsChecked;
             _topToolbar.TopMostIsChecked = topMost;
             _stickyNoteService.ApplyTopMost(_window, topMost);
+        }
+
+        private void ApplyAgentPanelFromStickyBar()
+        {
+            bool show = _stickyNoteBar.AgentIsChecked;
+            if (show)
+            {
+                _previousRightTabKey = _rightSidebar.SelectedTabKey;
+                _rightSidebar.RestoreSelectedTab(AgentTabKey);
+            }
+
+            _applyPreviewVisibility(show);
+
+            if (!show && !string.IsNullOrEmpty(_previousRightTabKey))
+            {
+                _rightSidebar.RestoreSelectedTab(_previousRightTabKey);
+            }
+
+            _refreshTabLayout();
         }
 
         private void ApplyTopMost(bool topMost)
@@ -400,6 +434,8 @@ namespace TxtAIEditor.Controls
         private const uint SetWindowPosNoSize = 0x0001;
         private const uint SetWindowPosNoZOrder = 0x0004;
         private const uint SetWindowPosNoActivate = 0x0010;
+
+        private const string AgentTabKey = "Agent";
 
         [DllImport("user32.dll")]
         private static extern bool GetCursorPos(out ScreenPoint point);
