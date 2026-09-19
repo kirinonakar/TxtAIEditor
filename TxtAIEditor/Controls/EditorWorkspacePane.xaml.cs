@@ -42,6 +42,7 @@ namespace TxtAIEditor.Controls
         private double _terminalSplitterStartHeight = 0;
         private double _terminalSplitterStartPointerY = 0;
         private bool _tabActionSpacerUpdateQueued;
+        private double _stickyAgentPanelTop;
         private string _noOpenTabsText = "열린 탭이 없습니다";
 
         public EditorWorkspacePane()
@@ -84,6 +85,131 @@ namespace TxtAIEditor.Controls
         public TabView EditorTabView2Control => EditorTabView2;
         public StickyNoteBar StickyNoteBarControl => StickyNoteBar;
         public Border StickyNoteDragHandleControl => StickyNoteDragHandle;
+
+        public bool ShowStickyAgentPanel(UIElement content)
+        {
+            if (content == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                if (!ReferenceEquals(StickyAgentPanelHost.Content, content))
+                {
+                    DetachFromParent(content);
+                    StickyAgentPanelHost.Content = null;
+                    StickyAgentPanelHost.Content = content;
+                }
+
+                ApplyStickyAgentPanelHostOffset();
+                StickyAgentPanelHost.Visibility = Visibility.Visible;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to show the sticky agent panel: {ex}");
+                return false;
+            }
+        }
+
+        public void HideStickyAgentPanel()
+        {
+            try
+            {
+                StickyAgentPanelHost.Visibility = Visibility.Collapsed;
+                if (StickyAgentPanelHost.Content != null)
+                {
+                    StickyAgentPanelHost.Content = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to hide the sticky agent panel: {ex.Message}");
+            }
+        }
+
+        // Keeps the editor tab strip visible and places the hosted panel in the
+        // display region underneath it. Only already-arranged values are read so
+        // no layout pass is forced from inside the caller's event handler; forcing
+        // layout there re-enters SizeChanged handling and trips the WinUI layout
+        // cycle detector (fatal 0x800F1000).
+        private void ApplyStickyAgentPanelHostOffset()
+        {
+            if (_stickyAgentPanelTop <= 0)
+            {
+                _stickyAgentPanelTop = MeasureTabStripHeight();
+            }
+
+            double top = _stickyAgentPanelTop;
+            if (top <= 0)
+            {
+                double actionHeight = double.IsNaN(PrimaryTabActions.Height)
+                    ? PrimaryTabActions.ActualHeight
+                    : PrimaryTabActions.Height;
+                top = PrimaryTabActions.Margin.Top + actionHeight + PrimaryTabActions.Margin.Bottom;
+            }
+
+            if (double.IsNaN(top) || top < 0)
+            {
+                top = 0;
+            }
+
+            StickyAgentPanelHost.Margin = new Thickness(0, top, 0, 0);
+        }
+
+        private double MeasureTabStripHeight()
+        {
+            try
+            {
+                var tabStrip = FindTabViewListView(EditorTabView);
+                if (tabStrip != null && tabStrip.ActualHeight > 0)
+                {
+                    return tabStrip.ActualHeight;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to measure the editor tab strip: {ex.Message}");
+            }
+
+            return 0;
+        }
+
+        private static void DetachFromParent(UIElement element)
+        {
+            try
+            {
+                DependencyObject? parent = VisualTreeHelper.GetParent(element);
+                while (parent != null)
+                {
+                    switch (parent)
+                    {
+                        case Panel panel when panel.Children.Contains(element):
+                            panel.Children.Remove(element);
+                            return;
+                        case Border border when ReferenceEquals(border.Child, element):
+                            border.Child = null;
+                            return;
+                        case ContentPresenter presenter when ReferenceEquals(presenter.Content, element):
+                            presenter.Content = null;
+                            return;
+                        case ContentControl contentControl when ReferenceEquals(contentControl.Content, element):
+                            contentControl.Content = null;
+                            return;
+                    }
+
+                    parent = parent is FrameworkElement frameworkElement
+                        ? VisualTreeHelper.GetParent(frameworkElement)
+                        : null;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to detach the agent pane from its parent: {ex.Message}");
+            }
+        }
+
         public TerminalPane TerminalPaneControl => EnsureTerminalPane();
         private TerminalPane TerminalPane => EnsureTerminalPane();
 

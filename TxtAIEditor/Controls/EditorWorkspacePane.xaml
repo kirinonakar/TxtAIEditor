@@ -68,6 +68,13 @@
                                 Height="32"/>
                     </TabView.TabStripFooter>
                 </TabView>
+
+                <ContentControl x:Name="StickyAgentPanelHost"
+                                Background="{ThemeResource EditorSurfaceBackgroundBrush}"
+                                HorizontalContentAlignment="Stretch"
+                                VerticalContentAlignment="Stretch"
+                                Visibility="Collapsed"/>
+
                 <StackPanel x:Name="PrimaryTabActions"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right"

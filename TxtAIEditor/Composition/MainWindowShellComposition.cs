@@ -95,6 +95,7 @@ namespace TxtAIEditor.Composition
                 ui.TitleBarRow,
                 ui.EditorWorkspace.StickyNoteBarControl,
                 ui.PreviewGrid,
+                ui.EditorWorkspace,
                 ui.EditorWorkspace.StickyNoteDragHandleControl,
                 ui.TopToolbar,
                 ui.MarkdownToolbar,
