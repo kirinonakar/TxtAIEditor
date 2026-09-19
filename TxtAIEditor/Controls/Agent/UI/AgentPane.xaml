@@ -268,7 +268,7 @@
                        VerticalAlignment="Center"
                        HorizontalAlignment="Right"
                        TextAlignment="Right"
-                       MinWidth="60"
+                       MinWidth="70"
                        FontSize="11"
                        Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
         </Grid>
