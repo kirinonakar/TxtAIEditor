@@ -253,7 +253,11 @@ function createEditorRenderer({
         const csvModeKey = csvTableMode.isEnabled ? `${csvTableMode.tableVersion || 0}:${csvTableMode.columnCount || 0}:${csvTableMode.selectedLine || 0}:${csvTableMode.selectedColumn || 0}:${csvTableMode.virtualLineCount || 0}:${csvTableMode.jsonNavigationKey}` : '0';
         const horizontalRenderKey = csvTableMode.isEnabled ? scrollContainer.scrollLeft : 0;
         const virtualHeightRenderKey = renderFullDocument ? 'full-document' : totalVirtualHeight();
-        const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${virtualHeightRenderKey}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${activeLine || 0}:${state.editingLine || 0}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}`;
+        // Full-document caret moves already patch editing-row in place. Including
+        // focus here rebuilds every row on the first scroll after the host focuses
+        // the editor, even though neither the text nor the rendered range changed.
+        const focusRenderKey = renderFullDocument ? '' : `${activeLine || 0}:${state.editingLine || 0}`;
+        const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${virtualHeightRenderKey}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${focusRenderKey}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}`;
         if (!csvTableMode.isEnabled || !isJsonCsvTableMode()) {
             requestMissingLines(renderStart, renderEnd);
             trimHexCacheToRange(renderStart, renderEnd);
