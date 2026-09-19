@@ -44,6 +44,8 @@ namespace TxtAIEditor.Controls
         private bool _restoreExtendsContentIntoTitleBar = true;
         private SizeInt32 _normalWindowSize;
         private bool _hasNormalWindowSize;
+        private PointInt32 _normalWindowPosition;
+        private bool _hasNormalWindowPosition;
         private bool _wasWindowMaximized;
         private bool _isDraggingWindow;
         private uint _dragPointerId;
@@ -108,7 +110,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            CaptureStickyNoteWindowSize();
+            CaptureStickyNoteWindowPlacement();
         }
 
         public void ApplyTopMostFromToolbar()
@@ -150,6 +152,8 @@ namespace TxtAIEditor.Controls
 
             _normalWindowSize = _window.AppWindow.Size;
             _hasNormalWindowSize = IsUsableWindowSize(_normalWindowSize);
+            _normalWindowPosition = _window.AppWindow.Position;
+            _hasNormalWindowPosition = IsUsableWindowPosition(_normalWindowPosition);
             _isActive = true;
             _wasLeftSidebarVisible = _shellPanelLayoutService.IsLeftSidebarVisible;
             _wasRightSidebarVisible = _shellPanelLayoutService.IsRightSidebarVisible;
@@ -176,6 +180,7 @@ namespace TxtAIEditor.Controls
             _shellPanelLayoutService.ApplyLeftSidebarVisibility(false);
             _shellPanelLayoutService.ApplyPreviewVisibility(false);
             ResizeWindow(GetStickyNoteWindowSize());
+            ApplySavedStickyNotePosition();
             _refreshTabLayout();
         }
 
@@ -228,6 +233,11 @@ namespace TxtAIEditor.Controls
                 ResizeWindow(_normalWindowSize);
             }
 
+            if (_hasNormalWindowPosition)
+            {
+                MoveWindow(_normalWindowPosition);
+            }
+
             if (_wasWindowMaximized && _window.AppWindow.Presenter is OverlappedPresenter presenter)
             {
                 presenter.Maximize();
@@ -249,16 +259,22 @@ namespace TxtAIEditor.Controls
             return _hasNormalWindowSize ? _normalWindowSize : _window.AppWindow.Size;
         }
 
-        private void CaptureStickyNoteWindowSize()
+        private void CaptureStickyNoteWindowPlacement()
         {
             var presenter = _window.AppWindow.Presenter as OverlappedPresenter;
             bool isRestored = presenter == null || presenter.State == OverlappedPresenterState.Restored;
             var currentSize = _window.AppWindow.Size;
+            var currentPosition = _window.AppWindow.Position;
             if (isRestored && IsUsableWindowSize(currentSize))
             {
                 var settings = _settingsService.CurrentSettings;
                 settings.StickyNoteWindowWidth = currentSize.Width;
                 settings.StickyNoteWindowHeight = currentSize.Height;
+                if (IsUsableWindowPosition(currentPosition))
+                {
+                    settings.StickyNoteWindowX = currentPosition.X;
+                    settings.StickyNoteWindowY = currentPosition.Y;
+                }
             }
 
             if (_hasNormalWindowSize)
@@ -266,8 +282,40 @@ namespace TxtAIEditor.Controls
                 var settings = _settingsService.CurrentSettings;
                 settings.WindowWidth = _normalWindowSize.Width;
                 settings.WindowHeight = _normalWindowSize.Height;
+                if (_hasNormalWindowPosition)
+                {
+                    settings.WindowX = _normalWindowPosition.X;
+                    settings.WindowY = _normalWindowPosition.Y;
+                }
             }
         }
+
+        private void ApplySavedStickyNotePosition()
+        {
+            var settings = _settingsService.CurrentSettings;
+            if (!HasSavedWindowPosition(settings.StickyNoteWindowX, settings.StickyNoteWindowY))
+            {
+                return;
+            }
+
+            MoveWindow(new PointInt32(settings.StickyNoteWindowX, settings.StickyNoteWindowY));
+        }
+
+        private void MoveWindow(PointInt32 position)
+        {
+            try
+            {
+                _window.AppWindow.Move(position);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to move sticky note window: {ex.Message}");
+            }
+        }
+
+        private static bool HasSavedWindowPosition(int x, int y) => x >= 0 && y >= 0;
+
+        private static bool IsUsableWindowPosition(PointInt32 position) => position.X > -30000 && position.Y > -30000;
 
         private void ResizeWindow(SizeInt32 size)
         {
