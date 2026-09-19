@@ -112,7 +112,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Grid Padding="15" RowSpacing="6" AllowDrop="True" DragOver="OnAgentGridDragOver" Drop="OnAgentGridDrop">
+    <Grid Padding="15,6,15,15" RowSpacing="6" AllowDrop="True" DragOver="OnAgentGridDragOver" Drop="OnAgentGridDrop">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -346,7 +346,7 @@
                     Style="{StaticResource AgentButtonStyle}"/>
         </StackPanel>
 
-        <Border Grid.Row="4" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="6" CornerRadius="4">
+        <Border Grid.Row="4" Background="{ThemeResource ToolbarBackgroundBrush}" Padding="6,3" CornerRadius="4">
             <Grid RowSpacing="4" ColumnSpacing="8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
