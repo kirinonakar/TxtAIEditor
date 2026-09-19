@@ -21,26 +21,28 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            if (settings.Theme == "PastelDark")
+            bool wasPastelDark = Application.Current.Resources.TryGetValue("ActiveTheme", out var activeTheme) &&
+                string.Equals(activeTheme as string, "PastelDark", StringComparison.Ordinal);
+            bool isPastelDark = settings.Theme == "PastelDark";
+            if (isPastelDark)
             {
                 ApplyPastelDarkTheme();
-                rootElement.RequestedTheme = ElementTheme.Light;
-                rootElement.RequestedTheme = ElementTheme.Dark;
             }
             else
             {
                 ClearCustomThemeOverrides();
-                if (settings.Theme == "Light")
-                {
-                    rootElement.RequestedTheme = ElementTheme.Dark;
-                    rootElement.RequestedTheme = ElementTheme.Light;
-                }
-                else
-                {
-                    rootElement.RequestedTheme = ElementTheme.Light;
-                    rootElement.RequestedTheme = ElementTheme.Dark;
-                }
             }
+
+            var requestedTheme = settings.Theme == "Light" ? ElementTheme.Light : ElementTheme.Dark;
+            // Only force a theme-resource refresh when switching custom palettes
+            // within the same base theme (Dark <-> PastelDark).
+            if (rootElement.ActualTheme == requestedTheme && wasPastelDark != isPastelDark)
+            {
+                rootElement.RequestedTheme = requestedTheme == ElementTheme.Dark
+                    ? ElementTheme.Light
+                    : ElementTheme.Dark;
+            }
+            rootElement.RequestedTheme = requestedTheme;
 
             ApplyTitleBarTheme(settings, appWindow);
             ApplyMarkdownToolbarTheme(settings, applyMarkdownToolbarBackground);
@@ -332,6 +334,15 @@ namespace TxtAIEditor.Core.Services
         {
             try
             {
+                // A theme toggle does not change the font. Rewriting resources on
+                // every visual element needlessly invalidates the entire layout.
+                if (rootElement.Resources.TryGetValue("ContentControlThemeFontFamily", out var appliedFont) &&
+                    appliedFont is Microsoft.UI.Xaml.Media.FontFamily currentFont &&
+                    string.Equals(currentFont.Source, settings.UiFontFamily, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
                 var fontFamily = new Microsoft.UI.Xaml.Media.FontFamily(settings.UiFontFamily);
                 
                 // Override theme resource font families globally in the application

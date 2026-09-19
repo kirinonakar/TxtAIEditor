@@ -266,6 +266,9 @@ function roundCssPixelsToDevicePixels(value) {
     return Math.round(value * dpr) / dpr;
 }
 
+let appliedLayoutOptionsKey = null;
+let appliedRenderOptionsKey = null;
+
 function applyOptions(msg) {
     const theme = msg.theme || 'Dark';
     const bg = msg.customBackgroundColor || (theme === 'PastelDark' ? '#24273a' : (theme === 'Light' ? '#ffffff' : '#1e1e1e'));
@@ -273,9 +276,21 @@ function applyOptions(msg) {
     const fg = resolveReadableColor(bg, preferredFg, theme === 'PastelDark' ? '#cad3f5' : (theme === 'Light' ? '#111111' : '#d4d4d4'));
     const fontSize = Number(msg.fontSize || 14);
     const baseLineHeight = Math.max(18, Math.ceil(fontSize + 8));
-    const previousLineHeight = viewportController.setLineHeight(
-        snapCssPixelsToDevicePixels(baseLineHeight),
-        state.lineCount);
+    const lineHeight = snapCssPixelsToDevicePixels(baseLineHeight);
+    const layoutOptionsKey = JSON.stringify([
+        fontSize, msg.fontFamily || 'Consolas, "Courier New", monospace',
+        lineHeight, Number(msg.tabSize || 4), !!msg.wordWrap
+    ]);
+    const renderOptionsKey = JSON.stringify([
+        !!msg.readOnly, !!msg.hexEditable,
+        msg.syntaxHighlighting === undefined ? true : !!msg.syntaxHighlighting,
+        msg.showDirtyLines === undefined ? true : !!msg.showDirtyLines,
+        msg.bracketPairColorization === undefined ? true : !!msg.bracketPairColorization,
+        msg.longLineProtectionFormat, msg.csvJsonKeyHeader, msg.csvJsonValueHeader
+    ]);
+    const layoutChanged = appliedLayoutOptionsKey !== layoutOptionsKey;
+    const renderChanged = appliedRenderOptionsKey !== renderOptionsKey;
+    viewportController.setLineHeight(lineHeight, state.lineCount);
     state.tabSize = Number(msg.tabSize || 4);
     state.readOnly = !!msg.readOnly;
     hexEditorMode.setEditable(msg.hexEditable);
@@ -381,7 +396,9 @@ function applyOptions(msg) {
         document.documentElement.style.setProperty('--hex-data-odd', '#8a8a8a');
     }
 
-    if (usesMeasuredLineHeights() || previousLineHeight !== viewportController.lineHeight) {
+    // Colors are CSS variables: changing them must not discard measured rows
+    // or rebuild the document (including the active IME contenteditable).
+    if (layoutChanged) {
         clearMeasuredLineHeights();
     }
 
@@ -485,8 +502,14 @@ function applyOptions(msg) {
         if (el) el.textContent = msg.menuConvert;
     }
 
-    setupVirtualHeight();
-    queueRender(true);
+    appliedLayoutOptionsKey = layoutOptionsKey;
+    appliedRenderOptionsKey = renderOptionsKey;
+    if (layoutChanged) {
+        setupVirtualHeight();
+    }
+    if (layoutChanged || renderChanged) {
+        queueRender(true);
+    }
 }
 
 function setupModel(lineCount) {
