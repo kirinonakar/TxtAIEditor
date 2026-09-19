@@ -264,10 +264,12 @@
             </Button>
             <TextBlock x:Name="AgentTokenCountText"
                        Grid.Column="3"
-                       Text="0.0k tokens"
+                       Text="0.0k"
                        VerticalAlignment="Center"
                        HorizontalAlignment="Right"
-                       FontSize="12"
+                       TextAlignment="Right"
+                       MinWidth="60"
+                       FontSize="11"
                        Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
         </Grid>
 

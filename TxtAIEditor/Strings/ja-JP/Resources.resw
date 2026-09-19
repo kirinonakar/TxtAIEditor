@@ -2447,10 +2447,10 @@
     <value>最後のAgent回答を新規タブに入力</value>
   </data>
   <data name="AgentTokenCountFormat" xml:space="preserve">
-    <value>{0:F1}k トークン</value>
+    <value>{0:F1}k</value>
   </data>
   <data name="AgentTokenCountWithLimitFormat" xml:space="preserve">
-    <value>{0} / {1} トークン</value>
+    <value>{0} / {1}</value>
   </data>
   <data name="AgentInlineTokenCountFormat" xml:space="preserve">
     <value>{0:N0} トークン</value>

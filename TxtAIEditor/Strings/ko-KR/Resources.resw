@@ -2447,10 +2447,10 @@
     <value>마지막 Agent 답변을 새 탭에 입력</value>
   </data>
   <data name="AgentTokenCountFormat" xml:space="preserve">
-    <value>{0:F1}k 토큰</value>
+    <value>{0:F1}k</value>
   </data>
   <data name="AgentTokenCountWithLimitFormat" xml:space="preserve">
-    <value>{0} / {1} 토큰</value>
+    <value>{0} / {1}</value>
   </data>
   <data name="AgentInlineTokenCountFormat" xml:space="preserve">
     <value>{0:N0} 토큰</value>

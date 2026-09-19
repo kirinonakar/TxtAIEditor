@@ -175,7 +175,7 @@ namespace TxtAIEditor.Controls
                 string currentStr = AgentTokenEstimator.Format(estimatedTokens);
                 string maxStr = AgentTokenEstimator.Format(maxTokens);
                 tokenCountText = string.Format(
-                    _getString("AgentTokenCountWithLimitFormat", "{0} / {1} tokens"),
+                    _getString("AgentTokenCountWithLimitFormat", "{0} / {1}"),
                     currentStr,
                     maxStr);
             }
@@ -183,7 +183,7 @@ namespace TxtAIEditor.Controls
             {
                 double kTokens = estimatedTokens / 1000.0;
                 tokenCountText = string.Format(
-                    _getString("AgentTokenCountFormat", "{0:F1}k tokens"),
+                    _getString("AgentTokenCountFormat", "{0:F1}k"),
                     kTokens);
             }
 

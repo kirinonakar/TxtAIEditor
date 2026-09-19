@@ -2447,10 +2447,10 @@
     <value>在新选项卡中插入最后一个 Agent 答案</value>
   </data>
   <data name="AgentTokenCountFormat" xml:space="preserve">
-    <value>{0:F1}k 代币</value>
+    <value>{0:F1}k</value>
   </data>
   <data name="AgentTokenCountWithLimitFormat" xml:space="preserve">
-    <value>{0} / {1} 代币</value>
+    <value>{0} / {1}</value>
   </data>
   <data name="AgentInlineTokenCountFormat" xml:space="preserve">
     <value>{0:N0} 个 token</value>
