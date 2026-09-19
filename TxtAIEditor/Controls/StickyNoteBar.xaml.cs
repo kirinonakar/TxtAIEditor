@@ -22,10 +22,13 @@ namespace TxtAIEditor.Controls
 
         public void Localize(Func<string, string, string> getString)
         {
-            ToolTipService.SetToolTip(TopMostButton, getString("TopMost", "항상 위") + " (F9)");
-            TopMostText.Text = getString("TopMost", "항상위");
-            ToolTipService.SetToolTip(ExitButton, getString("ExitStickyNoteTooltip", "스티커 노트 모드 종료 (F12)"));
-            ExitText.Text = getString("ExitStickyNoteText", "나가기");
+            string topMostTooltip = getString("TopMost", "항상 위") + " (F9)";
+            ToolTipService.SetToolTip(TopMostButton, topMostTooltip);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(TopMostButton, topMostTooltip);
+
+            string exitTooltip = getString("ExitStickyNoteTooltip", "스티커 노트 모드 종료 (F12)");
+            ToolTipService.SetToolTip(ExitButton, exitTooltip);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExitButton, exitTooltip);
         }
 
         private void OnExitClick(object sender, RoutedEventArgs e)
