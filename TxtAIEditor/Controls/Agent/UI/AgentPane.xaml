@@ -262,15 +262,24 @@
                     </Flyout>
                 </Button.Flyout>
             </Button>
-            <TextBlock x:Name="AgentTokenCountText"
-                       Grid.Column="3"
-                       Text="0.0k"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Right"
-                       TextAlignment="Right"
-                       MinWidth="70"
-                       FontSize="11"
-                       Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+            <Border Grid.Column="3"
+                    Width="80"
+                    Height="20"
+                    Padding="6,0"
+                    CornerRadius="10"
+                    Background="{ThemeResource AgentButtonBackground}"
+                    BorderBrush="{ThemeResource AgentButtonBorderBrush}"
+                    BorderThickness="1"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Right">
+                <TextBlock x:Name="AgentTokenCountText"
+                           Text="0.0k"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           TextAlignment="Center"
+                           FontSize="11"
+                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+            </Border>
         </Grid>
 
         <Border Grid.Row="1"
