@@ -634,12 +634,7 @@ namespace TxtAIEditor.Controls
             if (isHeading)
             {
                 paragraph.Margin = new Thickness(0, 8, 0, 4);
-                AddTextRunsWithEmojiSupport(
-                    line,
-                    paragraph.Inlines,
-                    isBold: true,
-                    fontSize: headingFontSize,
-                    foreground: activityForeground);
+                ParseLineToInlines(line, paragraph.Inlines, activityForeground, headingFontSize, forceHeading: true);
                 return paragraph;
             }
 
@@ -806,7 +801,7 @@ namespace TxtAIEditor.Controls
                 char.IsDigit(prefix[6]) && char.IsDigit(prefix[7]);
         }
 
-        private void ParseLineToInlines(string line, InlineCollection inlines, Brush? defaultForeground = null, double defaultFontSize = 0)
+        private void ParseLineToInlines(string line, InlineCollection inlines, Brush? defaultForeground = null, double defaultFontSize = 0, bool forceHeading = false)
         {
             if (string.IsNullOrEmpty(line))
             {
@@ -825,7 +820,10 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            bool isHeading = TryParseMarkdownHeading(line, out int headingLevel, out string displayLine);
+            int headingLevel = 0;
+            string displayLine = line;
+            bool isHeading = forceHeading ||
+                TryParseMarkdownHeading(line, out headingLevel, out displayLine);
             double headingFontSize = GetMarkdownHeadingFontSize(headingLevel);
             double runFontSize = defaultFontSize > 0 ? defaultFontSize : headingFontSize;
             line = displayLine;
