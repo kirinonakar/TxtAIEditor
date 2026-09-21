@@ -140,7 +140,8 @@ namespace TxtAIEditor.Controls
             // re-opened (or another session was restored).
             if (_runningSessions.TryGetValue(_currentSessionIdProvider(), out AgentRunContext? sessionContext))
             {
-                return sessionContext.CurrentRunTranscriptTokens + sessionContext.InFlightReasoningTokens;
+                return sessionContext.CurrentRunTranscriptTokens + sessionContext.InFlightReasoningTokens +
+                    sessionContext.InFlightResponseTokens;
             }
 
             AgentRunContext? context = GetActiveRunContext();
@@ -149,9 +150,9 @@ namespace TxtAIEditor.Controls
                 return _currentRunTranscriptTokens;
             }
 
-            // The panel token display must keep growing while the model is thinking,
-            // so include the reasoning tokens that are still streaming.
-            return context.CurrentRunTranscriptTokens + context.InFlightReasoningTokens;
+            // Include both native reasoning and ordinary response chunks while streaming.
+            return context.CurrentRunTranscriptTokens + context.InFlightReasoningTokens +
+                context.InFlightResponseTokens;
         }
 
         public void RestoreCurrentRunTranscriptTokens(double currentRunTranscriptTokens)
@@ -160,8 +161,8 @@ namespace TxtAIEditor.Controls
         }
 
         // Estimated tokens of the request that is actually sent to the model for the current
-        // session after context compression. 0 means the session has no active run or
-        // compression has not occurred yet, so callers should keep their own estimate.
+        // session. 0 means the session has no active run or its first request has not
+        // been measured yet, so callers should keep their own estimate.
         public double GetActualRequestTokens()
         {
             if (!_runningSessions.TryGetValue(_currentSessionIdProvider(), out AgentRunContext? context) ||
@@ -171,7 +172,7 @@ namespace TxtAIEditor.Controls
             }
 
             double addedTokens = context.CurrentRunTranscriptTokens - context.ActualRequestTokensBase +
-                context.InFlightReasoningTokens;
+                context.InFlightReasoningTokens + context.InFlightResponseTokens;
             return addedTokens > 0 ? context.ActualRequestTokens + addedTokens : context.ActualRequestTokens;
         }
 

@@ -15,7 +15,8 @@ namespace TxtAIEditor.Controls
         private readonly FrameworkElement _resourceOwner;
         private readonly Action<string> _explicitSelectionChanged;
         private readonly List<string> _renderedLines = new List<string>();
-        private bool _lineBlocksMatchRenderedLines = true;
+        private readonly List<RenderedGroup> _renderedGroups = new();
+        private bool _forceRender;
         private Func<string, string, string>? _getString;
 
         public AgentOutputRenderer(
@@ -33,9 +34,10 @@ namespace TxtAIEditor.Controls
         public void Localize(Func<string, string, string> getString)
         {
             _getString = getString;
+            _forceRender = true;
         }
 
-        public void UpdateRichText(string rawText)
+        public void UpdateRichText(string rawText, bool force = false)
         {
             string normalized = (rawText ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
             string[] lines = normalized.Split('\n');
@@ -83,11 +85,26 @@ namespace TxtAIEditor.Controls
                 displayLines.RemoveAll(IsHiddenNonVerboseActivityLine);
             }
 
+            int firstChangedLine = 0;
+            if (!force && !_forceRender)
+            {
+                while (firstChangedLine < _renderedLines.Count &&
+                       firstChangedLine < displayLines.Count &&
+                       _renderedLines[firstChangedLine] == displayLines[firstChangedLine])
+                {
+                    firstChangedLine++;
+                }
+
+                if (firstChangedLine == _renderedLines.Count && firstChangedLine == displayLines.Count)
+                {
+                    return;
+                }
+            }
+
+            _forceRender = false;
             _renderedLines.Clear();
             _renderedLines.AddRange(displayLines);
-            _lineBlocksMatchRenderedLines = !RequiresGroupedRendering(displayLines, 0);
-
-            RenderDisplayLinesToBlocks(displayLines);
+            PatchRenderedLines(firstChangedLine);
         }
 
         private static List<string> RemoveHiddenNonVerboseSections(List<string> lines)
@@ -145,7 +162,10 @@ namespace TxtAIEditor.Controls
             string normalized = text.Replace("\r\n", "\n").Replace('\r', '\n');
             string[] parts = normalized.Split('\n');
 
-            EnsureRenderedLineExists();
+            if (_renderedLines.Count == 0)
+            {
+                _renderedLines.Add(string.Empty);
+            }
 
             int firstChangedLineIndex = _renderedLines.Count - 1;
             int lastIndex = _renderedLines.Count - 1;
@@ -156,15 +176,7 @@ namespace TxtAIEditor.Controls
                 _renderedLines.Add(parts[i]);
             }
 
-            if (HideHtmlCodeBlocks ||
-                !_lineBlocksMatchRenderedLines ||
-                RequiresGroupedRendering(_renderedLines, Math.Max(0, firstChangedLineIndex - 1)))
-            {
-                UpdateRichText(string.Join("\n", _renderedLines));
-                return;
-            }
-
-            PatchRenderedRegularLines(firstChangedLineIndex);
+            PatchRenderedLines(firstChangedLineIndex);
         }
 
         public bool TrySetLastLine(string line)
@@ -174,44 +186,60 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            SetRenderedLine(_renderedLines.Count - 1, line);
+            int index = _renderedLines.Count - 1;
+            if (_renderedLines[index] != line)
+            {
+                _renderedLines[index] = line;
+                PatchRenderedLines(index);
+            }
             return true;
         }
 
-        private void RenderDisplayLinesToBlocks(List<string> displayLines)
+        private void PatchRenderedLines(int firstChangedLine)
         {
-            _outputText.Blocks.Clear();
-            RenderLinesToBlocksInternal(displayLines);
-        }
-
-        private void PatchRenderedRegularLines(int firstChangedLineIndex)
-        {
-            firstChangedLineIndex = Math.Max(0, firstChangedLineIndex);
-            if (!_lineBlocksMatchRenderedLines ||
-                _outputText.Blocks.Count < firstChangedLineIndex)
+            // A newly streamed separator can turn the preceding regular line into a table.
+            if (firstChangedLine > 0 && firstChangedLine <= _renderedLines.Count &&
+                IsTableRow(_renderedLines[firstChangedLine - 1]))
             {
-                UpdateRichText(string.Join("\n", _renderedLines));
-                return;
+                firstChangedLine--;
             }
 
-            while (_outputText.Blocks.Count > firstChangedLineIndex)
+            int keepGroups = 0;
+            int keepBlocks = 0;
+            int renderStart = 0;
+            foreach (RenderedGroup group in _renderedGroups)
+            {
+                if (group.EndLine > firstChangedLine || group.IsOpen)
+                {
+                    break;
+                }
+
+                keepGroups++;
+                keepBlocks = group.EndBlock;
+                renderStart = group.EndLine;
+            }
+
+            // Preserve all completed history blocks, including their embedded controls.
+            // Only the changed paragraph/table/code fence and its suffix are recreated.
+            while (_outputText.Blocks.Count > keepBlocks)
             {
                 _outputText.Blocks.RemoveAt(_outputText.Blocks.Count - 1);
             }
 
-            for (int i = firstChangedLineIndex; i < _renderedLines.Count; i++)
-            {
-                _outputText.Blocks.Add(RenderRegularLine(_renderedLines[i]));
-            }
+            _renderedGroups.RemoveRange(keepGroups, _renderedGroups.Count - keepGroups);
+            RenderLinesToBlocksInternal(_renderedLines, renderStart, trackGroups: true);
         }
 
-        private void RenderLinesToBlocksInternal(List<string> lines)
+        private readonly record struct RenderedGroup(int EndLine, int EndBlock, bool IsOpen);
+
+        private void RenderLinesToBlocksInternal(List<string> lines, int startIndex = 0, bool trackGroups = false)
         {
-            int i = 0;
+            int i = startIndex;
             while (i < lines.Count)
             {
                 string line = lines[i];
                 string trimmed = line.Trim();
+                bool isOpen = false;
 
                 if (trimmed.StartsWith("```"))
                 {
@@ -250,6 +278,7 @@ namespace TxtAIEditor.Controls
                     else
                     {
                         i = j;
+                        isOpen = true;
                     }
                 }
                 else if (i + 1 < lines.Count && IsTableRow(line) && IsTableSeparatorRow(lines[i + 1]))
@@ -268,12 +297,18 @@ namespace TxtAIEditor.Controls
                     Block tableBlock = RenderTable(tableLines);
                     _outputText.Blocks.Add(tableBlock);
                     i = j;
+                    isOpen = j == lines.Count;
                 }
                 else
                 {
                     Block lineBlock = RenderRegularLine(line);
                     _outputText.Blocks.Add(lineBlock);
                     i++;
+                }
+
+                if (trackGroups)
+                {
+                    _renderedGroups.Add(new RenderedGroup(i, _outputText.Blocks.Count, isOpen));
                 }
             }
         }
@@ -339,34 +374,6 @@ namespace TxtAIEditor.Controls
                 }
             }
             return true;
-        }
-
-        private static bool RequiresGroupedRendering(IReadOnlyList<string> lines, int startIndex)
-        {
-            startIndex = Math.Max(0, startIndex);
-            for (int i = startIndex; i < lines.Count; i++)
-            {
-                if (lines[i].Trim().StartsWith("```", StringComparison.Ordinal))
-                {
-                    return true;
-                }
-
-                if (IsTableRow(lines[i]) &&
-                    i + 1 < lines.Count &&
-                    IsTableSeparatorRow(lines[i + 1]))
-                {
-                    return true;
-                }
-
-                if (IsTableSeparatorRow(lines[i]) &&
-                    i > 0 &&
-                    IsTableRow(lines[i - 1]))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static List<string> ParseTableRow(string line)
@@ -797,41 +804,6 @@ namespace TxtAIEditor.Controls
             return char.IsDigit(prefix[0]) && char.IsDigit(prefix[1]) &&
                 char.IsDigit(prefix[3]) && char.IsDigit(prefix[4]) &&
                 char.IsDigit(prefix[6]) && char.IsDigit(prefix[7]);
-        }
-
-        private void EnsureRenderedLineExists()
-        {
-            if (_renderedLines.Count > 0)
-            {
-                return;
-            }
-
-            _renderedLines.Clear();
-            _outputText.Blocks.Clear();
-            _renderedLines.Add(string.Empty);
-        }
-
-        private void SetRenderedLine(int index, string line)
-        {
-            if (index < 0)
-            {
-                return;
-            }
-
-            while (_renderedLines.Count <= index)
-            {
-                _renderedLines.Add(string.Empty);
-            }
-
-            if (_renderedLines[index] == line)
-            {
-                return;
-            }
-
-            _renderedLines[index] = line;
-
-            string raw = string.Join("\n", _renderedLines);
-            UpdateRichText(raw);
         }
 
         private void ParseLineToInlines(string line, InlineCollection inlines, Brush? defaultForeground = null, double defaultFontSize = 0)

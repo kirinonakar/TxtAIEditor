@@ -43,8 +43,8 @@ namespace TxtAIEditor.Controls
         public StringBuilder RetryDebugHistory { get; } = new();
         public double SessionHistoryTokenCount { get; set; }
         public double CurrentRunTranscriptTokens { get; set; }
-        // Tokens of the request that is actually sent to the model, measured right after
-        // context compression with the same estimator as the compression threshold.
+        // Tokens of the captured request, measured before each model call (after any
+        // context compression) with the same estimator as the compression threshold.
         // 0 means no measurement has been taken for this run yet.
         public double ActualRequestTokens { get; set; }
         // CurrentRunTranscriptTokens when ActualRequestTokens was measured. The difference
@@ -68,6 +68,9 @@ namespace TxtAIEditor.Controls
         // committed to CurrentRunTranscriptTokens. Display-only overlay so the panel
         // token count keeps updating while the model is thinking.
         public double InFlightReasoningTokens { get; set; }
+        // Includes answer text, inline thinking and tool-call text until the response is
+        // committed to the transcript. Keep this separate from native reasoning tokens.
+        public double InFlightResponseTokens { get; set; }
         public bool IsPlanningMode { get; set; }
         public bool HasEnabledSkills { get; set; }
         public bool HasEnabledMcp { get; set; }

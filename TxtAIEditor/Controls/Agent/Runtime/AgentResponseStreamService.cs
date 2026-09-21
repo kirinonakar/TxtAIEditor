@@ -10,8 +10,7 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentResponseStreamService
     {
-        // Cadence for refreshing the panel context token count while reasoning tokens
-        // are still streaming.
+        // Shared cadence for reasoning, answer text and tool-call streaming updates.
         private const long InFlightContextStatsIntervalMs = 500;
 
         private readonly ILLMService _llmService;
@@ -63,6 +62,24 @@ namespace TxtAIEditor.Controls
             var responseBuilder = new StringBuilder();
             runContext.StreamingResponseText = string.Empty;
             runContext.StreamingReasoningText = string.Empty;
+            runContext.InFlightReasoningTokens = 0;
+            runContext.InFlightResponseTokens = 0;
+            // Estimate the captured request once off the UI thread. Streaming stats then
+            // only add the in-flight token count instead of reading the editor/history again.
+            runContext.ActualRequestTokens = await Task.Run(
+                () => AgentContextCompressionService.EstimateModelRequestTokens(
+                    runContext.LlmSettings,
+                    fixedPromptContext,
+                    currentTranscript,
+                    currentWorkspaceContext,
+                    runSelectionContext,
+                    planningMode,
+                    runContext.HasEnabledSkills,
+                    runContext.HasEnabledMcp,
+                    agentToolsList,
+                    imageAttachments),
+                cancellationToken);
+            runContext.ActualRequestTokensBase = runContext.CurrentRunTranscriptTokens;
             int printedLength = 0;
             bool toolCallPlaceholderShown = false;
             bool visibleTextFlushed = false;
@@ -80,23 +97,29 @@ namespace TxtAIEditor.Controls
             var stepReasoningBuilder = new StringBuilder();
             long lastInFlightStatsUpdateTicks = 0;
 
-            void UpdateInFlightReasoningTokens()
+            void UpdateInFlightReasoningTokens(string chunk)
             {
                 // Keep the in-flight reasoning estimate in the run context so the panel
                 // token count keeps growing while the model is thinking.
-                runContext.InFlightReasoningTokens = AgentTokenEstimator.Estimate(stepReasoningBuilder.ToString());
+                runContext.InFlightReasoningTokens += AgentTokenEstimator.Estimate(chunk);
             }
 
-            async Task RefreshContextStatsAsync()
+            async Task RefreshContextStatsAsync(bool force = false)
             {
                 long nowTicks = Environment.TickCount64;
-                if (nowTicks - lastInFlightStatsUpdateTicks < InFlightContextStatsIntervalMs)
+                if (!force && nowTicks - lastInFlightStatsUpdateTicks < InFlightContextStatsIntervalMs)
                 {
                     return;
                 }
 
                 lastInFlightStatsUpdateTicks = nowTicks;
-                await _uiDispatcher.RunAsync(() => _updateContextStatsImmediate(true));
+                await _uiDispatcher.RunAsync(() =>
+                {
+                    if (_runOutputController.IsSessionVisible(runContext.SessionId))
+                    {
+                        _updateContextStatsImmediate(true);
+                    }
+                });
             }
 
             Func<string, Task>? onReasoning = null;
@@ -107,7 +130,7 @@ namespace TxtAIEditor.Controls
                     cancellationToken.ThrowIfCancellationRequested();
                     stepReasoningBuilder.Append(reasoningChunk);
                     runContext.StreamingReasoningText = stepReasoningBuilder.ToString();
-                    UpdateInFlightReasoningTokens();
+                    UpdateInFlightReasoningTokens(reasoningChunk);
                     await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, reasoningChunk);
                     await RefreshContextStatsAsync();
                 };
@@ -119,7 +142,7 @@ namespace TxtAIEditor.Controls
                     cancellationToken.ThrowIfCancellationRequested();
                     stepReasoningBuilder.Append(reasoningChunk);
                     runContext.StreamingReasoningText = stepReasoningBuilder.ToString();
-                    UpdateInFlightReasoningTokens();
+                    UpdateInFlightReasoningTokens(reasoningChunk);
                     int tokenCount = (int)Math.Round(runContext.InFlightReasoningTokens);
                     string label = string.Format(
                         _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
@@ -162,6 +185,10 @@ namespace TxtAIEditor.Controls
                         cancellationToken.ThrowIfCancellationRequested();
                         responseBuilder.Append(chunk);
                         runContext.StreamingResponseText = responseBuilder.ToString();
+                        runContext.InFlightResponseTokens += AgentTokenEstimator.Estimate(chunk);
+                        // Refresh before the filtering/tool-call branches, including their
+                        // early returns. Hidden output still contributes to context length.
+                        await RefreshContextStatsAsync();
                         string rawStreamedText = responseBuilder.ToString();
 
                         if (!runContext.LlmSettings.LlmAgentVerbose)
@@ -499,14 +526,17 @@ namespace TxtAIEditor.Controls
                         return Task.CompletedTask;
                     },
                     sessionId: runContext.SessionId);
+                await RefreshContextStatsAsync(force: true);
             }
             catch (ResponseTruncatedException)
             {
                 truncated = true;
+                await RefreshContextStatsAsync(force: true);
             }
             finally
             {
                 runContext.InFlightReasoningTokens = 0;
+                runContext.InFlightResponseTokens = 0;
                 if (visionFallbackPending)
                 {
                     runContext.VisionFallbackPending = false;
@@ -529,7 +559,9 @@ namespace TxtAIEditor.Controls
                 await _uiDispatcher.RunAsync(() =>
                 {
                     runContext.CurrentRunTranscriptTokens += stepReasoningTokens;
-                    _updateContextStatsImmediate(true);
+                    // The final streaming refresh already includes both reasoning and
+                    // response tokens. Refresh again after the coordinator commits the
+                    // response, so clearing the overlays does not briefly drop the count.
                 });
             }
 

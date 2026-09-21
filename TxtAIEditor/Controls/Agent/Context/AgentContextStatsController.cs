@@ -132,12 +132,12 @@ namespace TxtAIEditor.Controls
             }
 
             string promptText = GetPromptText();
-            double estimatedTokens = EstimateContextTokens(promptText);
-            // After context compression the run reports the tokens that are actually sent to
-            // the model, so prefer that value over the estimate that still contains the
-            // uncompressed transcript.
+            // Streaming runs already have a request snapshot. Do not rebuild the workspace,
+            // history and tool catalog on the UI thread for each reasoning-count refresh.
             double actualRequestTokens = _actualRequestTokensProvider();
-            double displayTokens = actualRequestTokens > 0 ? actualRequestTokens : estimatedTokens;
+            double displayTokens = actualRequestTokens > 0
+                ? actualRequestTokens
+                : EstimateContextTokens(promptText);
             _estimatedTokensExcludingPrompt = Math.Max(
                 0,
                 displayTokens - AgentTokenEstimator.Estimate(promptText));

@@ -43,6 +43,7 @@ namespace TxtAIEditor.Controls
         private string? _pendingThinkingLabel;
         private DateTimeOffset _lastThinkingLabelRender = DateTimeOffset.MinValue;
         private bool _outputRenderDeferred;
+        private bool _forceOutputRender;
         private bool _outputSelectionLostByRender;
         private DispatcherTimer? _outputRenderResumeTimer;
         private DispatcherTimer? _autoCopySelectionTimer;
@@ -79,7 +80,7 @@ namespace TxtAIEditor.Controls
                 UIElement.PointerReleasedEvent,
                 new PointerEventHandler(OnOutputPointerReleased),
                 true);
-            _resourceOwner.ActualThemeChanged += (_, _) => RenderFullOutputText();
+            _resourceOwner.ActualThemeChanged += (_, _) => RenderFullOutputText(force: true);
         }
 
         public string RawOutputText
@@ -116,7 +117,7 @@ namespace TxtAIEditor.Controls
 
                 FlushAllPendingOutputText();
                 _renderer.HideHtmlCodeBlocks = value;
-                RenderFullOutputText();
+                RenderFullOutputText(force: true);
             }
         }
 
@@ -267,9 +268,10 @@ namespace TxtAIEditor.Controls
             ClearExplicitOutputSelection();
             _rawOutputText = text ?? string.Empty;
             _outputRenderDeferred = false;
+            _forceOutputRender = false;
             _outputSelectionLostByRender = false;
             _outputRenderResumeTimer?.Stop();
-            _renderer.UpdateRichText(_rawOutputText);
+            _renderer.UpdateRichText(_rawOutputText, force: true);
             _outputLength = _rawOutputText.Length;
         }
 
@@ -572,7 +574,7 @@ namespace TxtAIEditor.Controls
 
         private void ChangeOutputViewToEnd()
         {
-            if (IsOutputSelectionInteractionActive())
+            if (_userScrolledUp || IsOutputSelectionInteractionActive())
             {
                 return;
             }
@@ -683,7 +685,7 @@ namespace TxtAIEditor.Controls
             _outputLength = _thinkingLineStart + text.Length;
             if (!TryDeferOutputRenderForSelection())
             {
-                if (!_renderer.TrySetLastLine(text))
+                if (HideHtmlCodeBlocks || !_renderer.TrySetLastLine(text))
                 {
                     _renderer.UpdateRichText(_rawOutputText);
                 }
@@ -826,7 +828,7 @@ namespace TxtAIEditor.Controls
         private static string CollapseExcessBlankLinesForAppend(string existingText, string text)
         {
             string normalized = CollapseLineBreakRuns(NormalizeOutputLineBreaks(text));
-            int trailingBreaks = CountTrailingLineBreaks(NormalizeOutputLineBreaks(existingText));
+            int trailingBreaks = CountTrailingLineBreaks(existingText);
             int leadingBreaks = CountLeadingLineBreaks(normalized);
             int allowedLeadingBreaks = Math.Max(0, 2 - trailingBreaks);
             if (leadingBreaks > allowedLeadingBreaks)
@@ -888,9 +890,13 @@ namespace TxtAIEditor.Controls
         private static int CountTrailingLineBreaks(string text)
         {
             int count = 0;
-            for (int i = text.Length - 1; i >= 0 && text[i] == '\n'; i--)
+            for (int i = text.Length - 1; i >= 0 && (text[i] == '\n' || text[i] == '\r'); i--)
             {
                 count++;
+                if (text[i] == '\n' && i > 0 && text[i - 1] == '\r')
+                {
+                    i--;
+                }
             }
 
             return count;
@@ -918,14 +924,16 @@ namespace TxtAIEditor.Controls
             _renderer.AppendText(text);
         }
 
-        private void RenderFullOutputText()
+        private void RenderFullOutputText(bool force = false)
         {
+            _forceOutputRender |= force;
             if (TryDeferOutputRenderForSelection())
             {
                 return;
             }
 
-            _renderer.UpdateRichText(_rawOutputText);
+            _renderer.UpdateRichText(_rawOutputText, _forceOutputRender);
+            _forceOutputRender = false;
         }
 
         private bool IsOutputSelectionInteractionActive()
@@ -991,7 +999,8 @@ namespace TxtAIEditor.Controls
             _outputSelectionLostByRender = HasLiveOutputSelection();
             _outputRenderDeferred = false;
             _outputRenderResumeTimer?.Stop();
-            _renderer.UpdateRichText(_rawOutputText);
+            _renderer.UpdateRichText(_rawOutputText, _forceOutputRender);
+            _forceOutputRender = false;
             _outputLength = _rawOutputText.Length;
             ScrollOutputToEnd();
         }
