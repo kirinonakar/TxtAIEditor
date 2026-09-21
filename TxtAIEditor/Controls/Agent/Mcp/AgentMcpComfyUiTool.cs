@@ -49,7 +49,7 @@ namespace TxtAIEditor.Controls
             },
             "parameters": {
               "type": "object",
-              "description": "Optional replacements. Keys replace {{key}} placeholders and dot paths such as 6.inputs.text. You can set 6.inputs.image to \"\" to clear default workflow image names so that uploaded input images can be mapped."
+              "description": "Optional replacements. Keys replace {{key}} placeholders and dot paths such as 6.inputs.text. You can set 6.inputs.image to \"\" to clear default workflow image names so that uploaded input images can be mapped. All seed and noise_seed inputs are always replaced with fresh random seeds after these replacements; fixed seeds are not preserved."
             },
             "prompt": {
               "type": "string",
@@ -728,6 +728,7 @@ namespace TxtAIEditor.Controls
                 ApplyComfyParameters(promptNode, parameters);
                 ApplyComfyPromptText(promptNode, promptText);
                 ApplyComfyInputImages(promptNode, inputImages);
+                RandomizeComfySeeds(promptNode);
                 if (!workflowObject.ContainsKey("client_id"))
                 {
                     workflowObject["client_id"] = clientId;
@@ -739,11 +740,48 @@ namespace TxtAIEditor.Controls
             ApplyComfyParameters(workflowObject, parameters);
             ApplyComfyPromptText(workflowObject, promptText);
             ApplyComfyInputImages(workflowObject, inputImages);
+            RandomizeComfySeeds(workflowObject);
             return new JsonObject
             {
                 ["prompt"] = workflowObject,
                 ["client_id"] = clientId
             };
+        }
+
+        private static void RandomizeComfySeeds(JsonNode workflowNode)
+        {
+            if (workflowNode is not JsonObject workflowObject)
+            {
+                return;
+            }
+
+            foreach (var node in workflowObject)
+            {
+                if (node.Value is not JsonObject nodeObject ||
+                    !TryGetInputsObject(nodeObject, out var inputs))
+                {
+                    continue;
+                }
+
+                foreach (var input in inputs.ToList())
+                {
+                    if (!input.Key.Equals("seed", StringComparison.OrdinalIgnoreCase) &&
+                        !input.Key.Equals("noise_seed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    // Override literals and links after parameter replacement, keeping seeds JSON-safe.
+                    long seed;
+                    do
+                    {
+                        seed = Random.Shared.NextInt64(1L << 53);
+                    }
+                    while (JsonNode.DeepEquals(input.Value, JsonValue.Create(seed)));
+
+                    inputs[input.Key] = JsonValue.Create(seed);
+                }
+            }
         }
 
         private static int ApplyComfyParameters(JsonNode workflowNode, JsonObject parameters)
