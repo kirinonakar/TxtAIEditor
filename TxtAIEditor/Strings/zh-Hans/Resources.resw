@@ -3384,6 +3384,15 @@
   <data name="AgentMcpComfyUiSettingsInfo" xml:space="preserve">
     <value>启用 ComfyUI 插件时，会通过启动文件路径自动启动服务器，并将指定 API 工作流文件夹中的 JSON 列表提供给 Agent。</value>
   </data>
+  <data name="AgentMcpComfyUiRelatedSkillsLabel" xml:space="preserve">
+    <value>关联技能</value>
+  </data>
+  <data name="AgentMcpComfyUiRelatedSkillsInfo" xml:space="preserve">
+    <value>启用 ComfyUI 插件时，所选技能会一起启用。</value>
+  </data>
+  <data name="AgentMcpComfyUiRelatedSkillsEmpty" xml:space="preserve">
+    <value>没有安装技能</value>
+  </data>
   <data name="AgentMcpComfyUiStartStatusRunning" xml:space="preserve">
     <value>运行中</value>
   </data>

@@ -36,6 +36,13 @@ namespace TxtAIEditor.Controls
     {
         public string LaunchPath { get; set; } = string.Empty;
         public string WorkflowDirectory { get; set; } = string.Empty;
+        public List<string> RelatedSkillNames { get; set; } = new List<string>();
+    }
+
+    internal sealed class AgentMcpSkillOption
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
     }
 
     internal sealed class AgentMcpBrowserUseSettingsInput
@@ -209,7 +216,9 @@ namespace TxtAIEditor.Controls
             await ShowDialogAsync(dialog);
         }
 
-        public async Task<AgentMcpComfyUiSettingsInput?> ShowComfyUiSettingsAsync(AgentMcpComfyUiSettingsInput initial)
+        public async Task<AgentMcpComfyUiSettingsInput?> ShowComfyUiSettingsAsync(
+            AgentMcpComfyUiSettingsInput initial,
+            IReadOnlyList<AgentMcpSkillOption>? availableSkills = null)
         {
             var launchPathBox = CreateTextBox(_getString("AgentMcpComfyUiLaunchPathPlaceholder", "run_nvidia_gpu.bat 경로"));
             launchPathBox.Text = initial.LaunchPath;
@@ -255,11 +264,49 @@ namespace TxtAIEditor.Controls
 
             var workflowExplorerButton = CreateExplorerButton(workflowDirectoryBox);
 
+            var relatedSkillPanel = new StackPanel { Spacing = 4 };
+            if (availableSkills == null || availableSkills.Count == 0)
+            {
+                relatedSkillPanel.Children.Add(CreateInfoText(_getString(
+                    "AgentMcpComfyUiRelatedSkillsEmpty",
+                    "설치된 스킬 없음")));
+            }
+            else
+            {
+                var relatedSkillNames = new HashSet<string>(
+                    initial.RelatedSkillNames ?? new List<string>(),
+                    StringComparer.OrdinalIgnoreCase);
+                foreach (AgentMcpSkillOption skill in availableSkills)
+                {
+                    var skillCheckBox = new CheckBox
+                    {
+                        Content = skill.Name,
+                        IsChecked = relatedSkillNames.Contains(skill.Name),
+                        Tag = skill.Name
+                    };
+
+                    relatedSkillPanel.Children.Add(skillCheckBox);
+                }
+            }
+
+            var relatedSkillScrollViewer = new ScrollViewer
+            {
+                Content = relatedSkillPanel,
+                MaxHeight = 160,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            };
+
             var stack = new StackPanel { Spacing = 10, Width = 460 };
             stack.Children.Add(CreateLabel(_getString("AgentMcpComfyUiLaunchPathLabel", "ComfyUI 실행 파일")));
             stack.Children.Add(CreatePickerRow(launchPathBox, launchBrowseButton));
             stack.Children.Add(CreateLabel(_getString("AgentMcpComfyUiWorkflowDirectoryLabel", "워크플로우(API) 폴더")));
             stack.Children.Add(CreatePickerRow(workflowDirectoryBox, workflowBrowseButton, workflowExplorerButton));
+            stack.Children.Add(CreateLabel(_getString("AgentMcpComfyUiRelatedSkillsLabel", "연관 스킬")));
+            stack.Children.Add(relatedSkillScrollViewer);
+            stack.Children.Add(CreateInfoText(_getString(
+                "AgentMcpComfyUiRelatedSkillsInfo",
+                "선택한 스킬은 ComfyUI 플러그인을 활성화할 때 함께 활성화됩니다.")));
             stack.Children.Add(CreateInfoText(_getString(
                 "AgentMcpComfyUiSettingsInfo",
                 "ComfyUI 플러그인을 활성화하면 실행 파일 경로로 서버를 자동 실행하고, 지정한 API 워크플로우 폴더의 JSON 목록을 Agent에게 제공합니다.")));
@@ -284,7 +331,12 @@ namespace TxtAIEditor.Controls
             return new AgentMcpComfyUiSettingsInput
             {
                 LaunchPath = launchPathBox.Text?.Trim() ?? string.Empty,
-                WorkflowDirectory = workflowDirectoryBox.Text?.Trim() ?? string.Empty
+                WorkflowDirectory = workflowDirectoryBox.Text?.Trim() ?? string.Empty,
+                RelatedSkillNames = relatedSkillPanel.Children
+                    .OfType<CheckBox>()
+                    .Where(checkBox => checkBox.IsChecked == true && checkBox.Tag is string)
+                    .Select(checkBox => (string)checkBox.Tag)
+                    .ToList()
             };
         }
 

@@ -3426,6 +3426,15 @@ Plan: {0}</value>
   <data name="AgentMcpComfyUiSettingsInfo" xml:space="preserve">
     <value>When the ComfyUI plugin is enabled, TxtAIEditor starts the server from the launch file path and provides the Agent with the JSON list from the selected API workflow folder.</value>
   </data>
+  <data name="AgentMcpComfyUiRelatedSkillsLabel" xml:space="preserve">
+    <value>Related skills</value>
+  </data>
+  <data name="AgentMcpComfyUiRelatedSkillsInfo" xml:space="preserve">
+    <value>Selected skills are activated together when the ComfyUI plugin is enabled.</value>
+  </data>
+  <data name="AgentMcpComfyUiRelatedSkillsEmpty" xml:space="preserve">
+    <value>No installed skills</value>
+  </data>
   <data name="AgentMcpComfyUiStartStatusRunning" xml:space="preserve">
     <value>Running</value>
   </data>

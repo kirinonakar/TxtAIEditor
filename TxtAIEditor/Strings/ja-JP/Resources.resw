@@ -3384,6 +3384,15 @@
   <data name="AgentMcpComfyUiSettingsInfo" xml:space="preserve">
     <value>ComfyUI プラグインを有効にすると、起動ファイルのパスでサーバーを自動起動し、指定した API ワークフローフォルダーの JSON 一覧を Agent に提供します。</value>
   </data>
+  <data name="AgentMcpComfyUiRelatedSkillsLabel" xml:space="preserve">
+    <value>関連スキル</value>
+  </data>
+  <data name="AgentMcpComfyUiRelatedSkillsInfo" xml:space="preserve">
+    <value>選択したスキルは ComfyUI プラグインを有効にすると一緒に有効になります。</value>
+  </data>
+  <data name="AgentMcpComfyUiRelatedSkillsEmpty" xml:space="preserve">
+    <value>インストール済みスキルなし</value>
+  </data>
   <data name="AgentMcpComfyUiStartStatusRunning" xml:space="preserve">
     <value>実行中</value>
   </data>

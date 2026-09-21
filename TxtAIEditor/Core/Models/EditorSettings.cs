@@ -107,6 +107,7 @@ namespace TxtAIEditor.Core.Models
         // ComfyUI built-in MCP plugin
         public string ComfyUiLaunchPath { get; set; } = string.Empty;
         public string ComfyUiWorkflowDirectory { get; set; } = GetDefaultComfyUiWorkflowDirectory();
+        public List<string> ComfyUiRelatedSkillNames { get; set; } = new List<string>();
 
         // Browser Use built-in MCP plugin
         public bool BrowserUseAllowInteraction { get; set; } = true;

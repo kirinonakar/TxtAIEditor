@@ -23,6 +23,7 @@ namespace TxtAIEditor.Controls
         private readonly IReadOnlyList<string> _skillDirectories;
         private readonly List<AgentSkill> _skills = new();
         private readonly Dictionary<string, AgentSkill> _activePluginSkills = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, HashSet<string>> _builtInRelatedSkills = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _selectedSkillNames = new(StringComparer.OrdinalIgnoreCase);
         private Task? _loadTask;
         private bool _hasLoaded;
@@ -188,8 +189,45 @@ namespace TxtAIEditor.Controls
 
         public bool HasSelectedSkills()
         {
-            return _activePluginSkills.Count > 0 ||
-                _skills.Any(skill => _selectedSkillNames.Contains(skill.Name));
+            return GetSelectedSkills().Count > 0;
+        }
+
+        public async Task<IReadOnlyList<AgentMcpSkillOption>> GetInstalledSkillOptionsAsync()
+        {
+            await LoadIfNeededAsync();
+            return _skills
+                .Select(skill => new AgentMcpSkillOption
+                {
+                    Name = skill.Name,
+                    Description = skill.Description
+                })
+                .ToList();
+        }
+
+        public void SetBuiltInRelatedSkills(string pluginId, IReadOnlyList<string> skillNames)
+        {
+            string key = pluginId?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return;
+            }
+
+            var names = new HashSet<string>(
+                (skillNames ?? Array.Empty<string>())
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Select(name => name.Trim()),
+                StringComparer.OrdinalIgnoreCase);
+
+            if (names.Count == 0)
+            {
+                _builtInRelatedSkills.Remove(key);
+            }
+            else
+            {
+                _builtInRelatedSkills[key] = names;
+            }
+
+            UpdateUI();
         }
 
         public void ToggleSkill(string skillName)
@@ -291,6 +329,21 @@ namespace TxtAIEditor.Controls
             var selected = _skills
                 .Where(skill => _selectedSkillNames.Contains(skill.Name))
                 .ToList();
+            foreach (string relatedSkillName in EnumerateBuiltInRelatedSkillNames())
+            {
+                if (selected.Any(skill => skill.Name.Equals(relatedSkillName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                AgentSkill? relatedSkill = _skills.FirstOrDefault(skill =>
+                    skill.Name.Equals(relatedSkillName, StringComparison.OrdinalIgnoreCase));
+                if (relatedSkill != null)
+                {
+                    selected.Add(relatedSkill);
+                }
+            }
+
             foreach (AgentSkill pluginSkill in _activePluginSkills.Values)
             {
                 int existingIndex = selected.FindIndex(skill =>
@@ -306,6 +359,17 @@ namespace TxtAIEditor.Controls
             }
 
             return selected;
+        }
+
+        private IEnumerable<string> EnumerateBuiltInRelatedSkillNames()
+        {
+            foreach (HashSet<string> names in _builtInRelatedSkills.Values)
+            {
+                foreach (string name in names)
+                {
+                    yield return name;
+                }
+            }
         }
 
         private AgentSkill? FindSkill(string name)
@@ -345,7 +409,10 @@ namespace TxtAIEditor.Controls
                     CanDelete = AgentSkillDirectories.IsInsideUserSkillsDirectory(skill.SkillFilePath)
                 })
                 .ToList();
-            var selectedNames = _selectedSkillNames.ToList();
+            var selectedNames = _selectedSkillNames
+                .Concat(EnumerateBuiltInRelatedSkillNames())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
             void ApplyUI()
             {

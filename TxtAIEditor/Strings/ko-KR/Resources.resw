@@ -3426,6 +3426,15 @@
   <data name="AgentMcpComfyUiSettingsInfo" xml:space="preserve">
     <value>ComfyUI 플러그인을 활성화하면 실행 파일 경로로 서버를 자동 실행하고, 지정한 API 워크플로우 폴더의 JSON 목록을 Agent에게 제공합니다.</value>
   </data>
+  <data name="AgentMcpComfyUiRelatedSkillsLabel" xml:space="preserve">
+    <value>연관 스킬</value>
+  </data>
+  <data name="AgentMcpComfyUiRelatedSkillsInfo" xml:space="preserve">
+    <value>선택한 스킬은 ComfyUI 플러그인을 활성화할 때 함께 활성화됩니다.</value>
+  </data>
+  <data name="AgentMcpComfyUiRelatedSkillsEmpty" xml:space="preserve">
+    <value>설치된 스킬 없음</value>
+  </data>
   <data name="AgentMcpComfyUiStartStatusRunning" xml:space="preserve">
     <value>실행 중</value>
   </data>

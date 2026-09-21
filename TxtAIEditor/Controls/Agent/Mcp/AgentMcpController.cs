@@ -27,6 +27,8 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Action _contextChanged;
         private readonly Action<IReadOnlyList<AgentPluginSkill>>? _activePluginSkillsChanged;
+        private readonly Func<Task<IReadOnlyList<AgentMcpSkillOption>>>? _installedSkillsProvider;
+        private readonly Action<string, IReadOnlyList<string>>? _builtInPluginSkillsChanged;
         private readonly Func<string> _workspaceRootProvider;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
@@ -60,7 +62,9 @@ namespace TxtAIEditor.Controls
             Action? beforeDialog,
             Action? afterDialog,
             Action<TxtAIEditor.Core.Services.LLM.LlmMessageAttachment>? addImageAttachment = null,
-            Action<IReadOnlyList<AgentPluginSkill>>? activePluginSkillsChanged = null)
+            Action<IReadOnlyList<AgentPluginSkill>>? activePluginSkillsChanged = null,
+            Func<Task<IReadOnlyList<AgentMcpSkillOption>>>? installedSkillsProvider = null,
+            Action<string, IReadOnlyList<string>>? builtInPluginSkillsChanged = null)
         {
             _agentPane = agentPane;
             _initializePickerWindow = initializePickerWindow;
@@ -73,6 +77,8 @@ namespace TxtAIEditor.Controls
             _runtime = new AgentMcpRuntime(_credentialStore, _oauthService, workspaceRootProvider, _getString);
             _contextChanged = contextChanged;
             _activePluginSkillsChanged = activePluginSkillsChanged;
+            _installedSkillsProvider = installedSkillsProvider;
+            _builtInPluginSkillsChanged = builtInPluginSkillsChanged;
             _workspaceRootProvider = workspaceRootProvider;
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
@@ -238,6 +244,7 @@ namespace TxtAIEditor.Controls
             _selectedAgentPluginIds.RemoveWhere(id =>
                 _agentPlugins.All(plugin => !plugin.Id.Equals(id, StringComparison.OrdinalIgnoreCase)));
             NotifyActivePluginSkills();
+            UpdateComfyUiRelatedSkills();
             if (migratedPlaintextHeaders ||
                 migratedPlaintextOAuth ||
                 migratedPlaintextEnvironment ||
@@ -561,11 +568,17 @@ namespace TxtAIEditor.Controls
             string initialWorkflowDirectory = string.IsNullOrWhiteSpace(settings.ComfyUiWorkflowDirectory)
                 ? EditorSettings.GetDefaultComfyUiWorkflowDirectory()
                 : settings.ComfyUiWorkflowDirectory;
-            var input = await _dialogService.ShowComfyUiSettingsAsync(new AgentMcpComfyUiSettingsInput
-            {
-                LaunchPath = settings.ComfyUiLaunchPath,
-                WorkflowDirectory = initialWorkflowDirectory
-            });
+            IReadOnlyList<AgentMcpSkillOption> installedSkills = _installedSkillsProvider == null
+                ? Array.Empty<AgentMcpSkillOption>()
+                : await _installedSkillsProvider();
+            var input = await _dialogService.ShowComfyUiSettingsAsync(
+                new AgentMcpComfyUiSettingsInput
+                {
+                    LaunchPath = settings.ComfyUiLaunchPath,
+                    WorkflowDirectory = initialWorkflowDirectory,
+                    RelatedSkillNames = settings.ComfyUiRelatedSkillNames?.ToList() ?? new List<string>()
+                },
+                installedSkills);
             if (input == null)
             {
                 return;
@@ -589,7 +602,9 @@ namespace TxtAIEditor.Controls
 
             settings.ComfyUiLaunchPath = launchPath;
             settings.ComfyUiWorkflowDirectory = workflowDirectory;
+            settings.ComfyUiRelatedSkillNames = input.RelatedSkillNames?.ToList() ?? new List<string>();
             await _settingsService.SaveSettingsAsync(settings);
+            UpdateComfyUiRelatedSkills();
             RebuildAliases();
             UpdateUI();
         }
@@ -881,12 +896,14 @@ namespace TxtAIEditor.Controls
                 {
                     _selectedServerIds.Remove(_comfyUiTool.ServerId);
                     _comfyUiStatus = string.Empty;
+                    UpdateComfyUiRelatedSkills();
                     RebuildAliases();
                     UpdateUI();
                     return;
                 }
 
                 _selectedServerIds.Add(_comfyUiTool.ServerId);
+                UpdateComfyUiRelatedSkills();
                 RebuildAliases();
                 UpdateUI();
                 await EnsureBuiltInComfyUiReadyAsync(CancellationToken.None);
@@ -960,6 +977,7 @@ namespace TxtAIEditor.Controls
             if (_comfyUiTool.IsServerName(serverName))
             {
                 _selectedServerIds.Remove(_comfyUiTool.ServerId);
+                UpdateComfyUiRelatedSkills();
                 RebuildAliases();
                 UpdateUI();
                 return;
@@ -1689,6 +1707,19 @@ namespace TxtAIEditor.Controls
             {
                 StopServer(server.Id);
             }
+        }
+
+        private void UpdateComfyUiRelatedSkills()
+        {
+            if (_builtInPluginSkillsChanged == null)
+            {
+                return;
+            }
+
+            IReadOnlyList<string> relatedSkillNames = _selectedServerIds.Contains(_comfyUiTool.ServerId)
+                ? _settingsService.CurrentSettings.ComfyUiRelatedSkillNames ?? new List<string>()
+                : Array.Empty<string>();
+            _builtInPluginSkillsChanged(_comfyUiTool.ServerId, relatedSkillNames);
         }
 
         private void NotifyActivePluginSkills()
