@@ -45,6 +45,11 @@ namespace TxtAIEditor.Core.Services.LLM
             _providerName.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) ||
             _providerName.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
 
+        // The Custom provider targets arbitrary OpenAI-compatible endpoints that may
+        // expose a non-standard /responses route, so it always uses Chat Completions.
+        private bool ForcesChatCompletions =>
+            _providerName.Equals("Custom", StringComparison.OrdinalIgnoreCase);
+
         private async Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken)
         {
             var (context, output) = await ModelsDevCatalog.GetLimitsAsync(_providerName, model, cancellationToken);
@@ -68,7 +73,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 attachments,
                 tools);
 
-            if (await LlmResponsesApiClient.SupportsAsync(
+            if (!ForcesChatCompletions &&
+                await LlmResponsesApiClient.SupportsAsync(
                     _httpClient,
                     endpoint,
                     apiKey,
@@ -232,7 +238,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 attachments,
                 tools);
 
-            if (await LlmResponsesApiClient.SupportsAsync(
+            if (!ForcesChatCompletions &&
+                await LlmResponsesApiClient.SupportsAsync(
                     _httpClient,
                     endpoint,
                     apiKey,
