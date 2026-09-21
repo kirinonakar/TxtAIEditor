@@ -53,7 +53,7 @@ namespace TxtAIEditor.Controls
             },
             "prompt": {
               "type": "string",
-              "description": "Positive image prompt. If no explicit parameter path is provided, TxtAIEditor analyzes the workflow and fills a positive prompt text slot such as an empty StringConcatenate inputs.string_a linked from CLIPTextEncode."
+              "description": "Positive image prompt. TxtAIEditor follows positive conditioning connections and replaces the text or prompt input of text encoders (including CLIPTextEncode and TextEncodeQwenImage21), even when it contains default text. Linked empty StringConcatenate slots are also supported. Negative prompts are preserved and explicit parameters take precedence."
             },
             "inputImagePath": {
               "type": "string",
@@ -725,8 +725,9 @@ namespace TxtAIEditor.Controls
             string clientId = Guid.NewGuid().ToString("N");
             if (workflowObject.TryGetPropertyValue("prompt", out JsonNode? promptNode) && promptNode != null)
             {
+                var explicitInputs = GetExplicitComfyInputs(promptNode, parameters);
                 ApplyComfyParameters(promptNode, parameters);
-                ApplyComfyPromptText(promptNode, promptText);
+                ApplyComfyPromptText(promptNode, promptText, explicitInputs);
                 ApplyComfyInputImages(promptNode, inputImages);
                 RandomizeComfySeeds(promptNode);
                 if (!workflowObject.ContainsKey("client_id"))
@@ -737,8 +738,9 @@ namespace TxtAIEditor.Controls
                 return workflowObject;
             }
 
+            var workflowExplicitInputs = GetExplicitComfyInputs(workflowObject, parameters);
             ApplyComfyParameters(workflowObject, parameters);
-            ApplyComfyPromptText(workflowObject, promptText);
+            ApplyComfyPromptText(workflowObject, promptText, workflowExplicitInputs);
             ApplyComfyInputImages(workflowObject, inputImages);
             RandomizeComfySeeds(workflowObject);
             return new JsonObject
@@ -808,47 +810,117 @@ namespace TxtAIEditor.Controls
             return replacementCount;
         }
 
-        private static bool ApplyComfyPromptText(JsonNode workflowNode, string promptText)
+        private static HashSet<string> GetExplicitComfyInputs(JsonNode workflowNode, JsonObject parameters)
+        {
+            var paths = new HashSet<string>(StringComparer.Ordinal);
+            if (workflowNode is not JsonObject workflowObject)
+            {
+                return paths;
+            }
+
+            foreach (var node in workflowObject)
+            {
+                if (node.Value is not JsonObject nodeObject || !TryGetInputsObject(nodeObject, out var inputs))
+                {
+                    continue;
+                }
+
+                foreach (var input in inputs)
+                {
+                    string path = $"{node.Key}.inputs.{input.Key}";
+                    if (parameters.ContainsKey(path) ||
+                        parameters.ContainsKey($"{node.Key}.inputs") ||
+                        TryGetJsonString(input.Value, out string text) &&
+                        parameters.Any(parameter => text.Contains("{{" + parameter.Key + "}}", StringComparison.Ordinal)))
+                    {
+                        paths.Add(path);
+                    }
+                }
+            }
+
+            return paths;
+        }
+
+        private static bool ApplyComfyPromptText(JsonNode workflowNode, string promptText, HashSet<string> explicitInputs)
         {
             if (string.IsNullOrWhiteSpace(promptText) || workflowNode is not JsonObject workflowObject)
             {
                 return false;
             }
 
-            foreach (var node in workflowObject)
+            var positiveNodes = GetComfyConditioningAncestors(workflowObject, "positive");
+            var negativeNodes = GetComfyConditioningAncestors(workflowObject, "negative");
+
+            // A combined encoder can supply both positive and negative outputs (Qwen Image 2.1).
+            bool IsEligible(string id, JsonObject node) => !IsNegativePromptNode(node) &&
+                (!negativeNodes.Contains(id) || positiveNodes.Contains(id));
+
+            foreach (var node in workflowObject.OrderByDescending(node => positiveNodes.Contains(node.Key)))
             {
                 if (node.Value is not JsonObject nodeObject ||
-                    !IsPositiveClipTextEncodeNode(nodeObject))
+                    !IsEligible(node.Key, nodeObject) || !IsComfyTextEncodeNode(nodeObject))
                 {
                     continue;
                 }
 
-                if (TryApplyPromptToClipTextInput(workflowObject, nodeObject, promptText))
+                if (TryApplyPromptToEncoder(workflowObject, node.Key, promptText, explicitInputs, new HashSet<string>()))
                 {
                     return true;
                 }
             }
 
-            foreach (var node in workflowObject)
+            // Retain the legacy empty-string fallback for workflows without a known encoder.
+            foreach (string inputName in new[] { "string_a", "text" })
             {
-                if (node.Value is JsonObject nodeObject &&
-                    TryApplyPromptToStringA(nodeObject, promptText))
+                foreach (var node in workflowObject)
                 {
-                    return true;
-                }
-            }
-
-            foreach (var node in workflowObject)
-            {
-                if (node.Value is JsonObject nodeObject &&
-                    !IsNegativePromptNode(nodeObject) &&
-                    TryApplyPromptToTextInput(nodeObject, promptText))
-                {
-                    return true;
+                    if (node.Value is JsonObject nodeObject && IsEligible(node.Key, nodeObject) &&
+                        TryApplyComfyPromptInput(node.Key, nodeObject, inputName, promptText, explicitInputs, emptyOnly: true))
+                    {
+                        return true;
+                    }
                 }
             }
 
             return false;
+        }
+
+        private static HashSet<string> GetComfyConditioningAncestors(JsonObject workflow, string inputName)
+        {
+            var ancestors = new HashSet<string>(StringComparer.Ordinal);
+            var pending = new Stack<string>();
+            foreach (var node in workflow)
+            {
+                if (node.Value is JsonObject nodeObject && TryGetInputsObject(nodeObject, out var inputs) &&
+                    TryGetComfyLinkedNodeId(inputs[inputName], out string id))
+                {
+                    pending.Push(id);
+                }
+            }
+
+            while (pending.TryPop(out string? id))
+            {
+                if (!ancestors.Add(id) || workflow[id] is not JsonObject node || !TryGetInputsObject(node, out var inputs))
+                {
+                    continue;
+                }
+
+                foreach (var input in inputs)
+                {
+                    if (TryGetComfyLinkedNodeId(input.Value, out string upstreamId))
+                    {
+                        pending.Push(upstreamId);
+                    }
+                }
+            }
+
+            return ancestors;
+        }
+
+        private static bool TryGetComfyLinkedNodeId(JsonNode? node, out string id)
+        {
+            id = string.Empty;
+            return node is JsonArray link && link.Count == 2 && TryGetJsonString(link[0], out id);
         }
 
         private static int ApplyComfyInputImages(JsonNode workflowNode, IReadOnlyList<ComfyInputImageRef> inputImages)
@@ -913,51 +985,66 @@ namespace TxtAIEditor.Controls
                 title.Contains("Load Image", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool TryApplyPromptToClipTextInput(JsonObject workflowObject, JsonObject clipNode, string promptText)
+        private static bool TryApplyPromptToEncoder(
+            JsonObject workflow, string nodeId, string promptText, HashSet<string> explicitInputs, HashSet<string> visited)
         {
-            if (!TryGetInputsObject(clipNode, out var inputs) ||
-                !inputs.TryGetPropertyValue("text", out JsonNode? textNode))
+            if (!visited.Add(nodeId) || workflow[nodeId] is not JsonObject node ||
+                IsNegativePromptNode(node) || !TryGetInputsObject(node, out var inputs))
             {
                 return false;
             }
 
-            if (textNode is JsonArray link &&
-                link.Count > 0 &&
-                TryGetJsonString(link[0], out string linkedNodeId) &&
-                !string.IsNullOrWhiteSpace(linkedNodeId) &&
-                workflowObject.TryGetPropertyValue(linkedNodeId, out JsonNode? linkedNode) &&
-                linkedNode is JsonObject linkedObject)
+            foreach (string inputName in new[] { "string_a", "prompt", "text" })
             {
-                return TryApplyPromptToStringA(linkedObject, promptText) ||
-                    TryApplyPromptToTextInput(linkedObject, promptText);
+                if (!inputs.ContainsKey(inputName))
+                {
+                    continue;
+                }
+
+                if (explicitInputs.Contains($"{nodeId}.inputs.{inputName}"))
+                {
+                    return true;
+                }
+
+                if (TryGetComfyLinkedNodeId(inputs[inputName], out string linkedNodeId))
+                {
+                    if (TryApplyPromptToEncoder(workflow, linkedNodeId, promptText, explicitInputs, visited))
+                    {
+                        return true;
+                    }
+                }
+                else if (TryApplyComfyPromptInput(nodeId, node, inputName, promptText, explicitInputs,
+                    emptyOnly: inputName == "string_a" || !IsComfyTextEncodeNode(node)))
+                {
+                    return true;
+                }
             }
 
-            return TryApplyPromptToTextInput(clipNode, promptText);
+            return false;
         }
 
-        private static bool TryApplyPromptToStringA(JsonObject nodeObject, string promptText)
+        private static bool TryApplyComfyPromptInput(
+            string nodeId, JsonObject nodeObject, string inputName, string promptText,
+            HashSet<string> explicitInputs, bool emptyOnly)
         {
             if (!TryGetInputsObject(nodeObject, out var inputs) ||
-                !inputs.TryGetPropertyValue("string_a", out JsonNode? stringANode) ||
-                !IsEmptyJsonString(stringANode))
+                !inputs.TryGetPropertyValue(inputName, out JsonNode? input) ||
+                !TryGetJsonString(input, out string text))
             {
                 return false;
             }
 
-            inputs["string_a"] = JsonValue.Create(promptText);
-            return true;
-        }
+            if (explicitInputs.Contains($"{nodeId}.inputs.{inputName}"))
+            {
+                return true;
+            }
 
-        private static bool TryApplyPromptToTextInput(JsonObject nodeObject, string promptText)
-        {
-            if (!TryGetInputsObject(nodeObject, out var inputs) ||
-                !inputs.TryGetPropertyValue("text", out JsonNode? textNode) ||
-                !IsEmptyJsonString(textNode))
+            if (emptyOnly && !string.IsNullOrWhiteSpace(text))
             {
                 return false;
             }
 
-            inputs["text"] = JsonValue.Create(promptText);
+            inputs[inputName] = JsonValue.Create(promptText);
             return true;
         }
 
@@ -974,23 +1061,10 @@ namespace TxtAIEditor.Controls
             return true;
         }
 
-        private static bool IsPositiveClipTextEncodeNode(JsonObject nodeObject)
+        private static bool IsComfyTextEncodeNode(JsonObject nodeObject)
         {
             string classType = GetJsonObjectString(nodeObject, "class_type");
-            if (!classType.Contains("CLIPTextEncode", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            string title = GetNodeTitle(nodeObject);
-            if (title.Contains("negative", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            return title.Contains("positive", StringComparison.OrdinalIgnoreCase) ||
-                TryGetInputsObject(nodeObject, out var inputs) &&
-                inputs.ContainsKey("text");
+            return classType.Contains("TextEncode", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsNegativePromptNode(JsonObject nodeObject)
