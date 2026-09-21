@@ -264,7 +264,7 @@ namespace TxtAIEditor.Controls
 
             var workflowExplorerButton = CreateExplorerButton(workflowDirectoryBox);
 
-            var relatedSkillPanel = new StackPanel { Spacing = 4 };
+            var relatedSkillPanel = new StackPanel { Spacing = 0 };
             if (availableSkills == null || availableSkills.Count == 0)
             {
                 relatedSkillPanel.Children.Add(CreateInfoText(_getString(
@@ -282,7 +282,8 @@ namespace TxtAIEditor.Controls
                     {
                         Content = skill.Name,
                         IsChecked = relatedSkillNames.Contains(skill.Name),
-                        Tag = skill.Name
+                        Tag = skill.Name,
+                        FontSize = 12,
                     };
 
                     relatedSkillPanel.Children.Add(skillCheckBox);
