@@ -31,6 +31,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 { ("opencode-go", "kimi-k3"), (1000000, 131072) },
                 { ("opencode-go", "kimi-k2.7-code"), (262144, 262144) },
                 { ("opencode-go", "minimax-m3"), (512000, 131072) },
+                { ("opencode-go", "mimo-v2.6-flash"), (1000000, 128000) },
+                { ("opencode-go", "mimo-v2.6-pro"), (1048576, 128000) },
                 { ("opencode-go", "mimo-v2.5"), (1000000, 128000) },
                 { ("opencode-go", "mimo-v2.5-pro"), (1048576, 128000) },
                 { ("opencode-go", "mimo-v2-omni"), (262144, 128000) },
