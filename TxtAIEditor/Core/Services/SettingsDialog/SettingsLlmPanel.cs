@@ -46,6 +46,7 @@ namespace TxtAIEditor.Core.Services
         private readonly Slider _maxToolCallsSlider;
         private Task? _secretsLoadTask;
         private bool _secretsLoadRequested;
+        private string _lastSelectedProviderName = string.Empty;
 
         private SettingsLlmPanel(EditorSettings settings, ILLMService llmService, Func<string, string, string> getString)
         {
@@ -54,6 +55,7 @@ namespace TxtAIEditor.Core.Services
             _getString = getString;
 
             _llmProviderCombo = CreateProviderCombo(settings);
+            _lastSelectedProviderName = GetSelectedProviderName();
             string initialLlmEndpoint = settings.LlmProvider.Equals("Custom", StringComparison.OrdinalIgnoreCase)
                 ? (settings.LlmEndpointCustom ?? string.Empty)
                 : settings.LlmEndpoint;
@@ -502,7 +504,8 @@ namespace TxtAIEditor.Core.Services
             _llmProviderCombo.SelectionChanged += async (_, __) =>
             {
                 string provider = GetSelectedProviderName();
-                ApplyProviderDefaults(provider);
+                ApplyProviderDefaults(provider, _lastSelectedProviderName);
+                _lastSelectedProviderName = provider;
                 PopulateModelChoices(provider, SettingsLlmModelCatalog.GetModelForProviderChange(_settings, provider));
                 UpdateModelRefreshButtonVisibility();
 
@@ -767,7 +770,7 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private void ApplyProviderDefaults(string provider)
+        private void ApplyProviderDefaults(string provider, string previousProvider)
         {
             if (provider.Equals("Custom", StringComparison.OrdinalIgnoreCase))
             {
@@ -775,7 +778,12 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            if (!SettingsLlmModelCatalog.IsKnownDefaultEndpoint(_llmEndpointBox.Text.Trim()))
+            // Leaving the Custom provider: the box still holds the custom endpoint,
+            // which is not a known default, so always switch to the new provider's endpoint.
+            bool previousWasCustom = previousProvider != null &&
+                previousProvider.Equals("Custom", StringComparison.OrdinalIgnoreCase);
+            if (!previousWasCustom &&
+                !SettingsLlmModelCatalog.IsKnownDefaultEndpoint(_llmEndpointBox.Text.Trim()))
             {
                 return;
             }
