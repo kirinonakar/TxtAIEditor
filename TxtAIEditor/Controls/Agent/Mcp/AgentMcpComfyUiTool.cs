@@ -66,7 +66,7 @@ namespace TxtAIEditor.Controls
             },
             "outputFileName": {
               "type": "string",
-              "description": "File name or path for the generated image. Relative paths are saved under the current workspace."
+              "description": "File name or path for the generated image. Relative paths are saved under the current workspace. Paths outside the workspace are saved under the current workspace as well."
             },
             "endpoint": {
               "type": "string",
@@ -288,7 +288,7 @@ namespace TxtAIEditor.Controls
                 pollIntervalMs,
                 cancellationToken);
             byte[] imageBytes = await DownloadComfyImageAsync(endpoint, image, cancellationToken);
-            string fullPath = ResolveComfyOutputPath(outputPath, image);
+            string fullPath = ResolveComfyOutputPath(outputPath, image, out bool relocatedToWorkspace);
             string? directory = Path.GetDirectoryName(fullPath);
             if (!string.IsNullOrWhiteSpace(directory))
             {
@@ -311,7 +311,10 @@ namespace TxtAIEditor.Controls
             string workflowText = string.IsNullOrWhiteSpace(workflowDisplayPath)
                 ? string.Empty
                 : $"\nworkflow: {workflowDisplayPath}";
-            return $"MCP tool result: ComfyUI image saved: {displayPath}\nprompt_id: {promptId}\nsource_image: {image.FileName}{workflowText}{uploadedText}";
+            string workspaceSaveText = relocatedToWorkspace
+                ? "\nsaved_to_workspace: true (the requested output path was outside the workspace, so the image was saved inside the workspace)"
+                : string.Empty;
+            return $"MCP tool result: ComfyUI image saved: {displayPath}\nprompt_id: {promptId}\nsource_image: {image.FileName}{workflowText}{uploadedText}{workspaceSaveText}";
         }
 
         private async Task<string> ExecuteReadWorkflowAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -1633,8 +1636,9 @@ namespace TxtAIEditor.Controls
             return bytes;
         }
 
-        private string ResolveComfyOutputPath(string requestedPath, ComfyImageRef image)
+        private string ResolveComfyOutputPath(string requestedPath, ComfyImageRef image, out bool relocatedToWorkspace)
         {
+            relocatedToWorkspace = false;
             string path = requestedPath.Trim();
             if (path.EndsWith(Path.DirectorySeparatorChar) || path.EndsWith(Path.AltDirectorySeparatorChar))
             {
@@ -1653,12 +1657,26 @@ namespace TxtAIEditor.Controls
                 ? Path.GetFullPath(path)
                 : Path.GetFullPath(Path.Combine(root, path));
 
-            if (!IsAllowedComfyOutputPath(root, fullPath))
+            if (IsAllowedComfyOutputPath(root, fullPath))
             {
-                throw new InvalidOperationException("ComfyUI output path must stay inside the workspace, C:\\tmp, or the system temp directory.");
+                return fullPath;
             }
 
-            return fullPath;
+            // The requested path is outside the workspace, C:\tmp, and the temp directory.
+            // Save the image inside the workspace instead of failing the tool call.
+            relocatedToWorkspace = true;
+            string fileName = Path.GetFileName(path);
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                fileName = Path.GetFileName(image.FileName);
+            }
+
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                fileName = "comfyui_output.png";
+            }
+
+            return Path.GetFullPath(Path.Combine(root, fileName));
         }
 
         private string ResolveWorkspaceRoot()
