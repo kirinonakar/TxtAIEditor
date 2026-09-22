@@ -45,7 +45,7 @@ namespace TxtAIEditor.Core.Services
 
             ApplyDefaults(loadedSettings);
             CurrentSettings = loadedSettings;
-            LlmRequestTuning.Apply(CurrentSettings.LlmApiFormat, CurrentSettings.LlmMaxContextLength);
+            LlmRequestTuning.Apply(CurrentSettings.LlmApiFormat, CurrentSettings.LlmMaxContextLength, CurrentSettings.LlmDisableTemperature);
             IsLoaded = true;
         }
 
@@ -70,7 +70,7 @@ namespace TxtAIEditor.Core.Services
             try
             {
                 CurrentSettings = settings;
-                LlmRequestTuning.Apply(CurrentSettings.LlmApiFormat, CurrentSettings.LlmMaxContextLength);
+                LlmRequestTuning.Apply(CurrentSettings.LlmApiFormat, CurrentSettings.LlmMaxContextLength, CurrentSettings.LlmDisableTemperature);
                 IsLoaded = true;
                 string? dir = Path.GetDirectoryName(_settingsFilePath);
                 if (dir != null && !Directory.Exists(dir))

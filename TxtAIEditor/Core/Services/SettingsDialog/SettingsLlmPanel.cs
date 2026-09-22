@@ -29,6 +29,7 @@ namespace TxtAIEditor.Core.Services
         private readonly CheckBox _confirmBeforeSendingCheck;
         private readonly CheckBox _agentVerboseCheck;
         private readonly CheckBox _retainThinkingCheck;
+        private readonly CheckBox _disableTemperatureCheck;
         private readonly CheckBox _agentAutoApproveGitEditsCheck;
         private readonly CheckBox _agentAutoApprovePowerShellCheck;
         private readonly CheckBox _agentAutoApprovePlanningCheck;
@@ -82,6 +83,7 @@ namespace TxtAIEditor.Core.Services
             _confirmBeforeSendingCheck = new CheckBox { Content = getString("SettingsLlmConfirmBeforeSending", "전송 전 확인"), IsChecked = settings.LlmConfirmBeforeSending };
             _agentVerboseCheck = new CheckBox { Content = getString("SettingsLlmAgentVerbose", "Agent 상세 출력 활성화 (Verbose)"), IsChecked = settings.LlmAgentVerbose };
             _retainThinkingCheck = new CheckBox { Content = getString("SettingsLlmRetainThinking", "추론 유지 (Retain thinking)"), IsChecked = settings.LlmRetainThinking };
+            _disableTemperatureCheck = new CheckBox { Content = getString("SettingsLlmDisableTemperature", "temperature 보내지 않기"), IsChecked = settings.LlmDisableTemperature };
             _agentAutoApproveGitEditsCheck = new CheckBox { Content = getString("SettingsLlmAgentAutoApproveGitEdits", "Git 폴더 내 파일 변경/생성 자동 승인"), IsChecked = settings.LlmAgentAutoApproveGitEdits };
             _agentAutoApprovePowerShellCheck = new CheckBox { Content = getString("SettingsLlmAgentAutoApprovePowerShell", "고위험 PowerShell 명령 외 자동 승인"), IsChecked = settings.LlmAgentAutoApprovePowerShell };
             _agentAutoApprovePlanningCheck = new CheckBox { Content = getString("SettingsLlmAgentAutoApprovePlanning", "계획 실행 자동 승인"), IsChecked = settings.LlmAgentAutoApprovePlanning };
@@ -210,6 +212,7 @@ namespace TxtAIEditor.Core.Services
             settings.LlmConfirmBeforeSending = _confirmBeforeSendingCheck.IsChecked == true;
             settings.LlmAgentVerbose = _agentVerboseCheck.IsChecked == true;
             settings.LlmRetainThinking = _retainThinkingCheck.IsChecked == true;
+            settings.LlmDisableTemperature = _disableTemperatureCheck.IsChecked == true;
             settings.LlmAgentAutoApproveGitEdits = _agentAutoApproveGitEditsCheck.IsChecked == true;
             settings.LlmAgentAutoApprovePowerShell = _agentAutoApprovePowerShellCheck.IsChecked == true;
             settings.LlmAgentAutoApprovePlanning = _agentAutoApprovePlanningCheck.IsChecked == true;
@@ -415,6 +418,7 @@ namespace TxtAIEditor.Core.Services
             content.Children.Add(_confirmBeforeSendingCheck);
             content.Children.Add(_agentVerboseCheck);
             content.Children.Add(_retainThinkingCheck);
+            content.Children.Add(_disableTemperatureCheck);
 
             var maxToolCallsLabel = new TextBlock
             {

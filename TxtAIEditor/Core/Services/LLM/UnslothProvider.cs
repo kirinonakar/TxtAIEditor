@@ -65,9 +65,9 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 ["model"] = model,
                 ["messages"] = BuildMessages(systemPrompt, userContent, attachments),
-                ["temperature"] = 0.5,
                 ["stream"] = false
             };
+            LlmRequestTuning.SetTemperature(payloadDict, 0.5);
             AddReasoning(payloadDict);
             AddTools(payloadDict, tools);
 
@@ -162,13 +162,13 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 ["model"] = model,
                 ["messages"] = BuildMessages(systemPrompt, userContent, attachments),
-                ["temperature"] = 0.5,
                 ["stream"] = true,
                 ["stream_options"] = new Dictionary<string, object>
                 {
                     ["include_usage"] = true
                 }
             };
+            LlmRequestTuning.SetTemperature(payloadDict, 0.5);
             AddReasoning(payloadDict);
             AddTools(payloadDict, tools);
 

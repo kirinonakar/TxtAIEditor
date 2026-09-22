@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace TxtAIEditor.Core.Services.LLM
@@ -25,6 +26,9 @@ namespace TxtAIEditor.Core.Services.LLM
         /// <summary>User supplied context length in tokens; 0 means auto (use the catalog value).</summary>
         public static int MaxContextTokens { get; private set; }
 
+        /// <summary>When true, the temperature parameter is omitted from request payloads.</summary>
+        public static bool DisableTemperature { get; private set; }
+
         public static bool ForcesResponses =>
             ApiFormat.Equals(ApiFormatResponses, StringComparison.Ordinal);
 
@@ -34,10 +38,22 @@ namespace TxtAIEditor.Core.Services.LLM
         public static bool ForcesMessages =>
             ApiFormat.Equals(ApiFormatMessages, StringComparison.Ordinal);
 
-        public static void Apply(string? apiFormat, string? maxContextLength)
+        public static void Apply(string? apiFormat, string? maxContextLength, bool disableTemperature)
         {
             ApiFormat = NormalizeApiFormat(apiFormat);
             MaxContextTokens = ParseMaxContextTokens(maxContextLength);
+            DisableTemperature = disableTemperature;
+        }
+
+        /// <summary>
+        /// Writes the temperature parameter into a request payload unless the user disabled it.
+        /// </summary>
+        public static void SetTemperature(IDictionary<string, object> payload, double temperature)
+        {
+            if (!DisableTemperature)
+            {
+                payload["temperature"] = temperature;
+            }
         }
 
         public static string NormalizeApiFormat(string? value)

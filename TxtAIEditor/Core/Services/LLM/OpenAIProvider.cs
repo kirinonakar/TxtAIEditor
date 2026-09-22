@@ -144,7 +144,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (!_isOAuth)
             {
-                payloadDict["temperature"] = IsKimiModel(model) ? 1.0 : 0.5;
+                LlmRequestTuning.SetTemperature(payloadDict, IsKimiModel(model) ? 1.0 : 0.5);
             }
             if (outputLimit > 0)
             {
@@ -320,7 +320,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (!_isOAuth)
             {
-                payloadDict["temperature"] = IsKimiModel(model) ? 1.0 : 0.5;
+                LlmRequestTuning.SetTemperature(payloadDict, IsKimiModel(model) ? 1.0 : 0.5);
             }
             if (outputLimit > 0)
             {

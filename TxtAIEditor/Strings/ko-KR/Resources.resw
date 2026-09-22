@@ -2568,6 +2568,9 @@
   <data name="SettingsLlmRetainThinking" xml:space="preserve">
     <value>추론 유지 (thinking을 history와 다음 turn에 전달)</value>
   </data>
+  <data name="SettingsLlmDisableTemperature" xml:space="preserve">
+    <value>temperature 보내지 않기</value>
+  </data>
   <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
     <value>Git 폴더 내 파일 변경/생성 자동 승인</value>
   </data>

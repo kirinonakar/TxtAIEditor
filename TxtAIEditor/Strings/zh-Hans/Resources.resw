@@ -2568,6 +2568,9 @@
   <data name="SettingsLlmRetainThinking" xml:space="preserve">
     <value>在历史记录中保留推理并传递到下一轮</value>
   </data>
+  <data name="SettingsLlmDisableTemperature" xml:space="preserve">
+    <value>不发送 temperature</value>
+  </data>
   <data name="SettingsLlmAgentAutoApproveGitEdits" xml:space="preserve">
     <value>自动批准 Git 文件夹内的文件更改/创建</value>
   </data>

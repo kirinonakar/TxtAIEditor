@@ -225,8 +225,8 @@ namespace TxtAIEditor.Core.Services.LLM
                     new { role = "system", content = (object)systemPrompt },
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
-                ["temperature"] = 0.5
             };
+            LlmRequestTuning.SetTemperature(payloadDict, 0.5);
 
             if (tools != null && tools.Count > 0)
             {

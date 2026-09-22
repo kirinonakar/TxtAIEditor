@@ -317,9 +317,9 @@ namespace TxtAIEditor.Core.Services.LLM
 
             var generationConfigDict = new Dictionary<string, object>
             {
-                ["temperature"] = 0.5,
                 ["maxOutputTokens"] = outputLimit
             };
+            LlmRequestTuning.SetTemperature(generationConfigDict, 0.5);
 
             if (HasThinking)
             {
@@ -460,9 +460,9 @@ namespace TxtAIEditor.Core.Services.LLM
 
             var generationConfigDict = new Dictionary<string, object>
             {
-                ["temperature"] = 0.5,
                 ["maxOutputTokens"] = outputLimit
             };
+            LlmRequestTuning.SetTemperature(generationConfigDict, 0.5);
 
             if (HasThinking)
             {

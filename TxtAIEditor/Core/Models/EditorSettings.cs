@@ -95,6 +95,7 @@ namespace TxtAIEditor.Core.Models
         public bool LlmConfirmBeforeSending { get; set; } = false;
         public bool LlmAgentVerbose { get; set; } = false;
         public bool LlmRetainThinking { get; set; } = true;
+        public bool LlmDisableTemperature { get; set; } = false;
         public bool LlmAgentAutoApproveGitEdits { get; set; } = false;
         public bool LlmAgentAutoApprovePowerShell { get; set; } = false;
         public bool LlmAgentAutoApprovePlanning { get; set; } = false;

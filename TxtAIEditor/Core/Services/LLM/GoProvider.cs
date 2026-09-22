@@ -166,13 +166,13 @@ namespace TxtAIEditor.Core.Services.LLM
                     new { role = "system", content = (object)systemPrompt },
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
-                ["temperature"] = IsKimiModel(model) ? 1.0 : 0.5,
                 ["max_tokens"] = outputLimit,
                 ["prompt_cache_key"] = LlmResponsesApiClient.BuildPromptCacheKey(
                     model,
                     systemPrompt,
                     userContent)
             };
+            LlmRequestTuning.SetTemperature(payloadDict, IsKimiModel(model) ? 1.0 : 0.5);
 
             if (tools != null && tools.Count > 0)
             {
@@ -351,7 +351,6 @@ namespace TxtAIEditor.Core.Services.LLM
                     new { role = "system", content = (object)systemPrompt },
                     new { role = "user", content = BuildUserContent(userContent, attachments) }
                 },
-                ["temperature"] = IsKimiModel(model) ? 1.0 : 0.5,
                 ["stream"] = true,
                 ["max_tokens"] = outputLimit,
                 ["stream_options"] = new Dictionary<string, object>
@@ -363,6 +362,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     systemPrompt,
                     userContent)
             };
+            LlmRequestTuning.SetTemperature(payloadDict, IsKimiModel(model) ? 1.0 : 0.5);
 
             if (tools != null && tools.Count > 0)
             {
