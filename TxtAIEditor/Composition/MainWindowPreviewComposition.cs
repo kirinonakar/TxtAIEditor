@@ -32,7 +32,7 @@ namespace TxtAIEditor.Composition
         Action CloseActiveTabRequested,
         Action MoveActiveTabLeftRequested,
         Action MoveActiveTabRightRequested,
-        Func<string, Task> LoadFileAsync,
+        Func<string, int, Task> LoadFileAsync,
         Func<CoreWebView2WebMessageReceivedEventArgs, string> NormalizeWebMessageJson,
         Func<string> GetCurrentFolderPath,
         Func<string> GetCurrentRepoPath,

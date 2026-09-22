@@ -26,12 +26,12 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Func<CoreWebView2WebMessageReceivedEventArgs, string> _normalizeWebMessageJson;
         private readonly Action<string> _shortcutHandler;
-        private readonly Func<string, Task> _openFileAsync;
+        private readonly Func<string, int, Task> _openFileAsync;
 
         public CompareTabController(
             IFileService fileService,
             ISettingsService settingsService,
-            Func<string, Task> openFileAsync,
+            Func<string, int, Task> openFileAsync,
             MainWindowViewModel viewModel,
             EditorWorkspacePane editorWorkspace,
             TabView editorTabView,
@@ -244,8 +244,15 @@ namespace TxtAIEditor.Controls
                              root.TryGetProperty("path", out var pathProp))
                     {
                         string filePath = pathProp.GetString() ?? string.Empty;
+                        int lineNumber = 0;
+                        if (root.TryGetProperty("lineNumber", out var lineProp) &&
+                            lineProp.ValueKind == JsonValueKind.Number)
+                        {
+                            lineNumber = lineProp.GetInt32();
+                        }
+
                         if (!string.IsNullOrEmpty(filePath))
-                            await _openFileAsync(filePath);
+                            await _openFileAsync(filePath, lineNumber);
                     }
                 }
             }

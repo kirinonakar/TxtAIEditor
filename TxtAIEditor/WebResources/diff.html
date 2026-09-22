@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -353,9 +353,29 @@
         // ── Right panel file open ────────────────────────────────────────
         let rightFilePath = '';
 
+        // 현재 보이는 영역의 첫 번째 줄 번호(수정본 기준)를 반환한다.
+        function getCurrentRightLine() {
+            const totalRows = globalDiffB.length;
+            if (totalRows === 0) return 0;
+
+            const startIndex = Math.min(
+                totalRows - 1,
+                Math.max(0, Math.floor(rightWrapper.scrollTop / rowHeight)));
+
+            for (let k = startIndex; k < totalRows; k++) {
+                const item = globalDiffB[k];
+                if (item && item.lineNum) return item.lineNum;
+            }
+            for (let k = startIndex - 1; k >= 0; k--) {
+                const item = globalDiffB[k];
+                if (item && item.lineNum) return item.lineNum;
+            }
+            return 0;
+        }
+
         function openRightFile() {
             if (rightFilePath) {
-                post({ type: 'openFile', path: rightFilePath });
+                post({ type: 'openFile', path: rightFilePath, lineNumber: getCurrentRightLine() });
             }
         }
 
