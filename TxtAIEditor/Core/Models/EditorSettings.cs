@@ -90,6 +90,8 @@ namespace TxtAIEditor.Core.Models
         public string LlmVisionFallbackModel { get; set; } = "";
         public string LlmVisionFallbackThinkingLevel { get; set; } = "default";
         public string LlmThinkingLevel { get; set; } = "default";
+        public string LlmApiFormat { get; set; } = "auto";
+        public string LlmMaxContextLength { get; set; } = "auto";
         public bool LlmConfirmBeforeSending { get; set; } = false;
         public bool LlmAgentVerbose { get; set; } = false;
         public bool LlmRetainThinking { get; set; } = true;

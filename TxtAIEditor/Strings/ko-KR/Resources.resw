@@ -464,6 +464,30 @@
   <data name="SettingsLlmThinkingLevelXHigh" xml:space="preserve">
     <value>매우 높음 (xhigh)</value>
   </data>
+  <data name="SettingsLlmApiFormat" xml:space="preserve">
+    <value>API</value>
+  </data>
+  <data name="SettingsLlmApiFormatAuto" xml:space="preserve">
+    <value>자동 (Auto)</value>
+  </data>
+  <data name="SettingsLlmApiFormatChat" xml:space="preserve">
+    <value>Chat completion</value>
+  </data>
+  <data name="SettingsLlmApiFormatResponses" xml:space="preserve">
+    <value>Responses</value>
+  </data>
+  <data name="SettingsLlmApiFormatMessages" xml:space="preserve">
+    <value>messages</value>
+  </data>
+  <data name="SettingsLlmMaxContextLength" xml:space="preserve">
+    <value>최대 컨텍스트 길이 (Max context length)</value>
+  </data>
+  <data name="SettingsLlmMaxContextLengthAuto" xml:space="preserve">
+    <value>자동 (Auto)</value>
+  </data>
+  <data name="SettingsLlmMaxContextLengthPlaceholder" xml:space="preserve">
+    <value>예: 128k, 150k, 1m</value>
+  </data>
   <data name="SettingsLlmThinkingLevelMax" xml:space="preserve">
     <value>최대 (Max)</value>
   </data>

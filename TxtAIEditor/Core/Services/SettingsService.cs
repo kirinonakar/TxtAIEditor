@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services.LLM;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -44,6 +45,7 @@ namespace TxtAIEditor.Core.Services
 
             ApplyDefaults(loadedSettings);
             CurrentSettings = loadedSettings;
+            LlmRequestTuning.Apply(CurrentSettings.LlmApiFormat, CurrentSettings.LlmMaxContextLength);
             IsLoaded = true;
         }
 
@@ -58,6 +60,9 @@ namespace TxtAIEditor.Core.Services
             {
                 settings.ComfyUiWorkflowDirectory = EditorSettings.GetDefaultComfyUiWorkflowDirectory();
             }
+
+            settings.LlmApiFormat = LlmRequestTuning.NormalizeApiFormat(settings.LlmApiFormat);
+            settings.LlmMaxContextLength = LlmRequestTuning.NormalizeMaxContextLength(settings.LlmMaxContextLength);
         }
 
         public async Task SaveSettingsAsync(EditorSettings settings)
@@ -65,6 +70,7 @@ namespace TxtAIEditor.Core.Services
             try
             {
                 CurrentSettings = settings;
+                LlmRequestTuning.Apply(CurrentSettings.LlmApiFormat, CurrentSettings.LlmMaxContextLength);
                 IsLoaded = true;
                 string? dir = Path.GetDirectoryName(_settingsFilePath);
                 if (dir != null && !Directory.Exists(dir))

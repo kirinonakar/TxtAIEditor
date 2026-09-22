@@ -464,6 +464,30 @@
   <data name="SettingsLlmThinkingLevelXHigh" xml:space="preserve">
     <value>非常高 (xhigh)</value>
   </data>
+  <data name="SettingsLlmApiFormat" xml:space="preserve">
+    <value>API</value>
+  </data>
+  <data name="SettingsLlmApiFormatAuto" xml:space="preserve">
+    <value>自動 (Auto)</value>
+  </data>
+  <data name="SettingsLlmApiFormatChat" xml:space="preserve">
+    <value>Chat completion</value>
+  </data>
+  <data name="SettingsLlmApiFormatResponses" xml:space="preserve">
+    <value>Responses</value>
+  </data>
+  <data name="SettingsLlmApiFormatMessages" xml:space="preserve">
+    <value>messages</value>
+  </data>
+  <data name="SettingsLlmMaxContextLength" xml:space="preserve">
+    <value>最大上下文長度 (Max context length)</value>
+  </data>
+  <data name="SettingsLlmMaxContextLengthAuto" xml:space="preserve">
+    <value>自動 (Auto)</value>
+  </data>
+  <data name="SettingsLlmMaxContextLengthPlaceholder" xml:space="preserve">
+    <value>例如: 128k, 150k, 1m</value>
+  </data>
   <data name="SettingsLlmThinkingLevelMax" xml:space="preserve">
     <value>最高 (Max)</value>
   </data>

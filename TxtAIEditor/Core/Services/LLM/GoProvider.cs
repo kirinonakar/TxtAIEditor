@@ -117,7 +117,7 @@ namespace TxtAIEditor.Core.Services.LLM
             if (string.IsNullOrEmpty(apiKey))
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
-            if (IsAnthropicModel(model))
+            if (IsAnthropicModel(model) || LlmRequestTuning.ForcesMessages)
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.AnthropicMessages);
                 return await GenerateAnthropicCompletionAsync(endpoint, apiKey, model, systemPrompt, userContent, cancellationToken, attachments, tools, onUsage, onNativeToolCall);
@@ -132,7 +132,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 attachments,
                 tools);
 
-            if (UsesResponsesApi(model))
+            if (LlmRequestTuning.ForcesResponses ||
+                (!LlmRequestTuning.ForcesChatCompletions && UsesResponsesApi(model)))
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 return await LlmResponsesApiClient.GenerateCompletionAsync(
@@ -298,7 +299,7 @@ namespace TxtAIEditor.Core.Services.LLM
             if (string.IsNullOrEmpty(apiKey))
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
 
-            if (IsAnthropicModel(model))
+            if (IsAnthropicModel(model) || LlmRequestTuning.ForcesMessages)
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.AnthropicMessages);
                 await GenerateAnthropicCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, onNativeToolCall);
@@ -314,7 +315,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 attachments,
                 tools);
 
-            if (UsesResponsesApi(model))
+            if (LlmRequestTuning.ForcesResponses ||
+                (!LlmRequestTuning.ForcesChatCompletions && UsesResponsesApi(model)))
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 await LlmResponsesApiClient.GenerateCompletionStreamAsync(

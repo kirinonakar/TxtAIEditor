@@ -48,6 +48,17 @@ namespace TxtAIEditor.Core.Services.LLM
             CancellationToken cancellationToken = default,
             Action<HttpRequestMessage>? configureRequest = null)
         {
+            // The LLM settings can force a specific API shape instead of probing.
+            if (LlmRequestTuning.ForcesChatCompletions || LlmRequestTuning.ForcesMessages)
+            {
+                return false;
+            }
+
+            if (LlmRequestTuning.ForcesResponses)
+            {
+                return true;
+            }
+
             // DeepSeek models always use Chat Completions; skip the Responses API probe.
             if (IsDeepSeekModel(model))
             {

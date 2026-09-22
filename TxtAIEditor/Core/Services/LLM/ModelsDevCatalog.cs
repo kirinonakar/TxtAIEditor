@@ -228,6 +228,18 @@ namespace TxtAIEditor.Core.Services.LLM
 
         private static (int context, int output) Resolve(string appProvider, string model)
         {
+            (int context, int output) limits = ResolveModelLimits(appProvider, model);
+            int maxContextTokens = LlmRequestTuning.MaxContextTokens;
+            if (maxContextTokens > 0)
+            {
+                limits.context = maxContextTokens;
+            }
+
+            return limits;
+        }
+
+        private static (int context, int output) ResolveModelLimits(string appProvider, string model)
+        {
             if (string.IsNullOrWhiteSpace(model)) return (0, 0);
             string providerKey = MapProviderKey(appProvider);
 

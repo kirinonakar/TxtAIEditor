@@ -35,6 +35,8 @@ namespace TxtAIEditor.Core.Services
         private readonly ComboBox _sourceLangCombo;
         private readonly ComboBox _targetLangCombo;
         private readonly ComboBox _llmThinkingLevelCombo;
+        private readonly ComboBox _llmApiFormatCombo;
+        private readonly ComboBox _llmMaxContextLengthCombo;
         private readonly Button _refreshModelsButton;
         private readonly Button _visionFallbackRefreshModelsButton;
         private readonly TextBlock _modelStatusText;
@@ -87,6 +89,8 @@ namespace TxtAIEditor.Core.Services
             _targetLangCombo = CreateTargetLanguageCombo(settings, getString);
             _llmThinkingLevelCombo = CreateThinkingLevelCombo(settings.LlmThinkingLevel, getString);
             _visionFallbackThinkingLevelCombo = CreateThinkingLevelCombo(settings.LlmVisionFallbackThinkingLevel, getString);
+            _llmApiFormatCombo = CreateApiFormatCombo(settings.LlmApiFormat, getString);
+            _llmMaxContextLengthCombo = CreateMaxContextLengthCombo(settings.LlmMaxContextLength, getString);
             _refreshModelsButton = new Button
             {
                 Content = new FontIcon { Glyph = "\uE72C", FontSize = 12 },
@@ -220,6 +224,16 @@ namespace TxtAIEditor.Core.Services
                 6 => "max",
                 _ => "default"
             };
+            settings.LlmApiFormat = _llmApiFormatCombo.SelectedIndex switch
+            {
+                1 => LlmRequestTuning.ApiFormatChatCompletions,
+                2 => LlmRequestTuning.ApiFormatResponses,
+                3 => LlmRequestTuning.ApiFormatMessages,
+                _ => LlmRequestTuning.ApiFormatAuto
+            };
+            settings.LlmMaxContextLength = _llmMaxContextLengthCombo.SelectedIndex == 0
+                ? LlmRequestTuning.MaxContextLengthAuto
+                : LlmRequestTuning.NormalizeMaxContextLength(_llmMaxContextLengthCombo.Text);
             settings.LlmSourceLanguage = _sourceLangCombo.SelectedIndex switch
             {
                 1 => "Korean",
@@ -352,6 +366,12 @@ namespace TxtAIEditor.Core.Services
 
             SettingsDialogUi.AddLabel(content, _getString("SettingsLlmThinkingLevel", "Thinking Level"));
             content.Children.Add(_llmThinkingLevelCombo);
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmApiFormat", "API"));
+            content.Children.Add(_llmApiFormatCombo);
+
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmMaxContextLength", "Max context length"));
+            content.Children.Add(_llmMaxContextLengthCombo);
 
             return CreateCard(
                 _getString("SettingsLlmGroupMain", "LLM 공급자 & 모델"),
@@ -1114,6 +1134,63 @@ namespace TxtAIEditor.Core.Services
                 _ => 0
             };
             return comboBox;
+        }
+
+        private static ComboBox CreateApiFormatCombo(string apiFormat, Func<string, string, string> getString)
+        {
+            var comboBox = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+            comboBox.Items.Add(getString("SettingsLlmApiFormatAuto", "자동 (Auto)"));
+            comboBox.Items.Add(getString("SettingsLlmApiFormatChat", "Chat completion"));
+            comboBox.Items.Add(getString("SettingsLlmApiFormatResponses", "Responses"));
+            comboBox.Items.Add(getString("SettingsLlmApiFormatMessages", "messages"));
+            comboBox.SelectedIndex = LlmRequestTuning.NormalizeApiFormat(apiFormat) switch
+            {
+                LlmRequestTuning.ApiFormatChatCompletions => 1,
+                LlmRequestTuning.ApiFormatResponses => 2,
+                LlmRequestTuning.ApiFormatMessages => 3,
+                _ => 0
+            };
+            return comboBox;
+        }
+
+        private static ComboBox CreateMaxContextLengthCombo(string maxContextLength, Func<string, string, string> getString)
+        {
+            var comboBox = new ComboBox
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                IsEditable = true,
+                PlaceholderText = getString("SettingsLlmMaxContextLengthPlaceholder", "예: 128k, 150k, 1m")
+            };
+            comboBox.Items.Add(getString("SettingsLlmMaxContextLengthAuto", "자동 (Auto)"));
+            comboBox.Items.Add("128k");
+            comboBox.Items.Add("256k");
+            comboBox.Items.Add("512k");
+            comboBox.Items.Add("768k");
+            comboBox.Items.Add("1M");
+            comboBox.Loaded += (_, __) => SettingsDialogStyler.ApplyEditableComboBoxVisualStyles(comboBox);
+            ApplyMaxContextLengthSelection(comboBox, maxContextLength);
+            return comboBox;
+        }
+
+        private static void ApplyMaxContextLengthSelection(ComboBox comboBox, string maxContextLength)
+        {
+            string normalized = LlmRequestTuning.NormalizeMaxContextLength(maxContextLength);
+            if (normalized.Equals(LlmRequestTuning.MaxContextLengthAuto, StringComparison.OrdinalIgnoreCase))
+            {
+                comboBox.SelectedIndex = 0;
+                return;
+            }
+
+            for (int i = 0; i < comboBox.Items.Count; i++)
+            {
+                if (string.Equals(comboBox.Items[i] as string, normalized, StringComparison.OrdinalIgnoreCase))
+                {
+                    comboBox.SelectedIndex = i;
+                    return;
+                }
+            }
+
+            comboBox.Text = normalized;
         }
 
         private static ComboBox CreateThinkingLevelCombo(string thinkingLevel, Func<string, string, string> getString)
