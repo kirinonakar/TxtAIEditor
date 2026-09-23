@@ -97,7 +97,8 @@ namespace TxtAIEditor.Core.Services.LLM
                     onUsage,
                     onNativeToolCall,
                     _localizationService.GetString("OpenAIErrorApiCallFailed", "OpenAI API 호출 실패 ({0}): {1}"),
-                    _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."));
+                    _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."),
+                    allowExplicitPromptCaching: !_isOAuth);
             }
 
             await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
@@ -263,7 +264,8 @@ namespace TxtAIEditor.Core.Services.LLM
                     onReasoning,
                     onUsage,
                     onNativeToolCall,
-                    _localizationService.GetString("OpenAIErrorStreamCallFailed", "OpenAI API 스트리밍 호출 실패 ({0}): {1}"));
+                    _localizationService.GetString("OpenAIErrorStreamCallFailed", "OpenAI API 스트리밍 호출 실패 ({0}): {1}"),
+                    allowExplicitPromptCaching: !_isOAuth);
                 return;
             }
 
