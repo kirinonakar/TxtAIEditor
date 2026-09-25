@@ -4017,4 +4017,5 @@
   <data name="AgentActivityHistorySaveEmpty" xml:space="preserve"><value>保存するセッション履歴がありません。</value></data>
   <data name="AgentActivityHistorySavedFormat" xml:space="preserve"><value>verbose 履歴を保存しました: {0}</value></data>
   <data name="AgentActivityHistorySaveFailedFormat" xml:space="preserve"><value>履歴の保存に失敗しました: {0}</value></data>
+  <data name="AgentActivityHistoryLoadRunningBlocked" xml:space="preserve"><value>実行中のセッションは履歴から読み込めません。</value></data>
 </root>

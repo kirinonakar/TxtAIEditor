@@ -4059,4 +4059,5 @@
   <data name="AgentActivityHistorySaveEmpty" xml:space="preserve"><value>저장할 세션 히스토리가 없습니다.</value></data>
   <data name="AgentActivityHistorySavedFormat" xml:space="preserve"><value>verbose 히스토리 저장됨: {0}</value></data>
   <data name="AgentActivityHistorySaveFailedFormat" xml:space="preserve"><value>히스토리 저장 실패: {0}</value></data>
+  <data name="AgentActivityHistoryLoadRunningBlocked" xml:space="preserve"><value>실행 중인 세션은 히스토리에서 불러올 수 없습니다.</value></data>
 </root>

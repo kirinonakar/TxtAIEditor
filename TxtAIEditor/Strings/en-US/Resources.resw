@@ -4059,4 +4059,5 @@ Plan: {0}</value>
   <data name="AgentActivityHistorySaveEmpty" xml:space="preserve"><value>There is no session history to save.</value></data>
   <data name="AgentActivityHistorySavedFormat" xml:space="preserve"><value>Verbose history saved: {0}</value></data>
   <data name="AgentActivityHistorySaveFailedFormat" xml:space="preserve"><value>Failed to save history: {0}</value></data>
+  <data name="AgentActivityHistoryLoadRunningBlocked" xml:space="preserve"><value>A running session cannot be loaded from history.</value></data>
 </root>

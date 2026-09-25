@@ -4017,4 +4017,5 @@
   <data name="AgentActivityHistorySaveEmpty" xml:space="preserve"><value>没有可保存的会话历史记录。</value></data>
   <data name="AgentActivityHistorySavedFormat" xml:space="preserve"><value>已保存详细历史记录：{0}</value></data>
   <data name="AgentActivityHistorySaveFailedFormat" xml:space="preserve"><value>保存历史记录失败：{0}</value></data>
+  <data name="AgentActivityHistoryLoadRunningBlocked" xml:space="preserve"><value>正在运行的会话无法从历史记录中加载。</value></data>
 </root>
