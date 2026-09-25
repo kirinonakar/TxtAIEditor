@@ -273,6 +273,9 @@ namespace TxtAIEditor.Controls
             _outputRenderResumeTimer?.Stop();
             _renderer.UpdateRichText(_rawOutputText, force: true);
             _outputLength = _rawOutputText.Length;
+
+            // 세션 전환·기록 복원 시 스크롤을 항상 맨 아래(최신)로 맞춘다.
+            ScrollOutputToEnd(force: true);
         }
 
         public void FlushPendingOutput()
@@ -290,13 +293,14 @@ namespace TxtAIEditor.Controls
             double offset = _outputScrollViewer.VerticalOffset;
             double maxOffset = _outputScrollViewer.ScrollableHeight;
 
-            if (offset < _lastVerticalOffset - 1.0)
-            {
-                _userScrolledUp = true;
-            }
-            else if (offset >= maxOffset - 5.0)
+            // 내용 교체로 맨 아래에 붙은 오프셋은 사용자 스크롤로 보지 않는다.
+            if (offset >= maxOffset - 5.0)
             {
                 _userScrolledUp = false;
+            }
+            else if (offset < _lastVerticalOffset - 1.0)
+            {
+                _userScrolledUp = true;
             }
 
             _lastVerticalOffset = offset;
