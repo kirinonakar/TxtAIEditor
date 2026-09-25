@@ -91,6 +91,23 @@ namespace TxtAIEditor.Controls
             return _runningSessions.Count > 0;
         }
 
+        public bool IsSessionRunning(string sessionId)
+        {
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
+                return false;
+            }
+
+            if (_runningSessions.ContainsKey(sessionId))
+            {
+                return true;
+            }
+
+            var session = _openSessions.FirstOrDefault(item =>
+                string.Equals(item.Id, sessionId, StringComparison.Ordinal));
+            return session?.IsRunning == true;
+        }
+
         public bool IsSessionVisible(string sessionId)
         {
             return string.Equals(_currentSessionIdProvider(), sessionId, StringComparison.Ordinal);

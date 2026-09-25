@@ -79,10 +79,18 @@ namespace TxtAIEditor.Controls
 
         public void LoadHistorySession(string historyId)
         {
-            if (_isCurrentSessionRunning()) return;
-
             var item = _historyController.GetSession(historyId);
             if (item == null) return;
+
+            // 아직 실행 중(thinking)인 세션을 히스토리에서 불러오면 진행 중인 런 상태를
+            // 덮어쓰게 되므로 그 세션만 막는다. 다른 세션이 실행 중이어도 히스토리는 열 수 있다.
+            if (_openSessionController.IsSessionRunning(item.Id))
+            {
+                _agentPane.ClearActivity(_getString(
+                    "AgentActivityHistoryLoadRunningBlocked",
+                    "실행 중인 세션은 히스토리에서 불러올 수 없습니다."));
+                return;
+            }
 
             _openSessionController.SaveActiveFromUI();
 
