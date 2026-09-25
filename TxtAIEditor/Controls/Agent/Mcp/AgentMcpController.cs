@@ -1019,6 +1019,7 @@ namespace TxtAIEditor.Controls
             }
 
             _selectedServerIds.Clear();
+            UpdateComfyUiRelatedSkills();
             RebuildAliases();
             UpdateUI();
         }

@@ -24,6 +24,7 @@ namespace TxtAIEditor.Controls
         private readonly List<AgentSkill> _skills = new();
         private readonly Dictionary<string, AgentSkill> _activePluginSkills = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, HashSet<string>> _builtInRelatedSkills = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _removedBuiltInRelatedSkills = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _selectedSkillNames = new(StringComparer.OrdinalIgnoreCase);
         private Task? _loadTask;
         private bool _hasLoaded;
@@ -218,6 +219,21 @@ namespace TxtAIEditor.Controls
                     .Select(name => name.Trim()),
                 StringComparer.OrdinalIgnoreCase);
 
+            if (!_builtInRelatedSkills.TryGetValue(key, out HashSet<string>? previousNames) || previousNames == null)
+            {
+                previousNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (!previousNames.SetEquals(names))
+            {
+                // The configured list changed (ComfyUI activated, deactivated, or
+                // re-saved), so re-apply it and drop deselection overrides.
+                foreach (string name in names.Concat(previousNames))
+                {
+                    _removedBuiltInRelatedSkills.Remove(name);
+                }
+            }
+
             if (names.Count == 0)
             {
                 _builtInRelatedSkills.Remove(key);
@@ -237,9 +253,18 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (!_selectedSkillNames.Add(skillName))
+            if (IsSkillActive(skillName))
             {
                 _selectedSkillNames.Remove(skillName);
+                if (IsBuiltInRelatedSkill(skillName))
+                {
+                    _removedBuiltInRelatedSkills.Add(skillName);
+                }
+            }
+            else
+            {
+                _selectedSkillNames.Add(skillName);
+                _removedBuiltInRelatedSkills.Remove(skillName);
             }
 
             UpdateSelectionUI();
@@ -248,12 +273,22 @@ namespace TxtAIEditor.Controls
         public void RemoveSelectedSkill(string skillName)
         {
             _selectedSkillNames.Remove(skillName);
+            if (IsBuiltInRelatedSkill(skillName))
+            {
+                _removedBuiltInRelatedSkills.Add(skillName);
+            }
+
             UpdateSelectionUI();
         }
 
         public void ClearSelectedSkills()
         {
             _selectedSkillNames.Clear();
+            foreach (string name in EnumerateBuiltInRelatedSkillNames())
+            {
+                _removedBuiltInRelatedSkills.Add(name);
+            }
+
             UpdateSelectionUI();
         }
 
@@ -367,9 +402,31 @@ namespace TxtAIEditor.Controls
             {
                 foreach (string name in names)
                 {
-                    yield return name;
+                    if (!_removedBuiltInRelatedSkills.Contains(name))
+                    {
+                        yield return name;
+                    }
                 }
             }
+        }
+
+        private bool IsBuiltInRelatedSkill(string skillName)
+        {
+            return _builtInRelatedSkills.Values.Any(names => names.Contains(skillName));
+        }
+
+        private bool IsSkillActive(string skillName)
+        {
+            return _selectedSkillNames.Contains(skillName) ||
+                (IsBuiltInRelatedSkill(skillName) && !_removedBuiltInRelatedSkills.Contains(skillName));
+        }
+
+        private List<string> GetSelectedSkillNamesForUi()
+        {
+            return _selectedSkillNames
+                .Concat(EnumerateBuiltInRelatedSkillNames())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         private AgentSkill? FindSkill(string name)
@@ -409,10 +466,7 @@ namespace TxtAIEditor.Controls
                     CanDelete = AgentSkillDirectories.IsInsideUserSkillsDirectory(skill.SkillFilePath)
                 })
                 .ToList();
-            var selectedNames = _selectedSkillNames
-                .Concat(EnumerateBuiltInRelatedSkillNames())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var selectedNames = GetSelectedSkillNamesForUi();
 
             void ApplyUI()
             {
@@ -448,7 +502,7 @@ namespace TxtAIEditor.Controls
 
         private void UpdateSelectionUI()
         {
-            var selectedNames = _selectedSkillNames.ToList();
+            var selectedNames = GetSelectedSkillNamesForUi();
 
             void ApplyUI()
             {
