@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -19,10 +21,20 @@ namespace TxtAIEditor.Controls
 {
     public sealed partial class TerminalPane : UserControl
     {
+        private const int MaximumPendingOutputLength = 1_000_000;
+        private const int MaximumOutputBatchLength = 16 * 1024;
+
         public event Action<Windows.System.VirtualKey>? FunctionKeyShortcutPressed;
 
         private readonly ObservableCollection<TerminalSession> _terminalSessions = new ObservableCollection<TerminalSession>();
         private readonly DispatcherQueue _dispatcherQueue;
+        private readonly DispatcherQueueTimer _outputFlushTimer;
+        private readonly object _outputLock = new object();
+        private readonly Queue<string> _pendingOutput = new Queue<string>();
+        private int _pendingOutputOffset;
+        private int _pendingOutputLength;
+        private bool _outputReplayPending;
+        private bool _outputFlushStartQueued;
         private TerminalSession? _activeTerminalSession;
         private Func<string, string, string>? _getString;
         private bool _webViewReady;
@@ -36,6 +48,10 @@ namespace TxtAIEditor.Controls
         {
             InitializeComponent();
             _dispatcherQueue = DispatcherQueue;
+            _outputFlushTimer = _dispatcherQueue.CreateTimer();
+            _outputFlushTimer.Interval = TimeSpan.FromMilliseconds(16);
+            _outputFlushTimer.IsRepeating = true;
+            _outputFlushTimer.Tick += OnOutputFlushTick;
             TerminalSessionsList.ItemsSource = _terminalSessions;
             Unloaded += OnUnloaded;
             ActualThemeChanged += OnActualThemeChanged;
@@ -242,7 +258,13 @@ namespace TxtAIEditor.Controls
             }
 
             _terminalSessions.Clear();
-            _activeTerminalSession = null;
+            lock (_outputLock)
+            {
+                _activeTerminalSession = null;
+                ClearPendingOutput();
+                _outputFlushStartQueued = false;
+            }
+            _outputFlushTimer.Stop();
             ShowEmptyState();
         }
 
@@ -568,19 +590,123 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            session.AppendOutput(text);
-            _dispatcherQueue.TryEnqueue(() =>
+            bool queueTimerStart = false;
+            lock (_outputLock)
             {
-                if (_activeTerminalSession == session)
+                session.AppendOutput(text);
+                if (_activeTerminalSession != session)
                 {
-                    PostTerminalMessage(new { type = "output", sessionId = session.WindowTitle, data = text });
+                    return;
                 }
-            });
+
+                if (!_outputReplayPending)
+                {
+                    _pendingOutput.Enqueue(text);
+                    _pendingOutputLength += text.Length;
+                    if (_pendingOutputLength > MaximumPendingOutputLength)
+                    {
+                        ClearPendingOutput();
+                        _outputReplayPending = true;
+                    }
+                }
+                if (!_outputFlushStartQueued)
+                {
+                    _outputFlushStartQueued = true;
+                    queueTimerStart = true;
+                }
+            }
+
+            if (queueTimerStart && !_dispatcherQueue.TryEnqueue(() =>
+            {
+                lock (_outputLock)
+                {
+                    if ((_pendingOutputLength > 0 || _outputReplayPending) && _webViewReady)
+                    {
+                        _outputFlushTimer.Start();
+                    }
+                    else
+                    {
+                        _outputFlushStartQueued = false;
+                    }
+                }
+            }))
+            {
+                lock (_outputLock)
+                {
+                    _outputFlushStartQueued = false;
+                }
+            }
+        }
+
+        private void OnOutputFlushTick(DispatcherQueueTimer sender, object args)
+        {
+            TerminalSession? session;
+            string output;
+            bool resetTerminal;
+            lock (_outputLock)
+            {
+                session = _activeTerminalSession;
+                resetTerminal = _outputReplayPending;
+                if (session != null && resetTerminal)
+                {
+                    string snapshot = session.GetOutputSnapshot();
+                    ClearPendingOutput();
+                    _pendingOutput.Enqueue(snapshot);
+                    _pendingOutputLength = snapshot.Length;
+                }
+
+                if (session == null || _pendingOutputLength == 0 || !_webViewReady)
+                {
+                    _outputFlushTimer.Stop();
+                    _outputFlushStartQueued = false;
+                    return;
+                }
+
+                var batch = new StringBuilder(Math.Min(_pendingOutputLength, MaximumOutputBatchLength));
+                while (batch.Length < MaximumOutputBatchLength && _pendingOutput.Count > 0)
+                {
+                    string chunk = _pendingOutput.Peek();
+                    int length = Math.Min(chunk.Length - _pendingOutputOffset, MaximumOutputBatchLength - batch.Length);
+                    if (_pendingOutputOffset + length < chunk.Length &&
+                        char.IsHighSurrogate(chunk[_pendingOutputOffset + length - 1]) &&
+                        char.IsLowSurrogate(chunk[_pendingOutputOffset + length]))
+                    {
+                        length++;
+                    }
+                    batch.Append(chunk, _pendingOutputOffset, length);
+                    _pendingOutputOffset += length;
+                    _pendingOutputLength -= length;
+                    if (_pendingOutputOffset == chunk.Length)
+                    {
+                        _pendingOutput.Dequeue();
+                        _pendingOutputOffset = 0;
+                    }
+                }
+                output = batch.ToString();
+            }
+
+            if (resetTerminal)
+            {
+                PostTerminalSessionSettings(session);
+            }
+            PostTerminalMessage(new { type = "output", sessionId = session.WindowTitle, data = output });
+        }
+
+        private void ClearPendingOutput()
+        {
+            _pendingOutput.Clear();
+            _pendingOutputOffset = 0;
+            _pendingOutputLength = 0;
+            _outputReplayPending = false;
         }
 
         private void SetActiveTerminalSession(TerminalSession session)
         {
-            _activeTerminalSession = session;
+            lock (_outputLock)
+            {
+                _activeTerminalSession = session;
+                ClearPendingOutput();
+            }
             UpdateTitle();
 
             if (TerminalSessionsList.SelectedItem != session)
@@ -594,25 +720,44 @@ namespace TxtAIEditor.Controls
 
         private void PostActiveSession()
         {
-            if (_activeTerminalSession == null)
+            TerminalSession? session;
+            string existingOutput;
+            lock (_outputLock)
             {
-                return;
+                session = _activeTerminalSession;
+                if (session == null)
+                {
+                    return;
+                }
+
+                existingOutput = session.GetOutputSnapshot();
+                ClearPendingOutput();
+                if (!string.IsNullOrEmpty(existingOutput))
+                {
+                    _pendingOutput.Enqueue(existingOutput);
+                    _pendingOutputLength = existingOutput.Length;
+                    _outputFlushStartQueued = true;
+                }
             }
 
+            PostTerminalSessionSettings(session);
+
+            if (_webViewReady && !string.IsNullOrEmpty(existingOutput))
+            {
+                _outputFlushTimer.Start();
+            }
+        }
+
+        private void PostTerminalSessionSettings(TerminalSession session)
+        {
             PostTerminalMessage(new
             {
                 type = "setSession",
-                sessionId = _activeTerminalSession.WindowTitle,
+                sessionId = session.WindowTitle,
                 theme = ResolveThemeName(),
                 fontFamily = BuildTerminalFontFamily(),
                 fontSize = _terminalFontSize
             });
-
-            string existingOutput = _activeTerminalSession.GetOutputSnapshot();
-            if (!string.IsNullOrEmpty(existingOutput))
-            {
-                PostTerminalMessage(new { type = "output", sessionId = _activeTerminalSession.WindowTitle, data = existingOutput });
-            }
         }
 
         private void PostTerminalMessage(object message)
@@ -658,7 +803,13 @@ namespace TxtAIEditor.Controls
 
             if (_terminalSessions.Count == 0)
             {
-                _activeTerminalSession = null;
+                lock (_outputLock)
+                {
+                    _activeTerminalSession = null;
+                    ClearPendingOutput();
+                    _outputFlushStartQueued = false;
+                }
+                _outputFlushTimer.Stop();
                 ShowEmptyState();
                 SessionsEmptied?.Invoke(this, EventArgs.Empty);
                 return;
