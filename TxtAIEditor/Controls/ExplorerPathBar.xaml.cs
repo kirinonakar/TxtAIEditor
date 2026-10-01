@@ -6,6 +6,8 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using Windows.Foundation;
 
 namespace TxtAIEditor.Controls
@@ -101,7 +103,8 @@ namespace TxtAIEditor.Controls
                 for (double fontSize = MaxFontSize; fontSize >= MinFontSize - 0.001; fontSize -= FontStep)
                 {
                     List<PathToken> tokens = BuildTokens(fontSize, availableWidth);
-                    if (Wrap(tokens, availableWidth) <= MaxRows)
+                    if (Wrap(tokens, availableWidth) <= MaxRows &&
+                        (tokens.Count == 1 || !tokens.Any(token => token.IsTruncated)))
                     {
                         PlaceTokens(tokens);
                         return;
@@ -109,9 +112,9 @@ namespace TxtAIEditor.Controls
                 }
 
                 // 아주 긴 경로: 최소 글자 크기에서도 두 줄을 넘으면 앞쪽부터 생략하고
-                // 맨 앞의 생략 부호(…)를 클릭하면 숨겨진 앞쪽 경로가 펼쳐진다.
+                // 맨 앞의 생략 부호(...)를 클릭하면 루트부터 생략된 상위 경로만 펼쳐진다.
                 List<PathToken> minTokens = BuildTokens(MinFontSize, availableWidth);
-                if (Wrap(minTokens, availableWidth) > MaxRows)
+                if (Wrap(minTokens, availableWidth) > MaxRows || minTokens.Any(token => token.IsTruncated))
                 {
                     minTokens = TruncateKeepingTail(minTokens, availableWidth);
                 }
@@ -151,11 +154,14 @@ namespace TxtAIEditor.Controls
                 {
                     Text = segment.Name,
                     FontSize = fontSize,
-                    MaxWidth = availableWidth,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     TextWrapping = TextWrapping.NoWrap,
                     IsHitTestVisible = false
                 };
+                segmentBlock.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                double textWidth = Math.Max(1, availableWidth - width - SegmentPadding.Left - SegmentPadding.Right);
+                bool isTruncated = segmentBlock.DesiredSize.Width > textWidth;
+                segmentBlock.MaxWidth = textWidth;
                 var segmentBorder = new Border
                 {
                     Child = segmentBlock,
@@ -165,7 +171,7 @@ namespace TxtAIEditor.Controls
                     Background = TransparentBrush,
                     Tag = segment
                 };
-                ToolTipService.SetToolTip(segmentBorder, segment.Path);
+                ToolTipService.SetToolTip(segmentBorder, GetSegmentDisplayPath(segment));
                 Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(segmentBorder, segment.Name);
                 segmentBorder.Tapped += OnSegmentTapped;
                 segmentBorder.PointerEntered += OnSegmentPointerEntered;
@@ -174,7 +180,7 @@ namespace TxtAIEditor.Controls
                 elements.Add(segmentBorder);
                 width += segmentBorder.DesiredSize.Width;
 
-                tokens.Add(new PathToken(elements, width));
+                tokens.Add(new PathToken(elements, width, isTruncated));
             }
 
             return tokens;
@@ -204,11 +210,10 @@ namespace TxtAIEditor.Controls
         {
             var ellipsisToken = CreateEllipsisToken(availableWidth);
             var best = new List<PathToken> { ellipsisToken };
-            int bestTailCount = 0;
 
-            // 뒤(최근 경로)부터 최대한 많은 토큰을 남기되, 맨 앞에 생략 부호(…)를 둬도
+            // 뒤(최근 경로)부터 최대한 많은 토큰을 남기되, 맨 앞에 생략 부호(...)를 둬도
             // 두 줄 안에 들어오는 가장 큰 꼬리(tail)를 찾는다.
-            for (int tailCount = 0; tailCount <= tokens.Count; tailCount++)
+            for (int tailCount = 1; tailCount < tokens.Count; tailCount++)
             {
                 var candidate = new List<PathToken>(tailCount + 1) { ellipsisToken };
                 for (int i = tokens.Count - tailCount; i < tokens.Count; i++)
@@ -222,25 +227,16 @@ namespace TxtAIEditor.Controls
                 }
 
                 best = candidate;
-                bestTailCount = tailCount;
             }
 
             Wrap(best, availableWidth);
 
-            int hiddenCount = tokens.Count - bestTailCount;
-            if (hiddenCount > 0)
-            {
-                var hidden = new List<ExplorerBreadcrumbSegment>(hiddenCount);
-                for (int i = 0; i < hiddenCount; i++)
-                {
-                    if (tokens[i].Elements[^1].Tag is ExplorerBreadcrumbSegment segment)
-                    {
-                        hidden.Add(segment);
-                    }
-                }
-
-                ellipsisToken.Elements[0].Tag = hidden;
-            }
+            int hiddenCount = tokens.Count - (best.Count - 1);
+            List<ExplorerBreadcrumbSegment> hiddenAncestors = _segments!.Take(hiddenCount).ToList();
+            FrameworkElement ellipsisElement = ellipsisToken.Elements[0];
+            ellipsisElement.Tag = hiddenAncestors;
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(
+                ellipsisElement, string.Join($" {SeparatorText} ", hiddenAncestors.Select(segment => segment.Name)));
 
             return best;
         }
@@ -249,7 +245,7 @@ namespace TxtAIEditor.Controls
         {
             var ellipsisText = new TextBlock
             {
-                Text = "…",
+                Text = "...",
                 FontSize = MinFontSize,
                 IsHitTestVisible = false
             };
@@ -309,7 +305,7 @@ namespace TxtAIEditor.Controls
 
         private void OnEllipsisTapped(object sender, TappedRoutedEventArgs e)
         {
-            if (sender is not Border { Tag: List<ExplorerBreadcrumbSegment> hidden })
+            if (sender is not Border { Tag: List<ExplorerBreadcrumbSegment> ancestors })
             {
                 return;
             }
@@ -318,14 +314,14 @@ namespace TxtAIEditor.Controls
             {
                 Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft
             };
-            foreach (ExplorerBreadcrumbSegment segment in hidden)
+            foreach (ExplorerBreadcrumbSegment segment in ancestors)
             {
                 var item = new MenuFlyoutItem
                 {
                     Text = segment.Name,
                     Tag = segment
                 };
-                ToolTipService.SetToolTip(item, segment.Path);
+                ToolTipService.SetToolTip(item, GetSegmentDisplayPath(segment));
                 item.Click += OnHiddenSegmentClick;
                 flyout.Items.Add(item);
             }
@@ -339,6 +335,13 @@ namespace TxtAIEditor.Controls
             {
                 SegmentClicked?.Invoke(this, new ExplorerPathSegmentClickedEventArgs(segment));
             }
+        }
+
+        private static string GetSegmentDisplayPath(ExplorerBreadcrumbSegment segment)
+        {
+            return segment.Path == ExplorerDirectoryService.LocalRootPath
+                ? segment.Name
+                : RemotePath.GetDisplayPath(segment.Path);
         }
 
         private void OnSegmentPointerEntered(object sender, PointerRoutedEventArgs e)
@@ -369,14 +372,16 @@ namespace TxtAIEditor.Controls
 
         private sealed class PathToken
         {
-            public PathToken(List<FrameworkElement> elements, double width)
+            public PathToken(List<FrameworkElement> elements, double width, bool isTruncated = false)
             {
                 Elements = elements;
                 Width = width;
+                IsTruncated = isTruncated;
             }
 
             public List<FrameworkElement> Elements { get; }
             public double Width { get; }
+            public bool IsTruncated { get; }
             public int Row { get; set; }
             public double X { get; set; }
         }

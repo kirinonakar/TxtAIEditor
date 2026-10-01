@@ -644,6 +644,12 @@
   <data name="SearchHeader" xml:space="preserve">
     <value>フォルダ内検索と置換</value>
   </data>
+  <data name="SearchOpenedFileHeader" xml:space="preserve">
+    <value>現在のファイル内検索と置換</value>
+  </data>
+  <data name="SearchNoOpenedFileMessage" xml:space="preserve">
+    <value>先に検索するファイルを開いてください。</value>
+  </data>
   <data name="SearchPlaceholder" xml:space="preserve">
     <value>検索語を入力...</value>
   </data>

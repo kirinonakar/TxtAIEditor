@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.ViewModels;
 
 namespace TxtAIEditor.Controls
@@ -33,6 +34,10 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
+        private readonly Func<bool> _searchOpenedFileOnlyProvider;
+        private readonly Func<OpenedTab?> _activeTabProvider;
+        private readonly SearchReplaceTabSyncController? _tabSyncController;
+        private OpenedTab? _searchedTab;
         private string _lastSearchQuery = string.Empty;
         private CancellationTokenSource? _searchCancellationTokenSource;
         private int _searchVersion;
@@ -57,7 +62,10 @@ namespace TxtAIEditor.Controls
             Func<Task> refreshGitStatusAsync,
             Func<string, string, string>? getString = null,
             Action? beforeDialog = null,
-            Action? afterDialog = null)
+            Action? afterDialog = null,
+            Func<bool>? searchOpenedFileOnlyProvider = null,
+            Func<OpenedTab?>? activeTabProvider = null,
+            SearchReplaceTabSyncController? tabSyncController = null)
         {
             _fileSearchService = fileSearchService;
             _viewModel = viewModel;
@@ -78,6 +86,9 @@ namespace TxtAIEditor.Controls
             _getString = getString ?? ((_, fallback) => fallback);
             _beforeDialog = beforeDialog;
             _afterDialog = afterDialog;
+            _searchOpenedFileOnlyProvider = searchOpenedFileOnlyProvider ?? (() => false);
+            _activeTabProvider = activeTabProvider ?? (() => null);
+            _tabSyncController = tabSyncController;
         }
 
         public async Task SearchAllFilesAsync()
@@ -90,7 +101,20 @@ namespace TxtAIEditor.Controls
             }
 
             string searchRoot = _searchRootProvider();
-            if (string.IsNullOrEmpty(searchRoot))
+            bool searchOpenedFileOnly = _searchOpenedFileOnlyProvider();
+            OpenedTab? searchTab = searchOpenedFileOnly ? _activeTabProvider() : null;
+            if (searchOpenedFileOnly && (searchTab == null || _tabSyncController == null))
+            {
+                CancelActiveSearch();
+                _viewModel.SearchResults.Clear();
+                _viewModel.SearchResultsGrouped.Clear();
+                _showError(
+                    _getString("SearchFailedTitle", "검색 실패"),
+                    _getString("SearchNoOpenedFileMessage", "먼저 검색할 파일을 여십시오."));
+                return;
+            }
+
+            if (!searchOpenedFileOnly && (string.IsNullOrEmpty(searchRoot) || searchRoot == ExplorerDirectoryService.LocalRootPath))
             {
                 CancelActiveSearch();
                 _showError(
@@ -105,6 +129,7 @@ namespace TxtAIEditor.Controls
             _lastSearchQuery = query;
             _viewModel.SearchResults.Clear();
             _viewModel.SearchResultsGrouped.Clear();
+            _searchedTab = searchTab;
 
             var searchCancellationTokenSource = new CancellationTokenSource();
             _searchCancellationTokenSource = searchCancellationTokenSource;
@@ -115,7 +140,15 @@ namespace TxtAIEditor.Controls
             FileSearchSummary summary;
             try
             {
-                summary = await _fileSearchService.SearchAsync(
+                summary = searchTab != null
+                    ? await _tabSyncController!.SearchOpenedFileAsync(
+                        searchTab,
+                        query,
+                        GetSearchOptions(),
+                        _fileSearchService,
+                        results => PublishSearchResults(results, searchVersion, cancellationToken),
+                        cancellationToken)
+                    : await _fileSearchService.SearchAsync(
                     searchRoot,
                     query,
                     _largeFileThresholdBytesProvider(),
@@ -177,6 +210,7 @@ namespace TxtAIEditor.Controls
 
         public async Task ReplaceAllAsync()
         {
+            OpenedTab? searchedTab = _searchedTab;
             string query = _searchQueryInput.Text;
             string replace = _replaceQueryInput.Text;
             if (string.IsNullOrEmpty(query) || _viewModel.SearchResults.Count == 0)
@@ -220,6 +254,23 @@ namespace TxtAIEditor.Controls
             _afterDialog?.Invoke();
             if (result != ContentDialogResult.Primary)
             {
+                return;
+            }
+
+            if (searchedTab != null)
+            {
+                try
+                {
+                    await _tabSyncController!.ReplaceOpenedFileAsync(
+                        searchedTab, editableResults, query, replace, options, _fileSearchService);
+                    await SearchAllFilesAsync();
+                }
+                catch (Exception ex)
+                {
+                    _showError(_getString("ReplaceFailedTitle", "바꾸기 실패"),
+                        string.Format(_getString("ReplaceOneFailureFormat", "대체 실패: {0}"), ex.Message));
+                }
+
                 return;
             }
 
@@ -312,6 +363,14 @@ namespace TxtAIEditor.Controls
             string filePath = item.Path;
             try
             {
+                if (_searchedTab != null)
+                {
+                    await _tabSyncController!.ReplaceOpenedFileAsync(
+                        _searchedTab, new[] { item }, query, replace, options, _fileSearchService);
+                    await SearchAllFilesAsync();
+                    return;
+                }
+
                 var info = new FileInfo(filePath);
                 if (info.Length > thresholdBytes)
                 {
@@ -350,7 +409,14 @@ namespace TxtAIEditor.Controls
             if (item != null)
             {
                 _searchResultsList.SelectedItem = item;
-                await _loadAndHighlightResultAsync(item, _lastSearchQuery);
+                if (_searchedTab != null)
+                {
+                    await _tabSyncController!.HighlightOpenedFileResultAsync(_searchedTab, item, _lastSearchQuery);
+                }
+                else
+                {
+                    await _loadAndHighlightResultAsync(item, _lastSearchQuery);
+                }
             }
         }
 
@@ -419,7 +485,9 @@ namespace TxtAIEditor.Controls
 
         private void ApplySearchHeaderText(bool isSearching)
         {
-            _searchHeaderLabel.Text = _getString("SearchHeader", "폴더 전체 검색 및 바꾸기");
+            _searchHeaderLabel.Text = _searchOpenedFileOnlyProvider()
+                ? _getString("SearchOpenedFileHeader", "현재 파일 검색 및 바꾸기")
+                : _getString("SearchHeader", "폴더 전체 검색 및 바꾸기");
             _searchProgressIndicator.Visibility = isSearching ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -526,6 +594,11 @@ namespace TxtAIEditor.Controls
 
         private string GetRelativeDirectory(string path)
         {
+            if (_searchedTab != null)
+            {
+                return string.Empty;
+            }
+
             string searchRoot = _searchRootProvider();
             try
             {

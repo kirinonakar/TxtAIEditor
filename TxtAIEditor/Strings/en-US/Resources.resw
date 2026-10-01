@@ -644,6 +644,12 @@
   <data name="SearchHeader" xml:space="preserve">
     <value>Search &amp; Replace in Folder</value>
   </data>
+  <data name="SearchOpenedFileHeader" xml:space="preserve">
+    <value>Search &amp; Replace in Current File</value>
+  </data>
+  <data name="SearchNoOpenedFileMessage" xml:space="preserve">
+    <value>Open a file to search first.</value>
+  </data>
   <data name="SearchPlaceholder" xml:space="preserve">
     <value>Enter search term...</value>
   </data>

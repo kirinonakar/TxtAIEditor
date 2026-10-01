@@ -644,6 +644,12 @@
   <data name="SearchHeader" xml:space="preserve">
     <value>폴더 전체 검색 및 바꾸기</value>
   </data>
+  <data name="SearchOpenedFileHeader" xml:space="preserve">
+    <value>현재 파일 검색 및 바꾸기</value>
+  </data>
+  <data name="SearchNoOpenedFileMessage" xml:space="preserve">
+    <value>먼저 검색할 파일을 여십시오.</value>
+  </data>
   <data name="SearchPlaceholder" xml:space="preserve">
     <value>검색어 입력...</value>
   </data>

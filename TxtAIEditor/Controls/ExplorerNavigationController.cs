@@ -133,6 +133,12 @@ namespace TxtAIEditor.Controls
             _leftSidebar.SetExplorerTreeMode(IsTreeMode);
             UpdateBackButtonState();
 
+            if (!IsViewingRemote && CurrentFolderPath == ExplorerDirectoryService.LocalRootPath)
+            {
+                LoadLocalRoot();
+                return;
+            }
+
             if (IsViewingRemote)
             {
                 if (IsTreeMode)
@@ -166,6 +172,12 @@ namespace TxtAIEditor.Controls
 
         public void LoadDirectoryRoot(string folderPath)
         {
+            if (folderPath == ExplorerDirectoryService.LocalRootPath)
+            {
+                LoadLocalRoot();
+                return;
+            }
+
             if (IsTreeMode)
             {
                 CancelFlatDirectoryLoad();
@@ -174,6 +186,43 @@ namespace TxtAIEditor.Controls
             }
 
             _ = LoadFlatDirectoryRootAsync(folderPath, updateGitStatus: true);
+        }
+
+        private void LoadLocalRoot()
+        {
+            ClearExplorerFilterState();
+            CancelFlatDirectoryLoad();
+            _remoteWorkspaceService.Deactivate();
+            _leftSidebar.ExplorerTreeModeBtn.IsEnabled = true;
+            CurrentArchivePath = string.Empty;
+            CurrentArchiveDirectory = string.Empty;
+            _currentArchiveRemotePath = string.Empty;
+            SetCurrentFolderPath(ExplorerDirectoryService.LocalRootPath);
+            _currentRepoPathChanged(string.Empty);
+            ClearExplorerTreeNodes();
+            _viewModel.ExplorerItems.Clear();
+
+            var items = _itemSorter.Sort(
+                _directoryService.CreateDirectoryItems(ExplorerDirectoryService.LocalRootPath)).ToList();
+            foreach (ExplorerItem item in items)
+            {
+                item.IsDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+                if (IsTreeMode)
+                {
+                    _leftSidebar.ExplorerTree.RootNodes.Add(new Microsoft.UI.Xaml.Controls.TreeViewNode
+                    {
+                        Content = item,
+                        HasUnrealizedChildren = true
+                    });
+                }
+            }
+
+            if (!IsTreeMode)
+            {
+                _viewModel.ExplorerItems.ReplaceAll(items);
+            }
+
+            SetExplorerStatusText(FormatExplorerItemCount(items.Count));
         }
 
         private async Task<bool> LoadFlatDirectoryRootAsync(string folderPath, bool updateGitStatus)
@@ -702,6 +751,12 @@ namespace TxtAIEditor.Controls
 
         public void RefreshCurrentFolder()
         {
+            if (!IsViewingRemote && CurrentFolderPath == ExplorerDirectoryService.LocalRootPath)
+            {
+                LoadLocalRoot();
+                return;
+            }
+
             if (IsViewingRemote)
             {
                 _ = IsTreeMode
@@ -1323,7 +1378,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(CurrentFolderPath))
+            if (string.IsNullOrWhiteSpace(CurrentFolderPath) || CurrentFolderPath == ExplorerDirectoryService.LocalRootPath)
             {
                 return;
             }
@@ -1331,6 +1386,7 @@ namespace TxtAIEditor.Controls
             var parent = Directory.GetParent(CurrentFolderPath);
             if (parent == null)
             {
+                LoadDirectoryRoot(ExplorerDirectoryService.LocalRootPath);
                 return;
             }
 
@@ -1390,7 +1446,7 @@ namespace TxtAIEditor.Controls
             {
                 _ = NavigateRemoteVirtualPathAsync(entry.Path, revealInLeftPanel: false);
             }
-            else if (Directory.Exists(entry.Path))
+            else if (entry.Path == ExplorerDirectoryService.LocalRootPath || Directory.Exists(entry.Path))
             {
                 UpdateRepoPath(entry.Path);
                 LoadDirectoryRoot(entry.Path);
@@ -1578,6 +1634,12 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (segment.Path == ExplorerDirectoryService.LocalRootPath)
+            {
+                LoadDirectoryRoot(segment.Path);
+                return;
+            }
+
             if (!string.IsNullOrWhiteSpace(segment.Path) && Directory.Exists(segment.Path))
             {
                 UpdateRepoPath(segment.Path);
@@ -1663,7 +1725,7 @@ namespace TxtAIEditor.Controls
         public async Task UpdateGitStatusesAsync()
         {
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-            Dictionary<string, string>? statuses = IsViewingArchive
+            Dictionary<string, string>? statuses = IsViewingArchive || CurrentFolderPath == ExplorerDirectoryService.LocalRootPath
                 ? null
                 : await _gitStatusService.GetStatusesAsync(CurrentFolderPath);
             _leftSidebar.DispatcherQueue.TryEnqueue(() =>
@@ -1677,6 +1739,12 @@ namespace TxtAIEditor.Controls
             _itemSorter.CycleMode();
 
             UpdateSortButtonVisuals();
+
+            if (!IsViewingRemote && CurrentFolderPath == ExplorerDirectoryService.LocalRootPath)
+            {
+                _ = ApplyFilterAsync(_lastFilterQuery);
+                return;
+            }
 
             if (IsTreeMode && IsViewingRemote)
             {
@@ -1795,6 +1863,38 @@ namespace TxtAIEditor.Controls
 
         private async Task ApplyFilterAsync(string query)
         {
+            if (!IsViewingRemote && CurrentFolderPath == ExplorerDirectoryService.LocalRootPath)
+            {
+                bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+                var drives = _itemSorter.Sort(_directoryService
+                    .CreateDirectoryItems(ExplorerDirectoryService.LocalRootPath)
+                    .Where(item => ExplorerSearchService.MatchesPattern(item.Name, query))).ToList();
+                foreach (ExplorerItem item in drives)
+                {
+                    item.IsDark = isDark;
+                }
+
+                if (IsTreeMode)
+                {
+                    ClearExplorerTreeNodes();
+                    foreach (ExplorerItem item in drives)
+                    {
+                        _leftSidebar.ExplorerTree.RootNodes.Add(new Microsoft.UI.Xaml.Controls.TreeViewNode
+                        {
+                            Content = item,
+                            HasUnrealizedChildren = true
+                        });
+                    }
+                }
+                else
+                {
+                    _viewModel.ExplorerItems.ReplaceAll(drives);
+                }
+
+                SetExplorerStatusText(FormatExplorerItemCount(drives.Count));
+                return;
+            }
+
             if (IsViewingRemote)
             {
                 await ApplyRemoteFilterAsync(query);

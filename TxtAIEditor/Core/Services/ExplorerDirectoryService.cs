@@ -7,11 +7,28 @@ namespace TxtAIEditor.Core.Services
 {
     public sealed class ExplorerDirectoryService
     {
+        public const string LocalRootPath = "txtaieditor://local-root";
+
         public IEnumerable<ExplorerItem> CreateDirectoryItems(string parentPath)
         {
             var items = new List<ExplorerItem>();
             try
             {
+                if (parentPath == LocalRootPath)
+                {
+                    foreach (DriveInfo drive in DriveInfo.GetDrives())
+                    {
+                        items.Add(new ExplorerItem
+                        {
+                            Name = drive.Name.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                            Path = drive.Name,
+                            IsFolder = true
+                        });
+                    }
+
+                    return items;
+                }
+
                 var dirInfo = new DirectoryInfo(parentPath);
                 var enumerationOptions = new EnumerationOptions
                 {

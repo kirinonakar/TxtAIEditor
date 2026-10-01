@@ -151,7 +151,8 @@ namespace TxtAIEditor.Composition
                 tabNavigation.GetActiveTab,
                 callbacks.LoadFileAsync,
                 callbacks.UpdateLivePreview,
-                editorLineNavigation);
+                editorLineNavigation,
+                tab => splitImeSync.SyncEditsToOtherTabsAsync(tab));
 
             var searchReplace = new SearchReplaceController(
                 workspaceServices.FileSearchService,
@@ -172,7 +173,10 @@ namespace TxtAIEditor.Composition
                 callbacks.RefreshGitStatusAsync,
                 getString: callbacks.GetLocalizedString,
                 beforeDialog: () => { if (ui.EditorWorkspace.IsTerminalVisible) ui.TerminalPane.SuspendNativeWindows(); },
-                afterDialog: () => { if (ui.EditorWorkspace.IsTerminalVisible) ui.TerminalPane.ResumeNativeWindows(); });
+                afterDialog: () => { if (ui.EditorWorkspace.IsTerminalVisible) ui.TerminalPane.ResumeNativeWindows(); },
+                searchOpenedFileOnlyProvider: () => workspaceServices.RemoteWorkspaceService.IsActive || tabNavigation.GetActiveTab()?.IsRemoteFile == true,
+                activeTabProvider: tabNavigation.GetActiveTab,
+                tabSyncController: searchReplaceTabSync);
             searchReplace.FileModified += searchReplaceTabSync.HandleFileModifiedAsync;
 
             return new MainWindowEditorFoundationControllers(

@@ -33,6 +33,12 @@ namespace TxtAIEditor.Controls
             }
             else if (!string.IsNullOrWhiteSpace(folderPath))
             {
+                segments.Add(new ExplorerBreadcrumbSegment("/", ExplorerDirectoryService.LocalRootPath));
+                if (folderPath == ExplorerDirectoryService.LocalRootPath)
+                {
+                    return segments;
+                }
+
                 BuildLocal(segments, folderPath);
             }
 
@@ -114,6 +120,7 @@ namespace TxtAIEditor.Controls
             }
             else
             {
+                segments.Add(new ExplorerBreadcrumbSegment("/", ExplorerDirectoryService.LocalRootPath));
                 BuildLocalArchivePath(segments, archivePath);
             }
 

@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Editor;
 using TxtAIEditor.ViewModels;
 
@@ -22,6 +24,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, Task> _loadFileAsync;
         private readonly Action<OpenedTab> _updateLivePreview;
         private readonly EditorLineNavigationController _lineNavigationController;
+        private readonly Func<OpenedTab, Task> _syncEditsToOtherTabsAsync;
 
         public SearchReplaceTabSyncController(
             MainWindowViewModel viewModel,
@@ -33,7 +36,8 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab?> activeTabProvider,
             Func<string, Task> loadFileAsync,
             Action<OpenedTab> updateLivePreview,
-            EditorLineNavigationController lineNavigationController)
+            EditorLineNavigationController lineNavigationController,
+            Func<OpenedTab, Task> syncEditsToOtherTabsAsync)
         {
             _viewModel = viewModel;
             _primaryTabView = primaryTabView;
@@ -45,6 +49,136 @@ namespace TxtAIEditor.Controls
             _loadFileAsync = loadFileAsync;
             _updateLivePreview = updateLivePreview;
             _lineNavigationController = lineNavigationController;
+            _syncEditsToOtherTabsAsync = syncEditsToOtherTabsAsync;
+        }
+
+        public async Task<FileSearchSummary> SearchOpenedFileAsync(
+            OpenedTab tab,
+            string query,
+            FileSearchOptions options,
+            IFileSearchService fileSearchService,
+            Action<IReadOnlyList<SearchResultItem>> publishResults,
+            CancellationToken cancellationToken)
+        {
+            if (!_editorSessions.TryGetValue(tab.Id, out var session))
+            {
+                return new FileSearchSummary();
+            }
+
+            if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup))
+            {
+                await bridgeGroup.Bridge.FlushPendingEditForSaveAsync();
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            var regex = fileSearchService.BuildSearchRegex(query, options);
+            string[] lines = session.Model.GetLines(1, session.Model.LineCount).ToArray();
+            string path = tab.FilePath ?? tab.RemotePath ?? tab.Title;
+            return await Task.Run(() =>
+            {
+                var results = new List<SearchResultItem>();
+                int foundCount = 0;
+                for (int index = 0; index < lines.Length; index++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var match = regex.Match(lines[index]);
+                    if (!match.Success)
+                    {
+                        continue;
+                    }
+
+                    results.Add(new SearchResultItem
+                    {
+                        Path = path,
+                        LineNumber = index + 1,
+                        LineContent = lines[index],
+                        IndexOfMatch = match.Index,
+                        MatchLength = match.Length,
+                        CanReplace = !tab.IsReadOnlyViewer
+                    });
+                    foundCount++;
+                    if (results.Count >= 100)
+                    {
+                        publishResults(results.ToArray());
+                        results.Clear();
+                    }
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                if (results.Count > 0)
+                {
+                    publishResults(results.ToArray());
+                }
+
+                return new FileSearchSummary { FoundCount = foundCount };
+            }, cancellationToken);
+        }
+
+        public async Task ReplaceOpenedFileAsync(
+            OpenedTab tab,
+            IReadOnlyList<SearchResultItem> results,
+            string query,
+            string replacement,
+            FileSearchOptions options,
+            IFileSearchService fileSearchService)
+        {
+            if (tab.IsReadOnlyViewer || !_editorSessions.TryGetValue(tab.Id, out var session) ||
+                !_tabBridges.TryGetValue(tab.Id, out var bridgeGroup))
+            {
+                throw new InvalidOperationException();
+            }
+
+            await bridgeGroup.Bridge.FlushPendingEditForSaveAsync();
+            var replacements = results.GroupBy(item => item.LineNumber)
+                .Select(group => group.First())
+                .Where(item => item.LineNumber >= 1 && item.LineNumber <= session.Model.LineCount &&
+                    session.Model.GetLine(item.LineNumber) == item.LineContent)
+                .Select(item => new LineReplacement(item.LineNumber, item.LineContent,
+                    fileSearchService.ReplaceSearchMatches(item.LineContent, query, replacement, options)))
+                .Where(item => item.BeforeText != item.AfterText)
+                .OrderByDescending(item => item.LineNumber)
+                .ToList();
+
+            session.BeginUndoGroup();
+            try
+            {
+                foreach (LineReplacement item in replacements)
+                {
+                    session.ApplyRangeEdit(item.LineNumber, 1, item.LineNumber, item.BeforeText.Length + 1, item.AfterText);
+                }
+            }
+            finally
+            {
+                session.EndUndoGroup();
+            }
+
+            if (replacements.Count > 0)
+            {
+                session.RefreshTabContentPreview();
+                _tabDirtyStateController.MarkTabDirty(tab);
+                await bridgeGroup.Bridge.ResynchronizeModelAsync(session);
+                await _syncEditsToOtherTabsAsync(tab);
+                _updateLivePreview(tab);
+            }
+        }
+
+        public async Task HighlightOpenedFileResultAsync(OpenedTab tab, SearchResultItem item, string query)
+        {
+            TabViewItem? tabItem = FindTabItem(tab.Id);
+            if (tabItem != null)
+            {
+                if (_primaryTabView.TabItems.Contains(tabItem))
+                {
+                    _primaryTabView.SelectedItem = tabItem;
+                }
+                else
+                {
+                    _secondaryTabView.SelectedItem = tabItem;
+                }
+            }
+
+            await _lineNavigationController.RevealTabLineAsync(
+                tab.Id, item.LineNumber, item.IndexOfMatch, item.MatchLength, query);
         }
 
         public async Task HandleFileModifiedAsync(string filePath)

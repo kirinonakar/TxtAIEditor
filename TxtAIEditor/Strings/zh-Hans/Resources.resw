@@ -644,6 +644,12 @@
   <data name="SearchHeader" xml:space="preserve">
     <value>在文件夹中搜索和替换</value>
   </data>
+  <data name="SearchOpenedFileHeader" xml:space="preserve">
+    <value>在当前文件中搜索和替换</value>
+  </data>
+  <data name="SearchNoOpenedFileMessage" xml:space="preserve">
+    <value>请先打开要搜索的文件。</value>
+  </data>
   <data name="SearchPlaceholder" xml:space="preserve">
     <value>Enter 搜索词...</value>
   </data>
