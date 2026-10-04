@@ -691,77 +691,17 @@ namespace TxtAIEditor.Editor
             return SaveWithProgressAsync(filePath, encodingName, cancellationToken, progress: null);
         }
 
-        internal async Task SaveWithProgressAsync(
+        internal Task SaveWithProgressAsync(
             string filePath,
             string encodingName,
             CancellationToken cancellationToken,
             IProgress<TextOperationProgress>? progress)
         {
-            string? directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            string tempFilePath = Path.Combine(directory ?? Path.GetTempPath(), $"._{Path.GetFileName(filePath)}.tmp");
-            string backupFilePath = filePath + ".bak";
+            string[] lines = CaptureLines();
+            string lineEnding = LineEnding;
             Encoding encoding = TextEncodingService.GetEncodingByName(encodingName);
-
-            try
-            {
-                using (var stream = new FileStream(
-                    tempFilePath,
-                    FileMode.Create,
-                    FileAccess.Write,
-                    FileShare.None,
-                    bufferSize: 128 * 1024,
-                    options: FileOptions.Asynchronous | FileOptions.SequentialScan))
-                using (var writer = new StreamWriter(
-                    stream,
-                    encoding,
-                    bufferSize: 128 * 1024,
-                    leaveOpen: false))
-                {
-                    for (int i = 0; i < _lines.Count; i++)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (i % 512 == 0)
-                        {
-                            progress?.Report(new TextOperationProgress(i, _lines.Count, TimeSpan.Zero));
-                        }
-                        if (i > 0)
-                        {
-                        await writer.WriteAsync(LineEnding.AsMemory(), cancellationToken).ConfigureAwait(false);
-                        }
-
-                        await writer.WriteAsync(_lines[i].AsMemory(), cancellationToken).ConfigureAwait(false);
-                    }
-
-                    progress?.Report(new TextOperationProgress(_lines.Count, _lines.Count, TimeSpan.Zero));
-                }
-
-                if (File.Exists(filePath))
-                {
-                    File.Replace(tempFilePath, filePath, backupFilePath);
-                    if (File.Exists(backupFilePath))
-                    {
-                        File.Delete(backupFilePath);
-                    }
-                }
-                else
-                {
-                    File.Move(tempFilePath, filePath);
-                }
-            }
-            catch (Exception ex)
-            {
-                if (File.Exists(tempFilePath))
-                {
-                    try { File.Delete(tempFilePath); } catch { }
-                }
-
-                throw new IOException($"파일 저장 실패 (안전 복구 완료): {ex.Message}", ex);
-            }
+            return TextFileWriter.SaveAsync(filePath, lines, lineEnding, encoding, cancellationToken,
+                (processed, total) => progress?.Report(new TextOperationProgress(processed, total, TimeSpan.Zero)));
         }
 
         private static async Task<byte[]> ReadSampleBytesAsync(string filePath, CancellationToken cancellationToken)
@@ -1156,6 +1096,13 @@ namespace TxtAIEditor.Editor
 
     // A per-view session over a shared EditorDocument. Split views have distinct
     // ViewIds/ViewVersions while referencing the same Document instance.
+    internal sealed record EditorSaveCheckpoint(
+        long Version,
+        long UndoStateId,
+        IReadOnlyList<string>? Lines,
+        string EncodingName,
+        string LineEnding);
+
     public sealed class EditorDocumentSession
     {
         private const int MaxSearchMatches = 50_000;
@@ -1228,6 +1175,24 @@ namespace TxtAIEditor.Editor
             _document.CaptureSavedBaseline();
             _document.UndoManager.MarkSavedState();
             _document.IsDirty = false;
+        }
+
+        internal EditorSaveCheckpoint CaptureSaveCheckpoint()
+        {
+            return new EditorSaveCheckpoint(DocumentVersion, _document.UndoManager.CaptureSaveState(),
+                Model is HexDumpTextModel ? null : Model.GetLines(1, Model.LineCount).ToArray(),
+                Tab.EncodingName, Model.LineEnding);
+        }
+
+        internal void CompleteSaveCheckpoint(EditorSaveCheckpoint checkpoint)
+        {
+            if (checkpoint.Lines == null) return;
+            _document.SetSavedBaseline(checkpoint.Lines);
+            _document.UndoManager.MarkSavedState(checkpoint.UndoStateId);
+            Tab.OriginalEncodingName = checkpoint.EncodingName;
+            Tab.OriginalLineEnding = checkpoint.LineEnding;
+            _document.SetDirtyState(!IsAtSavedState || Tab.EncodingName != checkpoint.EncodingName ||
+                Model.LineEnding != checkpoint.LineEnding, updateUndoSavedState: false);
         }
 
         public void CopySavedBaselineFrom(EditorDocumentSession source)

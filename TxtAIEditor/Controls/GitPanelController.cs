@@ -125,16 +125,17 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            repoPath = _gitService.FindRepositoryRoot(repoPath) ?? repoPath;
-            string branch = await _gitService.GetCurrentBranchAsync(repoPath);
+            string requestedRepoPath = repoPath;
+            repoPath = await Task.Run(() => _gitService.FindRepositoryRoot(requestedRepoPath) ?? requestedRepoPath);
+            string branch = await Task.Run(() => _gitService.GetCurrentBranchAsync(repoPath));
             bool isGitNotDetected = GitBranchStatus.IsNotDetected(branch);
             string localizedBranch = isGitNotDetected ? GetGitNotDetectedText() : branch;
 
             // Fetch everything asynchronously first to avoid race conditions and UI flickering
-            var branchesTask = _gitService.GetBranchesAsync(repoPath);
-            var historyTask = _gitService.GetRecentHistoryAsync(repoPath, GitHistoryBatchSize);
-            var fileStatusesTask = _gitService.GetFileStatusesAsync(repoPath, includeAllUntrackedFiles: true);
-            var unpushedCountTask = _gitService.GetUnpushedCommitCountAsync(repoPath);
+            var branchesTask = Task.Run(() => _gitService.GetBranchesAsync(repoPath));
+            var historyTask = Task.Run(() => _gitService.GetRecentHistoryAsync(repoPath, GitHistoryBatchSize));
+            var fileStatusesTask = Task.Run(() => _gitService.GetFileStatusesAsync(repoPath, includeAllUntrackedFiles: true));
+            var unpushedCountTask = Task.Run(() => _gitService.GetUnpushedCommitCountAsync(repoPath));
 
             await Task.WhenAll(branchesTask, historyTask, fileStatusesTask, unpushedCountTask);
 

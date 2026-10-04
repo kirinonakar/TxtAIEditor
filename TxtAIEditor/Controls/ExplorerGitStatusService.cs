@@ -15,7 +15,10 @@ namespace TxtAIEditor.Controls
             _gitService = gitService;
         }
 
-        public async Task<Dictionary<string, string>?> GetStatusesAsync(string folderPath)
+        public Task<Dictionary<string, string>?> GetStatusesAsync(string folderPath) =>
+            Task.Run(() => GetStatusesCoreAsync(folderPath));
+
+        private async Task<Dictionary<string, string>?> GetStatusesCoreAsync(string folderPath)
         {
             string repoPath = _gitService.FindRepositoryRoot(folderPath) ?? string.Empty;
             if (string.IsNullOrEmpty(repoPath))

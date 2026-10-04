@@ -106,16 +106,18 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            if (string.IsNullOrEmpty(tab.FilePath) && !TryChooseSavePath(tab, GetSaveInitialDirectory()))
+            if (string.IsNullOrEmpty(tab.FilePath) && !TryChooseSavePath(tab, await GetSaveInitialDirectoryAsync()))
             {
                 return false;
             }
 
             try
             {
-                await SaveTabContentAndUploadAsync(tab);
-                tab.IsDirty = false;
-                _cleanDirtyStateOnOtherTabs(tab);
+                if (await SaveTabContentAndUploadAsync(tab))
+                {
+                    tab.IsDirty = false;
+                    _cleanDirtyStateOnOtherTabs(tab);
+                }
                 await CompleteSuccessfulSaveAsync(tab, syncLineEnding: true);
                 return true;
             }
@@ -145,7 +147,7 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            string? initialDir = GetSaveInitialDirectory(tab);
+            string? initialDir = await GetSaveInitialDirectoryAsync(tab);
             if (initialDir == null && !string.IsNullOrEmpty(tab.FilePath) && !tab.IsArchiveEntry)
             {
                 initialDir = Path.GetDirectoryName(tab.FilePath);
@@ -178,9 +180,11 @@ namespace TxtAIEditor.Controls
                     return false;
                 }
 
-                await SaveTabContentAndUploadAsync(tab);
-                tab.IsDirty = false;
-                _cleanDirtyStateOnOtherTabs(tab);
+                if (await SaveTabContentAndUploadAsync(tab))
+                {
+                    tab.IsDirty = false;
+                    _cleanDirtyStateOnOtherTabs(tab);
+                }
                 await CompleteSuccessfulSaveAsync(tab, syncLineEnding: false);
                 return true;
             }
@@ -209,10 +213,10 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private string? GetSaveInitialDirectory()
+        private async Task<string?> GetSaveInitialDirectoryAsync()
         {
             string? currentFolderPath = _currentFolderProvider();
-            if (!string.IsNullOrEmpty(currentFolderPath) && Directory.Exists(currentFolderPath))
+            if (!string.IsNullOrEmpty(currentFolderPath) && await Task.Run(() => Directory.Exists(currentFolderPath)))
             {
                 return currentFolderPath;
             }
@@ -220,19 +224,19 @@ namespace TxtAIEditor.Controls
             return null;
         }
 
-        private string? GetSaveInitialDirectory(OpenedTab tab)
+        private async Task<string?> GetSaveInitialDirectoryAsync(OpenedTab tab)
         {
             if (tab.IsArchiveEntry &&
                 !string.IsNullOrWhiteSpace(tab.ArchiveSourcePath))
             {
                 string? archiveDirectory = Path.GetDirectoryName(tab.ArchiveSourcePath);
-                if (!string.IsNullOrWhiteSpace(archiveDirectory) && Directory.Exists(archiveDirectory))
+                if (!string.IsNullOrWhiteSpace(archiveDirectory) && await Task.Run(() => Directory.Exists(archiveDirectory)))
                 {
                     return archiveDirectory;
                 }
             }
 
-            return GetSaveInitialDirectory();
+            return await GetSaveInitialDirectoryAsync();
         }
 
         private bool TryChooseSavePath(OpenedTab tab, string? initialDir)
@@ -304,7 +308,7 @@ return tab.FilePath != null
             return null;
         }
 
-        private async Task SaveTabContentAsync(OpenedTab tab)
+        private async Task<EditorSaveCheckpoint?> SaveTabContentAsync(OpenedTab tab)
         {
             long? flushedDocumentVersion = await FlushTabEditorBeforeSaveAsync(tab);
 
@@ -319,6 +323,7 @@ return tab.FilePath != null
                         "편집 입력을 확정하지 못해 저장을 취소했습니다. 다시 시도해 주세요."));
                 }
             }
+            EditorSaveCheckpoint? checkpoint = session?.CaptureSaveCheckpoint();
             if (tab.IsEncrypted)
             {
                 string? password = tab.EncryptionPassword;
@@ -332,7 +337,7 @@ return tab.FilePath != null
                 tab.ContentPreview = session != null && session.Model is HexDumpTextModel
                     ? string.Empty
                     : session?.GetText(120_000) ?? tab.ContentPreview;
-                return;
+                return checkpoint;
             }
 
             if (session != null)
@@ -363,19 +368,35 @@ return tab.FilePath != null
                     _statusBarController.HideTextOperationProgress();
                 }
                 tab.ContentPreview = session.Model is HexDumpTextModel ? string.Empty : session.GetText(120_000);
-                return;
+                return checkpoint;
             }
 
             await _fileService.SaveTextFileAsync(tab.FilePath!, tab.ContentPreview, tab.EncodingName);
+            return checkpoint;
         }
 
-        private async Task SaveTabContentAndUploadAsync(OpenedTab tab)
+        private async Task<bool> SaveTabContentAndUploadAsync(OpenedTab tab)
         {
-            await SaveTabContentAsync(tab);
+            var session = _sessionProvider(tab.Id);
+            string? filePath = tab.FilePath;
+            string encodingName = tab.EncodingName;
+            string? lineEnding = session?.Model.LineEnding;
+            EditorSaveCheckpoint? checkpoint = await SaveTabContentAsync(tab);
             if (!string.IsNullOrWhiteSpace(tab.RemotePath))
             {
                 await _remoteWorkspaceService.UploadLocalFileAsync(tab.FilePath!, tab.RemotePath);
             }
+            if (session != null && checkpoint != null && ReferenceEquals(session, _sessionProvider(tab.Id)) &&
+                tab.FilePath == filePath)
+            {
+                session.CompleteSaveCheckpoint(checkpoint);
+            }
+            // Input can continue while cloud I/O is pending. Never mark those
+            // newer edits (including edits in a shared view) as already saved.
+            return ReferenceEquals(session, _sessionProvider(tab.Id)) &&
+                session?.DocumentVersion == checkpoint?.Version &&
+                tab.FilePath == filePath && tab.EncodingName == encodingName &&
+                session?.Model.LineEnding == lineEnding;
         }
 
         private async Task CompleteSuccessfulSaveAsync(OpenedTab tab, bool syncLineEnding)
@@ -392,13 +413,15 @@ return tab.FilePath != null
             await _refreshGitStatusAsync();
             _updateWindowTitle();
 
-            if (!string.IsNullOrEmpty(tab.FilePath) && File.Exists(tab.FilePath))
+            if (!string.IsNullOrEmpty(tab.FilePath))
             {
                 _addRecentFile(tab.RemotePath ?? tab.FilePath);
             }
 
             string currentFolderPath = _currentFolderProvider();
-            if (!string.IsNullOrEmpty(currentFolderPath) && Directory.Exists(currentFolderPath))
+            if (!string.IsNullOrEmpty(currentFolderPath) &&
+                await Task.Run(() => Directory.Exists(currentFolderPath)) &&
+                string.Equals(currentFolderPath, _currentFolderProvider(), StringComparison.OrdinalIgnoreCase))
             {
                 _reloadDirectoryRoot(currentFolderPath);
             }

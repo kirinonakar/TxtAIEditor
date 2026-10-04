@@ -463,41 +463,11 @@ namespace TxtAIEditor.Editor
             return results.OrderBy(result => result.LineNumber).ThenBy(result => result.IndexOfMatch).ToList();
         }
 
-        public async Task SaveAsync(string filePath, string encodingName, CancellationToken cancellationToken = default)
+        public Task SaveAsync(string filePath, string encodingName, CancellationToken cancellationToken = default)
         {
-            string? directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
-            string temp = Path.Combine(directory ?? Path.GetTempPath(), $"._{Path.GetFileName(filePath)}.tmp");
-            string backup = filePath + ".bak";
-            try
-            {
-                Encoding encoding = TextEncodingService.GetEncodingByName(encodingName);
-                await using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None, 128 * 1024, true))
-                await using (var writer = new StreamWriter(stream, encoding, 128 * 1024, false))
-                {
-                    int lineNumber = 0;
-                    foreach (List<string> leaf in _leaves)
-                    {
-                        foreach (string line in leaf)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            if (lineNumber++ > 0) await writer.WriteAsync(LineEnding.AsMemory(), cancellationToken).ConfigureAwait(false);
-                            await writer.WriteAsync(line.AsMemory(), cancellationToken).ConfigureAwait(false);
-                        }
-                    }
-                }
-                if (File.Exists(filePath))
-                {
-                    File.Replace(temp, filePath, backup);
-                    if (File.Exists(backup)) File.Delete(backup);
-                }
-                else File.Move(temp, filePath);
-            }
-            catch (Exception ex)
-            {
-                if (File.Exists(temp)) { try { File.Delete(temp); } catch { } }
-                throw new IOException($"파일 저장 실패 (안전 복구 완료): {ex.Message}", ex);
-            }
+            string[] lines = _leaves.SelectMany(leaf => leaf).ToArray();
+            return TextFileWriter.SaveAsync(filePath, lines, LineEnding,
+                TextEncodingService.GetEncodingByName(encodingName), cancellationToken);
         }
 
         private long TotalStoredCharacters => _characterIndex.Total;

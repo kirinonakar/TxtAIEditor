@@ -41,50 +41,10 @@ namespace TxtAIEditor.Core.Services
             await SaveTextFileAsync(filePath, content, "UTF-8");
         }
 
-        public async Task SaveTextFileAsync(string filePath, string content, string encodingName)
+        public Task SaveTextFileAsync(string filePath, string content, string encodingName)
         {
-            // Fail-safe writing: Write to temporary file first, then atomically replace
-            string? directory = Path.GetDirectoryName(filePath);
-            if (directory != null && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            string tempFilePath = Path.Combine(directory ?? Path.GetTempPath(), $"._{Path.GetFileName(filePath)}.tmp");
-            string backupFilePath = filePath + ".bak";
-
-            try
-            {
-                Encoding encoding = TextEncodingService.GetEncodingByName(encodingName);
-                await File.WriteAllTextAsync(tempFilePath, content, encoding);
-
-                // 2. Perform atomic replace
-                if (File.Exists(filePath))
-                {
-                    // Create backup and replace
-                    File.Replace(tempFilePath, filePath, backupFilePath);
-                    
-                    // Cleanup backup if everything went flawlessly
-                    if (File.Exists(backupFilePath))
-                    {
-                        File.Delete(backupFilePath);
-                    }
-                }
-                else
-                {
-                    // Direct move if new file
-                    File.Move(tempFilePath, filePath);
-                }
-            }
-            catch (Exception ex)
-            {
-                // Safe recover
-                if (File.Exists(tempFilePath))
-                {
-                    try { File.Delete(tempFilePath); } catch { }
-                }
-                throw new IOException($"파일 저장 실패 (안전 복구 완료): {ex.Message}", ex);
-            }
+            return TextFileWriter.SaveAsync(filePath, new[] { content }, string.Empty,
+                TextEncodingService.GetEncodingByName(encodingName));
         }
 
         public Task<LargeFileInfo> GetLargeFileInfoAsync(string filePath)

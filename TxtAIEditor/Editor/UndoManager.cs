@@ -54,8 +54,19 @@ namespace TxtAIEditor.Editor
 
         public void MarkSavedState()
         {
+            MarkSavedState(CaptureSaveState());
+        }
+
+        internal long CaptureSaveState()
+        {
             CloseOpenTransaction();
-            _savedStateId = _currentStateId;
+            _mergeBoundary = true;
+            return _currentStateId;
+        }
+
+        internal void MarkSavedState(long stateId)
+        {
+            _savedStateId = stateId;
             _mergeBoundary = true;
         }
 

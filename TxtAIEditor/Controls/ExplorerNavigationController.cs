@@ -129,6 +129,7 @@ namespace TxtAIEditor.Controls
             }
 
             IsTreeMode = enableTreeMode;
+            CancelFlatDirectoryLoad();
             ClearExplorerFilterState();
             _leftSidebar.SetExplorerTreeMode(IsTreeMode);
             UpdateBackButtonState();
@@ -162,7 +163,7 @@ namespace TxtAIEditor.Controls
             if (IsTreeMode)
             {
                 CancelFlatDirectoryLoad();
-                LoadTreeRoot(ResolveTreeRoot(CurrentFolderPath));
+                LoadTreeRoot(CurrentFolderPath, resolveRepositoryRoot: true);
             }
             else
             {
@@ -181,7 +182,7 @@ namespace TxtAIEditor.Controls
             if (IsTreeMode)
             {
                 CancelFlatDirectoryLoad();
-                LoadTreeRoot(ResolveTreeRoot(folderPath));
+                LoadTreeRoot(folderPath, resolveRepositoryRoot: true);
                 return;
             }
 
@@ -453,20 +454,20 @@ namespace TxtAIEditor.Controls
 
         public async Task NavigateToFolderAsync(string folderPath, bool revealInLeftPanel = true)
         {
-            if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
+            if (string.IsNullOrEmpty(folderPath) || !await Task.Run(() => Directory.Exists(folderPath)))
             {
                 return;
             }
 
-            UpdateRepoPath(folderPath);
             if (IsTreeMode)
             {
-                CancelFlatDirectoryLoad();
-                LoadTreeRoot(ResolveTreeRoot(folderPath));
+                if (!await LoadTreeRootAsync(folderPath, resolveRepositoryRoot: true)) return;
             }
-            else if (!await LoadFlatDirectoryRootAsync(folderPath, updateGitStatus: false))
+            else
             {
-                return;
+                string? repoPath = await Task.Run(() => _gitService.FindRepositoryRoot(folderPath));
+                _currentRepoPathChanged(repoPath ?? string.Empty);
+                if (!await LoadFlatDirectoryRootAsync(folderPath, updateGitStatus: false)) return;
             }
 
             if (revealInLeftPanel)
@@ -542,6 +543,7 @@ namespace TxtAIEditor.Controls
 
         private async Task LoadRemoteDirectoryAsync(bool clearFilter = true)
         {
+            CancelFlatDirectoryLoad();
             CancelRemoteFilterSearch();
             if (!IsViewingRemote || _remoteWorkspaceService.ActiveConnection == null)
             {
@@ -1023,48 +1025,93 @@ namespace TxtAIEditor.Controls
                 : folderPath;
         }
 
-        private void LoadTreeRoot(string folderPath)
+        private void LoadTreeRoot(string folderPath, bool resolveRepositoryRoot = false)
+        {
+            _ = LoadTreeRootAsync(folderPath, resolveRepositoryRoot);
+        }
+
+        private async Task<bool> LoadTreeRootAsync(string folderPath, bool resolveRepositoryRoot)
         {
             ClearExplorerFilterState();
-            if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+            CancelFlatDirectoryLoad();
+            if (string.IsNullOrWhiteSpace(folderPath))
             {
-                return;
+                return false;
             }
 
-            _viewModel.ExplorerItems.Clear();
-            CurrentArchivePath = string.Empty;
-            CurrentArchiveDirectory = string.Empty;
-            _currentArchiveRemotePath = string.Empty;
-            SetCurrentFolderPath(folderPath);
-            UpdateRepoPath(folderPath);
-
-            var directoryInfo = new DirectoryInfo(folderPath);
-            var rootItem = new ExplorerItem
+            var cancellation = new System.Threading.CancellationTokenSource();
+            var cancellationToken = cancellation.Token;
+            _flatDirectoryLoadCancellation = cancellation;
+            bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+            ExplorerItemSorter.SortMode sortMode = _itemSorter.Mode;
+            try
             {
-                Name = string.IsNullOrWhiteSpace(directoryInfo.Name) ? directoryInfo.FullName : directoryInfo.Name,
-                Path = directoryInfo.FullName,
-                IsFolder = true,
-                ModifiedTime = directoryInfo.LastWriteTime,
-                IsDark = _leftSidebar.ActualTheme == ElementTheme.Dark
-            };
+                var loaded = await Task.Run(() =>
+                {
+                    string rootPath = resolveRepositoryRoot ? ResolveTreeRoot(folderPath) : folderPath;
+                    if (!Directory.Exists(rootPath)) return default;
+                    var directoryInfo = new DirectoryInfo(rootPath);
+                    var rootItem = new ExplorerItem
+                    {
+                        Name = string.IsNullOrWhiteSpace(directoryInfo.Name) ? directoryInfo.FullName : directoryInfo.Name,
+                        Path = directoryInfo.FullName,
+                        IsFolder = true,
+                        ModifiedTime = directoryInfo.LastWriteTime,
+                        IsDark = isDark
+                    };
+                    var children = _itemSorter.Sort(_directoryService.CreateDirectoryItems(rootPath), sortMode).ToList();
+                    cancellationToken.ThrowIfCancellationRequested();
+                    foreach (var child in children)
+                    {
+                        child.IsDark = isDark;
+                        child.IsArchive = !child.IsFolder && _archiveExplorerService.IsSupportedArchiveFile(child.Path);
+                    }
+                    string repoPath = _gitService.FindRepositoryRoot(rootPath) ?? string.Empty;
+                    return (Root: rootItem, Children: children, RepoPath: repoPath);
+                }, cancellationToken);
 
-            var rootNode = new Microsoft.UI.Xaml.Controls.TreeViewNode
+                if (cancellation.IsCancellationRequested || !IsTreeMode || loaded.Root == null ||
+                    !ReferenceEquals(_flatDirectoryLoadCancellation, cancellation)) return false;
+
+                _viewModel.ExplorerItems.Clear();
+                CurrentArchivePath = string.Empty;
+                CurrentArchiveDirectory = string.Empty;
+                _currentArchiveRemotePath = string.Empty;
+                SetCurrentFolderPath(loaded.Root.Path);
+                _currentRepoPathChanged(loaded.RepoPath);
+                var rootNode = new Microsoft.UI.Xaml.Controls.TreeViewNode { Content = loaded.Root };
+                foreach (var child in loaded.Children)
+                {
+                    rootNode.Children.Add(new Microsoft.UI.Xaml.Controls.TreeViewNode
+                    {
+                        Content = child,
+                        HasUnrealizedChildren = child.IsFolder || child.IsArchive
+                    });
+                }
+                ClearExplorerTreeNodes();
+                _leftSidebar.ExplorerTree.RootNodes.Add(rootNode);
+                rootNode.IsExpanded = true;
+                SetExplorerStatusText(FormatExplorerItemCount(rootNode.Children.Count));
+                await UpdateGitStatusesAsync();
+                return true;
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
             {
-                Content = rootItem,
-                HasUnrealizedChildren = true
-            };
-
-            ClearExplorerTreeNodes();
-            _leftSidebar.ExplorerTree.RootNodes.Add(rootNode);
-            PopulateTreeNode(rootNode);
-            rootNode.IsExpanded = true;
-
-            SetExplorerStatusText(FormatExplorerItemCount(rootNode.Children.Count));
-            _ = UpdateGitStatusesAsync();
+                Debug.WriteLine($"Failed loading tree '{folderPath}': {ex.Message}");
+            }
+            finally
+            {
+                if (ReferenceEquals(_flatDirectoryLoadCancellation, cancellation))
+                    _flatDirectoryLoadCancellation = null;
+                cancellation.Dispose();
+            }
+            return false;
         }
 
         private async Task LoadRemoteTreeRootAsync()
         {
+            CancelFlatDirectoryLoad();
             ClearExplorerFilterState();
             if (!IsViewingRemote || _remoteWorkspaceService.ActiveConnection == null)
             {
@@ -1724,12 +1771,14 @@ namespace TxtAIEditor.Controls
 
         public async Task UpdateGitStatusesAsync()
         {
+            string folderPath = CurrentFolderPath;
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
             Dictionary<string, string>? statuses = IsViewingArchive || CurrentFolderPath == ExplorerDirectoryService.LocalRootPath
                 ? null
-                : await _gitStatusService.GetStatusesAsync(CurrentFolderPath);
+                : await _gitStatusService.GetStatusesAsync(folderPath);
             _leftSidebar.DispatcherQueue.TryEnqueue(() =>
             {
+                if (!string.Equals(folderPath, CurrentFolderPath, StringComparison.OrdinalIgnoreCase)) return;
                 _gitStatusService.ApplyStatuses(GetVisibleExplorerItems(), statuses, isDark);
             });
         }

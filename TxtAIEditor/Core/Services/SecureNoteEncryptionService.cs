@@ -96,39 +96,14 @@ namespace TxtAIEditor.Core.Services
 
         public async Task SaveEncryptedTextFileAsync(string filePath, string plainText, string password)
         {
-            string encryptedText = EncryptText(plainText, password);
-            string? directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            string tempFilePath = Path.Combine(directory ?? Path.GetTempPath(), $"._{Path.GetFileName(filePath)}.tmp");
-            string backupFilePath = filePath + ".bak";
+            string encryptedText = await Task.Run(() => EncryptText(plainText, password)).ConfigureAwait(false);
 
             try
             {
-                await File.WriteAllTextAsync(tempFilePath, encryptedText, Utf8NoBom);
-                if (File.Exists(filePath))
-                {
-                    File.Replace(tempFilePath, filePath, backupFilePath);
-                    if (File.Exists(backupFilePath))
-                    {
-                        File.Delete(backupFilePath);
-                    }
-                }
-                else
-                {
-                    File.Move(tempFilePath, filePath);
-                }
+                await TextFileWriter.SaveAsync(filePath, new[] { encryptedText }, string.Empty, Utf8NoBom).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                if (File.Exists(tempFilePath))
-                {
-                    try { File.Delete(tempFilePath); } catch { }
-                }
-
                 throw new IOException($"암호화 파일 저장 실패 (안전 복구 완료): {ex.Message}", ex);
             }
         }

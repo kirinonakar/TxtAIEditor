@@ -36,6 +36,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<OpenedTab> _updateLivePreview;
 
         private bool _isSyncingEncodingCombo;
+        private int _fileStatsRequestVersion;
 
         public StatusBarController(
             StatusBarPane statusBar,
@@ -90,14 +91,33 @@ namespace TxtAIEditor.Controls
 
         public void UpdateFileStats(OpenedTab tab)
         {
-            long bytes = 0;
-            string? filePath = GetStatsFilePath(tab);
-            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
-            {
-                bytes = new FileInfo(filePath).Length;
-            }
+            _ = UpdateFileStatsAsync(tab, ++_fileStatsRequestVersion);
+        }
 
-            if (tab.IsImageViewer && ImageFileInfoReader.TryRead(filePath, out var imageInfo))
+        private async Task UpdateFileStatsAsync(OpenedTab tab, int requestVersion)
+        {
+            string? filePath = GetStatsFilePath(tab);
+            bool isImage = tab.IsImageViewer;
+            var stats = await Task.Run(() =>
+            {
+                long bytes = 0;
+                ImageFileInfo? image = null;
+                try
+                {
+                    if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+                        bytes = new FileInfo(filePath).Length;
+                    if (isImage && ImageFileInfoReader.TryRead(filePath, out var imageInfo))
+                        image = imageInfo;
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+                return (Bytes: bytes, Image: image);
+            });
+
+            if (requestVersion != _fileStatsRequestVersion || !_isActiveTab(tab) ||
+                !string.Equals(filePath, GetStatsFilePath(tab), StringComparison.OrdinalIgnoreCase)) return;
+
+            if (stats.Image is ImageFileInfo image)
             {
                 string imageFormat = _getString(
                     "StatusImageFileStatsFormat",
@@ -105,9 +125,9 @@ namespace TxtAIEditor.Controls
                 _statusBar.FileStatsText.Text = string.Format(
                     CultureInfo.CurrentCulture,
                     imageFormat,
-                    FormatFileSize(bytes),
-                    imageInfo.Width,
-                    imageInfo.Height);
+                    FormatFileSize(stats.Bytes),
+                    image.Width,
+                    image.Height);
                 return;
             }
 
@@ -115,7 +135,7 @@ namespace TxtAIEditor.Controls
             _statusBar.FileStatsText.Text = string.Format(
                 CultureInfo.CurrentCulture,
                 format,
-                FormatFileSize(bytes));
+                FormatFileSize(stats.Bytes));
         }
 
         public void UpdateTotalLines(OpenedTab tab)
