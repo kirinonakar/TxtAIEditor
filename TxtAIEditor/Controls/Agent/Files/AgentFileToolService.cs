@@ -32,6 +32,40 @@ namespace TxtAIEditor.Controls
                     : path;
             }
         }
+
+        public string DisplayFileName
+        {
+            get
+            {
+                string path = string.IsNullOrWhiteSpace(DisplayPath)
+                    ? RelativePath
+                    : DisplayPath;
+                string fileName = Path.GetFileName(path);
+                if (string.IsNullOrWhiteSpace(fileName))
+                {
+                    fileName = path;
+                }
+
+                return TotalModifications > 1
+                    ? $"({ModificationNumber}) {fileName}"
+                    : fileName;
+            }
+        }
+
+        public string DisplayTooltipPath
+        {
+            get
+            {
+                if (!string.IsNullOrWhiteSpace(FullPath))
+                {
+                    return FullPath;
+                }
+
+                return string.IsNullOrWhiteSpace(DisplayPath)
+                    ? RelativePath
+                    : DisplayPath;
+            }
+        }
     }
 
     public sealed class AgentReadImageResult

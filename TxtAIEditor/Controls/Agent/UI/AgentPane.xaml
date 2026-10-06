@@ -713,9 +713,10 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                                                    ToolTipService.ToolTip="{Binding DisplayTooltipPath}">
                                             <FontIcon Glyph="&#xE7C3;" FontSize="12" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
-                                            <TextBlock Text="{Binding DisplayRelativePath}"
+                                            <TextBlock Text="{Binding DisplayFileName}"
                                                        FontSize="11"
                                                        TextWrapping="NoWrap"
                                                        TextTrimming="CharacterEllipsis"
