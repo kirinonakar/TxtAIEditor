@@ -15,8 +15,8 @@ namespace TxtAIEditor.Controls
 
         public Task RunAsync(Action action)
         {
-            var tcs = new TaskCompletionSource();
-            _dispatcherQueue.TryEnqueue(() =>
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!_dispatcherQueue.TryEnqueue(() =>
             {
                 try
                 {
@@ -27,14 +27,17 @@ namespace TxtAIEditor.Controls
                 {
                     tcs.SetException(ex);
                 }
-            });
+            }))
+            {
+                tcs.SetException(new InvalidOperationException("The UI dispatcher is unavailable."));
+            }
             return tcs.Task;
         }
 
         public Task RunAsync(Func<Task> func)
         {
-            var tcs = new TaskCompletionSource();
-            _dispatcherQueue.TryEnqueue(async () =>
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!_dispatcherQueue.TryEnqueue(async () =>
             {
                 try
                 {
@@ -45,14 +48,17 @@ namespace TxtAIEditor.Controls
                 {
                     tcs.SetException(ex);
                 }
-            });
+            }))
+            {
+                tcs.SetException(new InvalidOperationException("The UI dispatcher is unavailable."));
+            }
             return tcs.Task;
         }
 
         public Task<T> RunAsync<T>(Func<T> func)
         {
-            var tcs = new TaskCompletionSource<T>();
-            _dispatcherQueue.TryEnqueue(() =>
+            var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!_dispatcherQueue.TryEnqueue(() =>
             {
                 try
                 {
@@ -63,14 +69,17 @@ namespace TxtAIEditor.Controls
                 {
                     tcs.SetException(ex);
                 }
-            });
+            }))
+            {
+                tcs.SetException(new InvalidOperationException("The UI dispatcher is unavailable."));
+            }
             return tcs.Task;
         }
 
         public Task<T> RunAsync<T>(Func<Task<T>> func)
         {
-            var tcs = new TaskCompletionSource<T>();
-            _dispatcherQueue.TryEnqueue(async () =>
+            var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!_dispatcherQueue.TryEnqueue(async () =>
             {
                 try
                 {
@@ -81,7 +90,10 @@ namespace TxtAIEditor.Controls
                 {
                     tcs.SetException(ex);
                 }
-            });
+            }))
+            {
+                tcs.SetException(new InvalidOperationException("The UI dispatcher is unavailable."));
+            }
             return tcs.Task;
         }
     }

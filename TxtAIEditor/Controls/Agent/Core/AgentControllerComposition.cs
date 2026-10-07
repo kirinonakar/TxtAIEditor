@@ -325,7 +325,7 @@ namespace TxtAIEditor.Controls
             fileTools.ActivityReporter = callbacks.AppendActivity;
             if (fileModifiedAsync != null)
             {
-                fileTools.FileModifiedAsync = fileModifiedAsync;
+                fileTools.FileModifiedAsync = path => uiDispatcher.RunAsync(() => fileModifiedAsync(path));
             }
 
             return new AgentControllerComposition(

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services.LLM;
 
@@ -215,20 +217,22 @@ namespace TxtAIEditor.Controls
                 _selectionSnapshotProvider().HasLineRange);
         }
 
-        public string BuildWorkspaceContext(
+        public Task<string> BuildWorkspaceContextAsync(
             string instruction,
             OpenedTab? activeTab,
             AgentSelectionSnapshot selectionSnapshot,
             IEnumerable<AgentAttachmentState> attachments,
-            string? workspaceRootOverride = null)
+            string workspaceRoot,
+            CancellationToken cancellationToken)
         {
-            return _workspaceContextBuilder.Build(
+            return _workspaceContextBuilder.BuildAsync(
                 instruction,
                 activeTab,
                 true,
                 selectionSnapshot.HasLineRange,
                 attachments,
-                workspaceRootOverride);
+                workspaceRoot,
+                cancellationToken);
         }
 
         public IReadOnlyList<LlmMessageAttachment> GetImageAttachmentsForRun(AgentRunContext context)

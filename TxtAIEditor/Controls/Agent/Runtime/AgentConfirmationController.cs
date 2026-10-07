@@ -47,13 +47,16 @@ namespace TxtAIEditor.Controls
 
         public async Task<bool> ConfirmFileEditAsync(AgentFileEditPreview preview)
         {
-            string displayPath = _fileTools.GetDisplayPath(
-                preview.FullPath,
-                preview.RelativePath);
-            preview.DisplayPath = displayPath;
+            string displayPath = preview.RelativePath;
+            await _runOnUIThreadAsync(() =>
+            {
+                displayPath = _fileTools.GetDisplayPath(preview.FullPath, preview.RelativePath);
+                preview.DisplayPath = displayPath;
+                return Task.FromResult(true);
+            });
             var settings = _settingsService.CurrentSettings;
             string root = _fileTools.WorkspaceRoot;
-            if (settings.LlmAgentAutoApproveGitEdits && _isGitRepoProvider(root))
+            if (settings.LlmAgentAutoApproveGitEdits && await Task.Run(() => _isGitRepoProvider(root)))
             {
                 _appendActivity(string.Format(
                     _getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"),

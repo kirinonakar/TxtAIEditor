@@ -201,7 +201,9 @@
       vscodeBridge?.postMessage({ type: 'input', sessionId: activeSessionId, data: text });
     });
 
-    const terminalPathPattern = /(?:file:\/\/\/[^\s<>"']+|file:\/\/\/[^<>"'|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|[A-Za-z]:\\[^\s<>"|?*]+|[A-Za-z]:\\[^<>"|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|\\\\[^\s<>"|?*]+|\\\\[^<>"|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|\/[^\s<>"']+|\/[^<>"'|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|(?:\.{1,2}[\\/])?(?:[^\s:<>"'|?*]+[\\/])+[^\s:<>"'|?*]*(?:\.[A-Za-z0-9_+~-]{1,12})*(?::\d+(?::\d+)?)?|[^\s:<>"'|?*]+\.[A-Za-z0-9_+~-]{1,12}(?::\d+(?::\d+)?)?|(?:\.{1,2}[\\/])?(?:[^<>"'|?*\r\n]+?[\\/])+[^<>"'|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|(?:\s|^)([^<>"'|?*\r\n\s]+(?:\s[^<>"'|?*\r\n\s]+)+\.[A-Za-z0-9_+~-]{1,12}(?::\d+(?::\d+)?)?))/g;
+    // A repeated directory segment must never consume its own separator. Otherwise
+    // ordinary output such as "a a/a a/..." causes exponential backtracking on hover.
+    const terminalPathPattern = /(?:file:\/\/\/[^\s<>"']+|file:\/\/\/[^<>"'|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|[A-Za-z]:\\[^\s<>"|?*]+|[A-Za-z]:\\[^<>"|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|\\\\[^\s<>"|?*]+|\\\\[^<>"|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|\/[^\s<>"']+|\/[^<>"'|?*\r\n]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|(?:\.{1,2}[\\/])?(?:[^\s:<>"'|?*\\/]+[\\/])+[^\s:<>"'|?*\\/]*(?:\.[A-Za-z0-9_+~-]{1,12})*(?::\d+(?::\d+)?)?|[^\s:<>"'|?*]+\.[A-Za-z0-9_+~-]{1,12}(?::\d+(?::\d+)?)?|(?:\.{1,2}[\\/])?(?:[^<>"'|?*\r\n\\/]+?[\\/])+[^<>"'|?*\r\n\\/]+?(?:\.[A-Za-z0-9_+~-]{1,12})+(?::\d+(?::\d+)?)?|(?:\s|^)([^<>"'|?*\r\n\s]+(?:\s[^<>"'|?*\r\n\s]+)+\.[A-Za-z0-9_+~-]{1,12}(?::\d+(?::\d+)?)?))/g;
 
     function trimTerminalPath(value) {
       return (value || '').replace(/[.,;)\]}]+$/g, '');
@@ -276,6 +278,8 @@
               },
               activate(event, linkText) {
                 if (event.ctrlKey || event.metaKey) {
+                  event.preventDefault();
+                  event.stopPropagation();
                   vscodeBridge?.postMessage({ type: messageType, [messageType === 'openPath' ? 'path' : 'url']: linkText });
                 }
               }

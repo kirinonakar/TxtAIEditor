@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
@@ -52,6 +54,30 @@ namespace TxtAIEditor.Controls
                    string.Equals(tab.Language, "pdf", StringComparison.OrdinalIgnoreCase) ||
                    (!string.IsNullOrWhiteSpace(tab.FilePath) &&
                     string.Equals(Path.GetExtension(tab.FilePath), ".pdf", StringComparison.OrdinalIgnoreCase));
+        }
+
+        public async Task<string> BuildAsync(
+            string instruction,
+            OpenedTab? activeTab,
+            bool includeActiveFile,
+            bool hasSelectionRangeContext,
+            IEnumerable<AgentAttachmentState> attachments,
+            string workspaceRoot,
+            CancellationToken cancellationToken)
+        {
+            // Capture UI-owned tab and attachment state before leaving the dispatcher.
+            var capturedContext = new List<string>();
+            AddOpenTabsContext(capturedContext, activeTab);
+            AddActiveTabContext(capturedContext, activeTab, includeActiveFile, hasSelectionRangeContext);
+            AddAttachmentsContext(capturedContext, attachments);
+
+            return await Task.Run(() =>
+            {
+                var context = new List<string> { "[Workspace root]", workspaceRoot, "" };
+                AddReferencedPathContext(context, instruction, workspaceRoot, cancellationToken);
+                context.AddRange(capturedContext);
+                return string.Join(Environment.NewLine, context);
+            }, cancellationToken);
         }
 
         private void AddOpenTabsContext(List<string> context, OpenedTab? activeTab)
@@ -128,7 +154,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private void AddReferencedPathContext(List<string> context, string instruction, string workspaceRoot)
+        private void AddReferencedPathContext(List<string> context, string instruction, string workspaceRoot, CancellationToken cancellationToken = default)
         {
             var mentionedPaths = ExtractMentionedPaths(instruction).Take(20).ToList();
             if (mentionedPaths.Count == 0)
@@ -140,8 +166,9 @@ namespace TxtAIEditor.Controls
             context.Add("Use these exact file names and paths. Do not translate, romanize, or rename them.");
             foreach (string mentionedPath in mentionedPaths)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 context.Add($"- Mentioned exactly: {mentionedPath}");
-                var matches = FindWorkspacePathMatches(workspaceRoot, mentionedPath, 5).ToList();
+                var matches = FindWorkspacePathMatches(workspaceRoot, mentionedPath, 5, cancellationToken).ToList();
                 if (matches.Count == 0)
                 {
                     context.Add("  Workspace match: not found yet; if the user asked to create/save this file, create it with exactly this name.");
@@ -190,7 +217,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private IEnumerable<string> FindWorkspacePathMatches(string root, string mentionedPath, int maxResults)
+        private IEnumerable<string> FindWorkspacePathMatches(string root, string mentionedPath, int maxResults, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
             {
@@ -201,8 +228,9 @@ namespace TxtAIEditor.Controls
             string mentionedFileName = Path.GetFileName(mentionedPath);
             int count = 0;
 
-            foreach (string filePath in EnumerateWorkspaceFiles(root))
+            foreach (string filePath in EnumerateWorkspaceFiles(root, cancellationToken))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string relative = Path.GetRelativePath(root, filePath).Replace('\\', '/');
                 bool isMatch = string.Equals(relative, normalizedMention, StringComparison.OrdinalIgnoreCase) ||
                                string.Equals(Path.GetFileName(filePath), mentionedFileName, StringComparison.OrdinalIgnoreCase);
@@ -220,7 +248,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static IEnumerable<string> EnumerateWorkspaceFiles(string root)
+        private static IEnumerable<string> EnumerateWorkspaceFiles(string root, CancellationToken cancellationToken)
         {
             var excludedDirectoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -231,13 +259,14 @@ namespace TxtAIEditor.Controls
             pending.Push(root);
             while (pending.Count > 0)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string dir = pending.Pop();
                 IEnumerable<string> files;
                 IEnumerable<string> subdirs;
                 try
                 {
-                    files = Directory.EnumerateFiles(dir);
-                    subdirs = Directory.EnumerateDirectories(dir);
+                    files = Directory.GetFiles(dir);
+                    subdirs = Directory.GetDirectories(dir);
                 }
                 catch
                 {
@@ -251,6 +280,7 @@ namespace TxtAIEditor.Controls
 
                 foreach (string subdir in subdirs)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (!excludedDirectoryNames.Contains(Path.GetFileName(subdir)))
                     {
                         pending.Push(subdir);

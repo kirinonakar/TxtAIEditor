@@ -299,12 +299,13 @@ namespace TxtAIEditor.Controls
                 AgentSelectionSnapshot currentRunSelectionSnapshot = _selectionContextController.CaptureSelectionForRun(_isRunning);
                 runContext.StreamToTabTargetTabId = currentRunActiveTab?.Id;
                 _fileToolController.SetRunContext(currentRunSelectionSnapshot, currentRunActiveTab);
-                string currentWorkspaceContext = _promptContextService.BuildWorkspaceContext(
+                string currentWorkspaceContext = await _promptContextService.BuildWorkspaceContextAsync(
                     conversationTurn,
                     currentRunActiveTab,
                     currentRunSelectionSnapshot,
                     runContext.Attachments,
-                    runContext.WorkspaceRoot);
+                    runContext.WorkspaceRoot,
+                    cancellationToken);
                 string runSelectionContext = _selectionContextController.BuildSelectionContext(currentRunSelectionSnapshot);
                 runContext.PlanWorkspaceContext = currentWorkspaceContext;
                 runContext.PlanSelectionContext = runSelectionContext;
@@ -951,14 +952,16 @@ namespace TxtAIEditor.Controls
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    await _uiDispatcher.RunAsync(() =>
-                    {
-                        currentWorkspaceContext = _promptContextService.BuildWorkspaceContext(
+                    currentWorkspaceContext = await _uiDispatcher.RunAsync(() =>
+                        _promptContextService.BuildWorkspaceContextAsync(
                             conversationTurn,
                             currentRunActiveTab,
                             currentRunSelectionSnapshot,
                             runContext.Attachments,
-                            runContext.WorkspaceRoot);
+                            runContext.WorkspaceRoot,
+                            cancellationToken));
+                    var transcriptUpdate = await Task.Run(() =>
+                    {
                         var addedPartBuilder = new StringBuilder();
                         addedPartBuilder.AppendLine();
                         addedPartBuilder.AppendLine();
@@ -983,11 +986,12 @@ namespace TxtAIEditor.Controls
                         }
 
                         string addedPart = addedPartBuilder.ToString();
-                        transcript += addedPart;
-                        modelTranscript += addedPart;
-                        runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(addedPart);
-                        _updateContextStatsImmediate(true);
-                    });
+                        return (Text: addedPart, Tokens: AgentTokenEstimator.Estimate(addedPart));
+                    }, cancellationToken);
+                    transcript += transcriptUpdate.Text;
+                    modelTranscript += transcriptUpdate.Text;
+                    runContext.CurrentRunTranscriptTokens += transcriptUpdate.Tokens;
+                    await _uiDispatcher.RunAsync(() => _updateContextStatsImmediate(true));
                     
                     foreach (var tcRes in toolCallResults)
                     {

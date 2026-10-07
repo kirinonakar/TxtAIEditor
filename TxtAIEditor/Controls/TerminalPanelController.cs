@@ -197,19 +197,25 @@ namespace TxtAIEditor.Controls
                     int.TryParse(match.Groups["line"].Value, out lineNumber);
                 }
 
-                if (File.Exists(filePath))
+                var target = await Task.Run(() => (
+                    IsFile: File.Exists(filePath),
+                    IsDirectory: Directory.Exists(filePath)));
+                if (target.IsFile)
                 {
                     await _openFileAsync(filePath, lineNumber);
                     return;
                 }
 
-                if (Directory.Exists(filePath))
+                if (target.IsDirectory)
                 {
                     await _navigateFolderAsync(filePath);
                     return;
                 }
 
-                Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+                await Task.Run(() =>
+                {
+                    using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+                });
             }
             catch (Exception ex)
             {

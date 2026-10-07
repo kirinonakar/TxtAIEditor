@@ -120,6 +120,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentFileEditToolService _edits;
         private readonly Func<string, string, string> _getString;
         private readonly Func<string> _workspaceRootProvider;
+        private readonly AsyncLocal<string?> _backgroundWorkspaceRoot = new();
 
         public AgentFileToolService(
             Func<string> workspaceRootProvider,
@@ -166,6 +167,11 @@ namespace TxtAIEditor.Controls
 
         private string ResolveWorkspaceRoot()
         {
+            if (_backgroundWorkspaceRoot.Value is string capturedRoot)
+            {
+                return capturedRoot;
+            }
+
             string? overrideRoot = WorkspaceRootOverrideProvider?.Invoke();
             if (!string.IsNullOrWhiteSpace(overrideRoot) && Directory.Exists(overrideRoot))
             {
@@ -175,49 +181,69 @@ namespace TxtAIEditor.Controls
             return _workspaceRootProvider();
         }
 
+        private Task<T> RunInBackgroundAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken = default)
+        {
+            // Snapshot the run's root before queuing work: a tab/session switch must
+            // not redirect an in-flight tool, and workers must not query UI providers.
+            string? root = WorkspaceRootOverrideProvider?.Invoke();
+            string capturedRoot = string.IsNullOrWhiteSpace(root) ? _workspaceRootProvider() : root;
+            return Task.Run(async () =>
+            {
+                _backgroundWorkspaceRoot.Value = capturedRoot;
+                try
+                {
+                    return await action().ConfigureAwait(false);
+                }
+                finally
+                {
+                    _backgroundWorkspaceRoot.Value = null;
+                }
+            }, cancellationToken);
+        }
+
         public Task<string> ListFilesAsync(string? glob, int maxResults)
         {
-            return _workspaceFiles.ListFilesAsync(glob, maxResults);
+            return RunInBackgroundAsync(() => _workspaceFiles.ListFilesAsync(glob, maxResults));
         }
 
         public Task<string> SearchTextAsync(string query, string? glob, int maxResults)
         {
-            return _workspaceFiles.SearchTextAsync(query, glob, maxResults);
+            return RunInBackgroundAsync(() => _workspaceFiles.SearchTextAsync(query, glob, maxResults));
         }
 
         public Task<string> ReadFileAsync(string path, int startLine, int lineCount)
         {
-            return _workspaceFiles.ReadFileAsync(path, startLine, lineCount);
+            return RunInBackgroundAsync(() => _workspaceFiles.ReadFileAsync(path, startLine, lineCount));
         }
 
         public Task<AgentReadImageResult> ReadImageAsync(string path)
         {
-            return _images.ReadImageAsync(path);
+            return RunInBackgroundAsync(() => _images.ReadImageAsync(path));
         }
 
         public Task<string> ExtractDocumentAsync(string path, string outputPath, int maxChars)
         {
-            return _documents.ExtractDocumentAsync(path, outputPath, maxChars);
+            return RunInBackgroundAsync(() => _documents.ExtractDocumentAsync(path, outputPath, maxChars));
         }
 
         public Task<string> RunRgAsync(string arguments, int timeoutMs, CancellationToken cancellationToken = default)
         {
-            return _processes.RunRgAsync(arguments, timeoutMs, cancellationToken);
+            return RunInBackgroundAsync(() => _processes.RunRgAsync(arguments, timeoutMs, cancellationToken), cancellationToken);
         }
 
         public Task<string> RunRgaAsync(string arguments, int timeoutMs, CancellationToken cancellationToken = default)
         {
-            return _processes.RunRgaAsync(arguments, timeoutMs, cancellationToken);
+            return RunInBackgroundAsync(() => _processes.RunRgaAsync(arguments, timeoutMs, cancellationToken), cancellationToken);
         }
 
         public Task<string> RunPowerShellAsync(string command, int timeoutMs, CancellationToken cancellationToken = default)
         {
-            return _processes.RunPowerShellAsync(command, timeoutMs, cancellationToken);
+            return RunInBackgroundAsync(() => _processes.RunPowerShellAsync(command, timeoutMs, cancellationToken), cancellationToken);
         }
 
         public Task<string> CreateFileAsync(string path, string content)
         {
-            return _edits.CreateFileAsync(path, content);
+            return RunInBackgroundAsync(() => _edits.CreateFileAsync(path, content));
         }
 
         public Task<string> SearchReplaceAsync(
@@ -233,7 +259,7 @@ namespace TxtAIEditor.Controls
             int? allowedStartLine = null,
             int? allowedEndLine = null)
         {
-            return _edits.SearchReplaceAsync(
+            return RunInBackgroundAsync(() => _edits.SearchReplaceAsync(
                 path,
                 searchText,
                 replacementText,
@@ -244,7 +270,7 @@ namespace TxtAIEditor.Controls
                 startLine,
                 endLine,
                 allowedStartLine,
-                allowedEndLine);
+                allowedEndLine));
         }
 
         public Task<string> ReplaceRangeAsync(
@@ -257,7 +283,7 @@ namespace TxtAIEditor.Controls
             int? allowedStartLine = null,
             int? allowedEndLine = null)
         {
-            return _edits.ReplaceRangeAsync(
+            return RunInBackgroundAsync(() => _edits.ReplaceRangeAsync(
                 path,
                 startLine,
                 endLine,
@@ -265,37 +291,37 @@ namespace TxtAIEditor.Controls
                 expectedStartLine,
                 expectedEndLine,
                 allowedStartLine,
-                allowedEndLine);
+                allowedEndLine));
         }
 
         public Task<string> ApplyPatchAsync(string? path, string patchText)
         {
-            return _edits.ApplyPatchAsync(path, patchText);
+            return RunInBackgroundAsync(() => _edits.ApplyPatchAsync(path, patchText));
         }
 
         public Task<string> OverwriteFileAsync(string path, string content)
         {
-            return _edits.OverwriteFileAsync(path, content);
+            return RunInBackgroundAsync(() => _edits.OverwriteFileAsync(path, content));
         }
 
         public Task<string> AppendToFileAsync(string path, string content)
         {
-            return _edits.AppendToFileAsync(path, content);
+            return RunInBackgroundAsync(() => _edits.AppendToFileAsync(path, content));
         }
 
         public Task<string> MergeFilesAsync(string[] paths, string targetPath)
         {
-            return _edits.MergeFilesAsync(paths, targetPath);
+            return RunInBackgroundAsync(() => _edits.MergeFilesAsync(paths, targetPath));
         }
 
         public Task<string> InsertIntoFileAsync(string path, string content, string before, string after)
         {
-            return _edits.InsertIntoFileAsync(path, content, before, after);
+            return RunInBackgroundAsync(() => _edits.InsertIntoFileAsync(path, content, before, after));
         }
 
         public Task<string> SplitFileAsync(string path, List<SplitRange> ranges, int linesPerFile)
         {
-            return _edits.SplitFileAsync(path, ranges, linesPerFile);
+            return RunInBackgroundAsync(() => _edits.SplitFileAsync(path, ranges, linesPerFile));
         }
 
         private async Task<bool> ConfirmEditAsync(AgentFileEditPreview preview)
