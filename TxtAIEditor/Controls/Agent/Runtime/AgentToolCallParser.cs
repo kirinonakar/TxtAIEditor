@@ -24,6 +24,7 @@ namespace TxtAIEditor.Controls
 
             string text = response.Trim();
             return (TryParseMulti(text, out var parsedCalls) && parsedCalls.Count > 0) ||
+                AgentDsmlToolCallParser.ContainsSyntax(text) ||
                 LooksLikeMalformedToolCallSyntax(text) ||
                 TryExtractSupportedCommandFence(text, out _);
         }
@@ -38,7 +39,18 @@ namespace TxtAIEditor.Controls
 
             string text = response.Trim();
 
-            // Check XML/DSML format first
+            if (AgentDsmlToolCallParser.ContainsSyntax(text))
+            {
+                if (AgentDsmlToolCallParser.TryParse(text, out _))
+                {
+                    return false;
+                }
+
+                detail = "The DSML tool-call block must contain one or more matching invoke/parameter tags with valid name and string attributes.";
+                return true;
+            }
+
+            // Check legacy XML-style format first
             int xmlOpenIndex = FindToolCallIndex(text);
             int xmlCloseIndex = FindLastToolCallCloseIndex(text);
             
@@ -123,7 +135,19 @@ namespace TxtAIEditor.Controls
 
             string text = response.Trim();
 
-            // Try XML/DSML tool calls first
+            // DeepSeek DSML uses dedicated invoke/parameter tags rather than JSON payloads.
+            if (AgentDsmlToolCallParser.ContainsSyntax(text))
+            {
+                if (AgentDsmlToolCallParser.TryParse(text, out List<ToolCallInfo> dsmlCalls))
+                {
+                    toolCalls.AddRange(dsmlCalls);
+                    return toolCalls.Count > 0;
+                }
+
+                return false;
+            }
+
+            // Try legacy XML-style tool calls first
             if (text.IndexOf("<tool_call", StringComparison.OrdinalIgnoreCase) >= 0 && TryParseXmlToolCalls(text, toolCalls))
             {
                 return toolCalls.Count > 0;
@@ -131,7 +155,8 @@ namespace TxtAIEditor.Controls
 
             bool hasToolCallTagSyntax =
                 text.IndexOf(ToolCallOpenTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) >= 0;
+                text.IndexOf(ToolCallCloseTag, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                AgentDsmlToolCallParser.ContainsSyntax(text);
 
             // 1. Prefer the final contiguous block of text tool calls, so explanatory
             // examples earlier in the response are ignored while multiple live calls
@@ -1549,25 +1574,47 @@ namespace TxtAIEditor.Controls
         public static int FindToolCallIndex(string text)
         {
             if (string.IsNullOrEmpty(text)) return -1;
+
+            int dsmlIndex = AgentDsmlToolCallParser.FindFirstCallStart(text);
             int idx = 0;
             while (true)
             {
                 idx = text.IndexOf("<tool_call", idx, StringComparison.OrdinalIgnoreCase);
-                if (idx < 0) return -1;
+                if (idx < 0) return dsmlIndex;
                 
                 int nextCharIdx = idx + "<tool_call".Length;
                 if (nextCharIdx >= text.Length)
                 {
-                    return idx; // streaming boundary
+                    return dsmlIndex >= 0 ? Math.Min(idx, dsmlIndex) : idx; // streaming boundary
                 }
                 
                 char nextChar = text[nextCharIdx];
                 if (nextChar == '>' || char.IsWhiteSpace(nextChar))
                 {
-                    return idx;
+                    return dsmlIndex >= 0 ? Math.Min(idx, dsmlIndex) : idx;
                 }
                 idx += 10;
             }
+        }
+
+        public static int GetPotentialToolCallTagSuffixLength(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return 0;
+            }
+
+            int holdBack = AgentDsmlToolCallParser.GetPotentialOpeningTagSuffixLength(text);
+            for (int length = Math.Min(text.Length, ToolCallOpenTag.Length - 1); length > holdBack; length--)
+            {
+                if (text.EndsWith(ToolCallOpenTag.Substring(0, length), StringComparison.OrdinalIgnoreCase))
+                {
+                    holdBack = length;
+                    break;
+                }
+            }
+
+            return holdBack;
         }
 
         public static int FindLastToolCallCloseIndex(string text)
@@ -1583,6 +1630,11 @@ namespace TxtAIEditor.Controls
                 {
                     startIndex = tagEndIndex + 1;
                 }
+            }
+
+            if (openIndex >= 0 && AgentDsmlToolCallParser.IsDsmlStartAt(text, openIndex))
+            {
+                return AgentDsmlToolCallParser.FindLastOuterCloseTag(text, startIndex);
             }
 
             return FindLastToolCallCloseOutsideJsonString(text, startIndex);
@@ -1634,7 +1686,13 @@ namespace TxtAIEditor.Controls
 
         private static int GetCloseTagLengthAt(string text, int index)
         {
-            string[] closeTags = { ToolCallCloseTag, LegacyToolCallCloseTag, "</invoke>", "</\uFF5C\uFF5CDSML\uFF5C\uFF5Ctool_calls>" };
+            int dsmlCloseLength = AgentDsmlToolCallParser.GetOuterClosingTagLengthAt(text, index);
+            if (dsmlCloseLength > 0)
+            {
+                return dsmlCloseLength;
+            }
+
+            string[] closeTags = { ToolCallCloseTag, LegacyToolCallCloseTag, "</invoke>" };
             foreach (var tag in closeTags)
             {
                 if (index + tag.Length <= text.Length &&

@@ -469,18 +469,7 @@ namespace TxtAIEditor.Controls
                         }
                         else
                         {
-                            int holdBack = 0;
-                            string tag = "<tool_call";
-                            for (int i = 1; i < tag.Length; i++)
-                            {
-                                string sub = tag.Substring(0, i);
-                                if (streamedText.EndsWith(sub, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    holdBack = i;
-                                    break;
-                                }
-                            }
-
+                            int holdBack = AgentToolCallParser.GetPotentialToolCallTagSuffixLength(streamedText);
                             int safeLength = streamedText.Length - holdBack;
                             if (printedLength < safeLength)
                             {
