@@ -241,7 +241,9 @@ namespace TxtAIEditor.Core.Services
             var startInfo = new ProcessStartInfo
             {
                 FileName = GitExecutablePath.Value,
-                Arguments = $"-c core.quotepath=false -c safe.directory=* {arguments}",
+                // Background status/diff must not lock the index for cache updates.
+                // Explicit writes such as add and commit still take their required locks.
+                Arguments = $"--no-optional-locks -c diff.autoRefreshIndex=false -c core.quotepath=false -c safe.directory=* {arguments}",
                 WorkingDirectory = workingDir,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -650,7 +652,8 @@ namespace TxtAIEditor.Core.Services
             var startInfo = new ProcessStartInfo
             {
                 FileName = GitExecutablePath.Value,
-                Arguments = $"-c core.quotepath=false -c safe.directory=* {arguments}",
+                // Disable optional index refresh locks; add/commit still take required locks.
+                Arguments = $"--no-optional-locks -c diff.autoRefreshIndex=false -c core.quotepath=false -c safe.directory=* {arguments}",
                 WorkingDirectory = workingDir,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
