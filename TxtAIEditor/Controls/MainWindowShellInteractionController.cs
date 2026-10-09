@@ -58,6 +58,7 @@ namespace TxtAIEditor.Controls
             _root.DragLeave += OnRootDragLeave;
             _root.Drop += OnRootDrop;
             _root.PreviewKeyDown += OnRootPreviewKeyDown;
+            _root.GettingFocus += OnRootGettingFocus;
             _root.KeyDown += OnRootKeyDown;
             _wordWrapKeyboardAccelerator.Invoked += OnWordWrapKeyboardAcceleratorInvoked;
             _previousTabKeyboardAccelerator.Invoked += OnPreviousTabKeyboardAcceleratorInvoked;
@@ -145,6 +146,14 @@ namespace TxtAIEditor.Controls
         private void OnRightSplitterPointerReleased(object sender, PointerRoutedEventArgs e)
         {
             _shellPanelLayoutService.OnRightSplitterPointerReleased(sender, e);
+        }
+
+        private void OnRootGettingFocus(UIElement sender, GettingFocusEventArgs e)
+        {
+            if (e.NewFocusedElement is Microsoft.UI.Xaml.Controls.TextBox)
+            {
+                TextInputModeService.EnsureInsertMode();
+            }
         }
 
         private void OnRootPreviewKeyDown(object sender, KeyRoutedEventArgs e)

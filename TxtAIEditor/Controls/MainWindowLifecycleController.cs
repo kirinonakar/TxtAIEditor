@@ -61,6 +61,7 @@ namespace TxtAIEditor.Controls
             }
             else
             {
+                TextInputModeService.EnsureInsertMode();
                 StartShortcuts();
             }
         }

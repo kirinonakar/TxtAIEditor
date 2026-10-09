@@ -86,8 +86,12 @@ namespace TxtAIEditor.Controls
 
         public void HandlePreviewKeyDown(KeyRoutedEventArgs e)
         {
+            // Recheck before native text input, including after returning from another app.
+            TextInputModeService.EnsureInsertMode();
+
             if (e.Handled ||
-                (e.Key != Windows.System.VirtualKey.Left && e.Key != Windows.System.VirtualKey.Right))
+                (e.Key != Windows.System.VirtualKey.Insert &&
+                 e.Key != Windows.System.VirtualKey.Left && e.Key != Windows.System.VirtualKey.Right))
             {
                 return;
             }
@@ -95,6 +99,18 @@ namespace TxtAIEditor.Controls
             var alt = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Menu) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
             var ctrl = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
             var shift = (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+            if (e.Key == Windows.System.VirtualKey.Insert)
+            {
+                // Prevent native TextBox controls from toggling overwrite mode.
+                // Keep modified Insert shortcuts, including copy and paste, available.
+                if (!alt && !ctrl && !shift)
+                {
+                    e.Handled = true;
+                }
+
+                return;
+            }
+
             if (!alt || ctrl || shift)
             {
                 return;
