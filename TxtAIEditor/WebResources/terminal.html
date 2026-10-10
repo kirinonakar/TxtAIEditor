@@ -280,6 +280,9 @@
                 if (event.ctrlKey || event.metaKey) {
                   event.preventDefault();
                   event.stopPropagation();
+                  // The stopped mouseup cannot reach xterm's document listener.
+                  // Clear its selection anchor and drag tracking before opening the link.
+                  term.clearSelection();
                   vscodeBridge?.postMessage({ type: messageType, [messageType === 'openPath' ? 'path' : 'url']: linkText });
                 }
               }
