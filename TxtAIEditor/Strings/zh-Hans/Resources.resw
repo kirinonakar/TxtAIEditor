@@ -1886,6 +1886,9 @@
   <data name="TOCHeader" xml:space="preserve">
     <value>PHZZ0ZZ目录页</value>
   </data>
+  <data name="TOCHeaderCountFormat" xml:space="preserve">
+    <value>{0} - {1} 个项目</value>
+  </data>
   <data name="SnippetEditTooltip" xml:space="preserve">
     <value>编辑</value>
   </data>

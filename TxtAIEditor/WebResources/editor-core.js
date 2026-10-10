@@ -783,7 +783,10 @@ function syncFolding() {
 function changeFolding(action, lineNumber = 0) {
     if (imeController.isComposing || imeController.rangeComposition || imeController.columnComposition) return false;
     syncFolding();
-    const scroll = { top: scrollContainer.scrollTop, left: scrollContainer.scrollLeft };
+    const collapseAll = action === 'collapseAll';
+    const scroll = collapseAll
+        ? { top: 0, left: 0 }
+        : { top: scrollContainer.scrollTop, left: scrollContainer.scrollLeft };
     if (action === 'toggle') {
         if (!foldingController.toggle(lineNumber, state.cache)) return false;
         state.foldDiscoveryLine = 0;
@@ -797,15 +800,19 @@ function changeFolding(action, lineNumber = 0) {
         state.currentColumn = (state.cache.get(hidden.header) || '').length + 1;
         state.editingLine = hidden.header;
     }
-    // Preserve pixel scroll position even when the folded document becomes shorter
-    // than the current viewport. Trailing space prevents the browser from clamping it.
-    state.foldScrollExtent = scroll.top + scrollContainer.clientHeight;
+    // Collapse All starts at the document top; other fold actions preserve the view.
+    // Trailing space keeps the browser from clamping a preserved scroll position.
+    state.foldScrollExtent = collapseAll ? 0 : scroll.top + scrollContainer.clientHeight;
     state.foldScrollWidth = !state.wordWrap && scroll.left > 0 ? scroll.left + scrollContainer.clientWidth : 0;
     if (state.foldScrollWidth) viewport.style.minWidth = `${state.foldScrollWidth}px`;
     else viewport.style.removeProperty('min-width');
     state.foldScrollRestore = scroll;
     compressedScrollMappingAnchor = null;
     setupVirtualHeight();
+    if (collapseAll) {
+        scrollContainer.scrollTop = 0;
+        scrollContainer.scrollLeft = 0;
+    }
     queueRender(true);
     return true;
 }
@@ -824,8 +831,12 @@ function requestFoldingLines() {
 }
 
 function revealFoldedLine(lineNumber) {
+    return revealFoldedLines([lineNumber]);
+}
+
+function revealFoldedLines(lineNumbers, options) {
     syncFolding();
-    if (!foldingController.reveal(lineNumber)) return false;
+    if (!foldingController.revealLines(lineNumbers, options)) return false;
     state.foldDiscoveryLine = 0;
     compressedScrollMappingAnchor = null;
     viewportController.invalidateRenderRange();
@@ -1808,6 +1819,7 @@ export {
     adjacentVisibleLine,
     foldingController,
     revealFoldedLine,
+    revealFoldedLines,
     syncFolding,
     MAX_RENDER_CHARS,
     applyOptions,

@@ -1886,6 +1886,9 @@
   <data name="TOCHeader" xml:space="preserve">
     <value>目次</value>
   </data>
+  <data name="TOCHeaderCountFormat" xml:space="preserve">
+    <value>{0} - {1}項目</value>
+  </data>
   <data name="SnippetEditTooltip" xml:space="preserve">
     <value>編集</value>
   </data>

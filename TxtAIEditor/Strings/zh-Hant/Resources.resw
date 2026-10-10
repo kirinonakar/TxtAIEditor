@@ -1886,6 +1886,9 @@
   <data name="TOCHeader" xml:space="preserve">
     <value>PHZZ0ZZ目錄頁</value>
   </data>
+  <data name="TOCHeaderCountFormat" xml:space="preserve">
+    <value>{0} - {1} 個項目</value>
+  </data>
   <data name="SnippetEditTooltip" xml:space="preserve">
     <value>編輯</value>
   </data>

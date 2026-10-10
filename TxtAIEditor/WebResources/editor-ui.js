@@ -7,6 +7,7 @@ import {
     post,
     queueRender,
     requestLines,
+    revealFoldedLine,
     searchController,
     setupVirtualHeight,
     state,
@@ -271,6 +272,7 @@ function scheduleRevealLineAlignment(lineNumber, token, retries = REVEAL_SCROLL_
 
 function revealLine(lineNumber, indexOfMatch = 0, matchLength = 0, query = '', preventFocus = false) {
     const safeLine = Math.min(Math.max(1, Number(lineNumber || 1)), state.lineCount);
+    revealFoldedLine(safeLine);
     state.currentLine = safeLine;
     state.currentColumn = Math.max(1, Number(indexOfMatch || 0) + 1);
     searchController.activeMatch = query

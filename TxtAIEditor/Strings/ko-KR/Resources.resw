@@ -1886,6 +1886,9 @@
   <data name="TOCHeader" xml:space="preserve">
     <value>목차 (TOC)</value>
   </data>
+  <data name="TOCHeaderCountFormat" xml:space="preserve">
+    <value>{0} - {1}항목</value>
+  </data>
   <data name="SnippetEditTooltip" xml:space="preserve">
     <value>수정</value>
   </data>

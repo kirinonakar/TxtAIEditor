@@ -64,10 +64,25 @@ export class FoldingController {
     }
 
     reveal(line) {
+        return this.revealLines([line]);
+    }
+
+    revealLines(lines, { includeHeaders = false } = {}) {
+        if (!this.collapsed.size) return false;
+        const targets = [...lines].map(Number).filter(Number.isFinite).sort((a, b) => a - b);
         let changed = false;
         for (const start of this.collapsed.keys()) {
             const range = this.ranges.get(start);
-            if (range && line > start && line <= range.end) {
+            if (!range) continue;
+            let low = 0;
+            let high = targets.length;
+            const firstHiddenLine = includeHeaders ? start : start + 1;
+            while (low < high) {
+                const mid = (low + high) >>> 1;
+                if (targets[mid] < firstHiddenLine) low = mid + 1;
+                else high = mid;
+            }
+            if (low < targets.length && targets[low] <= range.end) {
                 this.collapsed.delete(start);
                 changed = true;
             }

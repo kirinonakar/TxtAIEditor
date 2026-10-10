@@ -13,6 +13,7 @@ import {
     queueRender,
     receiveLineBlock,
     restoreScrollAnchor,
+    revealFoldedLines,
     searchController,
     selectionController,
     selectionInfo,
@@ -494,6 +495,7 @@ export function createHostMessageHandler({
                     matches: msg.matches,
                     documentVersion: state.documentVersion
                 });
+                revealFoldedLines(searchController.matchesByLine.keys(), { includeHeaders: true });
 
                 const pendingNavigation = searchController.pendingNavigation;
                 const usePendingNavigation = pendingNavigation && pendingNavigation.query === searchController.query;
