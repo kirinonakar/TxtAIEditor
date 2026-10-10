@@ -204,6 +204,56 @@ body:not(.wrap-enabled) #viewport {
     contain: layout style paint;
 }
 
+.fold-toggle {
+    position: absolute;
+    left: 1px;
+    top: 0;
+    width: 16px;
+    height: var(--line-height);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--gutter-fg);
+    font: inherit;
+    cursor: pointer;
+}
+
+.fold-toggle:hover,
+.fold-toggle:focus-visible {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--fg) 12%, transparent);
+}
+
+.line-row.folded-row {
+    grid-template-columns: var(--gutter-width) max-content max-content;
+}
+
+body.wrap-enabled .line-row.folded-row {
+    grid-template-columns: var(--gutter-width) minmax(0, 1fr) max-content;
+}
+
+.fold-summary {
+    align-self: start;
+    margin: 1px 8px;
+    padding: 0 5px;
+    height: calc(var(--line-height) - 2px);
+    border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent);
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--fg) 8%, var(--bg));
+    color: var(--fg);
+    font: inherit;
+    line-height: calc(var(--line-height) - 4px);
+    cursor: pointer;
+    user-select: none;
+}
+
+.fold-summary:hover,
+.fold-summary:focus-visible,
+.fold-summary.selected-fold {
+    background: var(--selection);
+    color: var(--selection-foreground);
+}
+
 body.wrap-enabled .line-row {
     grid-template-columns: var(--gutter-width) minmax(0, 1fr);
     width: 100%;

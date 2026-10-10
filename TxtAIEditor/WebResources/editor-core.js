@@ -7,6 +7,7 @@ import { ImeController } from './editor-ime-state.js';
 import { SearchController } from './editor-search-state.js';
 import { SelectionController } from './editor-selection-state.js';
 import { ViewportController } from './editor-viewport-state.js';
+import { FoldingController } from './editor-folding.js';
 import {
     CsvTableMode,
     EditorModeCoordinator,
@@ -51,6 +52,7 @@ const imeController = new ImeController({
 const selectionController = new SelectionController();
 const searchController = new SearchController();
 const viewportController = new ViewportController();
+const foldingController = new FoldingController();
 const hexEditorMode = new HexEditorMode({
     renderOverscan: HEX_RENDER_OVERSCAN,
     prefetchAhead: HEX_PREFETCH_AHEAD
@@ -101,6 +103,10 @@ const state = {
     editingLine: null,
     lastDeleteKeyDown: null,
     dirtyLines: new Map(),
+    foldScrollExtent: 0,
+    foldScrollWidth: 0,
+    foldScrollRestore: null,
+    foldDiscoveryLine: 0,
     longLineProtectionFormat: '... too long ({0} characters total)'
 };
 
@@ -287,7 +293,8 @@ function applyOptions(msg) {
         msg.syntaxHighlighting === undefined ? true : !!msg.syntaxHighlighting,
         msg.showDirtyLines === undefined ? true : !!msg.showDirtyLines,
         msg.bracketPairColorization === undefined ? true : !!msg.bracketPairColorization,
-        msg.longLineProtectionFormat, msg.csvJsonKeyHeader, msg.csvJsonValueHeader
+        msg.longLineProtectionFormat, msg.csvJsonKeyHeader, msg.csvJsonValueHeader,
+        msg.foldCollapseText, msg.foldExpandText, msg.foldSelectionFormat
     ]);
     const layoutChanged = appliedLayoutOptionsKey !== layoutOptionsKey;
     const renderChanged = appliedRenderOptionsKey !== renderOptionsKey;
@@ -296,6 +303,10 @@ function applyOptions(msg) {
     state.readOnly = !!msg.readOnly;
     hexEditorMode.setEditable(msg.hexEditable);
     state.wordWrap = !!msg.wordWrap;
+    if (state.wordWrap) {
+        state.foldScrollWidth = 0;
+        viewport.style.removeProperty('min-width');
+    }
     state.syntaxHighlighting = msg.hasOwnProperty('syntaxHighlighting') ? !!msg.syntaxHighlighting : true;
     state.showDirtyLines = msg.hasOwnProperty('showDirtyLines') ? !!msg.showDirtyLines : true;
     if (!state.showDirtyLines) {
@@ -304,6 +315,9 @@ function applyOptions(msg) {
     state.bracketPairColorization = msg.hasOwnProperty('bracketPairColorization') ? !!msg.bracketPairColorization : true;
     state.autocompleteOnEnter = msg.hasOwnProperty('autocompleteOnEnter') ? !!msg.autocompleteOnEnter : true;
     state.autocompleteOnTab = msg.hasOwnProperty('autocompleteOnTab') ? !!msg.autocompleteOnTab : true;
+    state.foldCollapseText = msg.foldCollapseText || state.foldCollapseText;
+    state.foldExpandText = msg.foldExpandText || state.foldExpandText;
+    state.foldSelectionFormat = msg.foldSelectionFormat || state.foldSelectionFormat;
 
     document.documentElement.style.setProperty('--bg', bg);
     document.documentElement.style.setProperty('--fg', fg);
@@ -474,7 +488,7 @@ function applyOptions(msg) {
 
     // Apply localized context menu text
     const actions = [
-        'cut', 'copy', 'paste', 'delete', 'selectAll', 'toggleComment',
+        'cut', 'copy', 'paste', 'delete', 'selectAll', 'toggleComment', 'collapseAll', 'expandAll',
         'sortAsc', 'sortDesc', 'removeDuplicates', 'removeEmptyLines', 'collapseConsecutiveEmptyLines', 'trimSpaces',
         'toUpperCase', 'toLowerCase', 'toSentenceCase', 'toTitleCase', 'urlEncode', 'urlDecode',
         'base64Encode', 'base64Decode', 'hexToDec', 'decToHex', 'formatText'
@@ -514,6 +528,12 @@ function applyOptions(msg) {
 }
 
 function setupModel(lineCount) {
+    foldingController.reset();
+    state.foldScrollExtent = 0;
+    state.foldScrollWidth = 0;
+    viewport.style.removeProperty('min-width');
+    state.foldScrollRestore = null;
+    state.foldDiscoveryLine = 0;
     compressedScrollMappingAnchor = null;
     state.lineCount = Math.max(1, Number(lineCount || 1));
     csvTableMode.virtualLineCount = 0;
@@ -684,6 +704,7 @@ function applyEditResultFromHost(startLine, oldLineCount, lines, documentLineCou
 }
 
 function setupVirtualHeight() {
+    syncFolding();
     runtime.syncWheelScrollMode();
     const savedScroll = scrollContainer.scrollTop;
 
@@ -715,7 +736,9 @@ function setupVirtualHeight() {
 function syncFullDocumentTrailingSpace() {
     const lastRow = viewport.lastElementChild;
     const lastRowHeight = Math.max(1, lastRow?.offsetHeight || viewportController.lineHeight);
-    const trailingHeight = Math.max(0, scrollContainer.clientHeight - lastRowHeight);
+    const contentBottom = (lastRow?.offsetTop || 0) + lastRowHeight;
+    const trailingHeight = Math.max(0, scrollContainer.clientHeight - lastRowHeight,
+        state.foldScrollExtent - contentBottom);
     viewport.style.setProperty('--full-document-trailing-height', `${trailingHeight}px`);
 }
 
@@ -734,6 +757,7 @@ function usesMeasuredLineHeights() {
 }
 
 function lineHeightFor(lineNumber) {
+    if (foldingController.containing(lineNumber)) return 0;
     return viewportController.lineHeightFor(lineNumber, {
         useMeasured: usesMeasuredLineHeights()
     });
@@ -741,7 +765,77 @@ function lineHeightFor(lineNumber) {
 
 function measuredLineHeightDeltaBefore(lineNumber) {
     if (!usesMeasuredLineHeights()) return 0;
-    return viewportController.measuredLineHeightDeltaBefore(lineNumber, state.lineCount);
+    let delta = viewportController.measuredLineHeightDeltaBefore(lineNumber, state.lineCount);
+    for (const range of foldingController.hidden) {
+        if (range.start >= lineNumber) break;
+        delta -= viewportController.measuredLineHeightDeltaBefore(Math.min(lineNumber, range.end + 1), state.lineCount) -
+            viewportController.measuredLineHeightDeltaBefore(range.start, state.lineCount);
+    }
+    return delta;
+}
+
+function syncFolding() {
+    return foldingController.update(state.cache, state.lineCount, state.language, state.cache.revision,
+        state.language !== 'hex' && !csvTableMode.isEnabled &&
+        !(state.inlineLivePreviewEnabled && ['html', 'svg', 'xml'].includes(state.language)));
+}
+
+function changeFolding(action, lineNumber = 0) {
+    if (imeController.isComposing || imeController.rangeComposition || imeController.columnComposition) return false;
+    syncFolding();
+    const scroll = { top: scrollContainer.scrollTop, left: scrollContainer.scrollLeft };
+    if (action === 'toggle') {
+        if (!foldingController.toggle(lineNumber, state.cache)) return false;
+        state.foldDiscoveryLine = 0;
+    } else {
+        foldingController.setAll(action === 'collapseAll', state.cache);
+        state.foldDiscoveryLine = action === 'collapseAll' ? 1 : 0;
+    }
+    const hidden = foldingController.containing(state.currentLine);
+    if (hidden) {
+        state.currentLine = hidden.header;
+        state.currentColumn = (state.cache.get(hidden.header) || '').length + 1;
+        state.editingLine = hidden.header;
+    }
+    // Preserve pixel scroll position even when the folded document becomes shorter
+    // than the current viewport. Trailing space prevents the browser from clamping it.
+    state.foldScrollExtent = scroll.top + scrollContainer.clientHeight;
+    state.foldScrollWidth = !state.wordWrap && scroll.left > 0 ? scroll.left + scrollContainer.clientWidth : 0;
+    if (state.foldScrollWidth) viewport.style.minWidth = `${state.foldScrollWidth}px`;
+    else viewport.style.removeProperty('min-width');
+    state.foldScrollRestore = scroll;
+    compressedScrollMappingAnchor = null;
+    setupVirtualHeight();
+    queueRender(true);
+    return true;
+}
+
+function requestFoldingLines() {
+    for (const line of foldingController.pendingLines) {
+        requestMissingLines(line, Math.min(state.lineCount, line + 999));
+    }
+    if (state.foldDiscoveryLine) {
+        while (state.foldDiscoveryLine <= state.lineCount && state.cache.has(state.foldDiscoveryLine)) {
+            state.foldDiscoveryLine++;
+        }
+        if (state.foldDiscoveryLine > state.lineCount) state.foldDiscoveryLine = 0;
+        else requestMissingLines(state.foldDiscoveryLine, Math.min(state.lineCount, state.foldDiscoveryLine + 999));
+    }
+}
+
+function revealFoldedLine(lineNumber) {
+    syncFolding();
+    if (!foldingController.reveal(lineNumber)) return false;
+    state.foldDiscoveryLine = 0;
+    compressedScrollMappingAnchor = null;
+    viewportController.invalidateRenderRange();
+    setupVirtualHeight();
+    queueRender(true);
+    return true;
+}
+
+function adjacentVisibleLine(lineNumber, direction) {
+    return foldingController.adjacentLine(lineNumber, direction, state.lineCount);
 }
 
 function setMeasuredLineHeight(lineNumber, height) {
@@ -768,10 +862,10 @@ function totalVirtualHeight() {
     const total = rawTotalVirtualHeight();
     if (usesCompressedScroll()) {
         const viewHeight = Math.max(scrollContainer.clientHeight, viewportController.lineHeight);
-        return Math.max(viewHeight + viewportController.lineHeight, Math.min(total, BROWSER_SCROLL_HEIGHT_LIMIT));
+        return Math.max(state.foldScrollExtent, viewHeight + viewportController.lineHeight, Math.min(total, BROWSER_SCROLL_HEIGHT_LIMIT));
     }
 
-    return total + trailingScrollHeight();
+    return Math.max(state.foldScrollExtent, total + trailingScrollHeight());
 }
 
 function rawTotalVirtualHeight() {
@@ -779,9 +873,9 @@ function rawTotalVirtualHeight() {
         return Math.max(1, scrollContainer.scrollHeight || (effectiveLineCount() * viewportController.lineHeight));
     }
 
-    let total = effectiveLineCount() * viewportController.lineHeight;
+    let total = (effectiveLineCount() - foldingController.hiddenCountBefore(effectiveLineCount() + 1)) * viewportController.lineHeight;
     if (usesMeasuredLineHeights()) {
-        total += viewportController.totalMeasuredLineHeightDelta(state.lineCount);
+        total += measuredLineHeightDeltaBefore(state.lineCount + 1);
     }
     return Math.max(1, total);
 }
@@ -801,9 +895,12 @@ function maximumVirtualScrollTop() {
 }
 
 function lineTop(lineNumber) {
+    lineNumber = foldingController.containing(lineNumber)?.header ?? lineNumber;
     if (usesFullDocumentRender()) {
         const line = Math.max(1, Math.min(effectiveLineCount(), Number(lineNumber || 1)));
-        const row = viewport.children[line - 1];
+        const row = foldingController.hidden.length
+            ? viewport.querySelector(`.line-row[data-line="${line}"]`)
+            : viewport.children[line - 1];
         if (row?.dataset?.line === String(line)) {
             return Math.max(0, row.offsetTop);
         }
@@ -812,11 +909,11 @@ function lineTop(lineNumber) {
     if (usesCompressedScroll()) {
         const metrics = compressedScrollMetrics();
         if (metrics.maxScrollTop <= 0 || metrics.maxFirstLine <= 1) return 0;
-        const line = Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(Number(lineNumber || 1))));
+        const line = Math.min(metrics.maxFirstLine, Math.max(1, foldingController.visibleIndex(Math.floor(Number(lineNumber || 1)))));
         return compressedScrollTopForLinePosition(line - 1, metrics);
     }
 
-    let top = (Math.max(1, lineNumber) - 1) * viewportController.lineHeight;
+    let top = (Math.max(1, lineNumber) - 1 - foldingController.hiddenCountBefore(lineNumber)) * viewportController.lineHeight;
     top += measuredLineHeightDeltaBefore(lineNumber);
     return Math.max(0, top);
 }
@@ -851,11 +948,11 @@ function lineAt(scrollTop) {
         const metrics = compressedScrollMetrics();
         if (metrics.maxScrollTop <= 0 || metrics.maxFirstLine <= 1) return 1;
         const linePosition = compressedLinePositionAtScrollTop(scrollTop, metrics);
-        return Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(linePosition) + 1));
+        return foldingController.lineAtVisibleIndex(Math.min(metrics.maxFirstLine, Math.max(1, Math.floor(linePosition) + 1)), lineCount);
     }
 
     if (!usesMeasuredLineHeights() || !viewportController.hasMeasuredLineHeights) {
-        return Math.min(lineCount, Math.max(1, Math.floor(scrollTop / viewportController.lineHeight) + 1));
+        return foldingController.lineAtVisibleIndex(Math.floor(scrollTop / viewportController.lineHeight) + 1, lineCount);
     }
 
     const targetTop = Math.max(0, Number(scrollTop || 0));
@@ -871,7 +968,7 @@ function lineAt(scrollTop) {
             high = mid - 1;
         }
     }
-    return Math.min(lineCount, Math.max(1, result));
+    return foldingController.containing(result)?.header ?? Math.min(lineCount, Math.max(1, result));
 }
 
 function visibleRange() {
@@ -882,6 +979,14 @@ function visibleRange() {
     }
 
     const firstVisible = lineAt(scrollContainer.scrollTop);
+    if (foldingController.hidden.length) {
+        const firstIndex = foldingController.visibleIndex(firstVisible);
+        const lastIndex = foldingController.visibleIndex(lineAt(scrollContainer.scrollTop + viewHeight));
+        const overscan = viewportController.overscan;
+        const start = foldingController.lineAtVisibleIndex(firstIndex - overscan, lineCount);
+        const end = foldingController.lineAtVisibleIndex(lastIndex + overscan, lineCount);
+        return { start, end, count: end - start + 1 };
+    }
     if (usesCompressedScroll()) {
         const visibleRows = Math.max(1, Math.ceil(viewHeight / viewportController.lineHeight) + 1);
         const overscan = activeEditorMode().renderOverscan({ defaultOverscan: viewportController.overscan });
@@ -917,7 +1022,7 @@ function compressedScrollMetrics() {
     const viewHeight = Math.max(scrollContainer.clientHeight, viewportController.lineHeight);
     const visibleRows = Math.max(1, Math.ceil(viewHeight / viewportController.lineHeight));
     const lineCount = effectiveLineCount();
-    const maxFirstLine = lineCount;
+    const maxFirstLine = lineCount - foldingController.hiddenCountBefore(lineCount + 1);
     const virtualHeight = totalVirtualHeight();
     const maxScrollTop = Math.max(0, virtualHeight - viewHeight);
     return { lineCount, maxFirstLine, maxScrollTop, visibleRows, viewHeight };
@@ -990,7 +1095,7 @@ function preserveCompressedScrollMapping(anchor, scrollTop = scrollContainer.scr
     }
 
     const metrics = compressedScrollMetrics();
-    const line = Math.min(metrics.maxFirstLine, Math.max(1, Number(anchor.line || 1)));
+    const line = Math.min(metrics.maxFirstLine, Math.max(1, foldingController.visibleIndex(Number(anchor.line || 1))));
     const ratio = Math.max(0, Math.min(1, Number(anchor.ratio || 0)));
     compressedScrollMappingAnchor = {
         linePosition: (line - 1) + ratio,
@@ -1014,7 +1119,7 @@ function viewportTopForLine(startLine) {
         viewportController.lineHeight;
     return scrollContainer.scrollTop -
         physicalOffset -
-        ((firstVisible - Math.max(1, Number(startLine || 1))) * viewportController.lineHeight);
+        ((firstVisible - foldingController.visibleIndex(Math.max(1, Number(startLine || 1)))) * viewportController.lineHeight);
 }
 
 function effectiveLineCount() {
@@ -1137,15 +1242,16 @@ function captureScrollAnchor(scrollTop = scrollContainer.scrollTop) {
         const linePosition = compressedLinePositionAtScrollTop(scrollTop);
         const wholeLinePosition = Math.floor(linePosition);
         return {
-            line: wholeLinePosition + 1,
+            line: foldingController.lineAtVisibleIndex(wholeLinePosition + 1, effectiveLineCount()),
             ratio: linePosition - wholeLinePosition
         };
     }
 
     const line = lineAt(scrollTop);
     const top = lineTop(line);
-    const nextTop = line < effectiveLineCount()
-        ? lineTop(line + 1)
+    const nextLine = foldingController.adjacentLine(line, 1, effectiveLineCount());
+    const nextTop = nextLine > line
+        ? lineTop(nextLine)
         : top + viewportController.lineHeight;
     const span = Math.max(0.0001, nextTop - top);
     const ratio = Math.max(0, Math.min(1, (Number(scrollTop || 0) - top) / span));
@@ -1157,8 +1263,9 @@ function restoreScrollAnchor(anchor) {
 
     const line = Math.min(effectiveLineCount(), Math.max(1, Number(anchor.line || 1)));
     const top = lineTop(line);
-    const nextTop = line < effectiveLineCount()
-        ? lineTop(line + 1)
+    const nextLine = foldingController.adjacentLine(line, 1, effectiveLineCount());
+    const nextTop = nextLine > line
+        ? lineTop(nextLine)
         : top + viewportController.lineHeight;
     const ratio = Math.max(0, Math.min(1, Number(anchor.ratio || 0)));
     const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
@@ -1287,6 +1394,7 @@ function invalidateMeasuredLineHeightsAround(lineNumber, radius = 0) {
 }
 
 function shiftCachedLines(fromLine, delta) {
+    foldingController.shift(fromLine, delta);
     shiftLineMap(state.cache, fromLine, delta);
     shiftMeasuredLineHeights(fromLine, delta);
     if (state.showDirtyLines) {
@@ -1695,6 +1803,12 @@ function lineCommentSyntax() {
 }
 
 export {
+    changeFolding,
+    requestFoldingLines,
+    adjacentVisibleLine,
+    foldingController,
+    revealFoldedLine,
+    syncFolding,
     MAX_RENDER_CHARS,
     applyOptions,
     applyEditResultFromHost,

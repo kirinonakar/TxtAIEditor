@@ -4024,4 +4024,9 @@
   <data name="AgentActivityHistorySavedFormat" xml:space="preserve"><value>已保存详细历史记录：{0}</value></data>
   <data name="AgentActivityHistorySaveFailedFormat" xml:space="preserve"><value>保存历史记录失败：{0}</value></data>
   <data name="AgentActivityHistoryLoadRunningBlocked" xml:space="preserve"><value>正在运行的会话无法从历史记录中加载。</value></data>
+  <data name="EditorFoldCollapse" xml:space="preserve"><value>折叠</value></data>
+  <data name="EditorFoldExpand" xml:space="preserve"><value>展开</value></data>
+  <data name="EditorFoldSelectFormat" xml:space="preserve"><value>选择全部 {0} 个折叠行</value></data>
+  <data name="EditorContextMenuCollapseAll" xml:space="preserve"><value>全部折叠</value></data>
+  <data name="EditorContextMenuExpandAll" xml:space="preserve"><value>全部展开</value></data>
 </root>

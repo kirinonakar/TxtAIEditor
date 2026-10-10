@@ -1,4 +1,5 @@
 export class EditorDocumentCache {
+    revision = 0;
     #lines = new Map();
     #lineEndStacks = new Map();
     #htmlLineEndContexts = new Map();
@@ -9,6 +10,7 @@ export class EditorDocumentCache {
     }
 
     clear() {
+        this.revision++;
         this.#lines.clear();
         this.clearDerivedContexts();
     }
@@ -20,6 +22,7 @@ export class EditorDocumentCache {
 
     delete(lineNumber) {
         const deleted = this.#lines.delete(lineNumber);
+        if (deleted) this.revision++;
         this.#invalidateDerivedContexts(lineNumber);
         return deleted;
     }
@@ -41,6 +44,7 @@ export class EditorDocumentCache {
     }
 
     set(lineNumber, text) {
+        if (this.#lines.get(lineNumber) !== text) this.revision++;
         this.#lines.set(lineNumber, text);
         this.#invalidateDerivedContexts(lineNumber);
         return this;

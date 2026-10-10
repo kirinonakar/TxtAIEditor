@@ -1,5 +1,6 @@
 import { contextMenu } from './editor-dom.js';
-import { hexEditorMode, post, state } from './editor-core.js';
+import { changeFolding, csvTableMode, hexEditorMode, imeController, post, state, syncFolding } from './editor-core.js';
+import { supportsFolding } from './editor-folding.js';
 import {
     changeLineIndent,
     copySelectionToClipboard,
@@ -15,9 +16,15 @@ import {
 
 // Context Menu Operations
 export function showContextMenu(clientX, clientY) {
+    syncFolding();
     for (const button of contextMenu.querySelectorAll('.context-menu-button')) {
         const requiresEdit = button.dataset.requiresEdit === 'true';
         button.disabled = requiresEdit && state.readOnly && !hexEditorMode.isEditable;
+        if (['collapseAll', 'expandAll'].includes(button.dataset.action)) {
+            button.disabled = imeController.isComposing || !!imeController.rangeComposition || !!imeController.columnComposition ||
+                !supportsFolding(state.language) || csvTableMode.isEnabled ||
+                (state.inlineLivePreviewEnabled && ['html', 'svg', 'xml'].includes(state.language));
+        }
     }
 
     const scrollSyncBtn = contextMenu.querySelector('[data-action="toggleScrollSync"]');
@@ -90,6 +97,10 @@ export function bindContextMenu() {
             break;
         case 'selectAll':
             selectAll();
+            break;
+        case 'collapseAll':
+        case 'expandAll':
+            changeFolding(action);
             break;
         case 'toggleComment':
             toggleComment();

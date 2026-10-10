@@ -1,4 +1,4 @@
-import { imeController, selectionController, state, viewportController } from './editor-core.js';
+import { foldingController, imeController, selectionController, state, viewportController } from './editor-core.js';
 import { viewport } from './editor-dom.js';
 
 function lineTextFromElement(element) {
@@ -11,7 +11,7 @@ function lineTextFromElement(element) {
 }
 
 function normalizeSelection(selection = selectionController.selection) {
-    return selectionController.normalize(selection);
+    return foldingController.expandSelection(selectionController.normalize(selection), state.cache);
 }
 
 function hasCustomSelection() {
@@ -78,6 +78,13 @@ function drawEditableSelectionOverlays() {
     });
 
     const selection = normalizeSelection();
+    for (const badge of viewport.querySelectorAll('.fold-summary')) {
+        const range = foldingController.collapsedRange(Number(badge.dataset.line));
+        const selected = selection && range && selection.start.line <= range.end &&
+            (selection.end.line > range.start ||
+                (selection.end.line === range.start && selection.end.column >= (state.cache.get(range.start) || '').length));
+        badge.classList.toggle('selected-fold', !!selected);
+    }
     if (!selection || !hasCustomSelection()) {
         drawImeBypassCaretOverlay();
         return;

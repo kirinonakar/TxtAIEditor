@@ -4066,4 +4066,9 @@ Plan: {0}</value>
   <data name="AgentActivityHistorySavedFormat" xml:space="preserve"><value>Verbose history saved: {0}</value></data>
   <data name="AgentActivityHistorySaveFailedFormat" xml:space="preserve"><value>Failed to save history: {0}</value></data>
   <data name="AgentActivityHistoryLoadRunningBlocked" xml:space="preserve"><value>A running session cannot be loaded from history.</value></data>
+  <data name="EditorFoldCollapse" xml:space="preserve"><value>Collapse</value></data>
+  <data name="EditorFoldExpand" xml:space="preserve"><value>Expand</value></data>
+  <data name="EditorFoldSelectFormat" xml:space="preserve"><value>Select all {0} folded lines</value></data>
+  <data name="EditorContextMenuCollapseAll" xml:space="preserve"><value>Collapse All</value></data>
+  <data name="EditorContextMenuExpandAll" xml:space="preserve"><value>Expand All</value></data>
 </root>

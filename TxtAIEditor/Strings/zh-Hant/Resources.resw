@@ -4024,4 +4024,9 @@
   <data name="AgentActivityHistorySavedFormat" xml:space="preserve"><value>已儲存詳細歷史記錄：{0}</value></data>
   <data name="AgentActivityHistorySaveFailedFormat" xml:space="preserve"><value>儲存歷史記錄失敗：{0}</value></data>
   <data name="AgentActivityHistoryLoadRunningBlocked" xml:space="preserve"><value>執行中的工作階段無法從歷史記錄載入。</value></data>
+  <data name="EditorFoldCollapse" xml:space="preserve"><value>摺疊</value></data>
+  <data name="EditorFoldExpand" xml:space="preserve"><value>展開</value></data>
+  <data name="EditorFoldSelectFormat" xml:space="preserve"><value>選取全部 {0} 個摺疊行</value></data>
+  <data name="EditorContextMenuCollapseAll" xml:space="preserve"><value>全部摺疊</value></data>
+  <data name="EditorContextMenuExpandAll" xml:space="preserve"><value>全部展開</value></data>
 </root>

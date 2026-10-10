@@ -1,3 +1,5 @@
+import { adjacentVisibleLine } from './editor-core.js';
+
 export function createCaretNavigationCommands({
     caretRectForOffset,
     changedTextBetween,
@@ -247,7 +249,8 @@ export function createCaretNavigationCommands({
     }
 
     function adjacentLogicalLineTarget(lineNumber, direction, preferredX, lineStep, fallbackColumn) {
-        const targetLine = lineNumber + direction;
+        const targetLine = adjacentVisibleLine(lineNumber, direction);
+        if (targetLine === lineNumber) return null;
         if (targetLine < 1 || targetLine > state.lineCount) return null;
 
         const targetText = state.cache.get(targetLine) || '';

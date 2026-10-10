@@ -3,14 +3,17 @@ import {
     MAX_RENDER_CHARS,
     csvTableMode,
     escapeHtml,
+    foldingController,
     imeController,
     lineAt,
     measureRenderedRows,
     preserveScrollTop,
     queueRender,
     requestMissingLines,
+    requestFoldingLines,
     selectionController,
     state,
+    syncFolding,
     setupVirtualHeight,
     syncCustomSelectionClass,
     trimHexCacheToRange,
@@ -185,6 +188,8 @@ function createEditorRenderer({
             return;
         }
 
+        if (syncFolding()) setupVirtualHeight();
+
         if (fullHtmlLivePreview.renderIfActive()) {
             return;
         }
@@ -257,11 +262,12 @@ function createEditorRenderer({
         // focus here rebuilds every row on the first scroll after the host focuses
         // the editor, even though neither the text nor the rendered range changed.
         const focusRenderKey = renderFullDocument ? '' : `${activeLine || 0}:${state.editingLine || 0}`;
-        const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${virtualHeightRenderKey}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${focusRenderKey}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}`;
+        const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${virtualHeightRenderKey}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${focusRenderKey}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}:${foldingController.version}`;
         if (!csvTableMode.isEnabled || !isJsonCsvTableMode()) {
             requestMissingLines(renderStart, renderEnd);
             trimHexCacheToRange(renderStart, renderEnd);
         }
+        requestFoldingLines();
         if (!viewportController.acceptRangeKey(rangeKey)) return;
 
         if (imeController.columnComposition) {
@@ -300,6 +306,11 @@ function createEditorRenderer({
         let livePreviewContextAnchorRow = '';
         const livePreviewSkipRef = { val: 0 };
         for (let line = renderStart; line <= renderEnd; line++) {
+            const hiddenFold = foldingController.containing(line);
+            if (hiddenFold) {
+                line = hiddenFold.end;
+                continue;
+            }
             if (composingRow && line === imeController.compositionLine) {
                 rows.push(`<div class="line-row-placeholder" data-line="${line}"></div>`);
                 continue;
@@ -337,6 +348,7 @@ function createEditorRenderer({
                 line >= editablePreviewBlock.startLine &&
                 line <= editablePreviewBlock.endLine;
             const shouldShowSource = line === sourceLine ||
+                !!foldingController.collapsedRange(line) ||
                 isEditablePreviewBlockLine ||
                 shouldShowSelectionSource ||
                 isLong ||
@@ -394,7 +406,7 @@ function createEditorRenderer({
             };
 
             if (state.inlineLivePreviewEnabled && hasLine && shouldShowSource && !isLong && !imeController.isComposing) {
-                if (!isEditablePreviewBlockLine && line !== sourceLine) {
+                if (!isEditablePreviewBlockLine && line !== sourceLine && !foldingController.collapsedRange(line)) {
                     renderedLivePreviewLine = renderPreviewLineAt(
                         line,
                         state.lineCount,
@@ -440,10 +452,23 @@ function createEditorRenderer({
                 ? ' editing-row'
                 : '';
             const hoveredClass = line === hoveredLineNumber ? ' hovered-row' : '';
+            const foldRange = foldingController.ranges.get(line);
+            const collapsedFold = foldingController.collapsedRange(line);
+            const foldLabel = collapsedFold ? state.foldExpandText : state.foldCollapseText;
+            const foldToggle = foldRange
+                ? `<button type="button" class="fold-toggle" data-line="${line}" aria-expanded="${!collapsedFold}" aria-label="${escapeHtml(foldLabel || '')}" title="${escapeHtml(foldLabel || '')}">${collapsedFold ? '▸' : '▾'}</button>`
+                : '';
+            const foldSummaryLabel = collapsedFold
+                ? String(state.foldSelectionFormat || '').replace('{0}', collapsedFold.end - line)
+                : '';
+            const foldSummary = collapsedFold
+                ? `<button type="button" class="fold-summary" data-line="${line}" aria-label="${escapeHtml(foldSummaryLabel)}" title="${escapeHtml(foldSummaryLabel)}">⋯ ${collapsedFold.end - line}</button>`
+                : '';
             const rowHtml =
-                `<div class="line-row${livePreviewClass}${editingClass}${hoveredClass}${isInSelection ? ' selected-row' : ''}${isSelectedEmptyLine ? ' selected-empty-row' : ''}${dirtyClass}" data-line="${line}"${livePreviewAttributes}>` +
-                `<div class="line-number">${line}</div>` +
+                `<div class="line-row${collapsedFold ? ' folded-row' : ''}${livePreviewClass}${editingClass}${hoveredClass}${isInSelection ? ' selected-row' : ''}${isSelectedEmptyLine ? ' selected-empty-row' : ''}${dirtyClass}" data-line="${line}"${livePreviewAttributes}>` +
+                `<div class="line-number">${foldToggle}${line}</div>` +
                 `<div class="${textClass}" contenteditable="${liveContentEditable}" spellcheck="false" data-line="${line}"${longLineAttributes}>${lineContent}</div>` +
+                foldSummary +
                 `</div>`;
 
             if (state.inlineLivePreviewEnabled && line < livePreviewLayoutStart) {
@@ -499,11 +524,16 @@ function createEditorRenderer({
             const targetCaret = activeLine === state.currentLine ? activeCaret : Math.max(0, state.currentColumn - 1);
             const element = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
             if (element && element.getAttribute('contenteditable') === 'true') {
-                setCaret(element, targetCaret);
+                setCaret(element, targetCaret, 0, true, !state.foldScrollRestore);
             }
         }
 
         drawEditableSelectionOverlays();
+        if (state.foldScrollRestore) {
+            scrollContainer.scrollTop = state.foldScrollRestore.top;
+            scrollContainer.scrollLeft = state.foldScrollRestore.left;
+            state.foldScrollRestore = null;
+        }
     }
 
     function focusLineWithRetry(lineNumber, columnZeroBased, retries = 20, focusToken = 0) {

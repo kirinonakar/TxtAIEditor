@@ -1,5 +1,6 @@
 import {
     compressedScrollMetrics,
+    foldingController,
     imeController,
     lineHeightFor,
     lineAt,
@@ -7,6 +8,7 @@ import {
     orderedRange,
     queueRender,
     reportCursorAndSelection,
+    revealFoldedLine,
     selectionController,
     state,
     usesFullDocumentRender,
@@ -619,6 +621,9 @@ function updateFullDocumentEditingRow(previousLine, nextLine) {
 }
 
 function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0, affinity = null) {
+    // Explicit navigation (including search and go-to-line) reveals the target.
+    // Selection of folded text keeps focus on its visible header instead.
+    revealFoldedLine(lineNumber);
     if (_focusRetryTimer) {
         clearTimeout(_focusRetryTimer);
         _focusRetryTimer = 0;
@@ -646,24 +651,25 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0, affinity =
 
     if (usesCompressedScroll()) {
         const metrics = compressedScrollMetrics();
-        const firstVisible = lineAt(scrollContainer.scrollTop);
-        const lastVisible = Math.min(state.lineCount, firstVisible + metrics.visibleRows - 1);
+        const firstVisible = foldingController.visibleIndex(lineAt(scrollContainer.scrollTop));
+        const targetIndex = foldingController.visibleIndex(lineNumber);
+        const lastVisible = Math.min(metrics.maxFirstLine, firstVisible + metrics.visibleRows - 1);
         const marginRows = Math.max(0, Math.ceil(scrollMargin / viewportController.lineHeight));
-        const isFarAway = lineNumber < firstVisible - metrics.visibleRows ||
-            lineNumber > lastVisible + metrics.visibleRows;
+        const isFarAway = targetIndex < firstVisible - metrics.visibleRows ||
+            targetIndex > lastVisible + metrics.visibleRows;
         let nextFirstVisible = firstVisible;
 
         if (isFarAway) {
-            nextFirstVisible = lineNumber - Math.floor(metrics.visibleRows / 2);
-        } else if (lineNumber <= firstVisible + marginRows) {
-            nextFirstVisible = lineNumber - marginRows;
-        } else if (lineNumber >= lastVisible - marginRows) {
-            nextFirstVisible = lineNumber - metrics.visibleRows + marginRows + 1;
+            nextFirstVisible = targetIndex - Math.floor(metrics.visibleRows / 2);
+        } else if (targetIndex <= firstVisible + marginRows) {
+            nextFirstVisible = targetIndex - marginRows;
+        } else if (targetIndex >= lastVisible - marginRows) {
+            nextFirstVisible = targetIndex - metrics.visibleRows + marginRows + 1;
         }
 
         nextFirstVisible = Math.min(metrics.maxFirstLine, Math.max(1, nextFirstVisible));
         if (nextFirstVisible !== firstVisible) {
-            scrollContainer.scrollTop = lineTop(nextFirstVisible);
+            scrollContainer.scrollTop = lineTop(foldingController.lineAtVisibleIndex(nextFirstVisible, state.lineCount));
         }
     } else if (scrollMargin > 0) {
         const viewTop = scrollContainer.scrollTop;

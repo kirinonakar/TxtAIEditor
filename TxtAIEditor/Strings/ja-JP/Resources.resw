@@ -4024,4 +4024,9 @@
   <data name="AgentActivityHistorySavedFormat" xml:space="preserve"><value>verbose 履歴を保存しました: {0}</value></data>
   <data name="AgentActivityHistorySaveFailedFormat" xml:space="preserve"><value>履歴の保存に失敗しました: {0}</value></data>
   <data name="AgentActivityHistoryLoadRunningBlocked" xml:space="preserve"><value>実行中のセッションは履歴から読み込めません。</value></data>
+  <data name="EditorFoldCollapse" xml:space="preserve"><value>折りたたむ</value></data>
+  <data name="EditorFoldExpand" xml:space="preserve"><value>展開</value></data>
+  <data name="EditorFoldSelectFormat" xml:space="preserve"><value>折りたたまれた {0} 行をすべて選択</value></data>
+  <data name="EditorContextMenuCollapseAll" xml:space="preserve"><value>すべて折りたたむ</value></data>
+  <data name="EditorContextMenuExpandAll" xml:space="preserve"><value>すべて展開</value></data>
 </root>

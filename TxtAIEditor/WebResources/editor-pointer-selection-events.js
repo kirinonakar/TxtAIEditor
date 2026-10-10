@@ -6,9 +6,12 @@ import {
 } from './editor-dom.js';
 import {
     clearCustomSelectionVisuals,
+    changeFolding,
     csvTableMode,
     dragDropController,
+    foldingController,
     hexEditorMode,
+    imeController,
     post,
     preserveScrollTop,
     queueRender,
@@ -901,6 +904,14 @@ export function bindPointerSelectionEvents({
 
         cancelActiveSelectionInteraction({ render: false });
 
+        const foldToggle = event.target.closest('.fold-toggle');
+        if (foldToggle) {
+            event.preventDefault();
+            event.stopPropagation();
+            changeFolding('toggle', Number(foldToggle.dataset.line));
+            return;
+        }
+
         if (isHexView()) {
             if (beginHexSelection(event)) {
                 return;
@@ -927,19 +938,26 @@ export function bindPointerSelectionEvents({
             }
         }
 
-        const lineNumEl = event.target.closest('.line-number');
+        const lineNumEl = event.target.closest('.line-number, .fold-summary');
         if (lineNumEl) {
             const row = lineNumEl.closest('.line-row');
             if (row) {
                 const line = Number(row.dataset.line || 1);
                 const text = state.cache.get(line) || '';
                 const lineLength = text.length;
+                const foldedRange = foldingController.collapsedRange(line);
+                if (foldedRange && imeController.isCompositionActive) {
+                    event.preventDefault();
+                    return;
+                }
+                const endLine = foldedRange?.end ?? line;
+                const endLength = (state.cache.get(endLine) || '').length;
 
                 event.preventDefault();
                 captureSelectionPointer(event);
 
                 selectionController.anchor = { line: line, column: 0 };
-                selectionController.selection = { start: { line: line, column: 0 }, end: { line: line, column: lineLength || 1 } };
+                selectionController.selection = { start: { line: line, column: 0 }, end: { line: endLine, column: endLength || 1 } };
                 syncCustomSelectionClass();
                 selectionController.isSelecting = true;
                 selectionController.isLineSelecting = true;
@@ -1271,15 +1289,17 @@ export function bindPointerSelectionEvents({
             const startLine = selectionController.anchor.line;
             const endLine = position.line;
             if (startLine <= endLine) {
-                const endText = state.cache.get(endLine) || '';
+                const lastLine = foldingController.collapsedRange(endLine)?.end ?? endLine;
+                const endText = state.cache.get(lastLine) || '';
                 newSelection = {
                     start: { line: startLine, column: 0 },
-                    end: { line: endLine, column: endText.length }
+                    end: { line: lastLine, column: endText.length }
                 };
             } else {
-                const startText = state.cache.get(startLine) || '';
+                const lastLine = foldingController.collapsedRange(startLine)?.end ?? startLine;
+                const startText = state.cache.get(lastLine) || '';
                 newSelection = {
-                    start: { line: startLine, column: startText.length },
+                    start: { line: lastLine, column: startText.length },
                     end: { line: endLine, column: 0 }
                 };
             }
@@ -1571,6 +1591,28 @@ export function bindPointerSelectionEvents({
     });
 
     viewport.addEventListener('click', event => {
+        if (event.target.closest?.('.fold-toggle')) {
+            if (event.detail === 0) changeFolding('toggle', Number(event.target.closest('.fold-toggle').dataset.line));
+            return;
+        }
+        if (event.target.closest?.('.fold-summary')) {
+            if (imeController.isCompositionActive) return;
+            if (event.detail === 0) {
+                const line = Number(event.target.closest('.fold-summary').dataset.line);
+                const range = foldingController.collapsedRange(line);
+                if (range) {
+                    selectionController.anchor = { line, column: 0 };
+                    selectionController.selection = {
+                        start: { line, column: 0 },
+                        end: { line: range.end, column: (state.cache.get(range.end) || '').length }
+                    };
+                    syncCustomSelectionClass();
+                    queueRender(true);
+                    reportCursorAndSelection();
+                }
+            }
+            return;
+        }
         if (isHexView()) {
             reportCursorAndSelection(document.activeElement);
             return;
