@@ -15,13 +15,16 @@
             --added-bg: rgba(46, 160, 67, 0.15);
             --added-border: rgba(46, 160, 67, 0.4);
             --added-text: #3fb950;
+            --added-change-bg: rgba(46, 160, 67, 0.4);
             --removed-bg: rgba(248, 81, 73, 0.15);
             --removed-border: rgba(248, 81, 73, 0.4);
             --removed-text: #f85149;
+            --removed-change-bg: rgba(248, 81, 73, 0.4);
             --empty-bg: #171717;
             --font-family: Consolas, "Courier New", monospace;
             --ui-font: "Segoe UI", "Malgun Gothic", sans-serif;
             --scrollmap-width: 14px;
+            --diff-columns: minmax(0, 1fr) var(--scrollmap-width) minmax(0, 1fr) var(--scrollmap-width);
         }
 
         @media (prefers-color-scheme: light) {
@@ -70,31 +73,35 @@
         }
 
         #diff-panels {
-            display: flex;
+            display: grid;
+            grid-template-columns: var(--diff-columns);
+            grid-template-rows: 24px minmax(0, 1fr) 8px;
             flex: 1;
+            min-height: 0;
             overflow: hidden;
             width: 100%;
         }
 
-        .diff-column {
-            display: flex;
-            flex-direction: column;
-            width: 50%;
-            height: 100%;
-            overflow: hidden;
+        #left-header {
+            grid-column: 1 / span 2;
+            grid-row: 1;
             border-right: 1px solid var(--border);
         }
 
-        .diff-column:last-child {
-            border-right: 0;
+        #right-header {
+            grid-column: 3 / span 2;
+            grid-row: 1;
         }
 
         .panel-header {
+            flex: 0 0 24px;
+            height: 24px;
             background: var(--header-bg);
-            padding: 4px 8px;
+            padding: 0 8px;
             display: flex;
             align-items: center;
             font-size: 12px;
+            line-height: 18px;
             color: var(--gutter-fg);
             border-bottom: 1px solid var(--border);
             font-family: var(--ui-font);
@@ -108,18 +115,19 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            line-height: 24px;
+            line-height: inherit;
         }
 
         .open-file-btn {
             display: inline-flex;
+            flex-shrink: 0;
             align-items: center;
             justify-content: center;
             background: none;
             border: none;
             color: var(--gutter-fg);
             cursor: pointer;
-            padding: 4px 6px;
+            padding: 2px 6px;
             margin: 0;
             border-radius: 4px;
             transition: background 0.15s, color 0.15s;
@@ -129,60 +137,90 @@
             color: var(--fg);
         }
 
-        /* Wrapper that contains both the scrollable content and the scrollmap */
-        .panel-body {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
+        /* One native scroll surface moves both panes in the same compositor
+           update. Headers, markers and horizontal controls stay outside it. */
+        #vertical-wrapper {
+            grid-column: 1 / -1;
+            grid-row: 2;
+            min-width: 0;
+            min-height: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
+            overflow-anchor: none;
+            position: relative;
+            background: var(--bg);
+        }
+        #vertical-wrapper::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+        }
+        .diff-canvas {
+            display: grid;
+            grid-template-columns: var(--diff-columns);
+            height: 0;
             position: relative;
         }
 
         .view-wrapper {
-            flex: 1;
-            overflow: auto;
+            min-width: 0;
+            min-height: 0;
+            overflow: clip;
             position: relative;
+            background: var(--bg);
         }
-        /* WebView2: hide vertical scrollbar, show styled horizontal */
-        .view-wrapper::-webkit-scrollbar {
-            width: 0;
-            height: 8px;
+        #left-wrapper { grid-column: 1; }
+        #right-wrapper { grid-column: 3; }
+        #left-scrollmap { grid-column: 2; border-right: 1px solid var(--border); }
+        #right-scrollmap { grid-column: 4; }
+        #left-horizontal { grid-column: 1; }
+        #right-horizontal { grid-column: 3; }
+        /* The thumb and both text layers share one horizontal position. */
+        .horizontal-scrollbar {
+            grid-row: 3;
+            min-width: 0;
+            position: relative;
+            overflow: hidden;
+            background: var(--bg);
+            touch-action: none;
+            user-select: none;
         }
-        .view-wrapper::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .view-wrapper::-webkit-scrollbar-thumb {
-            background: rgba(121, 121, 121, 0.4);
-            border-radius: 4px;
-        }
-        .view-wrapper::-webkit-scrollbar-thumb:hover {
-            background: rgba(121, 121, 121, 0.6);
-        }
-
-        .scroll-spacer {
+        .horizontal-thumb {
             position: absolute;
             top: 0;
             left: 0;
+            height: 100%;
             pointer-events: none;
+            background: rgba(121, 121, 121, 0.4);
+            border-radius: 4px;
+            will-change: transform;
+        }
+        .horizontal-scrollbar:hover .horizontal-thumb {
+            background: rgba(121, 121, 121, 0.6);
+        }
+        .horizontal-scrollbar:focus-visible {
+            outline: 1px solid var(--fg);
+            outline-offset: -1px;
         }
 
         .diff-view {
             position: absolute;
             top: 0;
             left: 0;
-            display: table;
-            border-collapse: collapse;
+            display: block;
+            background: var(--bg);
+            will-change: transform;
             font-family: var(--font-family);
             font-size: 13px;
             line-height: 20px;
         }
 
         .diff-row {
-            display: table-row;
+            display: flex;
             height: 20px;
         }
 
         .line-number {
-            display: table-cell;
+            flex: 0 0 50px;
             width: 50px;
             text-align: right;
             padding-right: 10px;
@@ -197,7 +235,8 @@
         }
 
         .line-content {
-            display: table-cell;
+            flex: 1;
+            min-width: 0;
             padding-left: 12px;
             white-space: pre;
             overflow: visible;
@@ -231,6 +270,15 @@
             border-left: 3px solid var(--removed-border);
         }
 
+        .row-added .inline-change {
+            background: var(--added-change-bg);
+            color: var(--fg);
+        }
+        .row-removed .inline-change {
+            background: var(--removed-change-bg);
+            color: var(--fg);
+        }
+
         .row-empty {
             background: var(--empty-bg);
             user-select: none;
@@ -242,6 +290,7 @@
 
         /* ── Scrollmap (custom scrollbar with diff markers) ── */
         .scrollmap {
+            grid-row: 2;
             width: var(--scrollmap-width);
             height: 100%;
             position: relative;
@@ -291,38 +340,36 @@
             <span id="diff-stats" style="font-weight: normal; color: var(--gutter-fg);">수집 중...</span>
         </div>
         <div id="diff-panels">
-            <!-- Left Panel (Original) -->
-            <div class="diff-column">
-                <div class="panel-header" id="left-header">원본 파일 (Original)</div>
-                <div class="panel-body">
+            <div class="panel-header" id="left-header">원본 파일 (Original)</div>
+            <div class="panel-header" id="right-header">
+                <span class="panel-header-text" id="right-header-text">비교 대상 파일 (Modified)</span>
+                <button class="open-file-btn" id="right-open-btn" title="파일 열기" onclick="openRightFile()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="vertical-wrapper" tabindex="0" aria-labelledby="diff-title">
+                <div class="diff-canvas" id="diff-canvas">
                     <div class="view-wrapper" id="left-wrapper">
-                        <div class="scroll-spacer" id="left-spacer"></div>
                         <div class="diff-view" id="left-view"></div>
                     </div>
-                    <div class="scrollmap" id="left-scrollmap">
-                        <div class="scrollmap-thumb" id="left-thumb"></div>
+                    <div class="view-wrapper" id="right-wrapper">
+                        <div class="diff-view" id="right-view"></div>
                     </div>
                 </div>
             </div>
-            <!-- Right Panel (Modified) -->
-            <div class="diff-column">
-                <div class="panel-header" id="right-header">
-                    <span class="panel-header-text" id="right-header-text">비교 대상 파일 (Modified)</span>
-                    <button class="open-file-btn" id="right-open-btn" title="파일 열기" onclick="openRightFile()">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                        </svg>
-                    </button>
-                </div>
-                <div class="panel-body">
-                    <div class="view-wrapper" id="right-wrapper">
-                        <div class="scroll-spacer" id="right-spacer"></div>
-                        <div class="diff-view" id="right-view"></div>
-                    </div>
-                    <div class="scrollmap" id="right-scrollmap">
-                        <div class="scrollmap-thumb" id="right-thumb"></div>
-                    </div>
-                </div>
+            <div class="scrollmap" id="left-scrollmap">
+                <div class="scrollmap-thumb" id="left-thumb"></div>
+            </div>
+            <div class="scrollmap" id="right-scrollmap">
+                <div class="scrollmap-thumb" id="right-thumb"></div>
+            </div>
+            <div class="horizontal-scrollbar" id="left-horizontal" role="scrollbar" aria-orientation="horizontal" aria-controls="left-view" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" tabindex="0" aria-labelledby="left-header">
+                <div class="horizontal-thumb" id="left-horizontal-thumb"></div>
+            </div>
+            <div class="horizontal-scrollbar" id="right-horizontal" role="scrollbar" aria-orientation="horizontal" aria-controls="right-view" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" tabindex="0" aria-labelledby="right-header-text">
+                <div class="horizontal-thumb" id="right-horizontal-thumb"></div>
             </div>
         </div>
     </div>
@@ -330,14 +377,18 @@
     <script>
         const leftWrapper  = document.getElementById('left-wrapper');
         const rightWrapper = document.getElementById('right-wrapper');
-        const leftSpacer   = document.getElementById('left-spacer');
-        const rightSpacer  = document.getElementById('right-spacer');
+        const verticalWrapper = document.getElementById('vertical-wrapper');
+        const diffCanvas = document.getElementById('diff-canvas');
         const leftView     = document.getElementById('left-view');
         const rightView    = document.getElementById('right-view');
         const leftScrollmap  = document.getElementById('left-scrollmap');
         const rightScrollmap = document.getElementById('right-scrollmap');
         const leftThumb  = document.getElementById('left-thumb');
         const rightThumb = document.getElementById('right-thumb');
+        const leftHorizontal = document.getElementById('left-horizontal');
+        const rightHorizontal = document.getElementById('right-horizontal');
+        const leftHorizontalThumb = document.getElementById('left-horizontal-thumb');
+        const rightHorizontalThumb = document.getElementById('right-horizontal-thumb');
 
         // Virtual scroll parameters
         const rowHeight = 20;
@@ -345,6 +396,11 @@
         let globalDiffB = [];
         let maxLineLength = 0;
         const charWidth = 8.5;
+        let horizontalOffset = 0;
+        let horizontalMax = 0;
+        let measuredFont = '';
+        let measuredContentWidth = 0;
+        const horizontalMetrics = new Map();
 
         // Prevent dragging duplicate windows
         window.addEventListener('dragover', e => e.preventDefault());
@@ -358,7 +414,7 @@
             const totalRows = globalDiffB.length;
             if (totalRows === 0) return 0;
 
-            const centerY = rightWrapper.scrollTop + rightWrapper.clientHeight / 2;
+            const centerY = verticalWrapper.scrollTop + verticalWrapper.clientHeight / 2;
             const centerIndex = Math.min(
                 totalRows - 1,
                 Math.max(0, Math.floor(centerY / rowHeight)));
@@ -508,11 +564,10 @@
                 const vAtD = history[d]; 
                 const k = currX - currY;
 
-                const dVal = d - 1;
                 const getV = (kVal) => (vAtD[kVal] !== undefined ? vAtD[kVal] : -1);
 
                 let prevK;
-                if (k === -dVal || (k !== dVal && getV(k - 1) < getV(k + 1))) {
+                if (k === -d || (k !== d && getV(k - 1) < getV(k + 1))) {
                     prevK = k + 1;
                 } else {
                     prevK = k - 1;
@@ -547,6 +602,203 @@
             }
 
             return { diffA, diffB };
+        }
+
+        // Keep grapheme clusters intact (including combining marks and emoji).
+        const diffSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+        function computeInlineDiff(textA, textB, budget) {
+            const a = Array.from(diffSegmenter.segment(textA), part => part.segment);
+            const b = Array.from(diffSegmenter.segment(textB), part => part.segment);
+            let prefix = 0;
+            while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
+            let endA = a.length;
+            let endB = b.length;
+            while (endA > prefix && endB > prefix && a[endA - 1] === b[endB - 1]) {
+                endA--;
+                endB--;
+            }
+
+            const matches = [];
+            for (let i = 0; i < prefix; i++) matches.push([i, i]);
+            const n = endA - prefix;
+            const m = endB - prefix;
+            const cells = (n + 1) * (m + 1);
+            // Bound both memory and total work; long replacements still retain
+            // their common prefix/suffix and never block on a quadratic matrix.
+            if (n > 0 && m > 0 && cells <= 250000 && cells <= budget.cells) {
+                budget.cells -= cells;
+                const width = m + 1;
+                const lcs = new Uint32Array(cells);
+                for (let i = n - 1; i >= 0; i--) {
+                    for (let j = m - 1; j >= 0; j--) {
+                        lcs[i * width + j] = a[prefix + i] === b[prefix + j]
+                            ? 1 + lcs[(i + 1) * width + j + 1]
+                            : Math.max(lcs[(i + 1) * width + j], lcs[i * width + j + 1]);
+                    }
+                }
+                let i = 0;
+                let j = 0;
+                while (i < n && j < m) {
+                    if (a[prefix + i] === b[prefix + j]) {
+                        matches.push([prefix + i++, prefix + j++]);
+                    } else if (lcs[(i + 1) * width + j] >= lcs[i * width + j + 1]) {
+                        i++;
+                    } else {
+                        j++;
+                    }
+                }
+            }
+            for (let i = endA, j = endB; i < a.length; i++, j++) matches.push([i, j]);
+
+            function changedRanges(parts, side) {
+                const offsets = [0];
+                for (const part of parts) offsets.push(offsets[offsets.length - 1] + part.length);
+                const ranges = [];
+                let start = 0;
+                for (const match of matches) {
+                    const index = match[side];
+                    if (start < index) ranges.push([offsets[start], offsets[index]]);
+                    start = index + 1;
+                }
+                if (start < parts.length) ranges.push([offsets[start], offsets[parts.length]]);
+                return ranges;
+            }
+
+            const weight = part => /\S/u.test(part) ? 1 : 0;
+            const total = Math.max(a.reduce((sum, part) => sum + weight(part), 0),
+                b.reduce((sum, part) => sum + weight(part), 0));
+            const shared = matches.reduce((sum, match) => sum + weight(a[match[0]]), 0);
+            return {
+                rangesA: changedRanges(a, 0),
+                rangesB: changedRanges(b, 1),
+                similarity: total === 0 ? 1 : shared / total
+            };
+        }
+
+        // Align replacement lines within each hunk, allowing inserted/deleted
+        // lines between them. Both virtual panels then share the same row index.
+        function alignChangedLines(diffA, diffB) {
+            const alignedA = [];
+            const alignedB = [];
+            const empty = () => ({ type: 'empty', text: '', lineNum: null });
+            const budget = { cells: 2000000 };
+            let start = 0;
+            while (start < diffA.length) {
+                if (diffA[start].type === 'unchanged' && diffB[start].type === 'unchanged') {
+                    alignedA.push(diffA[start]);
+                    alignedB.push(diffB[start++]);
+                    continue;
+                }
+                let end = start;
+                const removed = [];
+                const added = [];
+                while (end < diffA.length &&
+                    (diffA[end].type !== 'unchanged' || diffB[end].type !== 'unchanged')) {
+                    if (diffA[end].type === 'removed') removed.push(diffA[end]);
+                    if (diffB[end].type === 'added') added.push(diffB[end]);
+                    end++;
+                }
+
+                function appendPair(i, j, change) {
+                    removed[i].changes = change.rangesA;
+                    added[j].changes = change.rangesB;
+                    alignedA.push(removed[i]);
+                    alignedB.push(added[j]);
+                }
+
+                const n = removed.length;
+                const m = added.length;
+                if (n * m > 4096) {
+                    // A bounded lookahead keeps large hunks responsive while
+                    // still aligning replacements across nearby insertions.
+                    let i = 0;
+                    let j = 0;
+                    while (i < n || j < m) {
+                        let best = null;
+                        function consider(a, b) {
+                            const change = computeInlineDiff(removed[a].text, added[b].text, budget);
+                            if (change.similarity < 0.35) return;
+                            const cost = 2 * (1 - change.similarity) + 0.15 * (a - i + b - j);
+                            if (!best || cost < best.cost) best = { a, b, change, cost };
+                        }
+                        if (i < n && j < m) {
+                            consider(i, j);
+                            for (let gap = 1; gap <= 8; gap++) {
+                                if (i + gap < n) consider(i + gap, j);
+                                if (j + gap < m) consider(i, j + gap);
+                            }
+                        }
+                        if (best) {
+                            while (i < best.a) {
+                                alignedA.push(removed[i++]);
+                                alignedB.push(empty());
+                            }
+                            while (j < best.b) {
+                                alignedA.push(empty());
+                                alignedB.push(added[j++]);
+                            }
+                            appendPair(i++, j++, best.change);
+                        } else {
+                            if (i < n) {
+                                alignedA.push(removed[i++]);
+                                alignedB.push(empty());
+                            }
+                            if (j < m) {
+                                alignedA.push(empty());
+                                alignedB.push(added[j++]);
+                            }
+                        }
+                    }
+                } else {
+                    const width = m + 1;
+                    const costs = new Float64Array((n + 1) * width);
+                    const changes = new Map();
+                    for (let i = n; i >= 0; i--) {
+                        for (let j = m; j >= 0; j--) {
+                            const index = i * width + j;
+                            if (i === n) { costs[index] = m - j; continue; }
+                            if (j === m) { costs[index] = n - i; continue; }
+                            const change = computeInlineDiff(removed[i].text, added[j].text, budget);
+                            // Whitespace alone must not pair unrelated code lines.
+                            const pairCost = (n === 1 && m === 1) || change.similarity >= 0.35
+                                ? 2 * (1 - change.similarity) : Infinity;
+                            changes.set(index, { change, pairCost });
+                            costs[index] = Math.min(pairCost + costs[(i + 1) * width + j + 1],
+                                1 + costs[(i + 1) * width + j], 1 + costs[index + 1]);
+                        }
+                    }
+                    let i = 0;
+                    let j = 0;
+                    while (i < n || j < m) {
+                        const index = i * width + j;
+                        const candidate = changes.get(index);
+                        if (i < n && j < m && candidate.pairCost + costs[(i + 1) * width + j + 1] <= costs[index] + 1e-9) {
+                            appendPair(i++, j++, candidate.change);
+                        } else if (i < n && (j === m || costs[(i + 1) * width + j] <= costs[index + 1])) {
+                            alignedA.push(removed[i++]);
+                            alignedB.push(empty());
+                        } else {
+                            alignedA.push(empty());
+                            alignedB.push(added[j++]);
+                        }
+                    }
+                }
+                start = end;
+            }
+            return { diffA: alignedA, diffB: alignedB };
+        }
+
+        function renderLineText(item) {
+            if (!item.changes) return escapeHtml(item.text);
+            let html = '';
+            let offset = 0;
+            for (const [start, end] of item.changes) {
+                html += escapeHtml(item.text.slice(offset, start));
+                html += `<span class="inline-change">${escapeHtml(item.text.slice(start, end))}</span>`;
+                offset = end;
+            }
+            return html + escapeHtml(item.text.slice(offset));
         }
 
         // ── Scrollmap helpers ──────────────────────────────────────────────
@@ -602,28 +854,41 @@
             const totalH = globalDiffA.length * rowHeight;
             if (totalH === 0 || mapH === 0) return;
 
-            const scale   = mapH / totalH;
             const viewH   = wrapper.clientHeight;
             const scrollY = wrapper.scrollTop;
-
-            const thumbTop = scrollY * scale;
-            const thumbH   = totalH <= viewH ? mapH : Math.max(viewH * scale, 8);
+            const thumbH = Math.min(mapH, Math.max(viewH * mapH / totalH, 8));
+            const maxScroll = Math.max(0, totalH - viewH);
+            const thumbTop = maxScroll > 0 ? scrollY / maxScroll * (mapH - thumbH) : 0;
 
             thumb.style.top    = `${thumbTop}px`;
             thumb.style.height = `${thumbH}px`;
         }
 
         function attachScrollmapInput(scrollmap, wrapper, thumb) {
+            let dragMetrics = null;
+            let dragOffset = 0;
             function scrollToRatio(clientY) {
-                const rect   = scrollmap.getBoundingClientRect();
-                const ratio  = Math.min(Math.max((clientY - rect.top) / rect.height, 0), 1);
-                const totalH = globalDiffA.length * rowHeight;
-                const maxSc  = totalH - wrapper.clientHeight;
-                wrapper.scrollTop = ratio * maxSc;
+                if (!dragMetrics || dragMetrics.trackHeight <= 0) return;
+                const ratio = Math.min(Math.max(
+                    (clientY - dragMetrics.top - dragOffset) / dragMetrics.trackHeight, 0), 1);
+                wrapper.scrollTop = ratio * dragMetrics.maxScroll;
             }
 
             let dragging = false;
             scrollmap.addEventListener('mousedown', e => {
+                const rect = scrollmap.getBoundingClientRect();
+                const totalH = globalDiffA.length * rowHeight;
+                if (rect.height <= 0 || totalH <= wrapper.clientHeight) return;
+                const thumbH = Math.min(rect.height,
+                    Math.max(wrapper.clientHeight * rect.height / totalH, 8));
+                const maxScroll = totalH - wrapper.clientHeight;
+                const trackHeight = rect.height - thumbH;
+                const thumbTop = wrapper.scrollTop / maxScroll * trackHeight;
+                const pointerY = e.clientY - rect.top;
+                dragOffset = pointerY >= thumbTop && pointerY <= thumbTop + thumbH
+                    ? pointerY - thumbTop : thumbH / 2;
+                // Measure once at drag start, not after every scroll/style write.
+                dragMetrics = { top: rect.top, trackHeight, maxScroll };
                 dragging = true;
                 scrollToRatio(e.clientY);
                 e.preventDefault();
@@ -631,68 +896,142 @@
             window.addEventListener('mousemove', e => {
                 if (dragging) scrollToRatio(e.clientY);
             });
-            window.addEventListener('mouseup', () => { dragging = false; });
+            window.addEventListener('mouseup', () => { dragging = false; dragMetrics = null; });
         }
 
         // ── List Virtualization Logic ──────────────────────────────────────
-        function renderVisibleRows() {
-            const totalRows = globalDiffA.length;
-            const viewHeight = leftWrapper.clientHeight;
-            const scrollTop = leftWrapper.scrollTop;
+        let renderedStartIndex = 0;
+        let renderedEndIndex = -1;
 
-            const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - 5);
-            const endIndex = Math.min(totalRows - 1, Math.ceil((scrollTop + viewHeight) / rowHeight) + 5);
+        function createDiffRow(item) {
+            const row = document.createElement('div');
+            const changed = item.type === 'added' || item.type === 'removed';
+            row.className = 'diff-row' + (item.type === 'unchanged' ? '' : ` row-${item.type}`);
+            const sign = item.type === 'added' ? '+ ' : (item.type === 'removed' ? '- ' : '  ');
+            const content = item.type === 'empty' ? '' :
+                `<span class="diff-sign">${sign}</span>${changed ? renderLineText(item) : escapeHtml(item.text)}`;
+            row.innerHTML = `<div class="line-number">${item.lineNum || ''}</div><div class="line-content">${content}</div>`;
+            return row;
+        }
 
-            let leftHtml = '';
-            let rightHtml = '';
-
-            for (let k = startIndex; k <= endIndex; k++) {
-                const itemA = globalDiffA[k];
-                const itemB = globalDiffB[k];
-
-                // Left row
-                if (itemA.type === 'removed') {
-                    leftHtml += `<div class="diff-row row-removed"><div class="line-number">${itemA.lineNum}</div><div class="line-content"><span class="diff-sign">- </span>${escapeHtml(itemA.text)}</div></div>`;
-                } else if (itemA.type === 'empty') {
-                    leftHtml += `<div class="diff-row row-empty"><div class="line-number"></div><div class="line-content"></div></div>`;
-                } else {
-                    leftHtml += `<div class="diff-row"><div class="line-number">${itemA.lineNum}</div><div class="line-content"><span class="diff-sign">  </span>${escapeHtml(itemA.text)}</div></div>`;
-                }
-
-                // Right row
-                if (itemB.type === 'added') {
-                    rightHtml += `<div class="diff-row row-added"><div class="line-number">${itemB.lineNum}</div><div class="line-content"><span class="diff-sign">+ </span>${escapeHtml(itemB.text)}</div></div>`;
-                } else if (itemB.type === 'empty') {
-                    rightHtml += `<div class="diff-row row-empty"><div class="line-number"></div><div class="line-content"></div></div>`;
-                } else {
-                    rightHtml += `<div class="diff-row"><div class="line-number">${itemB.lineNum}</div><div class="line-content"><span class="diff-sign">  </span>${escapeHtml(itemB.text)}</div></div>`;
-                }
+        function updateVisibleRows(view, items, startIndex, endIndex, force) {
+            function fragment(start, end) {
+                const result = document.createDocumentFragment();
+                for (let k = start; k <= end; k++) result.append(createDiffRow(items[k]));
+                return result;
             }
+            if (force || renderedEndIndex < startIndex || renderedStartIndex > endIndex) {
+                view.replaceChildren(fragment(startIndex, endIndex));
+                return;
+            }
+            // Only remove offscreen rows and add the newly exposed edges.
+            // The overlapping rows retain their DOM nodes and text selection.
+            for (let k = renderedStartIndex; k < startIndex; k++) view.firstElementChild.remove();
+            for (let k = renderedEndIndex; k > endIndex; k--) view.lastElementChild.remove();
+            if (startIndex < renderedStartIndex) view.prepend(fragment(startIndex, renderedStartIndex - 1));
+            if (endIndex > renderedEndIndex) view.append(fragment(renderedEndIndex + 1, endIndex));
+        }
 
-            leftView.innerHTML = leftHtml;
-            rightView.innerHTML = rightHtml;
+        function renderVisibleRows(force = false) {
+            const totalRows = globalDiffA.length;
+            const viewHeight = verticalWrapper.clientHeight;
+            const scrollTop = verticalWrapper.scrollTop;
 
-            const offset = startIndex * rowHeight;
-            leftView.style.transform = `translateY(${offset}px)`;
-            rightView.style.transform = `translateY(${offset}px)`;
+            const firstVisible = Math.max(0, Math.floor(scrollTop / rowHeight));
+            const lastVisible = Math.min(totalRows - 1, Math.ceil((scrollTop + viewHeight) / rowHeight) - 1);
+            // Keep a viewport-sized buffer and reuse it until nearing its edge.
+            if (!force && renderedStartIndex <= Math.max(0, firstVisible - 5) &&
+                renderedEndIndex >= Math.min(totalRows - 1, lastVisible + 5)) return;
+            const bufferRows = Math.max(20, Math.ceil(viewHeight / rowHeight));
+            const startIndex = Math.max(0, firstVisible - bufferRows);
+            const endIndex = Math.min(totalRows - 1, lastVisible + bufferRows);
+            updateVisibleRows(leftView, globalDiffA, startIndex, endIndex, force);
+            updateVisibleRows(rightView, globalDiffB, startIndex, endIndex, force);
+            renderedStartIndex = startIndex;
+            renderedEndIndex = endIndex;
+
+            applyViewTransforms();
+        }
+
+        function applyViewTransforms() {
+            const scale = window.devicePixelRatio || 1;
+            const paintedOffset = Math.round(horizontalOffset * scale) / scale;
+            const transform = `translate3d(${-paintedOffset}px, ${renderedStartIndex * rowHeight}px, 0)`;
+            leftView.style.transform = transform;
+            rightView.style.transform = transform;
+        }
+
+        function setHorizontalOffset(value) {
+            horizontalOffset = Math.min(horizontalMax, Math.max(0, value));
+            // Paint the thumbs and glyphs in the same input event; there is no
+            // asynchronous native scroll event or follower feedback to wait for.
+            for (const [scrollbar, metrics] of horizontalMetrics) {
+                const x = horizontalMax > 0 ? horizontalOffset / horizontalMax * metrics.travel : 0;
+                metrics.thumb.style.transform = `translate3d(${x}px, 0, 0)`;
+                scrollbar.setAttribute('aria-valuenow', String(Math.round(horizontalOffset)));
+            }
+            applyViewTransforms();
+        }
+
+        function sizeHorizontalScrollbar(scrollbar, thumb, viewport) {
+            const width = scrollbar.clientWidth;
+            const thumbWidth = Math.min(width, Math.max(20,
+                viewport.clientWidth * width / Math.max(1, viewport.clientWidth + horizontalMax)));
+            thumb.style.width = `${thumbWidth}px`;
+            scrollbar.setAttribute('aria-valuemax', String(Math.round(horizontalMax)));
+            horizontalMetrics.set(scrollbar, { thumb, travel: Math.max(0, width - thumbWidth), thumbWidth });
         }
 
         function updateSpacerWidths() {
-            const minWidth = leftWrapper.clientWidth;
-            const finalWidth = Math.max(minWidth, maxLineLength * charWidth + 100);
+            const font = getComputedStyle(leftView);
+            const fontKey = `${font.fontSize} ${font.fontFamily}`;
+            if (fontKey !== measuredFont) {
+                const context = document.createElement('canvas').getContext('2d');
+                measuredContentWidth = maxLineLength * charWidth + 100;
+                if (context) {
+                    context.font = fontKey;
+                    const tabWidth = Math.max(1, context.measureText(' ').width * 8);
+                    const signWidth = context.measureText('  ').width;
+                    let widest = 0;
+                    function measure(text) {
+                        let width = signWidth;
+                        const parts = text.split('\t');
+                        for (let i = 0; i < parts.length; i++) {
+                            if (i > 0) width = (Math.floor(width / tabWidth) + 1) * tabWidth;
+                            width += context.measureText(parts[i]).width;
+                        }
+                        return width;
+                    }
+                    for (let k = 0; k < globalDiffA.length; k++) {
+                        widest = Math.max(widest, measure(globalDiffA[k].text), measure(globalDiffB[k].text));
+                    }
+                    measuredContentWidth = Math.ceil(widest + 100);
+                }
+                measuredFont = fontKey;
+            }
+            // Size against the whole comparison, including tabs and wide glyphs,
+            // so viewport changes cannot change the scrollbar's range mid-drag.
+            const minWidth = Math.max(leftWrapper.clientWidth, rightWrapper.clientWidth);
+            const finalWidth = Math.max(minWidth, measuredContentWidth);
             const widthPx = `${finalWidth}px`;
-            
-            leftSpacer.style.width = widthPx;
-            rightSpacer.style.width = widthPx;
+
             leftView.style.width = widthPx;
             rightView.style.width = widthPx;
+            horizontalMax = Math.max(0, finalWidth - Math.min(leftWrapper.clientWidth, rightWrapper.clientWidth));
+            // Each thumb has its own track geometry, but the text offset and
+            // maximum remain shared even when the pane widths differ.
+            sizeHorizontalScrollbar(leftHorizontal, leftHorizontalThumb, leftWrapper);
+            sizeHorizontalScrollbar(rightHorizontal, rightHorizontalThumb, rightWrapper);
+            setHorizontalOffset(horizontalOffset);
         }
 
         // ── Render ─────────────────────────────────────────────────────────
         function renderDiff(data) {
-            const { diffA, diffB } = computeLineDiff(data.textA, data.textB);
+            const lineDiff = computeLineDiff(data.textA, data.textB);
+            const { diffA, diffB } = alignChangedLines(lineDiff.diffA, lineDiff.diffB);
             globalDiffA = diffA;
             globalDiffB = diffB;
+            measuredFont = '';
 
             // Compute maximum line length
             maxLineLength = 0;
@@ -725,12 +1064,13 @@
                 openBtn.title = data.openFileTooltip;
             }
 
-            // Set spacer height
+            // One canvas owns the scroll height for both panes.
             const totalHeight = diffA.length * rowHeight;
-            leftSpacer.style.height = `${totalHeight}px`;
-            rightSpacer.style.height = `${totalHeight}px`;
+            diffCanvas.style.height = `${totalHeight}px`;
 
             updateSpacerWidths();
+            const maxScrollTop = Math.max(0, totalHeight - verticalWrapper.clientHeight);
+            if (verticalWrapper.scrollTop > maxScrollTop) verticalWrapper.scrollTop = maxScrollTop;
 
             // Calculate diff stats
             let additions = 0;
@@ -746,13 +1086,14 @@
                 .replace('{1}', deletions);
 
             // Initial render
-            renderVisibleRows();
+            renderVisibleRows(true);
+            lastPaintedScrollTop = verticalWrapper.scrollTop;
 
             requestAnimationFrame(() => {
                 buildScrollmapMarkers(leftScrollmap,  globalDiffA,  'removed');
                 buildScrollmapMarkers(rightScrollmap, globalDiffB, 'added');
-                updateScrollmapThumb(leftWrapper,  leftScrollmap,  leftThumb);
-                updateScrollmapThumb(rightWrapper, rightScrollmap, rightThumb);
+                updateScrollmapThumb(verticalWrapper, leftScrollmap, leftThumb);
+                updateScrollmapThumb(verticalWrapper, rightScrollmap, rightThumb);
             });
         }
 
@@ -765,35 +1106,104 @@
                 .replace(/'/g, '&#039;');
         }
 
-        // ── Synchronized Scrolling ─────────────────────────────────────────
-        let isSyncingLeftScroll  = false;
-        let isSyncingRightScroll = false;
+        // ── Shared vertical scrolling ──────────────────────────────────────
+        let scrollRenderPending = false;
+        let lastPaintedScrollTop = 0;
 
         function onScroll() {
-            renderVisibleRows();
-            updateScrollmapThumb(leftWrapper,  leftScrollmap,  leftThumb);
-            updateScrollmapThumb(rightWrapper, rightScrollmap, rightThumb);
+            if (scrollRenderPending || verticalWrapper.scrollTop === lastPaintedScrollTop) return;
+            scrollRenderPending = true;
+            requestAnimationFrame(() => {
+                scrollRenderPending = false;
+                renderVisibleRows();
+                updateScrollmapThumb(verticalWrapper, leftScrollmap, leftThumb);
+                updateScrollmapThumb(verticalWrapper, rightScrollmap, rightThumb);
+                lastPaintedScrollTop = verticalWrapper.scrollTop;
+            });
         }
 
-        leftWrapper.addEventListener('scroll', () => {
-            if (isSyncingLeftScroll) { isSyncingLeftScroll = false; return; }
-            isSyncingRightScroll = true;
-            rightWrapper.scrollTop  = leftWrapper.scrollTop;
-            rightWrapper.scrollLeft = leftWrapper.scrollLeft;
+        verticalWrapper.addEventListener('scroll', () => {
+            if (verticalWrapper.scrollLeft !== 0) {
+                const delta = verticalWrapper.scrollLeft;
+                verticalWrapper.scrollLeft = 0;
+                setHorizontalOffset(horizontalOffset + delta);
+            }
             onScroll();
         });
 
-        rightWrapper.addEventListener('scroll', () => {
-            if (isSyncingRightScroll) { isSyncingRightScroll = false; return; }
-            isSyncingLeftScroll = true;
-            leftWrapper.scrollTop  = rightWrapper.scrollTop;
-            leftWrapper.scrollLeft = rightWrapper.scrollLeft;
-            onScroll();
-        });
+        function attachHorizontalScrollInput(scrollbar, viewport) {
+            let drag = null;
+            function move(clientX) {
+                if (!drag || drag.travel <= 0) return;
+                const ratio = Math.min(1, Math.max(0, (clientX - drag.left - drag.grabOffset) / drag.travel));
+                setHorizontalOffset(ratio * drag.max);
+            }
+            scrollbar.addEventListener('pointerdown', event => {
+                if (event.button !== 0 || horizontalMax <= 0) return;
+                const metrics = horizontalMetrics.get(scrollbar);
+                const rect = scrollbar.getBoundingClientRect();
+                const thumbLeft = horizontalOffset / horizontalMax * metrics.travel;
+                const x = event.clientX - rect.left;
+                const grabOffset = x >= thumbLeft && x <= thumbLeft + metrics.thumbWidth
+                    ? x - thumbLeft : metrics.thumbWidth / 2;
+                drag = { left: rect.left, travel: metrics.travel, grabOffset, max: horizontalMax };
+                scrollbar.focus({ preventScroll: true });
+                scrollbar.setPointerCapture(event.pointerId);
+                move(event.clientX);
+                event.preventDefault();
+            });
+            scrollbar.addEventListener('pointermove', event => { if (drag) move(event.clientX); });
+            for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+                scrollbar.addEventListener(name, () => { drag = null; });
+            }
+            scrollbar.addEventListener('keydown', event => {
+                const page = viewport.clientWidth * 0.9;
+                let value;
+                switch (event.key) {
+                    case 'ArrowLeft': value = horizontalOffset - 30; break;
+                    case 'ArrowRight': value = horizontalOffset + 30; break;
+                    case 'PageUp': value = horizontalOffset - page; break;
+                    case 'PageDown': value = horizontalOffset + page; break;
+                    case 'Home': value = 0; break;
+                    case 'End': value = horizontalMax; break;
+                    default: return;
+                }
+                setHorizontalOffset(value);
+                event.preventDefault();
+            });
+        }
+        attachHorizontalScrollInput(leftHorizontal, leftWrapper);
+        attachHorizontalScrollInput(rightHorizontal, rightWrapper);
+
+        function onHorizontalWheel(event, wrapper, scrollbarOnly = false) {
+            if (event.ctrlKey) return;
+            const delta = event.deltaX || (event.shiftKey ? event.deltaY : 0);
+            if (!delta) {
+                if (scrollbarOnly && event.deltaY) {
+                    const unit = event.deltaMode === 1 ? rowHeight : (event.deltaMode === 2 ? verticalWrapper.clientHeight : 1);
+                    verticalWrapper.scrollTop += event.deltaY * unit;
+                    event.preventDefault();
+                }
+                return;
+            }
+            const horizontalUnit = event.deltaMode === 1 ? rowHeight : (event.deltaMode === 2 ? wrapper.clientWidth : 1);
+            setHorizontalOffset(horizontalOffset + delta * horizontalUnit);
+            if (!event.shiftKey && event.deltaY) {
+                const verticalUnit = event.deltaMode === 1 ? rowHeight : (event.deltaMode === 2 ? verticalWrapper.clientHeight : 1);
+                verticalWrapper.scrollTop += event.deltaY * verticalUnit;
+            }
+            event.preventDefault();
+        }
+        leftWrapper.addEventListener('wheel', event => onHorizontalWheel(event, leftWrapper), { passive: false });
+        rightWrapper.addEventListener('wheel', event => onHorizontalWheel(event, rightWrapper), { passive: false });
+        leftHorizontal.addEventListener('wheel', event => onHorizontalWheel(event, leftWrapper, true), { passive: false });
+        rightHorizontal.addEventListener('wheel', event => onHorizontalWheel(event, rightWrapper, true), { passive: false });
+        leftScrollmap.addEventListener('wheel', event => onHorizontalWheel(event, leftWrapper, true), { passive: false });
+        rightScrollmap.addEventListener('wheel', event => onHorizontalWheel(event, rightWrapper, true), { passive: false });
 
         // Scrollmap click/drag
-        attachScrollmapInput(leftScrollmap,  leftWrapper,  leftThumb);
-        attachScrollmapInput(rightScrollmap, rightWrapper, rightThumb);
+        attachScrollmapInput(leftScrollmap, verticalWrapper, leftThumb);
+        attachScrollmapInput(rightScrollmap, verticalWrapper, rightThumb);
 
         // Rebuild on resize
         const resizeObs = new ResizeObserver(() => {
@@ -801,12 +1211,13 @@
             renderVisibleRows();
             buildScrollmapMarkers(leftScrollmap,  globalDiffA,  'removed');
             buildScrollmapMarkers(rightScrollmap, globalDiffB, 'added');
-            updateScrollmapThumb(leftWrapper,  leftScrollmap,  leftThumb);
-            updateScrollmapThumb(rightWrapper, rightScrollmap, rightThumb);
+            updateScrollmapThumb(verticalWrapper, leftScrollmap, leftThumb);
+            updateScrollmapThumb(verticalWrapper, rightScrollmap, rightThumb);
         });
         resizeObs.observe(leftScrollmap);
         resizeObs.observe(rightScrollmap);
         resizeObs.observe(leftWrapper);
+        resizeObs.observe(verticalWrapper);
 
         function applyThemeSettings(theme, uiFontFamily, editorFontFamily) {
             const bg    = theme === 'PastelDark' ? '#24273a' : (theme === 'Light' ? '#ffffff' : '#1e1e1e');
@@ -825,12 +1236,19 @@
             }
             if (editorFontFamily) {
                 document.documentElement.style.setProperty('--font-family', editorFontFamily);
+                updateSpacerWidths();
             }
 
             const addedText   = theme === 'PastelDark' ? '#a6da95' : (theme === 'Light' ? '#22863a' : '#3fb950');
             const removedText = theme === 'PastelDark' ? '#ed8796' : (theme === 'Light' ? '#cb2431' : '#f85149');
             document.documentElement.style.setProperty('--added-text',   addedText);
             document.documentElement.style.setProperty('--removed-text', removedText);
+            document.documentElement.style.setProperty('--added-change-bg',
+                theme === 'PastelDark' ? 'rgba(166, 218, 149, 0.3)' :
+                    (theme === 'Light' ? 'rgba(46, 160, 67, 0.3)' : 'rgba(46, 160, 67, 0.4)'));
+            document.documentElement.style.setProperty('--removed-change-bg',
+                theme === 'PastelDark' ? 'rgba(237, 135, 150, 0.3)' :
+                    (theme === 'Light' ? 'rgba(248, 81, 73, 0.3)' : 'rgba(248, 81, 73, 0.4)'));
         }
 
         // ── WebView2 IPC ───────────────────────────────────────────────────
