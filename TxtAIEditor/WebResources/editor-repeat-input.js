@@ -208,13 +208,22 @@ export function createKeyboardRepeatController({
 
     function releaseModelRepeatKey(key) {
         if (!key) return;
+        // Native IME keys also produce Space/Enter keyup events. Only guard a
+        // key release whose press was actually handled by the model; otherwise
+        // the IME's committed space is suppressed without ever being inserted.
+        if (repeatState.continuousKey !== key && !repeatState.stoppedUntilReleaseKeys.has(key)) return;
         repeatState.stoppedUntilReleaseKeys.delete(key);
         clearPendingRepeatEdit(key);
     }
 
-    function resetModelRepeatState() {
+    function resetModelRepeatState({ forComposition = false } = {}) {
         repeatState.stoppedUntilReleaseKeys.clear();
-        clearPendingRepeatEdit();
+        clearPendingRepeatEdit(null, !forComposition);
+        if (forComposition) {
+            repeatState.releasedKeys.clear();
+            repeatState.suppressBeforeInputUntil = 0;
+            repeatState.suppressBeforeInputTypes.clear();
+        }
     }
 
     function repeatEditDelayFromNow() {

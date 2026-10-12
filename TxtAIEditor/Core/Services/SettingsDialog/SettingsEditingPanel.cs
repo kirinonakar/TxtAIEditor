@@ -23,6 +23,7 @@ namespace TxtAIEditor.Core.Services
         private readonly CheckBox _autoSaveAllowNonGitCheck;
         private readonly CheckBox _stripJupyterOutputsOnCommitCheck;
         private readonly CheckBox _defaultMarkdownCheck;
+        private readonly CheckBox _editInMarkdownPreviewCheck;
         private readonly CheckBox _defaultMarkdownToolbarCheck;
         private readonly CheckBox _startInTreeModeCheck;
         private readonly CheckBox _keepInTrayOnCloseCheck;
@@ -53,6 +54,7 @@ namespace TxtAIEditor.Core.Services
                 IsChecked = settings.StripJupyterOutputsOnCommit
             };
             _defaultMarkdownCheck = new CheckBox { Content = getString("SettingsLivePreview", "실시간 미리보기 기본 활성화"), IsChecked = settings.DefaultMarkdownEnabled };
+            _editInMarkdownPreviewCheck = new CheckBox { Content = getString("SettingsEditInMarkdownPreview", "마크다운 미리보기 상태로 편집"), IsChecked = settings.EditInMarkdownPreview };
             _defaultMarkdownToolbarCheck = new CheckBox { Content = getString("SettingsMarkdownToolbar", "기본 마크다운 툴바 활성화"), IsChecked = settings.DefaultMarkdownToolbarEnabled };
             _startInTreeModeCheck = new CheckBox { Content = getString("SettingsStartInTreeMode", "트리 모드로 시작"), IsChecked = settings.StartInTreeMode };
             _keepInTrayOnCloseCheck = new CheckBox
@@ -100,6 +102,7 @@ namespace TxtAIEditor.Core.Services
             settings.ExternalViewerPath = _externalViewerPathBox.Text.Trim();
             settings.ExternalViewerArguments = _externalViewerArgumentsBox.Text.Trim();
             settings.DefaultMarkdownEnabled = _defaultMarkdownCheck.IsChecked == true;
+            settings.EditInMarkdownPreview = _editInMarkdownPreviewCheck.IsChecked == true;
             settings.RightSidebarVisible = settings.DefaultMarkdownEnabled;
             settings.DefaultMarkdownToolbarEnabled = _defaultMarkdownToolbarCheck.IsChecked == true;
             settings.StartInTreeMode = _startInTreeModeCheck.IsChecked == true;
@@ -171,6 +174,7 @@ namespace TxtAIEditor.Core.Services
         {
             var content = new StackPanel { Spacing = 6 };
             content.Children.Add(_defaultMarkdownCheck);
+            content.Children.Add(_editInMarkdownPreviewCheck);
             content.Children.Add(_defaultMarkdownToolbarCheck);
             content.Children.Add(_startInTreeModeCheck);
             content.Children.Add(_stripJupyterOutputsOnCommitCheck);

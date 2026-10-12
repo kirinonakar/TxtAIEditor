@@ -1,5 +1,6 @@
 import { foldingController, imeController, selectionController, state, viewportController } from './editor-core.js';
 import { viewport } from './editor-dom.js';
+import { markdownPreviewTextPosition, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
 
 function lineTextFromElement(element) {
     const onlyTextNode = element?.childNodes?.length === 1 &&
@@ -221,7 +222,8 @@ function appendMergedSelectionOverlays(row, rowRect, rects, extraClass = '') {
 
     for (const rect of sorted) {
         const last = merged[merged.length - 1];
-        if (last && Math.abs(last.top - rect.top) < 1 && Math.abs(last.height - rect.height) < 1) {
+        if (last && Math.abs(last.top - rect.top) < 1 && Math.abs(last.height - rect.height) < 1 &&
+            (!usesMarkdownPreviewEditing(state) || rect.left <= last.right + 1)) {
             last.left = Math.min(last.left, rect.left);
             last.right = Math.max(last.right, rect.right);
             continue;
@@ -250,6 +252,8 @@ function textPositionsForOffsets(element, start, end) {
 
 function textPositionForOffset(element, offset) {
     if (!element) return null;
+    const previewPosition = markdownPreviewTextPosition(element, offset);
+    if (previewPosition) return previewPosition;
 
     let remaining = Math.max(0, Number(offset || 0));
     const onlyTextNode = element.childNodes.length === 1 &&

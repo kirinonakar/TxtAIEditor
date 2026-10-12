@@ -53,6 +53,7 @@ namespace TxtAIEditor.Core.Models
         public double RightSidebarExpandedWidth { get; set; } = 700;
         public bool ScrollSyncEnabled { get; set; } = true;
         public bool DefaultMarkdownEnabled { get; set; } = true;
+        public bool EditInMarkdownPreview { get; set; } = false;
         public bool DefaultMarkdownToolbarEnabled { get; set; } = true;
         public bool StartInTreeMode { get; set; } = false;
         public bool KeepInTrayOnClose { get; set; } = false;

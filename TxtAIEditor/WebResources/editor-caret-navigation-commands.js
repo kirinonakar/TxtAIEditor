@@ -1,4 +1,5 @@
 import { adjacentVisibleLine } from './editor-core.js';
+import { markdownPreviewTextPosition } from './editor-markdown-preview-edit.js';
 
 export function createCaretNavigationCommands({
     caretRectForOffset,
@@ -441,6 +442,21 @@ export function createCaretNavigationCommands({
                 target = { line: lineNumber, column: graphemeDeleteEnd(text, caret) };
             } else if (lineNumber < state.lineCount) {
                 target = { line: lineNumber + 1, column: 0 };
+            }
+        }
+
+        if (!extendSelection && !collapsedCustomSelection && target.line === lineNumber) {
+            const previewPosition = markdownPreviewTextPosition(moveElement, target.column, direction);
+            if (previewPosition) {
+                if (previewPosition.sourceOffset === caret) {
+                    if (direction < 0 && lineNumber > 1) {
+                        target = { line: lineNumber - 1, column: (state.cache.get(lineNumber - 1) || '').length };
+                    } else if (direction > 0 && lineNumber < state.lineCount) {
+                        target = { line: lineNumber + 1, column: 0 };
+                    }
+                } else {
+                    target.column = previewPosition.sourceOffset;
+                }
             }
         }
 

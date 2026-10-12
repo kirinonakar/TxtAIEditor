@@ -347,6 +347,9 @@
   <data name="SettingsLivePreview" xml:space="preserve">
     <value>Enable Preview by Default</value>
   </data>
+  <data name="SettingsEditInMarkdownPreview" xml:space="preserve">
+    <value>Edit in Markdown preview</value>
+  </data>
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>Enable Markdown Toolbar by Default</value>
   </data>

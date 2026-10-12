@@ -8,6 +8,7 @@ import { SearchController } from './editor-search-state.js';
 import { SelectionController } from './editor-selection-state.js';
 import { ViewportController } from './editor-viewport-state.js';
 import { FoldingController } from './editor-folding.js';
+import { updateGroupedMarkdownElement } from './editor-markdown-preview-edit.js';
 import {
     CsvTableMode,
     EditorModeCoordinator,
@@ -93,6 +94,8 @@ const state = {
     scrollSyncEnabled: true,
     autocompleteWords: [],
     inlineLivePreviewEnabled: false,
+    editInMarkdownPreview: false,
+    markdownPreviewPointerActive: false,
     livePreviewBaseHref: '',
     livePreviewLocalResourceVersion: '0',
     inlineLivePreviewSourceLine: null,
@@ -294,7 +297,8 @@ function applyOptions(msg) {
         msg.showDirtyLines === undefined ? true : !!msg.showDirtyLines,
         msg.bracketPairColorization === undefined ? true : !!msg.bracketPairColorization,
         msg.longLineProtectionFormat, msg.csvJsonKeyHeader, msg.csvJsonValueHeader,
-        msg.foldCollapseText, msg.foldExpandText, msg.foldSelectionFormat
+        msg.foldCollapseText, msg.foldExpandText, msg.foldSelectionFormat,
+        !!msg.editInMarkdownPreview
     ]);
     const layoutChanged = appliedLayoutOptionsKey !== layoutOptionsKey;
     const renderChanged = appliedRenderOptionsKey !== renderOptionsKey;
@@ -308,6 +312,8 @@ function applyOptions(msg) {
         viewport.style.removeProperty('min-width');
     }
     state.syntaxHighlighting = msg.hasOwnProperty('syntaxHighlighting') ? !!msg.syntaxHighlighting : true;
+    state.editInMarkdownPreview = !!msg.editInMarkdownPreview;
+    document.body.classList.toggle('markdown-preview-editing', state.editInMarkdownPreview);
     state.showDirtyLines = msg.hasOwnProperty('showDirtyLines') ? !!msg.showDirtyLines : true;
     if (!state.showDirtyLines) {
         state.dirtyLines.clear();
@@ -604,7 +610,7 @@ function updateLineFromHost(lineNumber, text, isComposing = false) {
 
     const element = viewport.querySelector(`.line-text[data-line="${line}"]`);
     if (element && element.getAttribute('contenteditable') === 'true') {
-        element.textContent = nextText;
+        if (!updateGroupedMarkdownElement(element, nextText, state)) element.textContent = nextText;
     }
 
     if (state.wordWrap) {

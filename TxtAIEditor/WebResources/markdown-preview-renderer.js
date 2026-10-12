@@ -669,7 +669,7 @@ function collectMarkdownTableBlock(startLine, maxLine, getLine) {
         rows.push(row);
         endLine = line;
     }
-    return { header, separator, rows, endLine };
+    return { header, separator, rows, startLine, sourceLines: Array.from({ length: endLine - startLine + 1 }, (_, index) => getLine(startLine + index)), endLine };
 }
 
 function findFencedCodeBlockContaining(lineNumber, maxLine, getLine) {
@@ -873,6 +873,13 @@ function renderMarkdownTableBlock(block, options = {}) {
         const rendered = inlineMarkdown(processed, options).replace(/\u0003/g, '<br>');
         return `<${tag}${cellStyle(cell, i)}>${rendered || '&nbsp;'}</${tag}>`;
     };
+    if (options.editableTableRow) {
+        const row = (line, header) => options.editableTableRow(
+            block.sourceLines[line - block.startLine], line, header, aligns, block.header.length);
+        let html = `<table><thead>${row(block.startLine, true)}</thead><tbody>`;
+        for (let line = block.startLine + 2; line <= block.endLine; line++) html += row(line, false);
+        return `${html}</tbody></table>`;
+    }
     let html = '<table><thead><tr>';
     block.header.forEach((cell, i) => {
         html += renderCell(cell, 'th', i);
@@ -1029,6 +1036,7 @@ function findMarkdownListBlockContaining(lineNumber, maxLine, getLine, options =
 function renderListContinuationParagraph(lines, startIndex, parentIndent, options = {}) {
     const tabSize = Number(options.tabSize || 4);
     const paragraphs = [];
+    const paragraphIndexes = [];
     let index = startIndex;
     while (index < lines.length) {
         const text = lines[index];
@@ -1039,6 +1047,7 @@ function renderListContinuationParagraph(lines, startIndex, parentIndent, option
         }
         if (leadingWhitespaceLength(text, tabSize) <= parentIndent) break;
         paragraphs.push(stripIndentColumns(text, parentIndent + tabSize, tabSize));
+        paragraphIndexes.push(index);
         index++;
     }
 
@@ -1050,9 +1059,12 @@ function renderListContinuationParagraph(lines, startIndex, parentIndent, option
         let codeIndex = 1;
         for (; codeIndex < paragraphs.length; codeIndex++) {
             if (isFencedCodeClose(paragraphs[codeIndex], firstFence)) {
+                const sourceIndexes = paragraphIndexes.slice(0, codeIndex + 1);
+                const sourceNumbers = sourceIndexes.map(index => Number(options.sourceStartLine || 1) + index);
+                const codeBlock = { code: code.join('\n'), language: firstFence.language, endLine: sourceNumbers.at(-1) };
                 return {
-                    html: renderFencedCodeBlock({ code: code.join('\n'), language: firstFence.language }),
-                    nextIndex: startIndex + codeIndex + 1
+                    html: options.editableCodeBlock?.(codeBlock, sourceNumbers[0], sourceIndexes.map(index => lines[index]), sourceNumbers) ?? renderFencedCodeBlock(codeBlock),
+                    nextIndex: paragraphIndexes[codeIndex] + 1
                 };
             }
             code.push(paragraphs[codeIndex]);
@@ -1065,7 +1077,9 @@ function renderListContinuationParagraph(lines, startIndex, parentIndent, option
 
     const html = paragraphs
         .filter(text => String(text || '').trim())
-        .map(text => `<p>${inlineMarkdown(text.trim(), options)}</p>`)
+        .map((text, index) => `<p>${options.editableListContinuation
+            ? options.editableListContinuation(lines[paragraphIndexes[index]], Number(options.sourceStartLine || 1) + paragraphIndexes[index])
+            : inlineMarkdown(text.trim(), options)}</p>`)
         .join('');
     return { html, nextIndex: index };
 }
@@ -1083,7 +1097,9 @@ function renderMarkdownListAt(lines, startIndex, indent, options = {}) {
         const info = listItemInfo(lines[index], options);
         if (!info || info.indent !== indent || info.type !== tag) break;
 
-        let itemHtml = info.taskChecked === null
+        let itemHtml = options.editableListItem
+            ? options.editableListItem(lines[index], Number(options.sourceStartLine || 1) + index, info)
+            : info.taskChecked === null
             ? inlineMarkdown(info.content, options)
             : `<input type="checkbox" disabled${info.taskChecked ? ' checked' : ''}> ${inlineMarkdown(info.content, options)}`;
         const itemClass = info.taskChecked === null ? '' : ' class="task-list-item"';
@@ -1115,6 +1131,7 @@ function renderMarkdownListAt(lines, startIndex, indent, options = {}) {
 }
 
 function renderMarkdownListBlock(block, options = {}) {
+    options = { ...options, sourceStartLine: block.startLine };
     let html = '';
     let index = 0;
     while (index < block.lines.length) {
@@ -1211,7 +1228,7 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
             return block;
         }
         if (block) {
-            return { html: renderFencedCodeBlock(block), endLine: block.endLine };
+            return { html: options.editableCodeBlock?.(block, lineNumber) ?? renderFencedCodeBlock(block), endLine: block.endLine };
         }
     }
     if (htmlBlockTagName(line)) {
@@ -1220,7 +1237,7 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
             return block;
         }
         if (block) {
-            return { html: sanitizeHtml(block.html, options), endLine: block.endLine };
+            return { html: options.editableHtmlBlock?.(block, lineNumber) ?? sanitizeHtml(block.html, options), endLine: block.endLine };
         }
     }
     if (isDisplayMathFence(line)) {
@@ -1275,7 +1292,9 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
             paragraphLines.push(nextLine);
             endLine = i;
         }
-        const innerHtml = paragraphLines.map(l => inlineMarkdown(l, options)).join('<br>');
+        const innerHtml = paragraphLines.map((l, index) => options.editableParagraphLine
+            ? options.editableParagraphLine(l, lineNumber + index)
+            : inlineMarkdown(l, options)).join('<br>');
         return { html: `<p>${innerHtml}</p>`, endLine };
     }
 

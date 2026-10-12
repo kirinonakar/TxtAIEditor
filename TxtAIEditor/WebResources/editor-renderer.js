@@ -11,6 +11,7 @@ import {
     queueRender,
     requestMissingLines,
     requestFoldingLines,
+    searchController,
     selectionController,
     state,
     syncFolding,
@@ -41,6 +42,7 @@ import {
 } from './editor-csv-table.js';
 import { isPointOnScrollContainerScrollbar } from './editor-caret.js';
 import { createFullHtmlLivePreviewRenderer } from './editor-html-live-preview.js';
+import { renderEditableMarkdownLine, renderGroupedEditableMarkdown, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
 
 function createEditorRenderer({
     findEditablePreviewBlockContaining,
@@ -58,6 +60,7 @@ function createEditorRenderer({
     let horizontalOverflowFrame = 0;
     const livePreviewProcessedImages = new Set();
     const livePreviewFailedImages = new Set();
+    let lastPreviewPaint = null;
     const fullHtmlLivePreview = createFullHtmlLivePreviewRenderer();
 
     function ensureHexStickyHeader() {
@@ -173,6 +176,7 @@ function createEditorRenderer({
 
     function render() {
         if (!state.initialized) return;
+        if (usesMarkdownPreviewEditing(state) && state.markdownPreviewPointerActive && !selectionController.isSelecting) return;
 
         const printContainer = document.getElementById('print-container');
         if (printContainer && printContainer.style.display === 'block') {
@@ -184,11 +188,13 @@ function createEditorRenderer({
         // WebView2 treats that disconnect as an IME commit boundary and Korean
         // syllables can be committed as separate jamo. Defer every DOM render
         // until compositionend instead of trying to detach/preserve the row.
-        if ((imeController.isComposing && imeController.compositionLine) || imeController.rangeComposition) {
+        const preserveComposition = usesMarkdownPreviewEditing(state) && imeController.isComposing &&
+            !imeController.rangeComposition && !imeController.columnComposition;
+        if (((imeController.isComposing && imeController.compositionLine) && !preserveComposition) || imeController.rangeComposition) {
             return;
         }
 
-        if (syncFolding()) setupVirtualHeight();
+        if (!preserveComposition && syncFolding()) setupVirtualHeight();
 
         if (fullHtmlLivePreview.renderIfActive()) {
             return;
@@ -213,6 +219,13 @@ function createEditorRenderer({
         const livePreviewContextLines = state.inlineLivePreviewEnabled ? 120 : 0;
         let renderStart = Math.max(1, range.start - livePreviewContextLines);
         let renderEnd = range.end;
+        if (usesMarkdownPreviewEditing(state)) {
+            const containingBlock = findEditablePreviewBlockContaining(renderStart, state.lineCount,
+                line => state.cache.get(line), { tabSize: state.tabSize || 4 });
+            if (containingBlock && ['list', 'table', 'paragraph', 'code'].includes(containingBlock.kind)) {
+                renderStart = containingBlock.startLine;
+            }
+        }
         if (csvTableMode.isEnabled) {
             const csvOverscan = 30;
             const firstVisibleCsvLine = lineAt(scrollContainer.scrollTop);
@@ -231,6 +244,13 @@ function createEditorRenderer({
         const activeLine = isFocused ? Number(activeEl.dataset.line) : null;
         const activeCaret = isFocused ? getCaretOffset(activeEl) : 0;
         const getCachedLine = lineNumber => state.cache.has(lineNumber) ? state.cache.get(lineNumber) : undefined;
+        const editInPreview = usesMarkdownPreviewEditing(state);
+        const preservePointerPaint = editInPreview && state.markdownPreviewPointerActive && lastPreviewPaint &&
+            lastPreviewPaint.scrollTop === scrollContainer.scrollTop &&
+            lastPreviewPaint.scrollLeft === scrollContainer.scrollLeft &&
+            lastPreviewPaint.width === scrollContainer.clientWidth &&
+            lastPreviewPaint.height === scrollContainer.clientHeight &&
+            lastPreviewPaint.revision === state.cache.revision;
         const requestedSourceLine = state.inlineLivePreviewEnabled
             ? (state.inlineLivePreviewSourceLine || 0)
             : 0;
@@ -261,8 +281,18 @@ function createEditorRenderer({
         // Full-document caret moves already patch editing-row in place. Including
         // focus here rebuilds every row on the first scroll after the host focuses
         // the editor, even though neither the text nor the rendered range changed.
-        const focusRenderKey = renderFullDocument ? '' : `${activeLine || 0}:${state.editingLine || 0}`;
-        const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${virtualHeightRenderKey}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${focusRenderKey}:${sourceLine}:${editablePreviewBlockKey}:${csvModeKey}:${foldingController.version}`;
+        const stablePreviewLayout = editInPreview && (!editablePreviewBlock || ['list', 'table', 'paragraph'].includes(editablePreviewBlock.kind) ||
+            (editablePreviewBlock.kind === 'code' && !['math', 'latex', 'mermaid'].includes(editablePreviewBlock.language?.toLowerCase())));
+        const focusRenderKey = renderFullDocument || stablePreviewLayout ? '' : `${activeLine || 0}:${state.editingLine || 0}`;
+        const searchRenderKey = JSON.stringify([searchController.query, searchController.documentVersion, searchController.matches.length,
+            searchController.activeMatch?.lineNumber, searchController.activeMatch?.indexOfMatch, searchController.activeMatch?.matchLength]);
+        const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${virtualHeightRenderKey}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${editInPreview}:${focusRenderKey}:${stablePreviewLayout ? 0 : sourceLine}:${stablePreviewLayout ? '' : editablePreviewBlockKey}:${csvModeKey}:${foldingController.version}:${searchRenderKey}`;
+        if (preservePointerPaint) {
+            // Account for completed measurements without rebuilding unchanged
+            // visible nodes, during the drag or on its following focus frame.
+            viewportController.acceptRangeKey(rangeKey);
+            return;
+        }
         if (!csvTableMode.isEnabled || !isJsonCsvTableMode()) {
             requestMissingLines(renderStart, renderEnd);
             trimHexCacheToRange(renderStart, renderEnd);
@@ -274,9 +304,14 @@ function createEditorRenderer({
             return;
         }
 
-        const composingRow = imeController.isComposing && imeController.compositionLine
-            ? viewport.querySelector(`.line-row[data-line="${imeController.compositionLine}"]`)
+        const composingRow = preserveComposition
+            ? viewport.querySelector(`.line-text[data-line="${imeController.compositionLine}"]`)?.closest('.line-row')
             : null;
+        if (preserveComposition && !composingRow) return;
+        const previousViewportTop = Number(/translateY\(([-\d.]+)/.exec(viewport.style.transform)?.[1] || 0);
+        const compositionDocumentTop = composingRow
+            ? Number(composingRow.dataset.compositionDocumentTop ?? (previousViewportTop + composingRow.offsetTop))
+            : 0;
 
         const offsetY = viewportTopForLine(renderStart);
         viewport.style.transform = renderFullDocument ? 'none' : `translateY(${offsetY}px)`;
@@ -305,14 +340,20 @@ function createEditorRenderer({
         let viewportLayoutStart = state.inlineLivePreviewEnabled ? livePreviewLayoutStart : renderStart;
         let livePreviewContextAnchorRow = '';
         const livePreviewSkipRef = { val: 0 };
+        let groupedPreviewEnd = 0;
+        let groupedHeightsChanged = false;
         for (let line = renderStart; line <= renderEnd; line++) {
+            if (editInPreview && line <= groupedPreviewEnd) {
+                if (livePreviewContextAnchorRow) {
+                    rows.push(livePreviewContextAnchorRow);
+                    livePreviewContextAnchorRow = '';
+                }
+                line = groupedPreviewEnd;
+                continue;
+            }
             const hiddenFold = foldingController.containing(line);
             if (hiddenFold) {
                 line = hiddenFold.end;
-                continue;
-            }
-            if (composingRow && line === imeController.compositionLine) {
-                rows.push(`<div class="line-row-placeholder" data-line="${line}"></div>`);
                 continue;
             }
 
@@ -335,7 +376,7 @@ function createEditorRenderer({
             const selectionBounds = selectionBoundsForLine(line, displayText.length);
             const isInSelection = !!selectionBounds;
             const isSelectedEmptyLine = isInSelection && displayText.length === 0 && hasCustomSelection();
-            const textClass = `line-text${hasLine ? '' : ' loading'}${isLong ? ' long-line' : ''}${isTruncatedLongLine ? ' truncated-long-line' : ''}`;
+            let textClass = `line-text${hasLine ? '' : ' loading'}${isLong ? ' long-line' : ''}${isTruncatedLongLine ? ' truncated-long-line' : ''}`;
             const longLineAttributes = isTruncatedLongLine
                 ? ` data-long-line-message="${escapeHtml(longLineMessage)}" title="${escapeHtml(longLineMessage)}"`
                 : '';
@@ -369,6 +410,8 @@ function createEditorRenderer({
             let livePreviewClass = '';
             let liveContentEditable = contentEditable;
             let livePreviewAttributes = '';
+            let previewDecoration = '';
+            let editableLineNumber = line;
             let renderedLivePreviewLine = null;
             if (isEditablePreviewBlockLine) {
                 const blockEdgeClass = `${line === editablePreviewBlock.startLine ? ' live-preview-source-block-start' : ''}${line === editablePreviewBlock.endLine ? ' live-preview-source-block-end' : ''}`;
@@ -404,6 +447,23 @@ function createEditorRenderer({
                 requireClosedFence: true,
                 sourceLine: sourceLine
             };
+
+            if (editInPreview && isInlineLivePreviewSourceLine) {
+                livePreviewClass += ' live-preview-row markdown-preview-edit-row';
+                // Keep rendered math/diagrams visible while their source is
+                // edited. Decorations live outside line-text so they never
+                // enter source columns, clipboard text, or saved Markdown.
+                if (isEditablePreviewBlockLine && line === editablePreviewBlock.startLine &&
+                    (editablePreviewBlock.kind === 'math' ||
+                        (editablePreviewBlock.kind === 'code' &&
+                            ['math', 'latex', 'mermaid'].includes(editablePreviewBlock.language?.toLowerCase())))) {
+                    const preview = renderPreviewLineAt(line, state.lineCount, getCachedLine,
+                        { ...livePreviewOptions, sourceLine: 0 }, { val: 0 });
+                    if (!preview.pending && !preview.source) {
+                        previewDecoration = `<div class="md-preview-block-decoration" contenteditable="false">${preview.html}</div>`;
+                    }
+                }
+            }
 
             if (state.inlineLivePreviewEnabled && hasLine && shouldShowSource && !isLong && !imeController.isComposing) {
                 if (!isEditablePreviewBlockLine && line !== sourceLine && !foldingController.collapsedRange(line)) {
@@ -444,6 +504,49 @@ function createEditorRenderer({
                             : ' live-preview-row';
                 }
             }
+            if (editInPreview && hasLine && !isLong && !foldingController.collapsedRange(line)) {
+                const grouped = renderGroupedEditableMarkdown(line, state, livePreviewOptions, groupedPreviewEnd);
+                const ownsMultilineHtml = !grouped.pending && !grouped.source && grouped.endLine > line &&
+                    !['code', 'math'].includes(findEditablePreviewBlockContaining(line, state.lineCount, getCachedLine, livePreviewOptions)?.kind);
+                if (grouped.empty || grouped.skipped || ownsMultilineHtml || /<(?:span|tr) class="line-text md-preview-embedded-line(?: |")/.test(grouped.html || '')) {
+                    renderedLivePreviewLine = grouped;
+                    groupedPreviewEnd = Math.max(groupedPreviewEnd, grouped.endLine || line);
+                    // The block's full height belongs to its first source row.
+                    // Covered rows must be zero even outside the DOM window;
+                    // otherwise long lists/tables add phantom blank scroll space.
+                    for (let covered = line + 1; covered <= groupedPreviewEnd; covered++) {
+                        groupedHeightsChanged = viewportController.setMeasuredLineHeight(covered, 0, state.lineCount) || groupedHeightsChanged;
+                    }
+                    if (grouped.extendRangeEnd > renderEnd) {
+                        requestMissingLines(renderEnd + 1, grouped.extendRangeEnd);
+                        renderEnd = Math.min(state.lineCount, grouped.extendRangeEnd);
+                    }
+                    lineContent = grouped.html || '';
+                    liveContentEditable = 'false';
+                    livePreviewClass = grouped.skipped ? ' live-preview-skipped' : ' live-preview-row markdown-preview-group-row';
+                    textClass = 'md-preview-block';
+                    livePreviewAttributes = '';
+                    previewDecoration = '';
+                    if (grouped.empty) {
+                        editableLineNumber = sourceLine >= line && sourceLine <= groupedPreviewEnd ? sourceLine : line;
+                        lineContent = renderEditableMarkdownLine(state.cache.get(editableLineNumber) || '', editableLineNumber, state);
+                        liveContentEditable = state.readOnly ? 'false' : 'true';
+                        livePreviewClass = ' live-preview-row live-preview-empty markdown-preview-edit-row';
+                        textClass = 'line-text';
+                    }
+                } else if (!grouped.pending && !grouped.source && grouped.endLine === line &&
+                    !['code', 'math'].includes(findEditablePreviewBlockContaining(line, state.lineCount, getCachedLine, livePreviewOptions)?.kind)) {
+                    lineContent = renderEditableMarkdownLine(text, line, state);
+                    liveContentEditable = contentEditable;
+                    livePreviewClass = ' live-preview-row markdown-preview-edit-row';
+                    livePreviewAttributes = '';
+                    previewDecoration = '';
+                }
+            }
+            if (editInPreview) {
+                lineContent = wrapPreviewHtmlSearchMatches(lineContent, line,
+                    renderedLivePreviewLine?.endLine || line, true);
+            }
             const dirtyType = !state.showDirtyLines || state.language === 'hex'
                 ? null
                 : state.dirtyLines.get(line);
@@ -467,8 +570,9 @@ function createEditorRenderer({
             const rowHtml =
                 `<div class="line-row${collapsedFold ? ' folded-row' : ''}${livePreviewClass}${editingClass}${hoveredClass}${isInSelection ? ' selected-row' : ''}${isSelectedEmptyLine ? ' selected-empty-row' : ''}${dirtyClass}" data-line="${line}"${livePreviewAttributes}>` +
                 `<div class="line-number">${foldToggle}${line}</div>` +
-                `<div class="${textClass}" contenteditable="${liveContentEditable}" spellcheck="false" data-line="${line}"${longLineAttributes}>${lineContent}</div>` +
+                `<div class="${textClass}" contenteditable="${liveContentEditable}" spellcheck="false" data-line="${editableLineNumber}"${longLineAttributes}>${lineContent}</div>` +
                 foldSummary +
+                previewDecoration +
                 `</div>`;
 
             if (state.inlineLivePreviewEnabled && line < livePreviewLayoutStart) {
@@ -494,32 +598,54 @@ function createEditorRenderer({
             rows.push(rowHtml);
         }
 
+        if (livePreviewContextAnchorRow) rows.push(livePreviewContextAnchorRow);
+        if (groupedHeightsChanged) setupVirtualHeight();
         viewport.style.transform = renderFullDocument
             ? 'none'
             : `translateY(${viewportTopForLine(viewportLayoutStart)}px)`;
-        viewport.innerHTML = rows.join('');
+        if (preserveComposition && composingRow) {
+            const template = document.createElement('template');
+            template.innerHTML = rows.join('');
+            const nextRows = [...template.content.children];
+            const composingIndex = nextRows.findIndex(row => row.dataset.line === composingRow.dataset.line);
+            // Never move, detach, or rewrite the IME-owned row. Other rows can
+            // be replaced around it, even when the user scrolls far away.
+            for (const row of [...viewport.children]) {
+                if (row !== composingRow) row.remove();
+            }
+            if (composingIndex >= 0) {
+                composingRow.style.removeProperty('position');
+                composingRow.style.removeProperty('top');
+                delete composingRow.dataset.compositionDocumentTop;
+                nextRows.forEach((row, index) => {
+                    if (index < composingIndex) viewport.insertBefore(row, composingRow);
+                    else if (index > composingIndex) viewport.appendChild(row);
+                });
+            } else {
+                composingRow.dataset.compositionDocumentTop = String(compositionDocumentTop);
+                composingRow.style.position = 'absolute';
+                composingRow.style.top = `${compositionDocumentTop - viewportTopForLine(viewportLayoutStart)}px`;
+                nextRows.forEach(row => viewport.appendChild(row));
+            }
+        } else {
+            viewport.innerHTML = rows.join('');
+        }
         viewportController.setRenderedRange(renderStart, renderEnd);
         syncHorizontalOverflow();
 
-        if (composingRow) {
-            const placeholder = viewport.querySelector(`.line-row-placeholder[data-line="${imeController.compositionLine}"]`);
-            if (placeholder) {
-                placeholder.replaceWith(composingRow);
-            }
-        }
         refreshHoveredLineFromLastPointer();
 
-        watchLivePreviewImages();
+        if (!preserveComposition) watchLivePreviewImages();
         if (renderFullDocument) {
             setupVirtualHeight();
         } else {
             measureRenderedRows(true);
         }
-        renderMermaidBlocks(viewport, () => measureRenderedRows(true, true));
+        if (!preserveComposition) renderMermaidBlocks(viewport, () => measureRenderedRows(true, true));
 
-        if (pendingInlineLivePreviewFocus) {
+        if (!preserveComposition && pendingInlineLivePreviewFocus) {
             focusPendingInlineLivePreviewLine();
-        } else if (isFocused && activeLine !== null) {
+        } else if (!preserveComposition && isFocused && activeLine !== null) {
             const targetLine = activeLine === state.currentLine ? activeLine : state.currentLine;
             const targetCaret = activeLine === state.currentLine ? activeCaret : Math.max(0, state.currentColumn - 1);
             const element = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
@@ -528,12 +654,15 @@ function createEditorRenderer({
             }
         }
 
-        drawEditableSelectionOverlays();
+        if (!preserveComposition) drawEditableSelectionOverlays();
         if (state.foldScrollRestore) {
             scrollContainer.scrollTop = state.foldScrollRestore.top;
             scrollContainer.scrollLeft = state.foldScrollRestore.left;
             state.foldScrollRestore = null;
         }
+        if (editInPreview) lastPreviewPaint = { scrollTop: scrollContainer.scrollTop,
+            scrollLeft: scrollContainer.scrollLeft, width: scrollContainer.clientWidth,
+            height: scrollContainer.clientHeight, revision: state.cache.revision };
     }
 
     function focusLineWithRetry(lineNumber, columnZeroBased, retries = 20, focusToken = 0) {
@@ -762,7 +891,13 @@ function createEditorRenderer({
                 livePreviewProcessedImages.add(imageKey);
                 if (!loaded) {
                     livePreviewFailedImages.add(imageKey);
-                    img.replaceWith(document.createTextNode(img.getAttribute('alt') || ''));
+                    if (img.closest('.markdown-preview-edit-row .line-text, .md-preview-embedded-line')) {
+                        // The alt text already belongs to the hidden Markdown
+                        // source. Adding another text node would corrupt saves.
+                        img.remove();
+                    } else {
+                        img.replaceWith(document.createTextNode(img.getAttribute('alt') || ''));
+                    }
                 }
                 viewportController.invalidateRenderRange();
                 measureRenderedRows(true, true);

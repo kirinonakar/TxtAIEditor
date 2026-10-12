@@ -45,7 +45,7 @@ export class ViewportController {
 
     lineHeightFor(lineNumber, { useMeasured = false } = {}) {
         return useMeasured
-            ? (this.#measuredLineHeights.get(Number(lineNumber)) || this.#lineHeight)
+            ? (this.#measuredLineHeights.get(Number(lineNumber)) ?? this.#lineHeight)
             : this.#lineHeight;
     }
 

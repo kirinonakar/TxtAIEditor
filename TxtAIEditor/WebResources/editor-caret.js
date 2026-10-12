@@ -17,6 +17,7 @@ import {
     viewportController
 } from './editor-core.js';
 import { scrollContainer, viewport } from './editor-dom.js';
+import { markdownPreviewTextPosition, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
 import {
     drawEditableSelectionOverlays,
     normalizeSelection
@@ -50,6 +51,12 @@ function makeEditablePlainText(element, caretColumn = null, restoreCaret = true)
         : Math.max(0, Math.min(Number(caretColumn || 0), text.length));
     const lineNumber = Number(element.dataset.line || state.currentLine || 1);
     state.editingLine = lineNumber;
+
+    // Preserve the native editable subtree, especially before compositionstart.
+    if (usesMarkdownPreviewEditing(state)) {
+        if (restoreCaret && caretColumn !== null && !imeController.isComposing) setCaret(element, column);
+        return { text, column };
+    }
 
     const needsFlatten = element.childNodes.length !== 1 ||
         element.firstChild?.nodeType !== Node.TEXT_NODE ||
@@ -161,6 +168,13 @@ function compositionSelectionRange(includeNativeSelection = true) {
 }
 
 function getCaretOffsetFromPoint(element, clientX, clientY) {
+    const textLength = lineTextFromElement(element).length;
+    // A block heading or a full-width editable row can return its opening
+    // boundary from native hit-testing when the pointer is in the empty area.
+    // Compare with the actual final caret, rather than the row's box width.
+    const endRect = caretRectForOffset(element, textLength, clientY);
+    if (endRect?.height > 0 && clientY >= endRect.top && clientY <= endRect.bottom &&
+        clientX >= endRect.right) return textLength;
     let range = null;
     if (document.caretRangeFromPoint) {
         range = document.caretRangeFromPoint(clientX, clientY);
@@ -191,10 +205,29 @@ function getCaretOffsetFromPoint(element, clientX, clientY) {
     }
 
     const rect = element.getBoundingClientRect();
-    const textLength = lineTextFromElement(element).length;
     if (clientX <= rect.left) return 0;
     if (clientX >= rect.right) return textLength;
     return Math.round(((clientX - rect.left) / Math.max(1, rect.width)) * textLength);
+}
+
+function lineElementAtHeight(row, clientY) {
+    const elements = row.querySelectorAll('.line-text');
+    let best = elements[0] || null;
+    let bestDistance = Infinity;
+    for (const element of elements) {
+        const fragments = Array.from(element.getClientRects());
+        if (!fragments.length) fragments.push(element.getBoundingClientRect());
+        for (const rect of fragments) {
+            if (rect.height <= 0) continue;
+            const distance = Math.max(rect.top - clientY, clientY - rect.bottom, 0) +
+                Math.abs(clientY - (rect.top + rect.bottom) / 2) * 0.001;
+            if (distance < bestDistance) {
+                best = element;
+                bestDistance = distance;
+            }
+        }
+    }
+    return best;
 }
 
 function lineElementFromEvent(event) {
@@ -236,7 +269,7 @@ function positionFromPointer(event) {
         const hit = document.elementFromPoint(event.clientX, event.clientY);
         const row = hit?.closest?.('.line-row');
         if (row) {
-            element = row.querySelector('.line-text');
+            element = hit.closest?.('.line-text') || lineElementAtHeight(row, event.clientY);
         }
         if (!element) {
             const rows = viewport.querySelectorAll('.line-row');
@@ -245,14 +278,14 @@ function positionFromPointer(event) {
             let bestDist = Infinity;
             for (const r of rows) {
                 const rect = r.getBoundingClientRect();
-                const mid = rect.top + rect.height / 2;
-                const dist = Math.abs(event.clientY - mid);
+                if (rect.height <= 0) continue;
+                const dist = Math.max(rect.top - event.clientY, event.clientY - rect.bottom, 0);
                 if (dist < bestDist) {
                     bestDist = dist;
                     bestRow = r;
                 }
             }
-            element = bestRow.querySelector('.line-text');
+            element = lineElementAtHeight(bestRow, event.clientY);
         }
     }
     if (!element) return null;
@@ -343,7 +376,12 @@ function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = tr
         return false;
     }
 
-    if (!walk(element)) {
+    const previewPosition = markdownPreviewTextPosition(element, offset,
+        offset < getCaretOffset(element) ? -1 : 1);
+    if (previewPosition) {
+        range.setStart(previewPosition.node, previewPosition.offset);
+        range.collapse(true);
+    } else if (!walk(element)) {
         range.selectNodeContents(element);
         range.collapse(false);
     }
@@ -405,7 +443,7 @@ function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = tr
     const preserveSelectionInputContext = selectionController.isSelecting || !!selectionController.selection?.isColumn;
     if (oldActiveLine !== null && oldActiveLine !== state.editingLine && !preserveSelectionInputContext) {
         if (!fullDocumentEditingRowPatched) {
-            queueRender(true);
+            queueRender(!usesMarkdownPreviewEditing(state));
         }
     } else {
         drawEditableSelectionOverlays();
@@ -431,6 +469,8 @@ function revealCaretHorizontally(element, offset) {
 }
 
 function textPositionForOffset(element, offset) {
+    const previewPosition = markdownPreviewTextPosition(element, offset);
+    if (previewPosition) return previewPosition;
     let remaining = Math.max(0, Number(offset || 0));
     let lastText = null;
 
@@ -637,7 +677,7 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0, affinity =
         state.inlineLivePreviewSourceLine = state.editingLine;
         const targetLine = state.editingLine;
         const targetColumn = Math.max(0, Number(columnZeroBased || 0));
-        queueRender(true);
+        queueRender(!usesMarkdownPreviewEditing(state));
         requestAnimationFrame(() => {
             const element = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
             if (element && element.getAttribute('contenteditable') === 'true') {
@@ -739,7 +779,8 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0, affinity =
 
 function keepElementInView(element) {
     const containerRect = scrollContainer.getBoundingClientRect();
-    const rect = element.closest('.line-row')?.getBoundingClientRect() || element.getBoundingClientRect();
+    const rect = element.dataset.markdownPreviewLine ? element.getBoundingClientRect()
+        : element.closest('.line-row')?.getBoundingClientRect() || element.getBoundingClientRect();
     if (rect.top < containerRect.top) {
         scrollContainer.scrollTop -= visualScrollDeltaToScrollTopDelta(containerRect.top - rect.top);
     } else if (rect.bottom > containerRect.bottom) {

@@ -55,7 +55,8 @@ import {
     setCaret,
     setNativeSelectionRangeInElement
 } from './editor-caret.js';
-import { renderLineContent } from './editor-highlighter.js';
+import { highlightPreviewSearchInElement, renderLineContent } from './editor-highlighter.js';
+import { markdownPreviewDeleteRange, needsMarkdownPreviewBlockRefresh, updateGroupedMarkdownElement } from './editor-markdown-preview-edit.js';
 import {
     activeColumnSelection,
     cloneEditorSelection,
@@ -147,6 +148,14 @@ function commitLine(element) {
     const text = lineTextFromElement(element);
     const textChanged = previousText !== text;
 
+    if (!isComposing && element.dataset.markdownPreviewLine === 'code-empty') {
+        if (textChanged) {
+            const inserted = text.endsWith(previousText) ? text.slice(0, text.length - previousText.length) : text;
+            insertIntoEmptyPreviewCode(element, inserted);
+        }
+        return null;
+    }
+
     const isInlineLivePreviewActiveLine = state.inlineLivePreviewEnabled &&
         state.inlineLivePreviewSourceLine === lineNumber;
 
@@ -160,7 +169,7 @@ function commitLine(element) {
         // cache 및 C# 문서 모델 delta는 compositionend에서 한 번만 확정한다.
     } else if (textChanged) {
         state.cache.set(lineNumber, text);
-        if (!isInlineLivePreviewActiveLine) {
+        if (!isInlineLivePreviewActiveLine || needsMarkdownPreviewBlockRefresh(state, lineNumber)) {
             state.cacheVersion++;
         }
     }
@@ -193,6 +202,7 @@ function commitLine(element) {
 
     postLineUpdate(lineNumber, previousText, text);
     post({ type: 'contentChanged' });
+    if (needsMarkdownPreviewBlockRefresh(state, lineNumber)) queueRender(true);
     reportCursorAndSelection(element, caretOffset);
 
     if (state.wordWrap) {
@@ -456,6 +466,14 @@ function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, toke
 }
 
 function splitCurrentLine(element, options = {}) {
+    if (element?.dataset.markdownPreviewLine === 'code-empty' && !hasCustomSelection()) {
+        insertIntoEmptyPreviewCode(element, '');
+        return;
+    }
+    if (element?.dataset.markdownPreviewLine === 'table' && !hasCustomSelection()) {
+        insertPlainTextByModel(element, '<br>');
+        return;
+    }
     // A held Enter can start the next split before the previous render-pass
     // restoration has fired.  Invalidate older restorations so they cannot move
     // focus/scroll back to an earlier line and make the caret appear to climb.
@@ -571,12 +589,14 @@ function splitCurrentLine(element, options = {}) {
     state.editingLine = nextLineNumber;
 
     if (useElementCaret && element.isConnected) {
-        element.innerHTML = renderLineContent(lineNumber, before);
+        if (!updateGroupedMarkdownElement(element, before, state)) element.innerHTML = renderLineContent(lineNumber, before);
     }
 
     const immediateTarget = viewport.querySelector(`.line-text[data-line="${nextLineNumber}"]`);
     if (immediateTarget && immediateTarget.getAttribute('contenteditable') === 'true') {
-        immediateTarget.innerHTML = renderLineContent(nextLineNumber, indentedAfter);
+        if (!updateGroupedMarkdownElement(immediateTarget, indentedAfter, state)) {
+            immediateTarget.innerHTML = renderLineContent(nextLineNumber, indentedAfter);
+        }
         setCaret(immediateTarget, nextCaretColumn);
     }
 
@@ -622,6 +642,10 @@ function insertTextAtCaret(text, options = {}) {
         }
     }
     const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    if (element?.dataset.markdownPreviewLine === 'table') {
+        insertPlainTextByModel(element, normalized);
+        return;
+    }
     if (!element || element.getAttribute('contenteditable') !== 'true') {
         const targetLine = state.currentLine || 1;
         const currentText = state.cache.get(targetLine) ?? '';
@@ -738,8 +762,32 @@ function insertTextAtCaret(text, options = {}) {
     insertPlainTextByModel(element, normalized);
 }
 
+function insertIntoEmptyPreviewCode(element, text) {
+    const position = { line: Number(element.dataset.line), column: 0 };
+    const inserted = String(text || '');
+    replaceSelectionWith({ start: position, end: position }, inserted + '\n',
+        { startOffset: inserted.length, endOffset: inserted.length });
+    const editVersion = state.cacheVersion;
+    // Finish the placeholder after the IME event returns, before another key
+    // can arrive ahead of the queued viewport paint and insert a second row.
+    queueMicrotask(() => {
+        if (!element.isConnected || imeController.isComposing || state.cacheVersion !== editVersion) return;
+        element.dataset.markdownPreviewLine = 'code';
+        updateGroupedMarkdownElement(element, state.cache.get(position.line) || '', state);
+        highlightPreviewSearchInElement(element, position.line);
+        if (state.currentLine === position.line) setCaret(element, Math.max(0, state.currentColumn - 1));
+    });
+}
+
 function insertPlainTextByModel(element, text) {
     if (!element || element.getAttribute('contenteditable') !== 'true') return;
+    if (element.dataset.markdownPreviewLine === 'code-empty' && !hasCustomSelection()) {
+        insertIntoEmptyPreviewCode(element, text);
+        return;
+    }
+    if (element.dataset.markdownPreviewLine === 'table') {
+        text = String(text || '').replace(/\r\n?|\n/g, '<br>').replace(/\|/g, '\\|');
+    }
     if (hasCustomSelection()) {
         const sel = normalizeSelection();
         if (sel) replaceSelectionWith(sel, text || '');
@@ -778,13 +826,17 @@ function updateSingleLine(element, text, caretColumn) {
         nextText.length > MAX_RENDER_CHARS) {
         element.textContent = nextText;
     } else {
-        element.innerHTML = renderLineContent(lineNumber, nextText);
+        if (!updateGroupedMarkdownElement(element, nextText, state)) {
+            element.innerHTML = renderLineContent(lineNumber, nextText);
+        }
+        highlightPreviewSearchInElement(element, lineNumber);
     }
 
     setCaret(element, nextColumn);
 
     postLineUpdate(lineNumber, previousText, nextText);
     post({ type: 'contentChanged' });
+    if (needsMarkdownPreviewBlockRefresh(state, lineNumber)) queueRender(true);
 
     if (state.wordWrap) {
         measureRenderedRows(false);
@@ -890,6 +942,7 @@ function mergeLineForward(element) {
         queueLineAction({ kind: 'mergeForward', lineNumber, currentText: text });
         return;
     }
+    if (element.dataset.markdownPreviewLine === 'code' && /^[ \t]*(?:`{3,}|~{3,})/.test(nextText)) return;
 
     applyMergeLineForward(lineNumber, text, nextText);
 }
@@ -904,6 +957,7 @@ function mergeLineBackward(element) {
         queueLineAction({ kind: 'mergeBackward', lineNumber, currentText: current });
         return;
     }
+    if (element.dataset.markdownPreviewLine === 'code' && /^[ \t]*(?:`{3,}|~{3,})/.test(previous)) return;
 
     applyMergeLineBackward(lineNumber, previous, current);
 }
@@ -927,6 +981,14 @@ function deleteForwardAtCaret(element = activeEditableElement()) {
 
     const text = lineTextFromElement(element);
     const caret = getCaretOffset(element);
+    const previewRange = markdownPreviewDeleteRange(element, caret, 1, graphemeDeleteStart, graphemeDeleteEnd);
+    if (previewRange) {
+        if (previewRange.merge) {
+            if (element.dataset.markdownPreviewLine !== 'table') mergeLineForward(element);
+        }
+        else updateSingleLine(element, text.slice(0, previewRange.start) + text.slice(previewRange.end), caret);
+        return;
+    }
     if (caret < text.length) {
         const delEnd = graphemeDeleteEnd(text, caret);
         updateSingleLine(element, text.slice(0, caret) + text.slice(delEnd), caret);
@@ -955,6 +1017,12 @@ function deleteBackwardAtCaret(element = activeEditableElement()) {
 
     const text = lineTextFromElement(element);
     const caret = getCaretOffset(element);
+    const previewRange = markdownPreviewDeleteRange(element, caret, -1, graphemeDeleteStart, graphemeDeleteEnd);
+    if (previewRange) {
+        updateSingleLine(element, text.slice(0, previewRange.start) + text.slice(previewRange.end), previewRange.start);
+        return;
+    }
+    if (element.dataset.markdownPreviewLine === 'table') return;
     if (caret > 0) {
         const tabSize = state.tabSize || 4;
         const prefix = text.slice(0, caret);

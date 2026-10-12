@@ -14,7 +14,8 @@ import {
     state,
     syncCustomSelectionClass
 } from './editor-core.js';
-import { renderLineContent } from './editor-highlighter.js';
+import { highlightPreviewSearchInElement, renderLineContent } from './editor-highlighter.js';
+import { markdownPreviewDeleteRange, updateGroupedMarkdownElement } from './editor-markdown-preview-edit.js';
 import {
     activeColumnSelection,
     hasCustomSelection,
@@ -31,6 +32,7 @@ import {
     focusLine,
     getCaretOffset,
     inputRangeInElement,
+    insertPlainTextByModel,
     isPendingImeSelectionCollapseFor,
     isSpaceInputEvent,
     lineElementFromEvent,
@@ -41,6 +43,7 @@ import {
     moveCaretVertical,
     replaceSelectionForCompositionStart,
     replaceSelectionWith,
+    resetModelRepeatState,
     setCaret,
     shouldSuppressNativeBeforeInput,
     updateSingleLine
@@ -70,7 +73,10 @@ export function bindTextInputEvents({ renderer }) {
         if (text.length > MAX_RENDER_CHARS) {
             element.textContent = text;
         } else {
-            element.innerHTML = renderLineContent(lineNumber, text);
+            if (!updateGroupedMarkdownElement(element, text, state)) {
+                element.innerHTML = renderLineContent(lineNumber, text);
+            }
+            highlightPreviewSearchInElement(element, lineNumber);
         }
         setCaret(element, inputSnapshot.caretOffset);
     }
@@ -89,6 +95,7 @@ export function bindTextInputEvents({ renderer }) {
         if (shouldSuppressNativeBeforeInput(event)) {
             return;
         }
+
         const element = lineElementFromEvent(event);
         if (element) {
             const pendingColumnText = !imeController.isComposing
@@ -163,6 +170,7 @@ export function bindTextInputEvents({ renderer }) {
     });
 
     viewport.addEventListener('compositionstart', event => {
+        resetModelRepeatState({ forComposition: true });
         cancelPendingColumnTextInputs();
         cancelAutocompleteCaretRestore();
         postCompositionNavigationInputGuard = null;
@@ -324,6 +332,13 @@ export function bindTextInputEvents({ renderer }) {
             return;
         }
 
+        if (element?.dataset.markdownPreviewLine === 'code-empty' && !hasCustomSelection()) {
+            event.preventDefault();
+            if (event.inputType === 'insertText') insertPlainTextByModel(element, event.data || '');
+            else if (['insertParagraph', 'insertLineBreak'].includes(event.inputType)) insertPlainTextByModel(element, '');
+            return;
+        }
+
         const columnSelection = activeColumnSelection();
         if (columnSelection && event.inputType?.startsWith('insert') &&
             event.inputType !== 'insertCompositionText' &&
@@ -380,6 +395,17 @@ export function bindTextInputEvents({ renderer }) {
 
             const caret = range ? range.start : getCaretOffset(target);
             makeEditablePlainText(target, caret);
+            const previewRange = markdownPreviewDeleteRange(target, caret,
+                event.inputType === 'deleteContentBackward' ? -1 : 1, graphemeDeleteStart, graphemeDeleteEnd);
+            if (previewRange) {
+                if (previewRange.merge) {
+                    if (target.dataset.markdownPreviewLine !== 'table') mergeLineForward(target);
+                }
+                else updateSingleLine(target, text.slice(0, previewRange.start) + text.slice(previewRange.end),
+                    event.inputType === 'deleteContentBackward' ? previewRange.start : caret);
+                return;
+            }
+            if (target.dataset.markdownPreviewLine === 'table') return;
             if (event.inputType === 'deleteContentBackward') {
                 if (caret > 0) {
                     const tabSize = state.tabSize || 4;
@@ -407,6 +433,17 @@ export function bindTextInputEvents({ renderer }) {
         }
 
         if (!hasCustomSelection()) {
+            if (element?.dataset.markdownPreviewLine === 'table' &&
+                ['insertLineBreak', 'insertParagraph'].includes(event.inputType)) {
+                event.preventDefault();
+                insertPlainTextByModel(element, '<br>');
+                return;
+            }
+            if (element?.dataset.markdownPreviewLine === 'table' && event.inputType === 'insertText') {
+                event.preventDefault();
+                insertPlainTextByModel(element, event.data || '');
+                return;
+            }
             if (element && element.getAttribute('contenteditable') === 'true' && event.inputType?.startsWith('insert')) {
                 makeEditablePlainText(element);
             }

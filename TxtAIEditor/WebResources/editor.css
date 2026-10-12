@@ -905,6 +905,160 @@ body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-
     overflow: hidden;
 }
 
+.markdown-preview-edit-row .md-preview-syntax {
+    display: none;
+}
+
+body.markdown-preview-editing.inline-live-preview-enabled .md-preview-syntax {
+    display: none;
+}
+
+.markdown-preview-group-row .md-preview-syntax {
+    display: none;
+}
+
+.markdown-preview-group-row .md-preview-content,
+.markdown-preview-edit-row .md-preview-content {
+    white-space: pre-wrap;
+}
+
+.markdown-preview-group-row .md-preview-html-content,
+.markdown-preview-edit-row .md-preview-html-content {
+    display: contents;
+    white-space: normal;
+}
+
+.markdown-preview-group-row .md-preview-code-content {
+    white-space: pre;
+}
+
+.markdown-preview-group-row .md-preview-content:empty::after,
+.markdown-preview-edit-row .md-preview-content:empty::after {
+    content: '\00a0';
+}
+
+.markdown-preview-group-row .md-preview-content.md-preview-br-anchor:empty::after,
+.markdown-preview-edit-row .md-preview-content.md-preview-br-anchor:empty::after {
+    content: '';
+}
+
+.live-preview-row .md-preview-block {
+    position: relative;
+    min-width: 0;
+    padding: 1px 10px 5px;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+}
+
+body .live-preview-row .line-text.md-preview-embedded-line,
+body.custom-selection-active .live-preview-row .line-text.md-preview-embedded-line[contenteditable="true"] {
+    display: inline;
+    position: static;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    font: inherit;
+    line-height: inherit;
+    white-space: inherit;
+    overflow: visible;
+    background: transparent;
+}
+
+body .live-preview-row tr.line-text.md-preview-embedded-line,
+body.custom-selection-active .live-preview-row tr.line-text.md-preview-embedded-line[contenteditable="true"] {
+    display: table-row;
+}
+
+body .live-preview-row .line-text.md-preview-html-boundary,
+body .live-preview-row .line-text.md-preview-code-fence {
+    display: none;
+}
+
+body:not(.hex-view-mode) .line-row.markdown-preview-group-row .line-text.md-preview-embedded-line[contenteditable="true"] {
+    background: transparent;
+}
+
+.inline-live-preview-enabled .markdown-preview-edit-row .line-text {
+    background: transparent;
+    white-space: pre-wrap;
+    cursor: text;
+}
+
+body.custom-selection-active.inline-live-preview-enabled .markdown-preview-edit-row .line-text[contenteditable="true"] {
+    background: transparent;
+}
+
+.markdown-preview-edit-row .md-preview-list {
+    display: inline-block;
+    position: relative;
+    padding-left: 2em;
+}
+
+.markdown-preview-edit-row .md-preview-list::before {
+    content: attr(data-marker);
+    position: absolute;
+    left: 0.35em;
+}
+
+.markdown-preview-edit-row .md-preview-link,
+.markdown-preview-group-row .md-preview-link {
+    color: #4da3ff;
+    text-decoration: underline;
+}
+
+.markdown-preview-edit-row .md-preview-code-line {
+    display: block;
+    padding: 0 4px;
+    background: var(--preview-code-bg);
+    white-space: pre-wrap;
+    font-family: var(--font-family);
+}
+
+.markdown-preview-edit-row.live-preview-source-code-fence,
+.markdown-preview-edit-row.live-preview-source-table-separator {
+    min-height: 4px;
+    height: 4px;
+}
+
+.markdown-preview-edit-row.live-preview-source-code-fence .line-text,
+.markdown-preview-edit-row.live-preview-source-code-fence .line-number,
+.markdown-preview-edit-row.live-preview-source-table-separator .line-text,
+.markdown-preview-edit-row.live-preview-source-table-separator .line-number {
+    min-height: 0;
+    height: 4px;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+    background: transparent;
+    border: 0;
+}
+
+.markdown-preview-edit-row .md-preview-table {
+    display: flex;
+    font-size: 0.9em;
+}
+
+.markdown-preview-edit-row .md-preview-cell {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 5px 10px;
+    border: 1px solid color-mix(in srgb, var(--fg) 35%, transparent);
+}
+
+.markdown-preview-edit-row .md-preview-cell-header {
+    background: color-mix(in srgb, var(--fg) 10%, transparent);
+    font-weight: 600;
+}
+
+.markdown-preview-edit-row .md-preview-block-decoration {
+    grid-column: 2;
+    padding: 4px 10px;
+    user-select: none;
+    pointer-events: none;
+}
+
 .line-row.live-preview-skipped .line-number,
 .line-row.live-preview-skipped .line-text {
     min-height: 0;
@@ -1040,6 +1194,10 @@ mark.active-match {
     background: #fd7e14;
     color: #ffffff;
     box-shadow: 0 0 3px rgba(253, 126, 20, 0.6);
+}
+
+.live-preview-row mark.search-match {
+    padding: 0;
 }
 
 .selection-fragment {

@@ -347,6 +347,9 @@
   <data name="SettingsLivePreview" xml:space="preserve">
     <value>默认启用预览</value>
   </data>
+  <data name="SettingsEditInMarkdownPreview" xml:space="preserve">
+    <value>在 Markdown 预览状态下编辑</value>
+  </data>
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>默认启用 Markdown 工具栏</value>
   </data>

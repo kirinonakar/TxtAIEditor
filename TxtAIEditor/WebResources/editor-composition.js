@@ -1,4 +1,5 @@
 import { ImePhase } from './editor-ime-state.js';
+import { updateGroupedMarkdownElement, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
 
 export function createEditorCompositionHandlers({
     activeColumnSelection,
@@ -222,7 +223,8 @@ function syncRenderedRowsAfterCompositionSelectionCollapse(startLine, endLine, n
                     if (state.cache.has(newLine)) {
                         // This row is outside the IME host. Re-highlight it after its line number
                         // shifts instead of flattening its syntax-token spans to plain text.
-                        textElement.innerHTML = renderLineContent(newLine, state.cache.get(newLine) || '');
+                        const text = state.cache.get(newLine) || '';
+                        if (!updateGroupedMarkdownElement(textElement, text, state)) textElement.innerHTML = renderLineContent(newLine, text);
                     }
                 }
             }
@@ -289,6 +291,14 @@ function prepareMultilineCompositionHost(selection = normalizeSelection()) {
         return null;
     }
 
+    if (usesMarkdownPreviewEditing(state)) {
+        // Keep selection view-only until input starts. The existing rich
+        // editable field can host deferred composition without flattening it.
+        setCaret(targetElement, start.column, 0, true, false);
+        drawEditableSelectionOverlays();
+        return targetElement;
+    }
+
     viewport.querySelectorAll('.range-composition-removed-row').forEach(row => {
         row.classList.remove('range-composition-removed-row');
     });
@@ -302,7 +312,8 @@ function prepareMultilineCompositionHost(selection = normalizeSelection()) {
         const lineNumber = Number(element.dataset.line || 0);
         if (lineNumber < normalized.start.line || lineNumber > normalized.end.line) continue;
         if (element.getAttribute('contenteditable') !== 'true') continue;
-        element.innerHTML = renderLineContent(lineNumber, state.cache.get(lineNumber) ?? lineTextFromElement(element));
+        const lineText = state.cache.get(lineNumber) ?? lineTextFromElement(element);
+        if (!updateGroupedMarkdownElement(element, lineText, state)) element.innerHTML = renderLineContent(lineNumber, lineText);
         if (lineNumber > start.line) {
             element.closest('.line-row')?.classList.add('range-composition-removed-row');
         }
@@ -540,7 +551,7 @@ function isLineInColumnComposition(lineNumber) {
 function updateVisibleLineTextDuringComposition(lineNumber, text, preserveElement = null) {
     const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
     if (!element || element === preserveElement || element.getAttribute('contenteditable') !== 'true') return;
-    element.innerHTML = renderLineContent(lineNumber, text);
+    if (!updateGroupedMarkdownElement(element, text, state)) element.innerHTML = renderLineContent(lineNumber, text);
 }
 
 function buildColumnCompositionLine(baseText, startCol, endCol, insertedText) {
@@ -925,7 +936,7 @@ function finishColumnComposition(element, lineNumber) {
         
         const element = viewport.querySelector(`.line-text[data-line="${bypassStartLine}"]`);
         if (element) {
-            element.innerHTML = renderLineContent(bypassStartLine, nextText);
+            if (!updateGroupedMarkdownElement(element, nextText, state)) element.innerHTML = renderLineContent(bypassStartLine, nextText);
             syncBypassTextareaPosition(element, bypassStartColumn);
             drawEditableSelectionOverlays();
         }

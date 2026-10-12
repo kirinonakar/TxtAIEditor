@@ -347,6 +347,9 @@
   <data name="SettingsLivePreview" xml:space="preserve">
     <value>デフォルトでプレビューを有効にする</value>
   </data>
+  <data name="SettingsEditInMarkdownPreview" xml:space="preserve">
+    <value>Markdownプレビューの状態で編集</value>
+  </data>
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>デフォルトでMarkdownツールバーを表示する</value>
   </data>

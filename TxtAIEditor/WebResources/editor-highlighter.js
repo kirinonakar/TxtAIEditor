@@ -1,5 +1,6 @@
 import { escapeHtml, hexEditorMode, imeController, searchController, state } from './editor-core.js';
 import { selectionBoundsForLine } from './editor-selection.js';
+import { renderEditableMarkdownLine, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
 
 const MAX_SYNTAX_CONTEXT_LOOKBACK_LINES = 200;
 
@@ -1034,6 +1035,16 @@ function renderLineContent(lineNumber, text, forcePlainText = false, suppressSel
         return escapeHtml(text);
     }
 
+    if (!forcePlainText && usesMarkdownPreviewEditing(state)) {
+        let html = renderEditableMarkdownLine(text, lineNumber, state);
+        if (searchController.query) {
+            html = wrapPreviewHtmlSearchMatches(html, lineNumber, lineNumber, true);
+        }
+        // Preview selections are painted by overlays. Never inject selection
+        // fragments into the rich HTML/list/code structure.
+        return html;
+    }
+
     const suppressSyntaxHighlighting = forcePlainText || shouldSkipLineSyntaxHighlighting(text);
 
     if (!suppressSelectionFragments) {
@@ -1177,11 +1188,58 @@ function renderSearchMatchesForLine(lineNumber, text, matches, activeMatch, supp
 // offsets stored in searchController refer to the source text, not to the
 // rendered HTML. Re-run the active query against the rendered text nodes
 // so search terms keep their shading inside live preview rows.
-function wrapPreviewHtmlSearchMatches(html, lineNumber, endLine) {
+function wrapSourcePreviewSearchMatches(html, lineNumber) {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    template.content.querySelectorAll('mark.search-match').forEach(mark => mark.replaceWith(...mark.childNodes));
+    const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    let node;
+    while ((node = walker.nextNode())) nodes.push(node);
+    const offsets = new Map();
+    for (const textNode of nodes) {
+        const field = textNode.parentElement?.closest('.line-text[data-line]');
+        const line = Number(field?.dataset.line || lineNumber);
+        const start = offsets.get(field) || 0;
+        const text = textNode.nodeValue || '';
+        offsets.set(field, start + text.length);
+        if (!text || textNode.parentElement?.closest('.md-preview-syntax, svg, math, script, style')) continue;
+        const matches = (searchController.matchesByLine.get(line) || []).filter(match =>
+            match.indexOfMatch < start + text.length && match.indexOfMatch + match.matchLength > start);
+        if (!matches.length) continue;
+        const fragment = document.createDocumentFragment();
+        let position = 0;
+        for (const match of matches.sort((a, b) => a.indexOfMatch - b.indexOfMatch)) {
+            const from = Math.max(position, match.indexOfMatch - start, 0);
+            const to = Math.min(text.length, match.indexOfMatch + match.matchLength - start);
+            if (to <= from) continue;
+            if (from > position) fragment.appendChild(document.createTextNode(text.slice(position, from)));
+            const mark = document.createElement('mark');
+            const active = searchController.activeMatch;
+            mark.className = active?.lineNumber === line && active.indexOfMatch === match.indexOfMatch
+                ? 'search-match active-match' : 'search-match';
+            mark.textContent = text.slice(from, to);
+            fragment.appendChild(mark);
+            position = to;
+        }
+        if (position < text.length) fragment.appendChild(document.createTextNode(text.slice(position)));
+        textNode.replaceWith(fragment);
+    }
+    return template.innerHTML;
+}
+
+function highlightPreviewSearchInElement(element, lineNumber) {
+    if (!usesMarkdownPreviewEditing(state) || !searchController.query || imeController.isComposing) return;
+    const html = wrapPreviewHtmlSearchMatches(element.innerHTML, lineNumber, lineNumber, true);
+    if (html !== element.innerHTML) element.innerHTML = html;
+}
+
+function wrapPreviewHtmlSearchMatches(html, lineNumber, endLine, sourcePreserving = false) {
     const query = searchController.query;
     if (!query || !html || searchController.matches.length === 0) {
         return html;
     }
+    if (sourcePreserving) return wrapSourcePreviewSearchMatches(html, lineNumber);
 
     const active = searchController.activeMatch;
     let activeOrdinal = -1;
@@ -1214,8 +1272,9 @@ function wrapPreviewHtmlSearchMatches(html, lineNumber, endLine) {
     let occurrence = -1;
     let node;
     const skippedContainers = 'svg, math, script, style';
-
-    while ((node = walker.nextNode())) {
+    const nodes = [];
+    while ((node = walker.nextNode())) nodes.push(node);
+    for (const node of nodes) {
         const text = node.nodeValue || '';
         if (!text) continue;
         if (node.parentElement?.closest?.(skippedContainers)) continue;
@@ -1277,6 +1336,7 @@ function wrapPreviewHtmlSearchMatches(html, lineNumber, endLine) {
 }
 
 export {
+    highlightPreviewSearchInElement,
     highlightLine,
     renderLineContent,
     shouldSkipLineSyntaxHighlighting,

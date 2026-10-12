@@ -81,6 +81,7 @@ namespace TxtAIEditor.Editor
                 ["theme"] = settings.Theme,
                 ["wordWrap"] = isHexLanguage ? false : settings.WordWrap,
                 ["syntaxHighlighting"] = settings.SyntaxHighlighting,
+                ["editInMarkdownPreview"] = settings.EditInMarkdownPreview,
                 ["showDirtyLines"] = settings.ShowDirtyLines,
                 ["bracketPairColorization"] = settings.BracketPairColorization,
                 ["fontSize"] = settings.FontSize,
