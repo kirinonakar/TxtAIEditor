@@ -4035,4 +4035,21 @@
   <data name="EditorFoldSelectFormat" xml:space="preserve"><value>折りたたまれた {0} 行をすべて選択</value></data>
   <data name="EditorContextMenuCollapseAll" xml:space="preserve"><value>すべて折りたたむ</value></data>
   <data name="EditorContextMenuExpandAll" xml:space="preserve"><value>すべて展開</value></data>
+  <data name="EditorMarkdownTableRow" xml:space="preserve"><value>行</value></data>
+  <data name="EditorMarkdownTableColumn" xml:space="preserve"><value>列</value></data>
+  <data name="EditorMarkdownTableRowBefore" xml:space="preserve"><value>上に行を追加</value></data>
+  <data name="EditorMarkdownTableRowAfter" xml:space="preserve"><value>下に行を追加</value></data>
+  <data name="EditorMarkdownTableRowDelete" xml:space="preserve"><value>行を削除</value></data>
+  <data name="EditorMarkdownTableRowUp" xml:space="preserve"><value>行を上に移動</value></data>
+  <data name="EditorMarkdownTableRowDown" xml:space="preserve"><value>行を下に移動</value></data>
+  <data name="EditorMarkdownTableSelectRow" xml:space="preserve"><value>行を選択</value></data>
+  <data name="EditorMarkdownTableColumnBefore" xml:space="preserve"><value>左に列を追加</value></data>
+  <data name="EditorMarkdownTableColumnAfter" xml:space="preserve"><value>右に列を追加</value></data>
+  <data name="EditorMarkdownTableColumnDelete" xml:space="preserve"><value>列を削除</value></data>
+  <data name="EditorMarkdownTableColumnLeft" xml:space="preserve"><value>列を左に移動</value></data>
+  <data name="EditorMarkdownTableColumnRight" xml:space="preserve"><value>列を右に移動</value></data>
+  <data name="EditorMarkdownTableSelectColumn" xml:space="preserve"><value>列を選択</value></data>
+  <data name="EditorMarkdownTableCellMode" xml:space="preserve"><value>セル選択</value></data>
+  <data name="EditorMarkdownTableClearCells" xml:space="preserve"><value>内容をクリア</value></data>
+  <data name="EditorMarkdownTableCopyCells" xml:space="preserve"><value>セルをコピー</value></data>
 </root>

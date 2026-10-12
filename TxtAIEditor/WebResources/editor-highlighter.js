@@ -1229,7 +1229,7 @@ function wrapSourcePreviewSearchMatches(html, lineNumber) {
 }
 
 function highlightPreviewSearchInElement(element, lineNumber) {
-    if (!usesMarkdownPreviewEditing(state) || !searchController.query || imeController.isComposing) return;
+    if (!(usesMarkdownPreviewEditing(state) || element.dataset.markdownPreviewLine === 'table') || !searchController.query || imeController.isComposing) return;
     const html = wrapPreviewHtmlSearchMatches(element.innerHTML, lineNumber, lineNumber, true);
     if (html !== element.innerHTML) element.innerHTML = html;
 }

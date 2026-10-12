@@ -587,6 +587,10 @@ function splitCurrentLine(element, options = {}) {
     state.currentLine = nextLineNumber;
     state.currentColumn = nextCaretColumn + 1;
     state.editingLine = nextLineNumber;
+    if (state.inlineLivePreviewEnabled) {
+        state.inlineLivePreviewSourceLine = nextLineNumber;
+        state.inlineLivePreviewEditableBlock = null;
+    }
 
     if (useElementCaret && element.isConnected) {
         if (!updateGroupedMarkdownElement(element, before, state)) element.innerHTML = renderLineContent(lineNumber, before);

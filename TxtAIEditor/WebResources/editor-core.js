@@ -100,6 +100,7 @@ const state = {
     livePreviewLocalResourceVersion: '0',
     inlineLivePreviewSourceLine: null,
     inlineLivePreviewEditableBlock: null,
+    markdownTableText: {},
     isSplitView: false,
     suppressNextBeforeInputType: null,
     lastManualDeleteAt: 0,
@@ -298,6 +299,7 @@ function applyOptions(msg) {
         msg.bracketPairColorization === undefined ? true : !!msg.bracketPairColorization,
         msg.longLineProtectionFormat, msg.csvJsonKeyHeader, msg.csvJsonValueHeader,
         msg.foldCollapseText, msg.foldExpandText, msg.foldSelectionFormat,
+        msg.markdownTableText,
         !!msg.editInMarkdownPreview
     ]);
     const layoutChanged = appliedLayoutOptionsKey !== layoutOptionsKey;
@@ -313,6 +315,7 @@ function applyOptions(msg) {
     }
     state.syntaxHighlighting = msg.hasOwnProperty('syntaxHighlighting') ? !!msg.syntaxHighlighting : true;
     state.editInMarkdownPreview = !!msg.editInMarkdownPreview;
+    state.markdownTableText = msg.markdownTableText || state.markdownTableText;
     document.body.classList.toggle('markdown-preview-editing', state.editInMarkdownPreview);
     state.showDirtyLines = msg.hasOwnProperty('showDirtyLines') ? !!msg.showDirtyLines : true;
     if (!state.showDirtyLines) {

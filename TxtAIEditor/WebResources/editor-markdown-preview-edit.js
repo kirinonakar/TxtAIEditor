@@ -1,10 +1,11 @@
 import { escapeHtml, findEditablePreviewBlockContaining, inlineMarkdown, renderPreviewLineAt, sanitizeHtml } from './markdown-preview-renderer.js';
+import { parseMarkdownTableRow } from './editor-markdown-table-model.js';
 
 // Every text node remains part of the Markdown source, in source order. Hiding
 // delimiters rather than deleting them lets the existing edit/undo/save protocol
 // keep using source columns, including during native IME composition.
-const syntax = text => `<span class="md-preview-syntax">${escapeHtml(text)}</span>`;
-const content = (html, options = {}) => `<span class="md-preview-content${options.htmlSource ? ' md-preview-html-content' : ''}">${html}</span>`;
+const syntax = text => `<span class="md-preview-syntax" contenteditable="false">${escapeHtml(text)}</span>`;
+const content = (html, options = {}) => `<span class="md-preview-content${options.htmlSource ? ' md-preview-html-content' : ''}"${options.editableCell !== undefined ? ` contenteditable="${options.editableCell}" tabindex="-1"` : ''}>${html}</span>`;
 
 function safeOpeningTag(raw, options) {
     const template = document.createElement('template');
@@ -22,9 +23,18 @@ export function usesMarkdownPreviewEditing(state) {
         ['markdown', 'md'].includes(state.language);
 }
 
+export function usesMarkdownTableEditing(state) {
+    return state.inlineLivePreviewEnabled && ['markdown', 'md'].includes(state.language);
+}
+
 export function needsMarkdownPreviewBlockRefresh(state, lineNumber) {
+    if (!usesMarkdownPreviewEditing(state)) return false;
+    const kind = document.querySelector(`#viewport .line-text[data-line="${lineNumber}"]`)?.dataset.markdownPreviewLine;
+    const text = state.cache.get(lineNumber) || '';
+    const list = /^[ \t]*(?:[-*+]|\d+\.)[ \t]+/.test(text);
+    if ((kind === 'paragraph' && (list || /^ {0,3}#{1,6}[ \t]/.test(text))) || (kind === 'list' && !list)) return true;
     const block = state.inlineLivePreviewEditableBlock;
-    return usesMarkdownPreviewEditing(state) && block &&
+    return block &&
         lineNumber >= block.startLine && lineNumber <= block.endLine &&
         (block.kind === 'math' || (block.kind === 'code' &&
             ['math', 'latex', 'mermaid'].includes(block.language?.toLowerCase())));
@@ -36,6 +46,10 @@ function inlineSource(text, options, depth = 0) {
     let index = 0;
     while (index < text.length) {
         const rest = text.slice(index);
+        if (/^[ \t]+$/.test(rest) && (!options.htmlSource || index > 0)) {
+            html += `<span class="md-preview-trailing-space">${escapeHtml(rest)}</span>`;
+            break;
+        }
         const escaped = !options.htmlSource && /^\\([\\`*_{}\[\]()#+.!>~|=-])/.exec(rest);
         if (escaped) {
             html += syntax('\\') + escapeHtml(escaped[1]);
@@ -145,20 +159,15 @@ function trimmedInlineSource(text, options, cellPadding = false) {
     const leading = text.length - text.trimStart().length;
     const start = cellPadding ? Math.min(1, leading) : leading;
     const end = cellPadding && /[ \t]$/.test(text) ? Math.max(start, text.length - 1) : text.length;
-    if (end <= start) return syntax(text) + content('');
-    return syntax(text.slice(0, start)) + content(inlineSource(text.slice(start, end), options)) + syntax(text.slice(end));
+    if (end <= start) return syntax(text.slice(0, start)) + content('', options) + syntax(text.slice(start));
+    return syntax(text.slice(0, start)) + content(inlineSource(text.slice(start, end), options), options) + syntax(text.slice(end));
 }
 
 function tableRowSource(text, header, aligns, columnCount, options) {
-    const first = text.indexOf('|');
-    const last = text.lastIndexOf('|');
-    const cells = [];
-    let start = first + 1;
-    for (let index = start; index <= last; index++) {
-        if (text[index] !== '|' || (text[index - 1] === '\\' && index !== last)) continue;
-        cells.push(text.slice(start, index));
-        start = index + 1;
-    }
+    const parsed = parseMarkdownTableRow(text);
+    const first = (parsed?.prefix.length || 1) - 1;
+    const last = parsed ? text.length - parsed.suffix.length : text.length - 1;
+    const cells = parsed?.cells.map(cell => cell.text) || [];
     const count = Math.max(columnCount, cells.length);
     const tag = header ? 'th' : 'td';
     return Array.from({ length: count }, (_, index) => {
@@ -167,7 +176,7 @@ function tableRowSource(text, header, aligns, columnCount, options) {
         const style = [align ? `text-align:${align}` : '', /<br\s*\/?>/i.test(cell) ? 'white-space:pre-line' : ''].filter(Boolean).join(';');
         const prefix = index === 0 ? syntax(text.slice(0, first + 1)) : index < cells.length ? syntax('|') : '';
         const suffix = index === cells.length - 1 ? syntax(text.slice(last)) : '';
-        return `<${tag}${style ? ` style="${style}"` : ''}>${prefix}${trimmedInlineSource(cell, options, true)}${suffix}</${tag}>`;
+        return `<${tag} contenteditable="false"${style ? ` style="${style}"` : ''}>${prefix}${trimmedInlineSource(cell, options, true)}${suffix}</${tag}>`;
     }).join('');
 }
 
@@ -220,7 +229,7 @@ export function renderGroupedEditableMarkdown(lineNumber, state, options = {}, s
         editableHtmlBlock: (block, line) => editableHtmlBlock(block, line, state, options),
         editableCodeBlock: (block, line, lines, numbers) => editableCodeBlock(block, line, state, options, lines, numbers),
         editableTableRow: (text, line, header, aligns, count) =>
-            `<tr ${editableAttributes(text, line, state, 'table')} data-preview-table-header="${header}" data-preview-table-aligns="${escapeHtml(JSON.stringify(aligns))}" data-preview-table-columns="${count}">${tableRowSource(text, header, aligns, count, options)}</tr>`
+            `<tr ${editableAttributes(text, line, state, 'table')} data-preview-table-header="${header}" data-preview-table-aligns="${escapeHtml(JSON.stringify(aligns))}" data-preview-table-columns="${count}">${tableRowSource(text, header, aligns, count, { ...options, editableCell: !state.readOnly && text.length <= 20000 })}</tr>`
     };
     return renderPreviewLineAt(lineNumber, state.lineCount,
         line => state.cache.get(line), editableOptions, { val: skipUntil });
@@ -230,12 +239,13 @@ export function renderGroupedEditableMarkdown(lineNumber, state, options = {}, s
 // table/thead/tbody/td layout stays owned by the canonical preview renderer.
 export function updateGroupedMarkdownElement(element, text, state) {
     const kind = element?.dataset.markdownPreviewLine;
-    if (!kind || !usesMarkdownPreviewEditing(state)) return false;
+    if (!kind || !(usesMarkdownPreviewEditing(state) || kind === 'table' && usesMarkdownTableEditing(state))) return false;
+    if (kind === 'paragraph' && /^(?:[ \t]*(?:[-*+]|\d+\.)[ \t]+| {0,3}#{1,6}[ \t])/.test(text)) return false;
     const options = { baseHref: state.livePreviewBaseHref || '', tabSize: state.tabSize || 4,
         localResourceVersion: state.livePreviewLocalResourceVersion || '0' };
     if (kind === 'table') {
         element.innerHTML = tableRowSource(text, element.dataset.previewTableHeader === 'true',
-            JSON.parse(element.dataset.previewTableAligns || '[]'), Number(element.dataset.previewTableColumns || 0), options);
+            JSON.parse(element.dataset.previewTableAligns || '[]'), Number(element.dataset.previewTableColumns || 0), { ...options, editableCell: !state.readOnly });
     } else if (kind === 'list') {
         const match = /^([ \t]*)([-*+]|\d+\.)([ \t]+)(?:\[([ xX])\]([ \t]+))?(.*)$/.exec(text);
         element.innerHTML = match ? listItemSource(text, { content: match[6], taskChecked: match[4] === undefined ? null : match[4].toLowerCase() === 'x' }, options)
@@ -280,6 +290,9 @@ export function renderEditableMarkdownLine(text, lineNumber, state) {
     const heading = /^( {0,3}#{1,6})([ \t])(.*)$/.exec(text);
     if (heading) {
         const level = heading[1].trim().length;
+        if (!heading[3].trim()) {
+            return `<h${level} class="md-preview-empty-heading"><span class="md-preview-syntax md-preview-heading-prefix" contenteditable="false">${escapeHtml(text)}</span><span class="md-preview-content md-preview-heading-body"></span></h${level}>`;
+        }
         const closing = /^(.*?)([ \t]#+[ \t]*)$/.exec(heading[3]);
         return syntax(heading[1] + heading[2]) + `<h${level}>${content(inlineSource(closing ? closing[1] : heading[3], options))}</h${level}>` +
             (closing ? syntax(closing[2]) : '');
@@ -302,6 +315,25 @@ export function renderEditableMarkdownLine(text, lineNumber, state) {
 
 // A source offset can point into an invisible delimiter. Find the nearest
 // visible text boundary, while still counting the hidden source characters.
+export function ensureMarkdownPreviewCaretAnchors(element) {
+    for (const empty of element.querySelectorAll('.md-preview-content:empty, .md-preview-content[data-markdown-empty-content]')) {
+        if (empty.textContent.length) continue;
+        if (![...empty.childNodes].some(node => node.nodeType === Node.TEXT_NODE)) empty.prepend(document.createTextNode(''));
+        // Give empty bodies their own editing host. Chromium may normalize an
+        // empty text boundary to a neighboring hidden prefix in the outer host.
+        if (!empty.hasAttribute('contenteditable')) {
+            empty.setAttribute('contenteditable', 'true');
+            empty.tabIndex = -1;
+        }
+        empty.dataset.markdownEmptyContent = 'true';
+        if (!empty.querySelector('br[data-markdown-caret-anchor]')) {
+            const anchor = document.createElement('br');
+            anchor.dataset.markdownCaretAnchor = 'true';
+            empty.appendChild(anchor);
+        }
+    }
+}
+
 export function markdownPreviewTextPosition(element, offset, direction = 1) {
     if (!element?.querySelector('.md-preview-content')) return null;
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
@@ -325,7 +357,7 @@ export function markdownPreviewTextPosition(element, offset, direction = 1) {
         before.selectNodeContents(element);
         before.setEndBefore(empty);
         const start = before.toString().length;
-        visible.push({ node: empty, start, end: start, empty: true });
+        if (!empty.firstChild) visible.push({ node: empty, start, end: start, empty: true });
     }
     visible.sort((a, b) => a.start - b.start);
     const target = Math.max(0, Number(offset || 0));
@@ -352,6 +384,10 @@ export function markdownPreviewTextPosition(element, offset, direction = 1) {
 
 export function markdownPreviewDeleteRange(element, offset, direction, deleteStart, deleteEnd) {
     if (!element?.querySelector('.md-preview-content')) return null;
+    const selectionNode = window.getSelection()?.rangeCount ? window.getSelection().getRangeAt(0).startContainer : null;
+    const caretCell = element.dataset.markdownPreviewLine === 'table'
+        ? (selectionNode?.nodeType === Node.ELEMENT_NODE ? selectionNode : selectionNode?.parentElement)?.closest('td, th') : null;
+    const cellScope = caretCell && element.contains(caretCell) ? caretCell : null;
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
     let sourceOffset = 0;
     let previous = null;
@@ -360,6 +396,10 @@ export function markdownPreviewDeleteRange(element, offset, direction, deleteSta
     while ((node = walker.nextNode())) {
         const text = node.textContent;
         const end = sourceOffset + text.length;
+        if (cellScope && !cellScope.contains(node)) {
+            sourceOffset = end;
+            continue;
+        }
         const atom = node.parentElement?.closest('.md-preview-atom');
         if (atom && !atoms.has(atom)) {
             atoms.add(atom);

@@ -159,6 +159,33 @@ namespace TxtAIEditor.Editor
                 message[property] = localizationService?.GetString(resource, fallback) ?? fallback;
             }
 
+            (string Key, string Resource, string Fallback)[] tableLabels =
+            {
+                ("row", "EditorMarkdownTableRow", "Row"),
+                ("column", "EditorMarkdownTableColumn", "Column"),
+                ("row-before", "EditorMarkdownTableRowBefore", "Insert row above"),
+                ("row-after", "EditorMarkdownTableRowAfter", "Insert row below"),
+                ("row-delete", "EditorMarkdownTableRowDelete", "Delete row"),
+                ("row-up", "EditorMarkdownTableRowUp", "Move row up"),
+                ("row-down", "EditorMarkdownTableRowDown", "Move row down"),
+                ("select-row", "EditorMarkdownTableSelectRow", "Select row"),
+                ("column-before", "EditorMarkdownTableColumnBefore", "Insert column left"),
+                ("column-after", "EditorMarkdownTableColumnAfter", "Insert column right"),
+                ("column-delete", "EditorMarkdownTableColumnDelete", "Delete column"),
+                ("column-left", "EditorMarkdownTableColumnLeft", "Move column left"),
+                ("column-right", "EditorMarkdownTableColumnRight", "Move column right"),
+                ("select-column", "EditorMarkdownTableSelectColumn", "Select column"),
+                ("cell-mode", "EditorMarkdownTableCellMode", "Select cells"),
+                ("clear-cells", "EditorMarkdownTableClearCells", "Clear cells"),
+                ("copy-cells", "EditorMarkdownTableCopyCells", "Copy cells")
+            };
+            var tableText = new Dictionary<string, string>();
+            foreach ((string key, string resource, string fallback) in tableLabels)
+            {
+                tableText[key] = localizationService?.GetString(resource, fallback) ?? fallback;
+            }
+            message["markdownTableText"] = tableText;
+
             AddCsvLocalizedText(message, localizationService);
         }
 

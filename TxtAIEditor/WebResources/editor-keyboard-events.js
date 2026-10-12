@@ -398,6 +398,20 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
             return;
         }
 
+        const listTabElement = event.key === 'Tab' && !isNativeHexInputTarget
+            ? lineElementFromEvent(event) || document.activeElement?.closest?.('.line-text') : null;
+        const markdownListTab = listTabElement && state.inlineLivePreviewEnabled && !earlyCtrl && !event.altKey &&
+            !imeController.isComposing && !isHangulImeKeyEvent(event) && ['markdown', 'md'].includes(state.language) &&
+            !['code', 'code-empty'].includes(listTabElement.dataset.markdownPreviewLine) &&
+            /^[ \t]*(?:[-*+]|\d+\.)[ \t]+/.test(state.cache.get(Number(listTabElement.dataset.line)) || '');
+        if (markdownListTab) {
+            event.preventDefault();
+            hideAutocomplete();
+            commitLine(listTabElement);
+            changeLineIndent(event.shiftKey ? -1 : 1);
+            return;
+        }
+
         if (autocompleteState.isOpen) {
             if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' ||
                 event.key === 'Backspace' || event.key === 'Delete') {
@@ -806,7 +820,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
             event.preventDefault();
             const keyName = normalizedModelRepeatKey(event);
             if (keyName === 'Enter') {
-                markNativeBeforeInputHandled(['insertLineBreak'], 120);
+                markNativeBeforeInputHandled(['insertLineBreak', 'insertParagraph'], 120);
             } else {
                 state.lastDeleteKeyDown = {
                     key: keyName,
@@ -824,7 +838,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
 
         if (event.key === 'Enter') {
             event.preventDefault();
-            markNativeBeforeInputHandled(['insertLineBreak'], 120);
+            markNativeBeforeInputHandled(['insertLineBreak', 'insertParagraph'], 120);
             splitCurrentLine(element);
             return;
         }

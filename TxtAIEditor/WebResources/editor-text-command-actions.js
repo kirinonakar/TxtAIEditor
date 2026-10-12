@@ -83,6 +83,9 @@ function createTextCommandActions({
         if (state.readOnly) return;
 
         const { startLine, endLine } = selectedLineRange();
+        const preserveCaret = !hasCustomSelection();
+        const caretLine = state.currentLine;
+        let caretColumn = Math.max(0, state.currentColumn - 1);
         const indentText = ' '.repeat(Math.max(1, state.tabSize || 4));
         let changed = false;
 
@@ -106,6 +109,7 @@ function createTextCommandActions({
                 }
 
                 if (next !== original) {
+                    if (preserveCaret && line === caretLine) caretColumn = Math.max(0, caretColumn + next.length - original.length);
                     state.cache.set(line, next);
                     if (!cleanDirtyMarker(line)) {
                         markDirty(line, 'mod');
@@ -121,8 +125,9 @@ function createTextCommandActions({
         } finally {
             endEditTransaction();
         }
+        if (preserveCaret) state.currentColumn = caretColumn + 1;
         queueRender(true);
-        setTimeout(() => focusLine(startLine, 0), 0);
+        focusLine(preserveCaret ? caretLine : startLine, preserveCaret ? caretColumn : 0);
     }
 
     function handleLineSortingAndCleanup(action) {

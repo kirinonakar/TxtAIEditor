@@ -38,6 +38,7 @@ import {
     lineElementFromEvent,
     lineTextFromElement,
     makeEditablePlainText,
+    markNativeBeforeInputHandled,
     mergeLineBackward,
     mergeLineForward,
     moveCaretVertical,
@@ -46,6 +47,7 @@ import {
     resetModelRepeatState,
     setCaret,
     shouldSuppressNativeBeforeInput,
+    splitCurrentLine,
     updateSingleLine
 } from './editor-commands.js';
 import {
@@ -56,6 +58,7 @@ import {
 export function bindTextInputEvents({ renderer }) {
     const { clearPendingInlineLivePreviewFocusForLine } = renderer;
     let postCompositionNavigationInputGuard = null;
+    let pendingCompositionLineBreak = null;
 
     function restoreInputLineHighlighting(element, inputSnapshot) {
         if (!element?.isConnected || !inputSnapshot ||
@@ -98,6 +101,15 @@ export function bindTextInputEvents({ renderer }) {
 
         const element = lineElementFromEvent(event);
         if (element) {
+            for (const content of element.querySelectorAll('[data-markdown-empty-content]')) {
+                if (content.textContent.length) delete content.dataset.markdownEmptyContent;
+            }
+            // Attribute-only styling leaves the native composition node and
+            // selection untouched, while hiding an empty heading's prefix as
+            // soon as the first title glyph arrives.
+            const emptyHeading = element.querySelector('.md-preview-empty-heading');
+            if (emptyHeading) emptyHeading.classList.toggle('md-preview-heading-has-content',
+                !!emptyHeading.querySelector('.md-preview-heading-body')?.textContent.trim());
             const pendingColumnText = !imeController.isComposing
                 ? consumePendingColumnTextInput(event.data)
                 : null;
@@ -174,6 +186,7 @@ export function bindTextInputEvents({ renderer }) {
         cancelPendingColumnTextInputs();
         cancelAutocompleteCaretRestore();
         postCompositionNavigationInputGuard = null;
+        pendingCompositionLineBreak = null;
         imeController.pendingVerticalNavigation = null;
         let element = lineElementFromEvent(event) || activeEditableElement();
         const pendingCompositionSelection = compositionSelectionRange();
@@ -222,6 +235,9 @@ export function bindTextInputEvents({ renderer }) {
         const element = lineElementFromEvent(event) || activeEditableElement();
         const lineNumber = element ? Number(element.dataset.line || imeController.compositionLine || state.currentLine) : imeController.compositionLine;
         const pendingVerticalNavigation = imeController.pendingVerticalNavigation;
+        const lineBreak = pendingCompositionLineBreak;
+        pendingCompositionLineBreak = null;
+        let committedElement = null;
 
         imeController.beginCommit();
         clearPendingImeSelectionCollapse();
@@ -279,7 +295,11 @@ export function bindTextInputEvents({ renderer }) {
                 // moved the caret, and commitLine() then restored currentLine to
                 // the composition source row.
                 const inputSnapshot = commitLine(current);
-                if (moveAfterComposition(current)) {
+                committedElement = current;
+                if (lineBreak) {
+                    // Split only after completeCommit has released the native
+                    // composition node and its selection.
+                } else if (moveAfterComposition(current)) {
                     guardNextCompositionInput(lineNumber);
                 } else {
                     triggerAutocomplete(current, inputSnapshot);
@@ -288,6 +308,11 @@ export function bindTextInputEvents({ renderer }) {
             }
         }
         imeController.completeCommit();
+        if (lineBreak?.lineNumber === lineNumber && lineBreak.documentId === state.hostDocumentId && committedElement?.isConnected) {
+            guardNextCompositionInput(lineNumber);
+            markNativeBeforeInputHandled(['insertLineBreak', 'insertParagraph'], 120);
+            splitCurrentLine(committedElement);
+        }
     });
 
     viewport.addEventListener('beforeinput', event => {
@@ -299,6 +324,13 @@ export function bindTextInputEvents({ renderer }) {
             event.inputType === 'insertCompositionText' ||
             event.inputType === 'deleteCompositionText') {
             cancelPendingColumnTextInputs();
+            if (['insertParagraph', 'insertLineBreak'].includes(event.inputType) &&
+                element?.getAttribute('contenteditable') === 'true' && element.dataset.markdownPreviewLine !== 'code-empty' &&
+                !imeController.rangeComposition && !imeController.columnComposition) {
+                event.preventDefault();
+                pendingCompositionLineBreak = { lineNumber: Number(element.dataset.line), documentId: state.hostDocumentId };
+                return;
+            }
             if (imeController.rangeComposition?.deferred) {
                 return;
             }
@@ -433,10 +465,10 @@ export function bindTextInputEvents({ renderer }) {
         }
 
         if (!hasCustomSelection()) {
-            if (element?.dataset.markdownPreviewLine === 'table' &&
+            if (element?.getAttribute('contenteditable') === 'true' &&
                 ['insertLineBreak', 'insertParagraph'].includes(event.inputType)) {
                 event.preventDefault();
-                insertPlainTextByModel(element, '<br>');
+                splitCurrentLine(element);
                 return;
             }
             if (element?.dataset.markdownPreviewLine === 'table' && event.inputType === 'insertText') {

@@ -42,7 +42,8 @@ import {
 } from './editor-csv-table.js';
 import { isPointOnScrollContainerScrollbar } from './editor-caret.js';
 import { createFullHtmlLivePreviewRenderer } from './editor-html-live-preview.js';
-import { renderEditableMarkdownLine, renderGroupedEditableMarkdown, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
+import { renderEditableMarkdownLine, renderGroupedEditableMarkdown, usesMarkdownPreviewEditing, usesMarkdownTableEditing } from './editor-markdown-preview-edit.js';
+import { syncMarkdownTableUi } from './editor-markdown-table-ui.js';
 
 function createEditorRenderer({
     findEditablePreviewBlockContaining,
@@ -188,7 +189,9 @@ function createEditorRenderer({
         // WebView2 treats that disconnect as an IME commit boundary and Korean
         // syllables can be committed as separate jamo. Defer every DOM render
         // until compositionend instead of trying to detach/preserve the row.
-        const preserveComposition = usesMarkdownPreviewEditing(state) && imeController.isComposing &&
+        const composingTable = usesMarkdownTableEditing(state) && imeController.compositionLine &&
+            viewport.querySelector(`.line-text[data-line="${imeController.compositionLine}"]`)?.dataset.markdownPreviewLine === 'table';
+        const preserveComposition = (usesMarkdownPreviewEditing(state) || composingTable) && imeController.isComposing &&
             !imeController.rangeComposition && !imeController.columnComposition;
         if (((imeController.isComposing && imeController.compositionLine) && !preserveComposition) || imeController.rangeComposition) {
             return;
@@ -219,10 +222,10 @@ function createEditorRenderer({
         const livePreviewContextLines = state.inlineLivePreviewEnabled ? 120 : 0;
         let renderStart = Math.max(1, range.start - livePreviewContextLines);
         let renderEnd = range.end;
-        if (usesMarkdownPreviewEditing(state)) {
+        if (usesMarkdownPreviewEditing(state) || usesMarkdownTableEditing(state)) {
             const containingBlock = findEditablePreviewBlockContaining(renderStart, state.lineCount,
                 line => state.cache.get(line), { tabSize: state.tabSize || 4 });
-            if (containingBlock && ['list', 'table', 'paragraph', 'code'].includes(containingBlock.kind)) {
+            if (containingBlock && (usesMarkdownPreviewEditing(state) && ['list', 'table', 'paragraph', 'code'].includes(containingBlock.kind) || containingBlock.kind === 'table')) {
                 renderStart = containingBlock.startLine;
             }
         }
@@ -234,7 +237,7 @@ function createEditorRenderer({
             renderStart = Math.max(1, firstVisibleCsvLine - csvOverscan);
             renderEnd = Math.min(Math.max(1, csvTableLineCount || state.lineCount), lastVisibleCsvLine + csvOverscan);
         }
-        const activeEl = document.activeElement;
+        const activeEl = document.activeElement?.closest?.('.line-text');
         // Split view의 비활성 WebView도 마지막 document.activeElement를 계속 보존한다.
         // 실제 창 포커스까지 확인하지 않으면 동기화 렌더가 비활성 pane에서 focus()를
         // 호출해 활성 pane의 Windows IME 컨텍스트와 다음 한글 자소를 빼앗는다.
@@ -343,7 +346,7 @@ function createEditorRenderer({
         let groupedPreviewEnd = 0;
         let groupedHeightsChanged = false;
         for (let line = renderStart; line <= renderEnd; line++) {
-            if (editInPreview && line <= groupedPreviewEnd) {
+            if ((editInPreview || usesMarkdownTableEditing(state)) && line <= groupedPreviewEnd) {
                 if (livePreviewContextAnchorRow) {
                     rows.push(livePreviewContextAnchorRow);
                     livePreviewContextAnchorRow = '';
@@ -504,7 +507,9 @@ function createEditorRenderer({
                             : ' live-preview-row';
                 }
             }
-            if (editInPreview && hasLine && !isLong && !foldingController.collapsedRange(line)) {
+            const editTable = usesMarkdownTableEditing(state) && hasLine && !isLong && text.trimStart().startsWith('|') &&
+                findEditablePreviewBlockContaining(line, state.lineCount, getCachedLine, livePreviewOptions)?.kind === 'table';
+            if ((editInPreview || editTable) && hasLine && !isLong && !foldingController.collapsedRange(line)) {
                 const grouped = renderGroupedEditableMarkdown(line, state, livePreviewOptions, groupedPreviewEnd);
                 const ownsMultilineHtml = !grouped.pending && !grouped.source && grouped.endLine > line &&
                     !['code', 'math'].includes(findEditablePreviewBlockContaining(line, state.lineCount, getCachedLine, livePreviewOptions)?.kind);
@@ -528,7 +533,8 @@ function createEditorRenderer({
                     livePreviewAttributes = '';
                     previewDecoration = '';
                     if (grouped.empty) {
-                        editableLineNumber = sourceLine >= line && sourceLine <= groupedPreviewEnd ? sourceLine : line;
+                        const emptyFocusLine = state.editingLine || sourceLine || state.currentLine;
+                        editableLineNumber = emptyFocusLine >= line && emptyFocusLine <= groupedPreviewEnd ? emptyFocusLine : line;
                         lineContent = renderEditableMarkdownLine(state.cache.get(editableLineNumber) || '', editableLineNumber, state);
                         liveContentEditable = state.readOnly ? 'false' : 'true';
                         livePreviewClass = ' live-preview-row live-preview-empty markdown-preview-edit-row';
@@ -543,7 +549,7 @@ function createEditorRenderer({
                     previewDecoration = '';
                 }
             }
-            if (editInPreview) {
+            if (editInPreview || editTable) {
                 lineContent = wrapPreviewHtmlSearchMatches(lineContent, line,
                     renderedLivePreviewLine?.endLine || line, true);
             }
@@ -655,6 +661,7 @@ function createEditorRenderer({
         }
 
         if (!preserveComposition) drawEditableSelectionOverlays();
+        syncMarkdownTableUi();
         if (state.foldScrollRestore) {
             scrollContainer.scrollTop = state.foldScrollRestore.top;
             scrollContainer.scrollLeft = state.foldScrollRestore.left;

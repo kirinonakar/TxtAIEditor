@@ -627,7 +627,7 @@ export function bindPointerSelectionEvents({
     function isEditablePreviewBlockElement(element) {
         return state.inlineLivePreviewEnabled &&
             element?.getAttribute?.('contenteditable') === 'true' &&
-            (usesMarkdownPreviewEditing(state) || element.closest?.('.line-row')?.classList?.contains('live-preview-source-block'));
+            (usesMarkdownPreviewEditing(state) || element.dataset.markdownPreviewLine === 'table' || element.closest?.('.line-row')?.classList?.contains('live-preview-source-block'));
     }
 
     function livePreviewPositionFromPointer(event) {
@@ -1029,7 +1029,7 @@ export function bindPointerSelectionEvents({
         if (!position) return;
 
         const now = Date.now();
-        const isDoubleClick = (event.detail >= 2) || (!usesMarkdownPreviewEditing(state) &&
+        const isDoubleClick = (event.detail >= 2) || (!usesMarkdownPreviewEditing(state) && position.element.dataset.markdownPreviewLine !== 'table' &&
             ((now - lastPointerDownTime < 350) &&
                 lastPointerDownPosition &&
                 (lastPointerDownPosition.line === position.line) &&

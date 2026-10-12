@@ -4077,4 +4077,21 @@
   <data name="EditorFoldSelectFormat" xml:space="preserve"><value>접힌 {0}줄 전체 선택</value></data>
   <data name="EditorContextMenuCollapseAll" xml:space="preserve"><value>전체 접기</value></data>
   <data name="EditorContextMenuExpandAll" xml:space="preserve"><value>전체 펼치기</value></data>
+  <data name="EditorMarkdownTableRow" xml:space="preserve"><value>행</value></data>
+  <data name="EditorMarkdownTableColumn" xml:space="preserve"><value>열</value></data>
+  <data name="EditorMarkdownTableRowBefore" xml:space="preserve"><value>위에 행 추가</value></data>
+  <data name="EditorMarkdownTableRowAfter" xml:space="preserve"><value>아래에 행 추가</value></data>
+  <data name="EditorMarkdownTableRowDelete" xml:space="preserve"><value>행 삭제</value></data>
+  <data name="EditorMarkdownTableRowUp" xml:space="preserve"><value>행 위로 이동</value></data>
+  <data name="EditorMarkdownTableRowDown" xml:space="preserve"><value>행 아래로 이동</value></data>
+  <data name="EditorMarkdownTableSelectRow" xml:space="preserve"><value>행 선택</value></data>
+  <data name="EditorMarkdownTableColumnBefore" xml:space="preserve"><value>왼쪽에 열 추가</value></data>
+  <data name="EditorMarkdownTableColumnAfter" xml:space="preserve"><value>오른쪽에 열 추가</value></data>
+  <data name="EditorMarkdownTableColumnDelete" xml:space="preserve"><value>열 삭제</value></data>
+  <data name="EditorMarkdownTableColumnLeft" xml:space="preserve"><value>열 왼쪽으로 이동</value></data>
+  <data name="EditorMarkdownTableColumnRight" xml:space="preserve"><value>열 오른쪽으로 이동</value></data>
+  <data name="EditorMarkdownTableSelectColumn" xml:space="preserve"><value>열 선택</value></data>
+  <data name="EditorMarkdownTableCellMode" xml:space="preserve"><value>셀 선택</value></data>
+  <data name="EditorMarkdownTableClearCells" xml:space="preserve"><value>내용 지우기</value></data>
+  <data name="EditorMarkdownTableCopyCells" xml:space="preserve"><value>셀 복사</value></data>
 </root>

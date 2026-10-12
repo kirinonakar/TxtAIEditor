@@ -17,7 +17,7 @@ import {
     viewportController
 } from './editor-core.js';
 import { scrollContainer, viewport } from './editor-dom.js';
-import { markdownPreviewTextPosition, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
+import { ensureMarkdownPreviewCaretAnchors, markdownPreviewTextPosition, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
 import {
     drawEditableSelectionOverlays,
     normalizeSelection
@@ -53,7 +53,7 @@ function makeEditablePlainText(element, caretColumn = null, restoreCaret = true)
     state.editingLine = lineNumber;
 
     // Preserve the native editable subtree, especially before compositionstart.
-    if (usesMarkdownPreviewEditing(state)) {
+    if (usesMarkdownPreviewEditing(state) || element.dataset.markdownPreviewLine === 'table') {
         if (restoreCaret && caretColumn !== null && !imeController.isComposing) setCaret(element, column);
         return { text, column };
     }
@@ -173,7 +173,7 @@ function getCaretOffsetFromPoint(element, clientX, clientY) {
     // boundary from native hit-testing when the pointer is in the empty area.
     // Compare with the actual final caret, rather than the row's box width.
     const endRect = caretRectForOffset(element, textLength, clientY);
-    if (endRect?.height > 0 && clientY >= endRect.top && clientY <= endRect.bottom &&
+    if (element.dataset.markdownPreviewLine !== 'table' && endRect?.height > 0 && clientY >= endRect.top && clientY <= endRect.bottom &&
         clientX >= endRect.right) return textLength;
     let range = null;
     if (document.caretRangeFromPoint) {
@@ -291,7 +291,7 @@ function positionFromPointer(event) {
     if (!element) return null;
     const line = Number(element.dataset.line || 1);
     const textLength = (state.cache.get(line) ?? lineTextFromElement(element)).length;
-    if (line >= state.lineCount && event.clientY >= element.getBoundingClientRect().bottom) {
+    if (element.dataset.markdownPreviewLine !== 'table' && line >= state.lineCount && event.clientY >= element.getBoundingClientRect().bottom) {
         return { line, column: textLength, element };
     }
     const column = Math.max(0, Math.min(getCaretOffsetFromPoint(element, event.clientX, event.clientY), textLength));
@@ -354,7 +354,11 @@ function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = tr
     if (state.inlineLivePreviewEnabled && state.inlineLivePreviewSourceLine) {
         state.inlineLivePreviewSourceLine = state.editingLine;
     }
-    element.focus({ preventScroll: true });
+    if (!imeController.isComposing) ensureMarkdownPreviewCaretAnchors(element);
+    const previewPosition = markdownPreviewTextPosition(element, offset,
+        offset < getCaretOffset(element) ? -1 : 1);
+    const contentEditor = (previewPosition?.node.nodeType === Node.ELEMENT_NODE ? previewPosition.node : previewPosition?.node.parentElement)?.closest('.md-preview-content[contenteditable="true"]');
+    (contentEditor || element).focus({ preventScroll: true });
     const selection = window.getSelection();
     const range = document.createRange();
     let remaining = Math.max(0, offset);
@@ -376,8 +380,6 @@ function setCaret(element, offset, scrollMargin = 0, includeSelectionReport = tr
         return false;
     }
 
-    const previewPosition = markdownPreviewTextPosition(element, offset,
-        offset < getCaretOffset(element) ? -1 : 1);
     if (previewPosition) {
         range.setStart(previewPosition.node, previewPosition.offset);
         range.collapse(true);

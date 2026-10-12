@@ -33,6 +33,7 @@ import { bindKeyboardEvents } from './editor-keyboard-events.js';
 import { bindPointerSelectionEvents } from './editor-pointer-selection-events.js';
 import { bindTextInputEvents } from './editor-text-input-events.js';
 import { hasCustomSelection } from './editor-selection.js';
+import { bindMarkdownTableEvents } from './editor-markdown-table-ui.js';
 
 export function bindEditorEvents({
     findReplaceController,
@@ -40,6 +41,7 @@ export function bindEditorEvents({
     getPreciseLivePreviewPosition,
     renderer
 }) {
+    bindMarkdownTableEvents();
     bindTextInputEvents({ renderer });
     const pointerEvents = bindPointerSelectionEvents({ getPreciseLivePreviewPosition, renderer });
     bindKeyboardEvents({

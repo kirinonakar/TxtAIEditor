@@ -1,3 +1,5 @@
+import { parseMarkdownTableRow } from './editor-markdown-table-model.js';
+
 const mermaidCache = new Map();
 const DEFAULT_MAX_MERGED_PARAGRAPH_LINES = 12;
 const LATEX_ENVIRONMENT_ALIASES = new Map([
@@ -613,26 +615,7 @@ function collectHtmlBlock(startLine, maxLine, getLine) {
 }
 
 function splitTableRow(line) {
-    const trimmed = String(line || '').trim();
-    if (!trimmed.startsWith('|') || !trimmed.endsWith('|')) return null;
-
-    const body = trimmed.slice(1, -1);
-    const cells = [];
-    let current = '';
-    for (let i = 0; i < body.length; i++) {
-        const ch = body[i];
-        if (ch === '\\' && body[i + 1] === '|') {
-            current += '|';
-            i++;
-        } else if (ch === '|') {
-            cells.push(current.trim());
-            current = '';
-        } else {
-            current += ch;
-        }
-    }
-    cells.push(current.trim());
-    return cells;
+    return parseMarkdownTableRow(line)?.cells.map(cell => cell.text.replace(/\\\|/g, '|').trim()) || null;
 }
 
 function isTableSeparator(line) {
@@ -931,7 +914,7 @@ function leadingWhitespaceLength(line, tabSize = 4) {
 
 function listItemInfo(text, options = {}) {
     const tabSize = Number(options.tabSize || 4);
-    const match = /^([ \t]*)([-*+]|\d+\.)(?:\s+\[([ xX])\])?\s+(.+)$/.exec(text || '');
+    const match = /^([ \t]*)([-*+]|\d+\.)(?:[ \t]+\[([ xX])\])?[ \t]+(.*)$/.exec(text || '');
     if (!match) return null;
     const ordered = /\d+\./.test(match[2]);
     return {

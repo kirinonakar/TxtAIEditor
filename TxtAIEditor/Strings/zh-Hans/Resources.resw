@@ -4035,4 +4035,21 @@
   <data name="EditorFoldSelectFormat" xml:space="preserve"><value>选择全部 {0} 个折叠行</value></data>
   <data name="EditorContextMenuCollapseAll" xml:space="preserve"><value>全部折叠</value></data>
   <data name="EditorContextMenuExpandAll" xml:space="preserve"><value>全部展开</value></data>
+  <data name="EditorMarkdownTableRow" xml:space="preserve"><value>行</value></data>
+  <data name="EditorMarkdownTableColumn" xml:space="preserve"><value>列</value></data>
+  <data name="EditorMarkdownTableRowBefore" xml:space="preserve"><value>在上方插入行</value></data>
+  <data name="EditorMarkdownTableRowAfter" xml:space="preserve"><value>在下方插入行</value></data>
+  <data name="EditorMarkdownTableRowDelete" xml:space="preserve"><value>删除行</value></data>
+  <data name="EditorMarkdownTableRowUp" xml:space="preserve"><value>上移行</value></data>
+  <data name="EditorMarkdownTableRowDown" xml:space="preserve"><value>下移行</value></data>
+  <data name="EditorMarkdownTableSelectRow" xml:space="preserve"><value>选择行</value></data>
+  <data name="EditorMarkdownTableColumnBefore" xml:space="preserve"><value>在左侧插入列</value></data>
+  <data name="EditorMarkdownTableColumnAfter" xml:space="preserve"><value>在右侧插入列</value></data>
+  <data name="EditorMarkdownTableColumnDelete" xml:space="preserve"><value>删除列</value></data>
+  <data name="EditorMarkdownTableColumnLeft" xml:space="preserve"><value>左移列</value></data>
+  <data name="EditorMarkdownTableColumnRight" xml:space="preserve"><value>右移列</value></data>
+  <data name="EditorMarkdownTableSelectColumn" xml:space="preserve"><value>选择列</value></data>
+  <data name="EditorMarkdownTableCellMode" xml:space="preserve"><value>选择单元格</value></data>
+  <data name="EditorMarkdownTableClearCells" xml:space="preserve"><value>清空内容</value></data>
+  <data name="EditorMarkdownTableCopyCells" xml:space="preserve"><value>复制单元格</value></data>
 </root>
