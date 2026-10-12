@@ -110,6 +110,7 @@ const state = {
     foldScrollExtent: 0,
     foldScrollWidth: 0,
     foldScrollRestore: null,
+    editScrollRestore: null,
     foldDiscoveryLine: 0,
     longLineProtectionFormat: '... too long ({0} characters total)'
 };
@@ -542,6 +543,7 @@ function setupModel(lineCount) {
     state.foldScrollWidth = 0;
     viewport.style.removeProperty('min-width');
     state.foldScrollRestore = null;
+    state.editScrollRestore = null;
     state.foldDiscoveryLine = 0;
     compressedScrollMappingAnchor = null;
     state.lineCount = Math.max(1, Number(lineCount || 1));

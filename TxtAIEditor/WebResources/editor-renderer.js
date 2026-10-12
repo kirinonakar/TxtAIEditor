@@ -656,7 +656,7 @@ function createEditorRenderer({
             const targetCaret = activeLine === state.currentLine ? activeCaret : Math.max(0, state.currentColumn - 1);
             const element = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
             if (element && element.getAttribute('contenteditable') === 'true') {
-                setCaret(element, targetCaret, 0, true, !state.foldScrollRestore);
+                setCaret(element, targetCaret, 0, true, !(state.foldScrollRestore || state.editScrollRestore));
             }
         }
 
@@ -666,6 +666,11 @@ function createEditorRenderer({
             scrollContainer.scrollTop = state.foldScrollRestore.top;
             scrollContainer.scrollLeft = state.foldScrollRestore.left;
             state.foldScrollRestore = null;
+        }
+        if (state.editScrollRestore) {
+            scrollContainer.scrollTop = state.editScrollRestore.top;
+            scrollContainer.scrollLeft = state.editScrollRestore.left;
+            state.editScrollRestore = null;
         }
         if (editInPreview) lastPreviewPaint = { scrollTop: scrollContainer.scrollTop,
             scrollLeft: scrollContainer.scrollLeft, width: scrollContainer.clientWidth,

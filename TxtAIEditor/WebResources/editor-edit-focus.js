@@ -74,18 +74,22 @@ export function restoreScrollTop(scrollTop) {
     scrollContainer.scrollTop = clampScrollTop(scrollTop);
 }
 
-export function queueFocusPreservingScroll(lineNumber, columnZeroBased, scrollTop) {
+export function queueFocusPreservingScroll(lineNumber, columnZeroBased, scrollTop, scrollLeft = null) {
     const token = ++scrollPreservingFocusToken;
+    const restore = () => {
+        restoreScrollTop(scrollTop);
+        if (scrollLeft !== null) scrollContainer.scrollLeft = scrollLeft;
+    };
 
     function run(attempt = 0) {
         if (token !== scrollPreservingFocusToken) return;
 
-        restoreScrollTop(scrollTop);
+        restore();
         const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
         if (element && element.getAttribute('contenteditable') === 'true') {
-            setCaret(element, columnZeroBased);
-            restoreScrollTop(scrollTop);
-            if (attempt < 2) {
+            setCaret(element, columnZeroBased, 0, true, scrollLeft === null);
+            restore();
+            if (scrollLeft === null && attempt < 2) {
                 requestAnimationFrame(() => run(attempt + 1));
             }
             return;
@@ -96,8 +100,9 @@ export function queueFocusPreservingScroll(lineNumber, columnZeroBased, scrollTo
             return;
         }
 
-        focusLine(lineNumber, columnZeroBased);
-        restoreScrollTop(scrollTop);
+        // A preserved viewport must not reveal an off-screen editing target.
+        if (scrollLeft === null) focusLine(lineNumber, columnZeroBased);
+        restore();
     }
 
     queuePostEditFocus(() => run());
