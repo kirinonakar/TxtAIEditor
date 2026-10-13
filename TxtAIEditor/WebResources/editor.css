@@ -568,6 +568,14 @@ body.csv-table-mode .line-row {
     -webkit-user-select: none;
 }
 
+.md-preview-list-gutter .md-preview-list-line-number {
+    position: absolute;
+    left: 0;
+    right: 0;
+    min-height: 0;
+    white-space: nowrap;
+}
+
 .line-row.dirty-mod::before,
 .line-row.dirty-add::before {
     content: "";

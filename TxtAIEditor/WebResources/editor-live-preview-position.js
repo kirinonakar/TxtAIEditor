@@ -62,18 +62,21 @@ export function createLivePreviewPositionResolver({
             
             finalColumn = mapHtmlOffsetToRawOffset(rawLineText, htmlLineText, offset);
         } else if (block.kind === 'list') {
+            const targetItem = (targetNode.nodeType === Node.ELEMENT_NODE ? targetNode : targetNode.parentElement)?.closest('[data-markdown-list-line]');
             const targetLi = targetNode.nodeType === Node.ELEMENT_NODE
                 ? targetNode.closest('li')
                 : targetNode.parentElement?.closest('li');
             if (targetLi) {
                 const liIndex = getPrecedingLiCount(element, targetLi);
-                clickedLine = Math.min(block.endLine, block.startLine + Math.max(0, liIndex));
+                clickedLine = targetItem ? Number(targetItem.dataset.markdownListLine)
+                    : Math.min(block.endLine, block.startLine + Math.max(0, liIndex));
                 const rawLineText = state.cache.get(clickedLine) || '';
-                const offset = getTextOffsetInLi(targetLi, targetNode, targetOffset);
+                const offset = targetItem?.tagName === 'P' ? getTextOffsetInElement(targetItem, targetNode, targetOffset)
+                    : getTextOffsetInLi(targetLi, targetNode, targetOffset);
                 
                 const tempDiv = document.createElement('div');
                 const itemInfo = listItemInfo(rawLineText, { tabSize: state.tabSize || 4 });
-                const textToRender = itemInfo ? itemInfo.content : rawLineText;
+                const textToRender = itemInfo ? itemInfo.content : rawLineText.trim();
                 tempDiv.innerHTML = inlineMarkdown(textToRender, { tabSize: state.tabSize || 4 });
                 const htmlLineText = tempDiv.textContent || '';
                 

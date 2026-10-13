@@ -200,7 +200,7 @@ export function performMarkdownTableAction(action) {
     closeMenus();
     replaceSelectionWith({ start: { line: table.startLine, column: 0 },
         end: { line: table.endLine, column: (state.cache.get(table.endLine) || '').length } }, change.text,
-        { startOffset: offset, endOffset: offset, preserveScroll: action === 'clear-cells' });
+        { startOffset: offset, endOffset: offset, preserveScroll: true });
     return true;
 }
 

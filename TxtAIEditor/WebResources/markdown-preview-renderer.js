@@ -1060,7 +1060,7 @@ function renderListContinuationParagraph(lines, startIndex, parentIndent, option
 
     const html = paragraphs
         .filter(text => String(text || '').trim())
-        .map((text, index) => `<p>${options.editableListContinuation
+        .map((text, index) => `<p data-markdown-list-line="${Number(options.sourceStartLine || 1) + paragraphIndexes[index]}">${options.editableListContinuation
             ? options.editableListContinuation(lines[paragraphIndexes[index]], Number(options.sourceStartLine || 1) + paragraphIndexes[index])
             : inlineMarkdown(text.trim(), options)}</p>`)
         .join('');
@@ -1080,6 +1080,7 @@ function renderMarkdownListAt(lines, startIndex, indent, options = {}) {
         const info = listItemInfo(lines[index], options);
         if (!info || info.indent !== indent || info.type !== tag) break;
 
+        const itemSourceLine = Number(options.sourceStartLine || 1) + index;
         let itemHtml = options.editableListItem
             ? options.editableListItem(lines[index], Number(options.sourceStartLine || 1) + index, info)
             : info.taskChecked === null
@@ -1107,7 +1108,7 @@ function renderMarkdownListAt(lines, startIndex, indent, options = {}) {
             index = continuation.nextIndex;
         }
 
-        items.push(`<li${itemClass}>${itemHtml}</li>`);
+        items.push(`<li${itemClass} data-markdown-list-line="${itemSourceLine}">${itemHtml}</li>`);
     }
 
     return { html: `<${tag}${startAttr}>${items.join('')}</${tag}>`, nextIndex: index };

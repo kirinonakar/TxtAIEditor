@@ -9,6 +9,7 @@ import { SelectionController } from './editor-selection-state.js';
 import { ViewportController } from './editor-viewport-state.js';
 import { FoldingController } from './editor-folding.js';
 import { updateGroupedMarkdownElement } from './editor-markdown-preview-edit.js';
+import { syncMarkdownListLineNumbers } from './editor-markdown-list-gutter.js';
 import {
     CsvTableMode,
     EditorModeCoordinator,
@@ -1376,6 +1377,7 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
         }
     }
 
+    syncMarkdownListLineNumbers();
     if (changed) {
         setupVirtualHeight();
         if (state.inlineLivePreviewEnabled) {

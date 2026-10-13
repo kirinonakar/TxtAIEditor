@@ -642,14 +642,20 @@ export function bindPointerSelectionEvents({
         return position;
     }
 
+    function selectWordFromPointer(event) {
+        const position = livePreviewPositionFromPointer(event);
+        return position ? selectWordAtPointer(event, position) : false;
+    }
+
     function restoreScrollPosition(scrollTop, scrollLeft) {
         const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
         scrollContainer.scrollTop = Math.min(maxScrollTop, Math.max(0, Number(scrollTop || 0)));
         scrollContainer.scrollLeft = Math.max(0, Number(scrollLeft || 0));
     }
 
-    function preserveAndRestoreScroll(scrollTop, scrollLeft) {
-        if (usesMarkdownPreviewEditing(state)) {
+    function preserveAndRestoreScroll(scrollTop, scrollLeft, stableLayout = usesMarkdownPreviewEditing(state) ||
+        livePreviewPointer?.start.element?.dataset.markdownPreviewLine === 'table') {
+        if (stableLayout) {
             // Editable preview clicks do not change layout. A synchronous
             // restore is sufficient; delayed restores fight the next wheel.
             restoreScrollPosition(scrollTop, scrollLeft);
@@ -812,6 +818,7 @@ export function bindPointerSelectionEvents({
     function finishLivePreviewPointer(event = null) {
         const pending = livePreviewPointer;
         if (!pending) return false;
+        const stableLayout = usesMarkdownPreviewEditing(state) || pending.start.element?.dataset.markdownPreviewLine === 'table';
 
         const endPosition = event ? livePreviewPositionFromPointer(event) : null;
         cancelLivePreviewSelectionFrame();
@@ -848,7 +855,7 @@ export function bindPointerSelectionEvents({
                 drawEditableSelectionOverlays();
                 syncLivePreviewSourceSelectionFocus();
             }
-            if (!usesMarkdownPreviewEditing(state)) preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft);
+            if (!usesMarkdownPreviewEditing(state)) preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft, stableLayout);
             reportCursorAndSelection(endPosition?.element || document.activeElement);
             return true;
         }
@@ -863,13 +870,13 @@ export function bindPointerSelectionEvents({
         dragDropController.clearPointerStart();
         syncCustomSelectionClass();
         clearCustomSelectionVisuals();
-        preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft);
+        preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft, stableLayout);
 
         if (clickPosition.element?.getAttribute?.('contenteditable') === 'true') {
             keepEditablePreviewBlockFromElement(clickPosition.element);
             if (usesMarkdownPreviewEditing(state)) state.alignCaretToY = null;
             setCaret(clickPosition.element, clickColumn, 0, true, !usesMarkdownPreviewEditing(state));
-            preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft);
+            preserveAndRestoreScroll(pending.scrollTop, pending.scrollLeft, stableLayout);
         } else {
             beginInlineLivePreviewEdit(clickPosition.line, clickColumn, {
                 preserveScroll: true,
@@ -940,7 +947,10 @@ export function bindPointerSelectionEvents({
         cancelPostEditFocusFollowUps();
         if (csvTableMode.isEnabled) return;
         if (event.button !== 0 || findPanel.contains(event.target)) return;
-        if (usesMarkdownPreviewEditing(state) && imeController.isComposing) return;
+        if (usesMarkdownPreviewEditing(state) && imeController.isComposing) {
+            if (event.target.closest('.line-number, .fold-summary, .fold-toggle')) event.preventDefault();
+            return;
+        }
 
         if (!contextMenu.hidden && !contextMenu.contains(event.target)) {
             hideContextMenu();
@@ -988,9 +998,13 @@ export function bindPointerSelectionEvents({
 
         const lineNumEl = event.target.closest('.line-number, .fold-summary');
         if (lineNumEl) {
+            if (imeController.isCompositionActive) {
+                event.preventDefault();
+                return;
+            }
             const row = lineNumEl.closest('.line-row');
             if (row) {
-                const line = Number(row.dataset.line || 1);
+                const line = Number(lineNumEl.dataset.line || row.dataset.line || 1);
                 const text = state.cache.get(line) || '';
                 const lineLength = text.length;
                 const foldedRange = foldingController.collapsedRange(line);
@@ -1029,17 +1043,23 @@ export function bindPointerSelectionEvents({
         if (!position) return;
 
         const now = Date.now();
-        const isDoubleClick = (event.detail >= 2) || (!usesMarkdownPreviewEditing(state) && position.element.dataset.markdownPreviewLine !== 'table' &&
-            ((now - lastPointerDownTime < 350) &&
+        const previewTarget = isEditablePreviewBlockElement(position.element);
+        const isDoubleClick = (event.detail >= 2) || (
+            ((now - lastPointerDownTime < 500) &&
                 lastPointerDownPosition &&
                 (lastPointerDownPosition.line === position.line) &&
-                (Math.abs(lastPointerDownPosition.column - position.column) < 5)));
+                (previewTarget
+                    ? event.detail === 0 && lastPointerDownPosition.detail === 0 &&
+                        lastPointerDownPosition.documentId === state.hostDocumentId && lastPointerDownPosition.cacheVersion === state.cacheVersion &&
+                        Math.hypot(event.clientX - lastPointerDownPosition.clientX, event.clientY - lastPointerDownPosition.clientY) <= 4
+                    : Math.abs(lastPointerDownPosition.column - position.column) < 5)));
 
         lastPointerDownTime = now;
-        lastPointerDownPosition = position;
+        lastPointerDownPosition = { ...position, detail: event.detail, clientX: event.clientX, clientY: event.clientY,
+            documentId: state.hostDocumentId, cacheVersion: state.cacheVersion };
 
         if (isDoubleClick && !event.shiftKey) {
-            if (selectWordAtPointer(event)) {
+            if (selectWordFromPointer(event)) {
                 event.preventDefault();
                 return;
             }
@@ -1706,7 +1726,7 @@ export function bindPointerSelectionEvents({
             return;
         }
         if (event.target.closest?.('.line-number')) return;
-        if (selectWordAtPointer(event)) {
+        if (selectWordFromPointer(event)) {
             event.preventDefault();
             event.stopPropagation();
         }

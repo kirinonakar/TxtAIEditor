@@ -11,6 +11,7 @@ import {
     revealFoldedLine,
     selectionController,
     state,
+    syncCustomSelectionClass,
     usesFullDocumentRender,
     usesCompressedScroll,
     visualScrollDeltaToScrollTopDelta,
@@ -319,8 +320,9 @@ function wordRangeAtColumn(text, column) {
     return start < end ? { start, end } : null;
 }
 
-function selectWordAtPointer(event) {
-    const position = positionFromPointer(event);
+function selectWordAtPointer(event, resolvedPosition = null) {
+    if (imeController.isCompositionActive) return false;
+    const position = resolvedPosition || positionFromPointer(event);
     if (!position) return false;
 
     const text = state.cache.get(position.line) ?? lineTextFromElement(position.element);
@@ -334,8 +336,16 @@ function selectWordAtPointer(event) {
     };
     state.currentLine = position.line;
     state.currentColumn = wordRange.end + 1;
-    queueRender(true);
-    setTimeout(() => focusLine(position.line, wordRange.end), 0);
+    if ((usesMarkdownPreviewEditing(state) || position.element.dataset.markdownPreviewLine === 'table') &&
+        position.element.getAttribute('contenteditable') === 'true') {
+        syncCustomSelectionClass();
+        setCaret(position.element, wordRange.end, 0, true, false);
+        setNativeSelectionRangeInElement(position.element, wordRange.start, wordRange.end);
+        drawEditableSelectionOverlays();
+    } else {
+        queueRender(true);
+        setTimeout(() => focusLine(position.line, wordRange.end), 0);
+    }
     reportCursorAndSelection(position.element);
     return true;
 }
@@ -825,15 +835,16 @@ function setNativeSelectionRangeInElement(element, startOffset, endOffset) {
     const textLength = lineTextFromElement(element).length;
     const start = Math.max(0, Math.min(Number(startOffset || 0), textLength));
     const end = Math.max(start, Math.min(Number(endOffset || 0), textLength));
-    const startPosition = textPositionForOffsetInElement(element, start);
-    const endPosition = textPositionForOffsetInElement(element, end);
+    const startPosition = markdownPreviewTextPosition(element, start, 1) || textPositionForOffsetInElement(element, start);
+    const endPosition = markdownPreviewTextPosition(element, end, -1) || textPositionForOffsetInElement(element, end);
     if (!startPosition || !endPosition) return false;
 
     const range = document.createRange();
     range.setStart(startPosition.node, startPosition.offset);
     range.setEnd(endPosition.node, endPosition.offset);
 
-    element.focus({ preventScroll: true });
+    const contentEditor = (startPosition.node.nodeType === Node.ELEMENT_NODE ? startPosition.node : startPosition.node.parentElement)?.closest('.md-preview-content[contenteditable="true"]');
+    (contentEditor || element).focus({ preventScroll: true });
     const domSelection = window.getSelection();
     if (!domSelection) return false;
     domSelection.removeAllRanges();

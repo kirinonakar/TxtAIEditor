@@ -44,6 +44,7 @@ import { isPointOnScrollContainerScrollbar } from './editor-caret.js';
 import { createFullHtmlLivePreviewRenderer } from './editor-html-live-preview.js';
 import { renderEditableMarkdownLine, renderGroupedEditableMarkdown, usesMarkdownPreviewEditing, usesMarkdownTableEditing } from './editor-markdown-preview-edit.js';
 import { syncMarkdownTableUi } from './editor-markdown-table-ui.js';
+import { syncMarkdownListLineNumbers } from './editor-markdown-list-gutter.js';
 
 function createEditorRenderer({
     findEditablePreviewBlockContaining,
@@ -660,6 +661,7 @@ function createEditorRenderer({
             }
         }
 
+        syncMarkdownListLineNumbers();
         if (!preserveComposition) drawEditableSelectionOverlays();
         syncMarkdownTableUi();
         if (state.foldScrollRestore) {
