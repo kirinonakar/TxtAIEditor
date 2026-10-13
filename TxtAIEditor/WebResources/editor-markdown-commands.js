@@ -175,6 +175,32 @@ function toggleLinePrefix(prefix) {
     }
 }
 
+function toggleUnorderedList() {
+    const { range, startLine, endLine } = selectedMarkdownLineRange();
+    const marker = text => /^([ \t]*)([-*+][ \t]+)/.exec(text);
+    const shouldRemove = Array.from({ length: endLine - startLine + 1 }, (_, i) => state.cache.get(startLine + i) ?? '')
+        .every(line => marker(line));
+    let nextColumn = range.start.column;
+    for (let line = startLine; line <= endLine; line++) {
+        const original = state.cache.get(line) ?? '';
+        const existing = marker(original);
+        const indent = existing?.[1] ?? original.match(/^[ \t]*/)[0];
+        const removed = shouldRemove ? existing[2].length : 0;
+        const added = !shouldRemove && !existing ? 2 : 0;
+        const next = shouldRemove ? indent + original.slice(indent.length + removed)
+            : added ? indent + '- ' + original.slice(indent.length) : original;
+        if (next !== original) applyLineText(line, next);
+        if (line === range.start.line && nextColumn >= indent.length) {
+            nextColumn = shouldRemove ? Math.max(indent.length, nextColumn - removed) : nextColumn + added;
+        }
+    }
+    if (rangeIsCollapsed(range)) {
+        setSelectionAfterLineEdits({ line: range.start.line, column: nextColumn }, { line: range.start.line, column: nextColumn });
+    } else {
+        setSelectionAfterLineEdits({ line: startLine, column: 0 }, { line: endLine, column: (state.cache.get(endLine) ?? '').length });
+    }
+}
+
 function headingPrefix(line) {
     const match = line.match(/^(#{1,6})(?: |$)/);
     if (!match) return null;
@@ -690,7 +716,7 @@ function applyMarkdownCommand(command, color) {
         case 'inlineCode': toggleWrappedSelection('`'); break;
         case 'math': toggleWrappedSelection('$$', '$$'); break;
         case 'quote': toggleLinePrefix('> '); break;
-        case 'ul': toggleLinePrefix('- '); break;
+        case 'ul': toggleUnorderedList(); break;
         case 'task': toggleLinePrefix('- [ ] '); break;
         case 'image': toggleMarkdownImage(); break;
         case 'link': toggleMarkdownLink(); break;

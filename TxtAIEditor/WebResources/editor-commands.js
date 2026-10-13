@@ -196,16 +196,19 @@ function commitLine(element) {
         return inputSnapshot;
     }
 
+    const refreshPreview = needsMarkdownPreviewBlockRefresh(state, lineNumber);
+    if (refreshPreview && text.trim()) element.closest('.line-row')?.classList.remove('live-preview-empty');
+
     if (!cleanDirtyMarker(lineNumber)) {
         markDirty(lineNumber, 'mod');
     }
 
     postLineUpdate(lineNumber, previousText, text);
     post({ type: 'contentChanged' });
-    if (needsMarkdownPreviewBlockRefresh(state, lineNumber)) queueRender(true);
+    if (refreshPreview) queueRender(true);
     reportCursorAndSelection(element, caretOffset);
 
-    if (state.wordWrap) {
+    if (state.wordWrap && !refreshPreview) {
         measureRenderedRows(false);
     }
     return inputSnapshot;
@@ -820,6 +823,8 @@ function updateSingleLine(element, text, caretColumn) {
     selectionController.anchor = { line: lineNumber, column: nextColumn };
     state.currentLine = lineNumber;
     state.currentColumn = nextColumn + 1;
+    const refreshPreview = needsMarkdownPreviewBlockRefresh(state, lineNumber);
+    if (refreshPreview && nextText.trim()) element.closest('.line-row')?.classList.remove('live-preview-empty');
 
     if (!cleanDirtyMarker(lineNumber)) {
         markDirty(lineNumber, 'mod');
@@ -840,9 +845,9 @@ function updateSingleLine(element, text, caretColumn) {
 
     postLineUpdate(lineNumber, previousText, nextText);
     post({ type: 'contentChanged' });
-    if (needsMarkdownPreviewBlockRefresh(state, lineNumber)) queueRender(true);
+    if (refreshPreview) queueRender(true);
 
-    if (state.wordWrap) {
+    if (state.wordWrap && !refreshPreview) {
         measureRenderedRows(false);
     }
 }

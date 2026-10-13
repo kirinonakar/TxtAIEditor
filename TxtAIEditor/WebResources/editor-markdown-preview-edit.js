@@ -29,8 +29,10 @@ export function usesMarkdownTableEditing(state) {
 
 export function needsMarkdownPreviewBlockRefresh(state, lineNumber) {
     if (!usesMarkdownPreviewEditing(state)) return false;
-    const kind = document.querySelector(`#viewport .line-text[data-line="${lineNumber}"]`)?.dataset.markdownPreviewLine;
+    const element = document.querySelector(`#viewport .line-text[data-line="${lineNumber}"]`);
+    const kind = element?.dataset.markdownPreviewLine;
     const text = state.cache.get(lineNumber) || '';
+    if (text.trim() && element?.closest('.line-row')?.classList.contains('live-preview-empty')) return true;
     const list = /^[ \t]*(?:[-*+]|\d+\.)[ \t]+/.test(text);
     if ((kind === 'paragraph' && (list || /^ {0,3}#{1,6}[ \t]/.test(text))) || (kind === 'list' && !list)) return true;
     const block = state.inlineLivePreviewEditableBlock;
