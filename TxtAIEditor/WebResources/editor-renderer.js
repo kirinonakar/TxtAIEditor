@@ -313,10 +313,6 @@ function createEditorRenderer({
             : null;
         if (preserveComposition && !composingRow) return;
         const previousViewportTop = Number(/translateY\(([-\d.]+)/.exec(viewport.style.transform)?.[1] || 0);
-        const compositionDocumentTop = composingRow
-            ? Number(composingRow.dataset.compositionDocumentTop ?? (previousViewportTop + composingRow.offsetTop))
-            : 0;
-
         const offsetY = viewportTopForLine(renderStart);
         viewport.style.transform = renderFullDocument ? 'none' : `translateY(${offsetY}px)`;
 
@@ -575,7 +571,7 @@ function createEditorRenderer({
                 ? `<button type="button" class="fold-summary" data-line="${line}" aria-label="${escapeHtml(foldSummaryLabel)}" title="${escapeHtml(foldSummaryLabel)}">⋯ ${collapsedFold.end - line}</button>`
                 : '';
             const rowHtml =
-                `<div class="line-row${collapsedFold ? ' folded-row' : ''}${livePreviewClass}${editingClass}${hoveredClass}${isInSelection ? ' selected-row' : ''}${isSelectedEmptyLine ? ' selected-empty-row' : ''}${dirtyClass}" data-line="${line}"${livePreviewAttributes}>` +
+                `<div class="line-row${collapsedFold ? ' folded-row' : ''}${livePreviewClass}${editingClass}${hoveredClass}${isInSelection ? ' selected-row' : ''}${isSelectedEmptyLine ? ' selected-empty-row' : ''}${dirtyClass}" data-line="${line}" data-preview-end-line="${renderedLivePreviewLine?.endLine || line}"${livePreviewAttributes}>` +
                 `<div class="line-number">${foldToggle}${line}</div>` +
                 `<div class="${textClass}" contenteditable="${liveContentEditable}" spellcheck="false" data-line="${editableLineNumber}"${longLineAttributes}>${lineContent}</div>` +
                 foldSummary +
@@ -614,26 +610,53 @@ function createEditorRenderer({
             const template = document.createElement('template');
             template.innerHTML = rows.join('');
             const nextRows = [...template.content.children];
-            const composingIndex = nextRows.findIndex(row => row.dataset.line === composingRow.dataset.line);
-            // Never move, detach, or rewrite the IME-owned row. Other rows can
-            // be replaced around it, even when the user scrolls far away.
-            for (const row of [...viewport.children]) {
-                if (row !== composingRow) row.remove();
+            const currentRows = [...viewport.children];
+            const startOf = row => Number(row.dataset.line);
+            const endOf = row => Number(row.dataset.previewEndLine || row.dataset.line);
+            let preservedStart = startOf(composingRow);
+            let preservedEnd = endOf(composingRow);
+            const overlaps = row => startOf(row) <= preservedEnd && endOf(row) >= preservedStart;
+            // A committed syllable can merge/split its former blank row before
+            // the next syllable's composition starts. Keep all old rows covered
+            // by that regrouping, rather than painting another copy of them.
+            let expanded;
+            do {
+                expanded = false;
+                for (const row of [...currentRows, ...nextRows]) {
+                    if (!overlaps(row)) continue;
+                    const start = Math.min(preservedStart, startOf(row));
+                    const end = Math.max(preservedEnd, endOf(row));
+                    expanded ||= start !== preservedStart || end !== preservedEnd;
+                    preservedStart = start;
+                    preservedEnd = end;
+                }
+            } while (expanded);
+            const preservedRows = currentRows.filter(overlaps);
+            const preservedTops = new Map(preservedRows.map(row => [row,
+                Number(row.dataset.compositionDocumentTop ?? (previousViewportTop + row.offsetTop))]));
+            const isInRenderWindow = nextRows.some(overlaps);
+            // Never move, detach, or rewrite an IME-owned row. Repaint only the
+            // unrelated rows, including newly scrolled regions of the document.
+            for (const row of currentRows) {
+                if (!overlaps(row)) row.remove();
             }
-            if (composingIndex >= 0) {
-                composingRow.style.removeProperty('position');
-                composingRow.style.removeProperty('top');
-                delete composingRow.dataset.compositionDocumentTop;
-                nextRows.forEach((row, index) => {
-                    if (index < composingIndex) viewport.insertBefore(row, composingRow);
-                    else if (index > composingIndex) viewport.appendChild(row);
-                });
-            } else {
-                composingRow.dataset.compositionDocumentTop = String(compositionDocumentTop);
-                composingRow.style.position = 'absolute';
-                composingRow.style.top = `${compositionDocumentTop - viewportTopForLine(viewportLayoutStart)}px`;
-                nextRows.forEach(row => viewport.appendChild(row));
+            for (const row of preservedRows) {
+                if (isInRenderWindow) {
+                    row.style.removeProperty('position');
+                    row.style.removeProperty('top');
+                    delete row.dataset.compositionDocumentTop;
+                } else {
+                    const top = preservedTops.get(row);
+                    row.dataset.compositionDocumentTop = String(top);
+                    row.style.position = 'absolute';
+                    row.style.top = `${top - viewportTopForLine(viewportLayoutStart)}px`;
+                }
             }
+            nextRows.forEach(row => {
+                if (overlaps(row)) return;
+                if (isInRenderWindow && endOf(row) < preservedStart) viewport.insertBefore(row, preservedRows[0]);
+                else viewport.appendChild(row);
+            });
         } else {
             viewport.innerHTML = rows.join('');
         }

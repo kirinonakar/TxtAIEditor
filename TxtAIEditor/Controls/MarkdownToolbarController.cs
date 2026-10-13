@@ -56,6 +56,14 @@ namespace TxtAIEditor.Controls
                 if (_tabBridges.TryGetValue(tabId, out var bridgeGroup) && bridgeGroup.Bridge != null)
                 {
                     await bridgeGroup.Bridge.ApplyMarkdownCommandAsync(command, color);
+                    try
+                    {
+                        bridgeGroup.WebView.Focus(FocusState.Programmatic);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Failed to focus editor after Markdown command: {ex.Message}");
+                    }
                 }
                 else if (_notebookViewerControllerProvider?.Invoke() is JupyterNotebookViewerController notebookViewer)
                 {

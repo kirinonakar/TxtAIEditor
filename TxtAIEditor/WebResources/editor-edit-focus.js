@@ -1,4 +1,5 @@
 import {
+    imeController,
     reportCursorAndSelection,
     selectionController,
     state,
@@ -82,7 +83,7 @@ export function queueFocusPreservingScroll(lineNumber, columnZeroBased, scrollTo
     };
 
     function run(attempt = 0) {
-        if (token !== scrollPreservingFocusToken) return;
+        if (token !== scrollPreservingFocusToken || imeController.isComposing) return;
 
         restore();
         const element = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);

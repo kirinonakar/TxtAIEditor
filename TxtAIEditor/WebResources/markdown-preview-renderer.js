@@ -1278,7 +1278,7 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
         }
         const innerHtml = paragraphLines.map((l, index) => options.editableParagraphLine
             ? options.editableParagraphLine(l, lineNumber + index)
-            : inlineMarkdown(l, options)).join('<br>');
+            : `<span data-markdown-paragraph-line="${lineNumber + index}">${inlineMarkdown(l, options)}</span>`).join('<br>');
         return { html: `<p>${innerHtml}</p>`, endLine };
     }
 

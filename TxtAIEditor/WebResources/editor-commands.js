@@ -23,6 +23,7 @@ import {
     preserveCompressedScrollMapping,
     preserveScrollTop,
     queueRender,
+    renderImmediately,
     readClipboardText,
     reportCursorAndSelection,
     requestLines,
@@ -1604,6 +1605,7 @@ const { applyMarkdownCommand } = createMarkdownCommandHandlers({
     getCaretOffset,
     hasCustomSelection,
     hasTextAt,
+    imeController,
     isStandaloneDelimiter,
     lineTextFromElement,
     markDirty,
@@ -1613,12 +1615,15 @@ const { applyMarkdownCommand } = createMarkdownCommandHandlers({
     preserveScrollTop,
     queueFocusPreservingScroll,
     queueRender,
+    renderImmediately,
     replaceSelectionWith,
     reportCursorAndSelection,
     selectionController,
+    setCaret,
     scrollContainer,
     state,
     syncCustomSelectionClass,
+    viewport,
     writeClipboardText
 });
 const {

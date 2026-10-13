@@ -7,6 +7,7 @@ export function createMarkdownCommandHandlers(deps) {
         getCaretOffset,
         hasCustomSelection,
         hasTextAt,
+        imeController,
         isStandaloneDelimiter,
         lineTextFromElement,
         markDirty,
@@ -16,12 +17,15 @@ export function createMarkdownCommandHandlers(deps) {
         preserveScrollTop,
         queueFocusPreservingScroll,
         queueRender,
+        renderImmediately,
         replaceSelectionWith,
         reportCursorAndSelection,
         selectionController,
+        setCaret,
         scrollContainer,
         state,
         syncCustomSelectionClass,
+        viewport,
         writeClipboardText
     } = deps;
 
@@ -39,22 +43,21 @@ export function createMarkdownCommandHandlers(deps) {
 function activeMarkdownRange() {
     if (hasCustomSelection()) return normalizeSelection();
 
+    // Reacquiring the editable host can create a new caret at its start.
+    // Keep the selection from before that focus change, or the saved model caret.
+    const selection = window.getSelection();
+    const nativeRange = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
+    const currentColumn = state.currentColumn;
     const element = activeEditableElement();
     const line = Number(element?.dataset.line || state.currentLine || 1);
     const text = state.cache.get(line) ?? (element ? lineTextFromElement(element) : '');
-    const fallbackColumn = Math.max(0, Math.min((state.currentColumn || 1) - 1, text.length));
-    if (!element) {
+    const fallbackColumn = Math.max(0, Math.min((currentColumn || 1) - 1, text.length));
+    if (!element || !nativeRange || !element.contains(nativeRange.startContainer) || !element.contains(nativeRange.endContainer)) {
         return { start: { line, column: fallbackColumn }, end: { line, column: fallbackColumn } };
     }
 
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || !element.contains(selection.anchorNode)) {
-        const caret = Math.max(0, Math.min(getCaretOffset(element), text.length));
-        return { start: { line, column: caret }, end: { line, column: caret } };
-    }
-
-    const anchor = Math.max(0, Math.min(offsetFromNode(element, selection.anchorNode, selection.anchorOffset), text.length));
-    const focus = Math.max(0, Math.min(offsetFromNode(element, selection.focusNode, selection.focusOffset), text.length));
+    const anchor = Math.max(0, Math.min(offsetFromNode(element, nativeRange.startContainer, nativeRange.startOffset), text.length));
+    const focus = Math.max(0, Math.min(offsetFromNode(element, nativeRange.endContainer, nativeRange.endOffset), text.length));
     return orderedRange({ start: { line, column: anchor }, end: { line, column: focus } });
 }
 
@@ -92,6 +95,16 @@ function setSelectionAfterLineEdits(start, end, scroll = null) {
     post({ type: 'contentChanged' });
     queueRender(true);
     if (scroll) {
+        // Finish the structural edit before the next native input. A timer can
+        // otherwise place the caret in the old, empty DOM before its RAF paint.
+        renderImmediately();
+        const element = viewport.querySelector(`.line-text[data-line="${end.line}"]`);
+        if (element?.getAttribute('contenteditable') === 'true') {
+            setCaret(element, end.column, 0, true, false);
+            scrollContainer.scrollTop = scroll.top;
+            scrollContainer.scrollLeft = scroll.left;
+            return;
+        }
         queueFocusPreservingScroll(end.line, end.column, scroll.top, scroll.left);
         return;
     }
@@ -189,6 +202,7 @@ function toggleLinePrefix(prefix) {
 }
 
 function toggleUnorderedList() {
+    if (imeController.isComposing) return;
     const scroll = { top: scrollContainer.scrollTop, left: scrollContainer.scrollLeft };
     const { range, startLine, endLine } = selectedMarkdownLineRange();
     const marker = text => /^([ \t]*)([-*+][ \t]+)/.exec(text);

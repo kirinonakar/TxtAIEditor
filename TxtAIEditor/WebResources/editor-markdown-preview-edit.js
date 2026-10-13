@@ -227,7 +227,7 @@ export function renderGroupedEditableMarkdown(lineNumber, state, options = {}, s
         ...options, sourceLine: 0,
         editableListItem: (text, line, info) => `<span ${editableAttributes(text, line, state, 'list')}>${listItemSource(text, info, options)}</span>`,
         editableListContinuation: (text, line) => `<span ${editableAttributes(text, line, state, 'continuation')}>${trimmedInlineSource(text, options)}</span>`,
-        editableParagraphLine: (text, line) => `<span ${editableAttributes(text, line, state, 'paragraph')}>${content(inlineSource(text, options))}</span>`,
+        editableParagraphLine: (text, line) => `<span ${editableAttributes(text, line, state, 'paragraph')} data-markdown-paragraph-line="${line}">${content(inlineSource(text, options))}</span>`,
         editableHtmlBlock: (block, line) => editableHtmlBlock(block, line, state, options),
         editableCodeBlock: (block, line, lines, numbers) => editableCodeBlock(block, line, state, options, lines, numbers),
         editableTableRow: (text, line, header, aligns, count) =>

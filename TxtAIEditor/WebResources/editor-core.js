@@ -1329,6 +1329,13 @@ function queueRender(force = false) {
     });
 }
 
+function renderImmediately() {
+    if (imeController.isComposing) return false;
+    viewportController.invalidateRenderRange();
+    runtime.render();
+    return true;
+}
+
 function queueColumnTextInputFallback(text, callback, delayMs = 40) {
     return imeController.queueColumnTextInputFallback(text, callback, delayMs);
 }
@@ -1877,6 +1884,7 @@ export {
     preserveScrollTop,
     queueColumnTextInputFallback,
     queueRender,
+    renderImmediately,
     readClipboardText,
     receiveLineBlock,
     reportCursorAndSelection,

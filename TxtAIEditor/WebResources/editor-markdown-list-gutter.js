@@ -1,12 +1,13 @@
 import { viewport } from './editor-dom.js';
 
-// A canonical nested list owns one outer source row. Paint its source numbers
+// A canonical list or paragraph owns one outer source row. Paint its numbers
 // in that row's gutter, outside editable content and without adding row height.
 export function syncMarkdownListLineNumbers() {
-    if (!viewport.querySelector('[data-markdown-list-line]')) return;
+    const sourceLines = '[data-markdown-list-line], [data-markdown-paragraph-line]';
+    if (!viewport.querySelector(sourceLines)) return;
     for (const row of viewport.querySelectorAll('.line-row.live-preview-row')) {
-        if (!row.querySelector('[data-markdown-list-line]')) continue;
-        const items = row.querySelectorAll('[data-markdown-list-line], [data-markdown-preview-line="code"]');
+        if (!row.querySelector(sourceLines)) continue;
+        const items = row.querySelectorAll(`${sourceLines}, [data-markdown-preview-line="code"]`);
         if (!items.length) continue;
         const gutter = row.querySelector(':scope > .line-number');
         if (!gutter) continue;
@@ -15,7 +16,7 @@ export function syncMarkdownListLineNumbers() {
         // Finish geometry reads before changing any gutter labels, so large
         // lists do not alternate layout measurement and DOM writes per item.
         const positions = [...items].map(item => ({
-            line: Number(item.dataset.markdownListLine || item.dataset.line),
+            line: Number(item.dataset.markdownListLine || item.dataset.markdownParagraphLine || item.dataset.line),
             top: Math.max(0, item.getBoundingClientRect().top - rowRect.top)
         }));
         gutter.classList.add('md-preview-list-gutter');
