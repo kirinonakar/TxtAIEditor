@@ -40,7 +40,7 @@ import {
     renderCsvTableRows,
     restoreCsvFocusAfterRender
 } from './editor-csv-table.js';
-import { isPointOnScrollContainerScrollbar } from './editor-caret.js';
+import { isPointOnScrollContainerScrollbar, revealPendingInputCaret } from './editor-caret.js';
 import { createFullHtmlLivePreviewRenderer } from './editor-html-live-preview.js';
 import { renderEditableMarkdownLine, renderGroupedEditableMarkdown, usesMarkdownPreviewEditing, usesMarkdownTableEditing } from './editor-markdown-preview-edit.js';
 import { syncMarkdownTableUi } from './editor-markdown-table-ui.js';
@@ -697,6 +697,7 @@ function createEditorRenderer({
             scrollContainer.scrollLeft = state.editScrollRestore.left;
             state.editScrollRestore = null;
         }
+        revealPendingInputCaret();
         if (editInPreview) lastPreviewPaint = { scrollTop: scrollContainer.scrollTop,
             scrollLeft: scrollContainer.scrollLeft, width: scrollContainer.clientWidth,
             height: scrollContainer.clientHeight, revision: state.cache.revision };

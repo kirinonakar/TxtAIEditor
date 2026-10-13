@@ -1359,7 +1359,6 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
 
     const anchorLine = lineAt(scrollContainer.scrollTop);
     const anchorOffset = scrollContainer.scrollTop - lineTop(anchorLine);
-    const oldEditingLineTop = state.editingLine ? lineTop(state.editingLine) : null;
     const containerRect = scrollContainer.getBoundingClientRect();
     let changed = false;
     for (const row of viewport.querySelectorAll('.line-row')) {
@@ -1389,13 +1388,10 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
         setupVirtualHeight();
         if (state.inlineLivePreviewEnabled) {
             const maxScrollTop = Math.max(0, totalVirtualHeight() - scrollContainer.clientHeight);
-            let anchoredScrollTop;
-            if (state.editingLine && oldEditingLineTop !== null) {
-                const newEditingLineTop = lineTop(state.editingLine);
-                anchoredScrollTop = Math.min(maxScrollTop, Math.max(0, scrollContainer.scrollTop + (newEditingLineTop - oldEditingLineTop)));
-            } else {
-                anchoredScrollTop = Math.min(maxScrollTop, Math.max(0, lineTop(anchorLine) + anchorOffset));
-            }
+            // A grouped paragraph's later source lines have zero virtual height.
+            // Their lineTop is the block's end, not the visible text caret.
+            // Anchor the viewport here; input reveals its actual caret separately.
+            const anchoredScrollTop = Math.min(maxScrollTop, Math.max(0, lineTop(anchorLine) + anchorOffset));
             if (Math.abs(scrollContainer.scrollTop - anchoredScrollTop) > 1) {
                 scrollContainer.scrollTop = anchoredScrollTop;
             }

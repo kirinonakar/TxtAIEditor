@@ -52,6 +52,7 @@ import {
     makeEditablePlainText,
     offsetFromPointInElement,
     positionFromPointer,
+    requestInputCaretReveal,
     selectWordAtPointer,
     setCaret,
     setNativeSelectionRangeInElement
@@ -185,6 +186,7 @@ function commitLine(element) {
         if (state.wordWrap && !imeController.rangeComposition) {
             measureRenderedRows(false);
         }
+        requestInputCaretReveal(element, caretOffset);
         return inputSnapshot;
     }
 
@@ -212,6 +214,7 @@ function commitLine(element) {
     if (state.wordWrap && !refreshPreview) {
         measureRenderedRows(false);
     }
+    requestInputCaretReveal(element, caretOffset);
     return inputSnapshot;
 }
 
@@ -851,6 +854,7 @@ function updateSingleLine(element, text, caretColumn) {
     if (state.wordWrap && !refreshPreview) {
         measureRenderedRows(false);
     }
+    requestInputCaretReveal(element, nextColumn);
 }
 
 function applyMergeLineForward(lineNumber, text, nextText) {

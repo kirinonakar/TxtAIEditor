@@ -25,7 +25,12 @@ import {
 } from './editor-selection.js';
 
 let caretVisualAffinity = null;
-document.addEventListener('pointerdown', () => { caretVisualAffinity = null; }, true);
+let pendingInputCaretReveal = null;
+document.addEventListener('pointerdown', () => {
+    caretVisualAffinity = null;
+    pendingInputCaretReveal = null;
+}, true);
+document.addEventListener('wheel', () => { pendingInputCaretReveal = null; }, { capture: true, passive: true });
 
 function hasUpstreamCaretAffinity(element, offset) {
     const selection = window.getSelection();
@@ -694,7 +699,7 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0, affinity =
             const element = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
             if (element && element.getAttribute('contenteditable') === 'true') {
                 setCaret(element, targetColumn, 0, true, true, affinity);
-                keepElementInView(element);
+                keepElementInView(element, targetColumn, scrollMargin);
             }
         });
         return;
@@ -789,15 +794,37 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0, affinity =
     tryFocus();
 }
 
-function keepElementInView(element) {
+function keepElementInView(element, offset = getCaretOffset(element), bottomMargin = 0) {
     const containerRect = scrollContainer.getBoundingClientRect();
-    const rect = element.dataset.markdownPreviewLine ? element.getBoundingClientRect()
-        : element.closest('.line-row')?.getBoundingClientRect() || element.getBoundingClientRect();
+    const rect = caretRectForOffset(element, offset);
+    if (!rect || rect.height <= 0 || scrollContainer.clientHeight <= 0) return;
+    const bottomLimit = containerRect.bottom - Math.min(bottomMargin,
+        Math.max(0, scrollContainer.clientHeight - rect.height));
+    const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
     if (rect.top < containerRect.top) {
-        scrollContainer.scrollTop -= visualScrollDeltaToScrollTopDelta(containerRect.top - rect.top);
-    } else if (rect.bottom > containerRect.bottom) {
-        scrollContainer.scrollTop += visualScrollDeltaToScrollTopDelta(rect.bottom - containerRect.bottom);
+        scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - visualScrollDeltaToScrollTopDelta(containerRect.top - rect.top));
+    } else if (rect.bottom > bottomLimit) {
+        scrollContainer.scrollTop = Math.min(maxScroll,
+            scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(rect.bottom - bottomLimit));
     }
+}
+
+function requestInputCaretReveal(element, offset) {
+    if (!state.inlineLivePreviewEnabled || element?.dataset.markdownPreviewLine === 'table') return;
+    pendingInputCaretReveal = { line: Number(element.dataset.line), column: offset };
+    // Structural edits paint before this frame. Ordinary native/IME input can
+    // reveal its caret without moving focus, selection, or the composing node.
+    requestAnimationFrame(revealPendingInputCaret);
+}
+
+function revealPendingInputCaret() {
+    const pending = pendingInputCaretReveal;
+    if (!pending) return;
+    pendingInputCaretReveal = null;
+    const element = document.activeElement?.closest?.('.line-text');
+    if (!element || Number(element.dataset.line) !== pending.line ||
+        getCaretOffset(element) !== pending.column) return;
+    keepElementInView(element, pending.column, 3 * viewportController.lineHeight);
 }
 
 function textPositionForOffsetInElement(element, offset) {
@@ -854,6 +881,8 @@ function setNativeSelectionRangeInElement(element, startOffset, endOffset) {
 
 export {
     caretRectForOffset,
+    requestInputCaretReveal,
+    revealPendingInputCaret,
     compositionSelectionRange,
     focusLine,
     getCaretOffset,
