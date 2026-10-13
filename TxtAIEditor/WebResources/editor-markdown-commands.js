@@ -13,10 +13,13 @@ export function createMarkdownCommandHandlers(deps) {
         normalizeSelection,
         orderedRange,
         post,
+        preserveScrollTop,
+        queueFocusPreservingScroll,
         queueRender,
         replaceSelectionWith,
         reportCursorAndSelection,
         selectionController,
+        scrollContainer,
         state,
         syncCustomSelectionClass,
         writeClipboardText
@@ -75,13 +78,23 @@ function replaceMarkdownRange(range, replacement, startOffset = 0, endOffset = s
     replaceSelectionWith(orderedRange(range), replacement, { startOffset, endOffset });
 }
 
-function setSelectionAfterLineEdits(start, end) {
+function setSelectionAfterLineEdits(start, end, scroll = null) {
     selectionController.anchor = start;
     selectionController.selection = comparePositions(start, end) === 0 ? null : { start, end };
     state.currentLine = end.line;
     state.currentColumn = end.column + 1;
+    if (scroll) {
+        preserveScrollTop(scroll.top);
+        state.editScrollRestore = scroll;
+        state.editingLine = end.line;
+        if (state.inlineLivePreviewEnabled) state.inlineLivePreviewSourceLine = end.line;
+    }
     post({ type: 'contentChanged' });
     queueRender(true);
+    if (scroll) {
+        queueFocusPreservingScroll(end.line, end.column, scroll.top, scroll.left);
+        return;
+    }
     setTimeout(() => {
         focusLine(end.line, end.column);
         reportCursorAndSelection();
@@ -176,6 +189,7 @@ function toggleLinePrefix(prefix) {
 }
 
 function toggleUnorderedList() {
+    const scroll = { top: scrollContainer.scrollTop, left: scrollContainer.scrollLeft };
     const { range, startLine, endLine } = selectedMarkdownLineRange();
     const marker = text => /^([ \t]*)([-*+][ \t]+)/.exec(text);
     const shouldRemove = Array.from({ length: endLine - startLine + 1 }, (_, i) => state.cache.get(startLine + i) ?? '')
@@ -195,9 +209,9 @@ function toggleUnorderedList() {
         }
     }
     if (rangeIsCollapsed(range)) {
-        setSelectionAfterLineEdits({ line: range.start.line, column: nextColumn }, { line: range.start.line, column: nextColumn });
+        setSelectionAfterLineEdits({ line: range.start.line, column: nextColumn }, { line: range.start.line, column: nextColumn }, scroll);
     } else {
-        setSelectionAfterLineEdits({ line: startLine, column: 0 }, { line: endLine, column: (state.cache.get(endLine) ?? '').length });
+        setSelectionAfterLineEdits({ line: startLine, column: 0 }, { line: endLine, column: (state.cache.get(endLine) ?? '').length }, scroll);
     }
 }
 

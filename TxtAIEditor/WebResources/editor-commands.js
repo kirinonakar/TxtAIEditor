@@ -1610,10 +1610,13 @@ const { applyMarkdownCommand } = createMarkdownCommandHandlers({
     normalizeSelection,
     orderedRange,
     post,
+    preserveScrollTop,
+    queueFocusPreservingScroll,
     queueRender,
     replaceSelectionWith,
     reportCursorAndSelection,
     selectionController,
+    scrollContainer,
     state,
     syncCustomSelectionClass,
     writeClipboardText
