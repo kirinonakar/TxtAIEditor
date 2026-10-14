@@ -65,6 +65,7 @@ import {
     triggerAutocomplete
 } from './editor-autocomplete.js';
 import { cancelPostEditFocusFollowUps } from './editor-edit-focus.js';
+import { usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
 
 export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
     function samePosition(a, b) {
@@ -401,7 +402,8 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
         const listTabElement = event.key === 'Tab' && !isNativeHexInputTarget
             ? lineElementFromEvent(event) || document.activeElement?.closest?.('.line-text') : null;
         const markdownListTab = listTabElement && state.inlineLivePreviewEnabled && !earlyCtrl && !event.altKey &&
-            !imeController.isComposing && !isHangulImeKeyEvent(event) && ['markdown', 'md'].includes(state.language) &&
+            !imeController.isComposing && !isHangulImeKeyEvent(event) &&
+            (['markdown', 'md'].includes(state.language) || usesMarkdownPreviewEditing(state)) &&
             !['code', 'code-empty'].includes(listTabElement.dataset.markdownPreviewLine) &&
             !listTabElement.closest('.live-preview-source-code, .live-preview-source-math') &&
             /^[ \t]*(?:[-*+]|\d+\.)[ \t]+/.test(state.cache.get(Number(listTabElement.dataset.line)) || '');

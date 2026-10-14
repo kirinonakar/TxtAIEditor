@@ -20,11 +20,12 @@ function safeOpeningTag(raw, options) {
 
 export function usesMarkdownPreviewEditing(state) {
     return state.editInMarkdownPreview && state.inlineLivePreviewEnabled &&
-        ['markdown', 'md'].includes(state.language);
+        ['markdown', 'md', 'plaintext', 'latex'].includes(state.language);
 }
 
 export function usesMarkdownTableEditing(state) {
-    return state.inlineLivePreviewEnabled && ['markdown', 'md'].includes(state.language);
+    return state.inlineLivePreviewEnabled &&
+        (['markdown', 'md'].includes(state.language) || usesMarkdownPreviewEditing(state));
 }
 
 export function isStandaloneLatexExpression(text) {

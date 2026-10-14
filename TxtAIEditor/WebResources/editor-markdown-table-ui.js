@@ -2,6 +2,7 @@ import { scrollContainer, viewport } from './editor-dom.js';
 import { clearCustomSelectionVisuals, csvTableMode, imeController, post, selectionController, state, syncCustomSelectionClass } from './editor-core.js';
 import { commitLine, replaceSelectionWith, setCaret } from './editor-commands.js';
 import { changeMarkdownTable, readMarkdownTable, tableSourceLine } from './editor-markdown-table-model.js';
+import { usesMarkdownTableEditing } from './editor-markdown-preview-edit.js';
 
 let selected = null;
 let toolbar = null;
@@ -17,7 +18,7 @@ const actions = {
 };
 
 function enabled() {
-    return state.inlineLivePreviewEnabled && ['markdown', 'md'].includes(state.language) && !csvTableMode.isEnabled;
+    return usesMarkdownTableEditing(state) && !csvTableMode.isEnabled;
 }
 
 function sourceTable() {
