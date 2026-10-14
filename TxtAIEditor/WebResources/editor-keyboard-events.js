@@ -403,6 +403,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
         const markdownListTab = listTabElement && state.inlineLivePreviewEnabled && !earlyCtrl && !event.altKey &&
             !imeController.isComposing && !isHangulImeKeyEvent(event) && ['markdown', 'md'].includes(state.language) &&
             !['code', 'code-empty'].includes(listTabElement.dataset.markdownPreviewLine) &&
+            !listTabElement.closest('.live-preview-source-code, .live-preview-source-math') &&
             /^[ \t]*(?:[-*+]|\d+\.)[ \t]+/.test(state.cache.get(Number(listTabElement.dataset.line)) || '');
         if (markdownListTab) {
             event.preventDefault();

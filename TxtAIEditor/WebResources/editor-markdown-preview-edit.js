@@ -1,4 +1,4 @@
-import { escapeHtml, findEditablePreviewBlockContaining, inlineMarkdown, renderPreviewLineAt, sanitizeHtml } from './markdown-preview-renderer.js';
+import { containsInlineMath, escapeHtml, findEditablePreviewBlockContaining, inlineMarkdown, renderPreviewLineAt, sanitizeHtml } from './markdown-preview-renderer.js';
 import { parseMarkdownTableRow } from './editor-markdown-table-model.js';
 
 // Every text node remains part of the Markdown source, in source order. Hiding
@@ -27,11 +27,25 @@ export function usesMarkdownTableEditing(state) {
     return state.inlineLivePreviewEnabled && ['markdown', 'md'].includes(state.language);
 }
 
+export function isStandaloneLatexExpression(text) {
+    return /^(?:\$\$[^\n]+\$\$|\$[^$\n]+\$|\\\[[^\n]+\\\]|\\\([^\n]+\\\))$/.test(String(text || '').trim());
+}
+
+export function paragraphContainsInlineMath(block, getLine) {
+    if (block?.kind !== 'paragraph') return false;
+    for (let line = block.startLine; line <= block.endLine; line++) {
+        if (containsInlineMath(getLine(line))) return true;
+    }
+    return false;
+}
+
 export function needsMarkdownPreviewBlockRefresh(state, lineNumber) {
     if (!usesMarkdownPreviewEditing(state)) return false;
     const element = document.querySelector(`#viewport .line-text[data-line="${lineNumber}"]`);
     const kind = element?.dataset.markdownPreviewLine;
     const text = state.cache.get(lineNumber) || '';
+    if ((!kind && containsInlineMath(text)) || (kind === 'paragraph' && containsInlineMath(text)) ||
+        element?.closest('.line-row')?.classList.contains('live-preview-source-math')) return true;
     if (text.trim() && element?.closest('.line-row')?.classList.contains('live-preview-empty')) return true;
     const list = /^[ \t]*(?:[-*+]|\d+\.)[ \t]+/.test(text);
     if ((kind === 'paragraph' && (list || /^ {0,3}#{1,6}[ \t]/.test(text))) || (kind === 'list' && !list)) return true;
@@ -276,7 +290,13 @@ export function renderEditableMarkdownLine(text, lineNumber, state) {
     if (!text.trim()) return syntax(text) + content('');
     const block = findEditablePreviewBlockContaining(lineNumber, state.lineCount,
         line => line === lineNumber ? text : state.cache.get(line), options);
-    if (block?.kind === 'code' || block?.kind === 'math') {
+    if ((!block && containsInlineMath(text)) || paragraphContainsInlineMath(block, line => line === lineNumber ? text : state.cache.get(line))) {
+        return escapeHtml(text);
+    }
+    if (block?.kind === 'math' || (block?.kind === 'code' && ['math', 'latex', 'mermaid'].includes(block.language?.toLowerCase()))) {
+        return escapeHtml(text);
+    }
+    if (block?.kind === 'code') {
         const fence = lineNumber < block.bodyStartLine || lineNumber > block.bodyEndLine;
         return fence ? syntax(text)
             : `<span class="md-preview-code-line">${content(escapeHtml(text))}</span>`;

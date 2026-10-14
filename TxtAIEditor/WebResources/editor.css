@@ -1116,6 +1116,16 @@ body.custom-selection-active.inline-live-preview-enabled .markdown-preview-edit-
     pointer-events: none;
 }
 
+.live-preview-source-block-end .md-preview-math-decoration,
+.live-preview-source-block-end .md-preview-mermaid-decoration {
+    grid-column: 2;
+    grid-row: 2;
+    padding: 8px 12px;
+    border-top: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
+    user-select: none;
+    pointer-events: none;
+}
+
 .line-row.live-preview-skipped .line-number,
 .line-row.live-preview-skipped .line-text {
     min-height: 0;

@@ -42,7 +42,8 @@ import {
 } from './editor-csv-table.js';
 import { isPointOnScrollContainerScrollbar, revealPendingInputCaret } from './editor-caret.js';
 import { createFullHtmlLivePreviewRenderer } from './editor-html-live-preview.js';
-import { renderEditableMarkdownLine, renderGroupedEditableMarkdown, usesMarkdownPreviewEditing, usesMarkdownTableEditing } from './editor-markdown-preview-edit.js';
+import { paragraphContainsInlineMath, renderEditableMarkdownLine, renderGroupedEditableMarkdown, usesMarkdownPreviewEditing, usesMarkdownTableEditing } from './editor-markdown-preview-edit.js';
+import { containsInlineMath } from './markdown-preview-renderer.js';
 import { syncMarkdownTableUi } from './editor-markdown-table-ui.js';
 import { syncMarkdownListLineNumbers } from './editor-markdown-list-gutter.js';
 
@@ -285,7 +286,10 @@ function createEditorRenderer({
         // Full-document caret moves already patch editing-row in place. Including
         // focus here rebuilds every row on the first scroll after the host focuses
         // the editor, even though neither the text nor the rendered range changed.
-        const stablePreviewLayout = editInPreview && (!editablePreviewBlock || ['list', 'table', 'paragraph'].includes(editablePreviewBlock.kind) ||
+        const mathParagraphSource = paragraphContainsInlineMath(editablePreviewBlock, getCachedLine);
+        const standaloneMathSource = sourceLine && ((!editablePreviewBlock && containsInlineMath(state.cache.get(sourceLine))) || mathParagraphSource);
+        const hasStandaloneMathEditor = !!viewport.querySelector('.md-preview-math-decoration');
+        const stablePreviewLayout = editInPreview && !standaloneMathSource && !hasStandaloneMathEditor && (!editablePreviewBlock || ['list', 'table', 'paragraph'].includes(editablePreviewBlock.kind) ||
             (editablePreviewBlock.kind === 'code' && !['math', 'latex', 'mermaid'].includes(editablePreviewBlock.language?.toLowerCase())));
         const focusRenderKey = renderFullDocument || stablePreviewLayout ? '' : `${activeLine || 0}:${state.editingLine || 0}`;
         const searchRenderKey = JSON.stringify([searchController.query, searchController.documentVersion, searchController.matches.length,
@@ -388,6 +392,18 @@ function createEditorRenderer({
             const isEditablePreviewBlockLine = !!editablePreviewBlock &&
                 line >= editablePreviewBlock.startLine &&
                 line <= editablePreviewBlock.endLine;
+            const detectedPreviewBlock = editInPreview
+                ? findEditablePreviewBlockContaining(line, state.lineCount, getCachedLine, { tabSize: state.tabSize || 4 })
+                : null;
+            const standaloneMath = !detectedPreviewBlock && containsInlineMath(text);
+            const isRenderedBlockLine = detectedPreviewBlock?.kind === 'math' ||
+                (detectedPreviewBlock?.kind === 'code' && ['math', 'latex', 'mermaid'].includes(detectedPreviewBlock.language?.toLowerCase())) ||
+                paragraphContainsInlineMath(detectedPreviewBlock, getCachedLine) || standaloneMath;
+            const renderedSourceBlock = isEditablePreviewBlockLine &&
+                (mathParagraphSource || editablePreviewBlock.kind === 'math' || (editablePreviewBlock.kind === 'code' &&
+                    ['math', 'latex', 'mermaid'].includes(editablePreviewBlock.language?.toLowerCase())))
+                ? editablePreviewBlock : standaloneMath && line === sourceLine ? { startLine: line, endLine: line } : null;
+            const isRenderedSourceLine = !!renderedSourceBlock;
             const shouldShowSource = line === sourceLine ||
                 !!foldingController.collapsedRange(line) ||
                 isEditablePreviewBlockLine ||
@@ -405,7 +421,7 @@ function createEditorRenderer({
             let lineContent = renderLineContent(
                 line,
                 displayText,
-                shouldSkipSyntaxHighlighting,
+                shouldSkipSyntaxHighlighting || isRenderedSourceLine,
                 isInlineLivePreviewSourceLine);
             let livePreviewClass = '';
             let liveContentEditable = contentEditable;
@@ -423,6 +439,7 @@ function createEditorRenderer({
                         ? `${isMathFenceLine ? ' live-preview-source-math-fence' : ''}`
                         : `${editablePreviewBlock.kind === 'table' && line === editablePreviewBlock.separatorLine ? ' live-preview-source-table-separator' : ''}`;
                 livePreviewClass = ` live-preview-source-block live-preview-source-${editablePreviewBlock.kind}${blockEdgeClass}${blockMetaClass}`;
+                if (mathParagraphSource) livePreviewClass += ' live-preview-source-math';
                 const commonAttributes = ` data-live-preview-block-kind="${editablePreviewBlock.kind}" data-live-preview-block-start="${editablePreviewBlock.startLine}" data-live-preview-block-end="${editablePreviewBlock.endLine}"`;
                 livePreviewAttributes = editablePreviewBlock.kind === 'code'
                     ? `${commonAttributes} data-live-preview-block-body-start="${editablePreviewBlock.bodyStartLine}" data-live-preview-block-body-end="${editablePreviewBlock.bodyEndLine}" data-live-preview-block-language="${escapeHtml(editablePreviewBlock.language || '')}"`
@@ -436,6 +453,7 @@ function createEditorRenderer({
                 }
             } else if (isInlineLivePreviewSourceLine) {
                 livePreviewClass = ' live-preview-source-line';
+                if (standaloneMath) livePreviewClass += ' live-preview-source-block live-preview-source-math live-preview-source-block-end';
             }
             const livePreviewOptions = {
                 mode: 'markdown',
@@ -448,20 +466,19 @@ function createEditorRenderer({
                 sourceLine: sourceLine
             };
 
-            if (editInPreview && isInlineLivePreviewSourceLine) {
+            if (editInPreview && isInlineLivePreviewSourceLine && !isRenderedSourceLine) {
                 livePreviewClass += ' live-preview-row markdown-preview-edit-row';
-                // Keep rendered math/diagrams visible while their source is
-                // edited. Decorations live outside line-text so they never
-                // enter source columns, clipboard text, or saved Markdown.
-                if (isEditablePreviewBlockLine && line === editablePreviewBlock.startLine &&
-                    (editablePreviewBlock.kind === 'math' ||
-                        (editablePreviewBlock.kind === 'code' &&
-                            ['math', 'latex', 'mermaid'].includes(editablePreviewBlock.language?.toLowerCase())))) {
-                    const preview = renderPreviewLineAt(line, state.lineCount, getCachedLine,
-                        { ...livePreviewOptions, sourceLine: 0 }, { val: 0 });
-                    if (!preview.pending && !preview.source) {
-                        previewDecoration = `<div class="md-preview-block-decoration" contenteditable="false">${preview.html}</div>`;
-                    }
+            }
+
+            // Put the rendered result after every source line, including the
+            // closing fence, so a tall diagram cannot overlap its own editor.
+            if (editInPreview && isRenderedSourceLine && line === renderedSourceBlock.endLine) {
+                const preview = renderPreviewLineAt(renderedSourceBlock.startLine, state.lineCount, getCachedLine,
+                    { ...livePreviewOptions, sourceLine: 0 }, { val: 0 });
+                if (!preview.pending && !preview.source) {
+                    const previewClass = renderedSourceBlock.language?.toLowerCase() === 'mermaid'
+                        ? 'md-preview-mermaid-decoration' : 'md-preview-math-decoration';
+                    previewDecoration = `<div class="md-preview-block-decoration ${previewClass}" contenteditable="false" aria-hidden="true">${preview.html}</div>`;
                 }
             }
 
@@ -506,7 +523,7 @@ function createEditorRenderer({
             }
             const editTable = usesMarkdownTableEditing(state) && hasLine && !isLong && text.trimStart().startsWith('|') &&
                 findEditablePreviewBlockContaining(line, state.lineCount, getCachedLine, livePreviewOptions)?.kind === 'table';
-            if ((editInPreview || editTable) && hasLine && !isLong && !foldingController.collapsedRange(line)) {
+            if ((editInPreview || editTable) && !isRenderedBlockLine && hasLine && !isLong && !foldingController.collapsedRange(line)) {
                 const grouped = renderGroupedEditableMarkdown(line, state, livePreviewOptions, groupedPreviewEnd);
                 const ownsMultilineHtml = !grouped.pending && !grouped.source && grouped.endLine > line &&
                     !['code', 'math'].includes(findEditablePreviewBlockContaining(line, state.lineCount, getCachedLine, livePreviewOptions)?.kind);

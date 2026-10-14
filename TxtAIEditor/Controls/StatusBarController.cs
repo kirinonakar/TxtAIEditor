@@ -625,7 +625,8 @@ namespace TxtAIEditor.Controls
 
             string currentLanguage = string.IsNullOrWhiteSpace(tab.Language) ? "plaintext" : tab.Language;
             if (!string.Equals(currentLanguage, "plaintext", StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(currentLanguage, "markdown", StringComparison.OrdinalIgnoreCase))
+                !string.Equals(currentLanguage, "markdown", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(currentLanguage, "latex", StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }

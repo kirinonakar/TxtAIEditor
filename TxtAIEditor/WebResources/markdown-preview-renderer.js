@@ -284,12 +284,24 @@ function stashCodeSpans(value, stash) {
     return result;
 }
 
-function stashInlineMath(value, stash) {
+function replaceInlineMath(value, render) {
     return value
-        .replace(/\\\[([\s\S]+?)\\\]/g, (_, expr) => stash(renderLatex(expr, true)))
-        .replace(/\\\(([\s\S]+?)\\\)/g, (_, expr) => stash(renderLatex(expr, false)))
-        .replace(/\$\$([\s\S]+?)\$\$/g, (_, expr) => stash(renderLatex(expr, true)))
-        .replace(/(^|[^\w\\])\$([^$\n]+?)\$/g, (_, prefix, expr) => `${prefix}${stash(renderLatex(expr, false))}`);
+        .replace(/\\\[([\s\S]+?)\\\]/g, (_, expr) => render(expr, true))
+        .replace(/\\\(([\s\S]+?)\\\)/g, (_, expr) => render(expr, false))
+        .replace(/\$\$([\s\S]+?)\$\$/g, (_, expr) => render(expr, true))
+        .replace(/(^|[^\w\\])\$([^$\n]+?)\$/g, (_, prefix, expr) => `${prefix}${render(expr, false)}`);
+}
+
+function stashInlineMath(value, stash) {
+    return replaceInlineMath(value, (expr, display) => stash(renderLatex(expr, display)));
+}
+
+function containsInlineMath(text) {
+    let found = false;
+    // Use the same delimiter rules as rendering, with literal code spans masked.
+    const source = stashCodeSpans(String(text ?? ''), () => '\u0001');
+    replaceInlineMath(source, () => { found = true; return '\u0001'; });
+    return found;
 }
 
 function sanitizeInlineHtmlTag(tag) {
@@ -834,11 +846,13 @@ function paragraphBlockBoundsAt(lineNumber, maxLine, getLine, options = {}) {
 
 function findEditablePreviewBlockContaining(lineNumber, maxLine, getLine, options = {}) {
     if (!lineNumber || lineNumber < 1) return null;
-    return (options.renderListsAsBlocks !== false
+    // Fence boundaries own their contents, even when a source line starts with
+    // a Markdown list marker such as the + operator in a LaTeX expression.
+    return findFencedCodeBlockContaining(lineNumber, maxLine, getLine) ||
+        findDisplayMathBlockContaining(lineNumber, maxLine, getLine) ||
+        (options.renderListsAsBlocks !== false
         ? findMarkdownListBlockContaining(lineNumber, maxLine, getLine, options)
         : null) ||
-        findFencedCodeBlockContaining(lineNumber, maxLine, getLine) ||
-        findDisplayMathBlockContaining(lineNumber, maxLine, getLine) ||
         findMarkdownTableBlockContaining(lineNumber, maxLine, getLine) ||
         paragraphBlockBoundsAt(lineNumber, maxLine, getLine, options);
 }
@@ -1399,6 +1413,7 @@ function initializeMermaid(theme = 'dark') {
 }
 
 export {
+    containsInlineMath,
     escapeAttribute,
     escapeHtml,
     fencedCodeInfo,
