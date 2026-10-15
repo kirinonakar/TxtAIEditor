@@ -46,6 +46,7 @@ import { paragraphContainsInlineMath, renderEditableMarkdownLine, renderGroupedE
 import { containsInlineMath } from './markdown-preview-renderer.js';
 import { syncMarkdownTableUi } from './editor-markdown-table-ui.js';
 import { syncMarkdownListLineNumbers } from './editor-markdown-list-gutter.js';
+import { livePreviewLayoutRange, patchLivePreviewRows } from './editor-live-preview-render-state.js';
 
 function createEditorRenderer({
     findEditablePreviewBlockContaining,
@@ -64,6 +65,8 @@ function createEditorRenderer({
     const livePreviewProcessedImages = new Set();
     const livePreviewFailedImages = new Set();
     let lastPreviewPaint = null;
+    let livePreviewLayout = null;
+    const livePreviewRowMarkup = new WeakMap();
     const fullHtmlLivePreview = createFullHtmlLivePreviewRenderer();
 
     function ensureHexStickyHeader() {
@@ -214,19 +217,20 @@ function createEditorRenderer({
         const firstVisibleLine = lineAt(scrollContainer.scrollTop);
         const lastVisibleLine = lineAt(
             scrollContainer.scrollTop + Math.max(scrollContainer.clientHeight, viewportController.lineHeight));
-        const livePreviewLayoutOverscan = 10;
-        const livePreviewLayoutStart = state.inlineLivePreviewEnabled
-            ? Math.max(range.start, firstVisibleLine - livePreviewLayoutOverscan)
-            : range.start;
-        const livePreviewLayoutEnd = state.inlineLivePreviewEnabled
-            ? Math.min(range.end, lastVisibleLine + livePreviewLayoutOverscan)
-            : range.end;
+        const previewBlockOptions = { tabSize: state.tabSize || 4,
+            blockContextCache: { code: new Map(), math: new Map() } };
+        livePreviewLayout = state.inlineLivePreviewEnabled
+            ? livePreviewLayoutRange(livePreviewLayout, firstVisibleLine, lastVisibleLine, state.lineCount,
+                `${state.language}:${state.lineCount}:${scrollContainer.clientWidth}:${scrollContainer.clientHeight}:${state.wordWrap}:${foldingController.version}`)
+            : null;
+        const livePreviewLayoutStart = livePreviewLayout?.start ?? range.start;
+        const livePreviewLayoutEnd = livePreviewLayout?.end ?? range.end;
         const livePreviewContextLines = state.inlineLivePreviewEnabled ? 120 : 0;
-        let renderStart = Math.max(1, range.start - livePreviewContextLines);
-        let renderEnd = range.end;
+        let renderStart = Math.max(1, livePreviewLayoutStart - livePreviewContextLines);
+        let renderEnd = livePreviewLayoutEnd;
         if (usesMarkdownPreviewEditing(state) || usesMarkdownTableEditing(state)) {
             const containingBlock = findEditablePreviewBlockContaining(renderStart, state.lineCount,
-                line => state.cache.get(line), { tabSize: state.tabSize || 4 });
+                line => state.cache.get(line), previewBlockOptions);
             if (containingBlock && (usesMarkdownPreviewEditing(state) && ['list', 'table', 'paragraph', 'code'].includes(containingBlock.kind) || containingBlock.kind === 'table')) {
                 renderStart = containingBlock.startLine;
             }
@@ -294,7 +298,7 @@ function createEditorRenderer({
         const focusRenderKey = renderFullDocument || stablePreviewLayout ? '' : `${activeLine || 0}:${state.editingLine || 0}`;
         const searchRenderKey = JSON.stringify([searchController.query, searchController.documentVersion, searchController.matches.length,
             searchController.activeMatch?.lineNumber, searchController.activeMatch?.indexOfMatch, searchController.activeMatch?.matchLength]);
-        const rangeKey = `${range.start}:${range.end}:${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${virtualHeightRenderKey}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${editInPreview}:${focusRenderKey}:${stablePreviewLayout ? 0 : sourceLine}:${stablePreviewLayout ? '' : editablePreviewBlockKey}:${csvModeKey}:${foldingController.version}:${searchRenderKey}`;
+        const rangeKey = `${renderStart}:${renderEnd}:${livePreviewLayoutStart}:${livePreviewLayoutEnd}:${state.lineCount}:${scrollContainer.clientWidth}:${horizontalRenderKey}:${state.wordWrap}:${virtualHeightRenderKey}:${state.cacheVersion}:${state.inlineLivePreviewEnabled}:${editInPreview}:${focusRenderKey}:${stablePreviewLayout ? 0 : sourceLine}:${stablePreviewLayout ? '' : editablePreviewBlockKey}:${csvModeKey}:${foldingController.version}:${searchRenderKey}`;
         if (preservePointerPaint) {
             // Account for completed measurements without rebuilding unchanged
             // visible nodes, during the drag or on its following focus frame.
@@ -341,6 +345,7 @@ function createEditorRenderer({
         }
 
         const rows = [];
+        const previewRows = [];
         let viewportLayoutStart = state.inlineLivePreviewEnabled ? livePreviewLayoutStart : renderStart;
         let livePreviewContextAnchorRow = '';
         const livePreviewSkipRef = { val: 0 };
@@ -393,7 +398,7 @@ function createEditorRenderer({
                 line >= editablePreviewBlock.startLine &&
                 line <= editablePreviewBlock.endLine;
             const detectedPreviewBlock = editInPreview
-                ? findEditablePreviewBlockContaining(line, state.lineCount, getCachedLine, { tabSize: state.tabSize || 4 })
+                ? findEditablePreviewBlockContaining(line, state.lineCount, getCachedLine, previewBlockOptions)
                 : null;
             const standaloneMath = !detectedPreviewBlock && containsInlineMath(text);
             const isRenderedBlockLine = detectedPreviewBlock?.kind === 'math' ||
@@ -456,6 +461,7 @@ function createEditorRenderer({
                 if (standaloneMath) livePreviewClass += ' live-preview-source-block live-preview-source-math live-preview-source-block-end';
             }
             const livePreviewOptions = {
+                ...previewBlockOptions,
                 mode: 'markdown',
                 baseHref: state.livePreviewBaseHref || '',
                 localResourceVersion: state.livePreviewLocalResourceVersion || '0',
@@ -549,14 +555,14 @@ function createEditorRenderer({
                     if (grouped.empty) {
                         const emptyFocusLine = state.editingLine || sourceLine || state.currentLine;
                         editableLineNumber = emptyFocusLine >= line && emptyFocusLine <= groupedPreviewEnd ? emptyFocusLine : line;
-                        lineContent = renderEditableMarkdownLine(state.cache.get(editableLineNumber) || '', editableLineNumber, state);
+                        lineContent = renderEditableMarkdownLine(state.cache.get(editableLineNumber) || '', editableLineNumber, state, previewBlockOptions);
                         liveContentEditable = state.readOnly ? 'false' : 'true';
                         livePreviewClass = ' live-preview-row live-preview-empty markdown-preview-edit-row';
                         textClass = 'line-text';
                     }
                 } else if (!grouped.pending && !grouped.source && grouped.endLine === line &&
                     !['code', 'math'].includes(findEditablePreviewBlockContaining(line, state.lineCount, getCachedLine, livePreviewOptions)?.kind)) {
-                    lineContent = renderEditableMarkdownLine(text, line, state);
+                    lineContent = renderEditableMarkdownLine(text, line, state, previewBlockOptions);
                     liveContentEditable = contentEditable;
                     livePreviewClass = ' live-preview-row markdown-preview-edit-row';
                     livePreviewAttributes = '';
@@ -594,6 +600,9 @@ function createEditorRenderer({
                 foldSummary +
                 previewDecoration +
                 `</div>`;
+            if (state.inlineLivePreviewEnabled) {
+                previewRows.push({ line, html: rowHtml, pending: !hasLine || !!renderedLivePreviewLine?.pending });
+            }
 
             if (state.inlineLivePreviewEnabled && line < livePreviewLayoutStart) {
                 if (renderedLivePreviewLine &&
@@ -674,6 +683,9 @@ function createEditorRenderer({
                 if (isInRenderWindow && endOf(row) < preservedStart) viewport.insertBefore(row, preservedRows[0]);
                 else viewport.appendChild(row);
             });
+        } else if (state.inlineLivePreviewEnabled) {
+            const visibleRows = new Set(rows);
+            patchLivePreviewRows(viewport, previewRows.filter(row => visibleRows.has(row.html)), livePreviewRowMarkup);
         } else {
             viewport.innerHTML = rows.join('');
         }

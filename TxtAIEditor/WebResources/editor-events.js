@@ -152,7 +152,6 @@ export function bindEditorEvents({
             // Scrolling them needs neither a cache scan nor another render frame.
             if (!usesFullDocumentRender()) {
                 prefetchAround(scrollContainer.scrollTop);
-                queueRender();
             }
 
             if (lastSetScrollTop !== -1 && Math.abs(scrollContainer.scrollTop - lastSetScrollTop) <= 1) {
@@ -174,6 +173,9 @@ export function bindEditorEvents({
                 });
             }
         });
+        // Prefetch and paint in the same frame, with visible-line requests first.
+        // Queuing the render inside scrollWorkFrame adds an extra frame of delay.
+        if (!usesFullDocumentRender()) queueRender();
     });
 
     window.addEventListener('resize', () => {

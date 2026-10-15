@@ -282,8 +282,9 @@ export function updateGroupedMarkdownElement(element, text, state) {
     return true;
 }
 
-export function renderEditableMarkdownLine(text, lineNumber, state) {
+export function renderEditableMarkdownLine(text, lineNumber, state, previewOptions = {}) {
     const options = {
+        ...previewOptions,
         baseHref: state.livePreviewBaseHref || '',
         localResourceVersion: state.livePreviewLocalResourceVersion || '0',
         tabSize: state.tabSize || 4

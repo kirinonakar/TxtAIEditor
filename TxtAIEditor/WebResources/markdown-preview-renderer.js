@@ -667,15 +667,14 @@ function collectMarkdownTableBlock(startLine, maxLine, getLine) {
     return { header, separator, rows, startLine, sourceLines: Array.from({ length: endLine - startLine + 1 }, (_, index) => getLine(startLine + index)), endLine };
 }
 
-function findFencedCodeBlockContaining(lineNumber, maxLine, getLine) {
+function findFencedCodeBlockContaining(lineNumber, maxLine, getLine, scanCache) {
     const targetLine = Math.min(Math.max(1, Number(lineNumber || 1)), maxLine);
     let firstKnownLine = targetLine;
-    while (firstKnownLine > 1 && getLine(firstKnownLine - 1) !== undefined) {
+    while (firstKnownLine > 1 && !scanCache?.has(firstKnownLine - 1) && getLine(firstKnownLine - 1) !== undefined) {
         firstKnownLine--;
     }
 
-    let openFence = null;
-    let startLine = 0;
+    let { openFence = null, startLine = 0 } = scanCache?.get(firstKnownLine - 1) || {};
 
     for (let line = firstKnownLine; line <= targetLine; line++) {
         const text = getLine(line);
@@ -683,6 +682,7 @@ function findFencedCodeBlockContaining(lineNumber, maxLine, getLine) {
 
         if (openFence) {
             if (isFencedCodeClose(text, openFence)) {
+                scanCache?.set(line, { openFence: null, startLine: 0 });
                 if (targetLine <= line) {
                     return {
                         kind: 'code',
@@ -695,6 +695,8 @@ function findFencedCodeBlockContaining(lineNumber, maxLine, getLine) {
                 }
                 openFence = null;
                 startLine = 0;
+            } else {
+                scanCache?.set(line, { openFence, startLine });
             }
             continue;
         }
@@ -704,6 +706,7 @@ function findFencedCodeBlockContaining(lineNumber, maxLine, getLine) {
             openFence = fence;
             startLine = line;
         }
+        scanCache?.set(line, { openFence, startLine });
     }
 
     if (openFence && startLine > 0) {
@@ -745,21 +748,21 @@ function findMarkdownTableBlockContaining(lineNumber, maxLine, getLine) {
     return null;
 }
 
-function findDisplayMathBlockContaining(lineNumber, maxLine, getLine) {
+function findDisplayMathBlockContaining(lineNumber, maxLine, getLine, scanCache) {
     const targetLine = Math.min(Math.max(1, Number(lineNumber || 1)), maxLine);
     let firstKnownLine = targetLine;
-    while (firstKnownLine > 1 && getLine(firstKnownLine - 1) !== undefined) {
+    while (firstKnownLine > 1 && !scanCache?.has(firstKnownLine - 1) && getLine(firstKnownLine - 1) !== undefined) {
         firstKnownLine--;
     }
 
-    let opener = '';
-    let startLine = 0;
+    let { opener = '', startLine = 0 } = scanCache?.get(firstKnownLine - 1) || {};
     for (let line = firstKnownLine; line <= maxLine; line++) {
         const text = getLine(line);
         if (text === undefined) return null;
 
         if (opener) {
             if (isDisplayMathClose(text, opener)) {
+                scanCache?.set(line, { opener: '', startLine: 0 });
                 if (targetLine >= startLine && targetLine <= line) {
                     return {
                         kind: 'math',
@@ -774,6 +777,8 @@ function findDisplayMathBlockContaining(lineNumber, maxLine, getLine) {
                 opener = '';
                 startLine = 0;
                 if (line >= targetLine) return null;
+            } else {
+                scanCache?.set(line, { opener, startLine });
             }
             continue;
         }
@@ -783,6 +788,7 @@ function findDisplayMathBlockContaining(lineNumber, maxLine, getLine) {
             opener = (text || '').trim();
             startLine = line;
         }
+        scanCache?.set(line, { opener, startLine });
     }
 
     return null;
@@ -848,8 +854,10 @@ function findEditablePreviewBlockContaining(lineNumber, maxLine, getLine, option
     if (!lineNumber || lineNumber < 1) return null;
     // Fence boundaries own their contents, even when a source line starts with
     // a Markdown list marker such as the + operator in a LaTeX expression.
-    return findFencedCodeBlockContaining(lineNumber, maxLine, getLine) ||
-        findDisplayMathBlockContaining(lineNumber, maxLine, getLine) ||
+    // These checkpoints are owned by a single render pass. Reuse the scanned
+    // prefix across rows without carrying stale fence state through an edit.
+    return findFencedCodeBlockContaining(lineNumber, maxLine, getLine, options.blockContextCache?.code) ||
+        findDisplayMathBlockContaining(lineNumber, maxLine, getLine, options.blockContextCache?.math) ||
         (options.renderListsAsBlocks !== false
         ? findMarkdownListBlockContaining(lineNumber, maxLine, getLine, options)
         : null) ||
@@ -1009,12 +1017,13 @@ function collectMarkdownListBlock(startLine, maxLine, getLine, options = {}) {
 
 function findMarkdownListBlockContaining(lineNumber, maxLine, getLine, options = {}) {
     const targetLine = Math.min(Math.max(1, Number(lineNumber || 1)), maxLine);
-    let firstKnownLine = targetLine;
-    while (firstKnownLine > 1 && getLine(firstKnownLine - 1) !== undefined) {
-        firstKnownLine--;
-    }
-
-    for (let startLine = targetLine; startLine >= firstKnownLine; startLine--) {
+    for (let startLine = targetLine; startLine >= 1; startLine--) {
+        const text = getLine(startLine);
+        if (text === undefined) return null;
+        // collectMarkdownListBlock cannot cross unindented non-list text.
+        // Stop at that boundary instead of searching the entire cached prefix.
+        if (String(text).trim() && !listItemInfo(text, options) &&
+            leadingWhitespaceLength(text, Number(options.tabSize || 4)) === 0) return null;
         if (!isMarkdownListStart(startLine, getLine, options)) continue;
 
         const block = collectMarkdownListBlock(startLine, maxLine, getLine, options);
