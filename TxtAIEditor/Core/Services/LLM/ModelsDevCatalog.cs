@@ -209,6 +209,18 @@ namespace TxtAIEditor.Core.Services.LLM
             if (string.IsNullOrWhiteSpace(model)) return (0, 0);
             string providerKey = MapProviderKey(appProvider);
 
+            if (providerKey == "openrouter" &&
+                (string.Equals(model.Trim(), "openrouter/auto", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(model.Trim(), "openrouter/auto-beta", StringComparison.OrdinalIgnoreCase)))
+            {
+                // Auto Router's catalog advertises the largest routable window, not the
+                // selected model's limits. Use a 1M budgeting ceiling (the reported endpoint
+                // limit) instead of 2M; individual routed models can still have lower limits.
+                // Output is unknown until routing: 0 omits max_tokens/max_output_tokens so
+                // the server applies the selected model's default instead of reserving 2M.
+                return (1048576, 0);
+            }
+
             if (TryResolveFromModelsDev(providerKey, model, out var modelsDevLimits))
             {
                 return modelsDevLimits;
