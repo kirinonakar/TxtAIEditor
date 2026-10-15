@@ -694,7 +694,10 @@ function focusLine(lineNumber, columnZeroBased = 0, scrollMargin = 0, affinity =
         state.inlineLivePreviewSourceLine = state.editingLine;
         const targetLine = state.editingLine;
         const targetColumn = Math.max(0, Number(columnZeroBased || 0));
-        queueRender(!usesMarkdownPreviewEditing(state));
+        const targetElement = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
+        // Blank runs share one editable host. Its source line must be rebound
+        // when navigation targets another blank in that same rendered run.
+        queueRender(!usesMarkdownPreviewEditing(state) || targetElement?.getAttribute('contenteditable') !== 'true');
         requestAnimationFrame(() => {
             const element = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
             if (element && element.getAttribute('contenteditable') === 'true') {

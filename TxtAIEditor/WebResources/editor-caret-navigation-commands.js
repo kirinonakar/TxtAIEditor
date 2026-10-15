@@ -1,5 +1,5 @@
 import { adjacentVisibleLine } from './editor-core.js';
-import { markdownPreviewTextPosition } from './editor-markdown-preview-edit.js';
+import { markdownPreviewTextPosition, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
 
 export function createCaretNavigationCommands({
     caretRectForOffset,
@@ -250,7 +250,20 @@ export function createCaretNavigationCommands({
     }
 
     function adjacentLogicalLineTarget(lineNumber, direction, preferredX, lineStep, fallbackColumn) {
-        const targetLine = adjacentVisibleLine(lineNumber, direction);
+        let targetLine = adjacentVisibleLine(lineNumber, direction);
+        if (usesMarkdownPreviewEditing(state)) {
+            // Tag-only HTML boundaries and hidden code fences have no caret.
+            // Continue to the next source line that can receive editing focus.
+            while (targetLine >= 1 && targetLine <= state.lineCount && targetLine !== lineNumber) {
+                const targetElement = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
+                const hiddenTag = (state.cache.get(targetLine) || '').trimStart().startsWith('<') &&
+                    targetElement?.querySelector('.md-preview-syntax') && !markdownPreviewTextPosition(targetElement, 0);
+                if (!targetElement?.matches('.md-preview-html-boundary, .md-preview-code-fence') && !hiddenTag) break;
+                const next = adjacentVisibleLine(targetLine, direction);
+                if (next === targetLine) return null;
+                targetLine = next;
+            }
+        }
         if (targetLine === lineNumber) return null;
         if (targetLine < 1 || targetLine > state.lineCount) return null;
 
@@ -334,10 +347,12 @@ export function createCaretNavigationCommands({
             const targetY = caretRect.top + caretRect.height / 2 + direction * lineStep;
 
             if (targetY >= visualBounds.top - 1 && targetY <= visualBounds.bottom + 1) {
-                const targetColumn = offsetFromPointInElement(moveElement, preferredX, targetY, caretRect, direction, lineStep);
-                if (targetColumn !== null) {
+                const hitColumn = offsetFromPointInElement(moveElement, preferredX, targetY, caretRect, direction, lineStep);
+                if (hitColumn !== null) {
+                    const targetColumn = markdownPreviewTextPosition(moveElement, hitColumn, direction)?.sourceOffset ?? hitColumn;
                     const targetRect = caretRectForOffset(moveElement, targetColumn, targetY);
-                    target = {
+                    const movedVisually = targetRect && direction * (targetRect.top - caretRect.top) > lineStep * 0.4;
+                    if (targetColumn !== caret || movedVisually) target = {
                         line: lineNumber,
                         column: targetColumn,
                         visualLeft: preferredX,

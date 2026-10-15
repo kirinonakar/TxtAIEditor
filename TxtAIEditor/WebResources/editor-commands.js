@@ -58,7 +58,7 @@ import {
     setNativeSelectionRangeInElement
 } from './editor-caret.js';
 import { highlightPreviewSearchInElement, renderLineContent } from './editor-highlighter.js';
-import { markdownPreviewDeleteRange, needsMarkdownPreviewBlockRefresh, updateGroupedMarkdownElement } from './editor-markdown-preview-edit.js';
+import { markdownPreviewDeleteRange, markdownPreviewTextPosition, needsMarkdownPreviewBlockRefresh, updateGroupedMarkdownElement, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
 import {
     activeColumnSelection,
     cloneEditorSelection,
@@ -524,9 +524,16 @@ function splitCurrentLine(element, options = {}) {
     const text = useElementCaret
         ? lineTextFromElement(element)
         : (state.cache.get(lineNumber) ?? '');
-    const caret = useElementCaret
+    let caret = useElementCaret
         ? getCaretOffset(element)
         : Math.max(0, Math.min(Number(state.currentColumn || 1) - 1, text.length));
+
+    if (useElementCaret && usesMarkdownPreviewEditing(state) && element.dataset.markdownPreviewLine !== 'code') {
+        // The first visible caret is after hidden heading/list delimiters.
+        // Enter at a visual line's start must move those delimiters too.
+        const visibleStart = markdownPreviewTextPosition(element, 0)?.sourceOffset || 0;
+        if (caret <= visibleStart) caret = 0;
+    }
 
     if (useElementCaret) {
         // Keep the model in sync before splitting. This covers the last native

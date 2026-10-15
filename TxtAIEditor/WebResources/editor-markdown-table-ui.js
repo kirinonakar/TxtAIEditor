@@ -1,8 +1,9 @@
 import { scrollContainer, viewport } from './editor-dom.js';
-import { clearCustomSelectionVisuals, csvTableMode, imeController, post, selectionController, state, syncCustomSelectionClass } from './editor-core.js';
-import { commitLine, replaceSelectionWith, setCaret } from './editor-commands.js';
+import { clearCustomSelectionVisuals, csvTableMode, imeController, post, renderImmediately, selectionController, state, syncCustomSelectionClass, viewportController } from './editor-core.js';
+import { commitLine, focusLine, replaceSelectionWith, setCaret } from './editor-commands.js';
 import { changeMarkdownTable, readMarkdownTable, tableSourceLine } from './editor-markdown-table-model.js';
 import { usesMarkdownTableEditing } from './editor-markdown-preview-edit.js';
+import { cancelPostEditFocusFollowUps } from './editor-edit-focus.js';
 
 let selected = null;
 let toolbar = null;
@@ -158,12 +159,49 @@ function selectCell(hit, extend = false, rectangular = false) {
     syncMarkdownTableUi();
 }
 
+function leaveTable(table, direction) {
+    const line = direction < 0 ? table.startLine - 1 : table.endLine + 1;
+    const needsLine = line < 1 || line > state.lineCount;
+    if (needsLine && state.readOnly) return false;
+    const active = document.activeElement?.closest?.('.line-text');
+    if (active?.dataset.markdownPreviewLine === 'table') commitLine(active);
+    clearTextSelection();
+    resetMarkdownTableUi();
+    closeMenus();
+    if (needsLine) {
+        const position = direction < 0 ? { line: 1, column: 0 }
+            : { line: state.lineCount, column: (state.cache.get(state.lineCount) || '').length };
+        const offset = direction < 0 ? 0 : 1;
+        replaceSelectionWith({ start: position, end: position }, '\n', { startOffset: offset, endOffset: offset });
+    } else {
+        state.currentLine = line;
+        state.currentColumn = 1;
+        state.editingLine = line;
+        state.inlineLivePreviewSourceLine = line;
+        state.inlineLivePreviewEditableBlock = null;
+        selectionController.anchor = { line, column: 0 };
+    }
+    // Prepare the real outside editing host before another key/IME event can
+    // reach the old table cell. No delayed focus may jump back into that cell.
+    cancelPostEditFocusFollowUps();
+    renderImmediately();
+    const targetLine = Math.max(1, line);
+    const target = viewport.querySelector(`.line-text[data-line="${targetLine}"]`);
+    if (target?.getAttribute('contenteditable') === 'true') setCaret(target, 0, 3 * viewportController.lineHeight);
+    else focusLine(targetLine, 0, 3 * viewportController.lineHeight);
+    return true;
+}
+
 function moveCell(delta, extend = false, rectangular = false) {
     const table = sourceTable();
     if (!table || imeController.isComposing) return false;
     const node = window.getSelection()?.focusNode;
     const hit = hitCell(node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement);
     const origin = !cellMode && !selected.rectangular && hit?.startLine === table.startLine ? hit : selected.focus;
+    if (!extend && delta[1] === 0 &&
+        (delta[0] < 0 && origin.row === 0 || delta[0] > 0 && origin.row === table.rows.length - 1)) {
+        return leaveTable(table, delta[0]);
+    }
     const row = Math.max(0, Math.min(table.rows.length - 1, origin.row + delta[0]));
     const column = Math.max(0, Math.min(table.columns - 1, origin.column + delta[1]));
     selectCell({ startLine: table.startLine, row, column }, extend, rectangular);
