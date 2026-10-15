@@ -415,13 +415,13 @@ function createEditorRenderer({
                 shouldShowSelectionSource ||
                 isLong ||
                 !state.inlineLivePreviewEnabled ||
-                imeController.isComposing ||
+                (imeController.isComposing && !preserveComposition) ||
                 !hasLine;
             const isInlineLivePreviewSourceLine = state.inlineLivePreviewEnabled &&
                 hasLine &&
                 shouldShowSource &&
                 !isLong &&
-                !imeController.isComposing;
+                (!imeController.isComposing || preserveComposition);
             // Long JSON rows skip token spans independently of search and selection overlays.
             let lineContent = renderLineContent(
                 line,
@@ -488,7 +488,7 @@ function createEditorRenderer({
                 }
             }
 
-            if (state.inlineLivePreviewEnabled && hasLine && shouldShowSource && !isLong && !imeController.isComposing) {
+            if (state.inlineLivePreviewEnabled && hasLine && shouldShowSource && !isLong && (!imeController.isComposing || preserveComposition)) {
                 if (!isEditablePreviewBlockLine && line !== sourceLine && !foldingController.collapsedRange(line)) {
                     renderedLivePreviewLine = renderPreviewLineAt(
                         line,
@@ -661,11 +661,9 @@ function createEditorRenderer({
             const preservedTops = new Map(preservedRows.map(row => [row,
                 Number(row.dataset.compositionDocumentTop ?? (previousViewportTop + row.offsetTop))]));
             const isInRenderWindow = nextRows.some(overlaps);
-            // Never move, detach, or rewrite an IME-owned row. Repaint only the
-            // unrelated rows, including newly scrolled regions of the document.
-            for (const row of currentRows) {
-                if (!overlaps(row)) row.remove();
-            }
+            // Keep the composing rows in place and reuse unchanged surrounding
+            // blocks too. Recreating images/math on each syllable changes their
+            // measured heights and moves the viewport even in mid-document.
             for (const row of preservedRows) {
                 if (isInRenderWindow) {
                     row.style.removeProperty('position');
@@ -678,11 +676,13 @@ function createEditorRenderer({
                     row.style.top = `${top - viewportTopForLine(viewportLayoutStart)}px`;
                 }
             }
-            nextRows.forEach(row => {
-                if (overlaps(row)) return;
-                if (isInRenderWindow && endOf(row) < preservedStart) viewport.insertBefore(row, preservedRows[0]);
-                else viewport.appendChild(row);
-            });
+            const markupByLine = new Map(previewRows.map(row => [row.line, row]));
+            const paintRows = nextRows.filter(row => !overlaps(row)).map(row => markupByLine.get(startOf(row)));
+            const protectedRows = preservedRows.map(row => ({ line: startOf(row), pending: true }));
+            const desiredRows = isInRenderWindow
+                ? [...paintRows, ...protectedRows].sort((a, b) => a.line - b.line)
+                : [...protectedRows, ...paintRows];
+            patchLivePreviewRows(viewport, desiredRows, livePreviewRowMarkup, new Set(preservedRows));
         } else if (state.inlineLivePreviewEnabled) {
             const visibleRows = new Set(rows);
             patchLivePreviewRows(viewport, previewRows.filter(row => visibleRows.has(row.html)), livePreviewRowMarkup);

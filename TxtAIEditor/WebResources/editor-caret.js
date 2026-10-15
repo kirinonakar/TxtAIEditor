@@ -26,11 +26,21 @@ import {
 
 let caretVisualAffinity = null;
 let pendingInputCaretReveal = null;
+let previewInputScrollAnchor = null;
+let previewInputScrollRestore = null;
+
+function clearInputScrollAnchor() {
+    pendingInputCaretReveal = null;
+    previewInputScrollAnchor = null;
+    if (state.editScrollRestore === previewInputScrollRestore) state.editScrollRestore = null;
+    previewInputScrollRestore = null;
+}
+
 document.addEventListener('pointerdown', () => {
     caretVisualAffinity = null;
-    pendingInputCaretReveal = null;
+    clearInputScrollAnchor();
 }, true);
-document.addEventListener('wheel', () => { pendingInputCaretReveal = null; }, { capture: true, passive: true });
+document.addEventListener('wheel', clearInputScrollAnchor, { capture: true, passive: true });
 
 function hasUpstreamCaretAffinity(element, offset) {
     const selection = window.getSelection();
@@ -812,9 +822,39 @@ function keepElementInView(element, offset = getCaretOffset(element), bottomMarg
     }
 }
 
+function capturePreviewInputScrollAnchor(element) {
+    previewInputScrollAnchor = null;
+    if (!usesMarkdownPreviewEditing(state) || element?.getAttribute('contenteditable') !== 'true' ||
+        element.dataset.markdownPreviewLine === 'table') return;
+    const rect = caretRectForOffset(element, getCaretOffset(element));
+    const containerRect = scrollContainer.getBoundingClientRect();
+    if (!rect || rect.height <= 0 || rect.top < containerRect.top || rect.bottom > containerRect.bottom) return;
+    previewInputScrollAnchor = {
+        element, documentId: state.hostDocumentId, width: scrollContainer.clientWidth,
+        top: scrollContainer.scrollTop, caretRowTop: rect.top - element.getBoundingClientRect().top
+    };
+}
+
 function requestInputCaretReveal(element, offset) {
     if (!state.inlineLivePreviewEnabled || element?.dataset.markdownPreviewLine === 'table') return;
-    pendingInputCaretReveal = { line: Number(element.dataset.line), column: offset };
+    if (state.editScrollRestore === previewInputScrollRestore) state.editScrollRestore = null;
+    previewInputScrollRestore = null;
+    let scroll = null;
+    const anchor = previewInputScrollAnchor;
+    if (anchor?.element === element && anchor.documentId === state.hostDocumentId &&
+        anchor.width === scrollContainer.clientWidth && usesMarkdownPreviewEditing(state)) {
+        const rect = caretRectForOffset(element, offset);
+        // Compare within the edited line: remeasuring a block above moves both
+        // its element and caret, but does not mean the caret wrapped to a new row.
+        const rowDelta = rect ? rect.top - element.getBoundingClientRect().top - anchor.caretRowTop : Infinity;
+        if (Math.abs(rowDelta) <= 1) {
+            scroll = { top: anchor.top, left: scrollContainer.scrollLeft };
+            previewInputScrollRestore = scroll;
+            state.editScrollRestore = scroll;
+            scrollContainer.scrollTop = scroll.top;
+        }
+    }
+    pendingInputCaretReveal = { line: Number(element.dataset.line), column: offset, scroll };
     // Structural edits paint before this frame. Ordinary native/IME input can
     // reveal its caret without moving focus, selection, or the composing node.
     requestAnimationFrame(revealPendingInputCaret);
@@ -827,6 +867,10 @@ function revealPendingInputCaret() {
     const element = document.activeElement?.closest?.('.line-text');
     if (!element || Number(element.dataset.line) !== pending.line ||
         getCaretOffset(element) !== pending.column) return;
+    if (pending.scroll) {
+        scrollContainer.scrollTop = pending.scroll.top;
+        return;
+    }
     keepElementInView(element, pending.column, 3 * viewportController.lineHeight);
 }
 
@@ -884,6 +928,7 @@ function setNativeSelectionRangeInElement(element, startOffset, endOffset) {
 
 export {
     caretRectForOffset,
+    capturePreviewInputScrollAnchor,
     requestInputCaretReveal,
     revealPendingInputCaret,
     compositionSelectionRange,

@@ -421,6 +421,10 @@ function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, toke
 
     const run = () => {
         if (token !== splitScrollRestoreToken) return;
+        // Input or navigation after Enter owns the caret now. In particular,
+        // never rewind a new Korean composition to the inserted list marker.
+        if (imeController.isComposing || state.currentLine !== targetLineNumber ||
+            state.currentColumn !== targetColumn + 1) return;
 
         const element = viewport.querySelector(`.line-text[data-line="${targetLineNumber}"]`);
         if (!element || element.getAttribute('contenteditable') !== 'true') {
@@ -563,8 +567,22 @@ function splitCurrentLine(element, options = {}) {
     // on every split.  Non-indented plain text keeps its original space.
     const shouldConsumeBoundarySpace = !shouldReuseExistingIndent && indent.length > 0 && afterStartsWithSpace;
     const normalizedAfter = shouldConsumeBoundarySpace ? after.slice(1) : after;
-    const indentedAfter = insertedIndent + normalizedAfter;
-    const nextCaretColumn = insertedIndent.length;
+    let nextPrefix = insertedIndent;
+    const listItem = usesMarkdownPreviewEditing(state) &&
+        elementLineNumber === lineNumber && element?.dataset.markdownPreviewLine === 'list' &&
+        caret === text.length
+        ? /^([ \t]*)([-*+]|\d+\.)([ \t]+)(?:\[([ xX])\]([ \t]+))?(.*)$/.exec(text)
+        : null;
+    const continueList = !!listItem && listItem[6].trim().length > 0;
+    if (continueList) {
+        const marker = /^\d+\.$/.test(listItem[2])
+            ? `${Number.parseInt(listItem[2], 10) + 1}.`
+            : listItem[2];
+        nextPrefix = listItem[1] + marker + listItem[3] +
+            (listItem[4] !== undefined ? `[ ]${listItem[5]}` : '');
+    }
+    const indentedAfter = nextPrefix + normalizedAfter;
+    const nextCaretColumn = nextPrefix.length;
     const nextLineNumber = lineNumber + 1;
 
     state.cache.set(lineNumber, before);
@@ -623,9 +641,22 @@ function splitCurrentLine(element, options = {}) {
     }
 
     queueRender(true);
+    let continuedListReady = false;
+    if (continueList && renderImmediately()) {
+        // Build the new empty item before the next input event, rather than
+        // leaving focus in the old next item's DOM until the queued paint.
+        const nextElement = viewport.querySelector(`.line-text[data-line="${nextLineNumber}"]`);
+        if (nextElement?.getAttribute('contenteditable') === 'true') {
+            setCaret(nextElement, nextCaretColumn);
+            continuedListReady = true;
+        }
+        if (shouldPreserveSplitScrollTop) {
+            scrollContainer.scrollTop = clampScrollTop(splitScrollAnchor.scrollTop);
+        }
+    }
     if (splitScrollAnchor) {
         alignSplitCaretAfterRender(nextLineNumber, nextCaretColumn, splitScrollAnchor, splitRestoreToken);
-    } else {
+    } else if (!continuedListReady) {
         focusLine(nextLineNumber, nextCaretColumn, 3 * viewportController.lineHeight);
     }
 }

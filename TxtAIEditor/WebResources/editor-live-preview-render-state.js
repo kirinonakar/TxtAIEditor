@@ -16,7 +16,7 @@ export function livePreviewLayoutRange(previous, first, last, lineCount, layoutK
 
 // Compare the generated markup, rather than innerHTML: Mermaid, image loading,
 // list gutters and the editable selection may have enriched the live DOM.
-export function patchLivePreviewRows(viewport, rows, markupByRow) {
+export function patchLivePreviewRows(viewport, rows, markupByRow, preservedRows = new Set()) {
     const existing = new Map([...viewport.children].map(row => [Number(row.dataset.line), row]));
     const wantedLines = new Set(rows.map(row => row.line));
     const desired = new Set();
@@ -33,7 +33,7 @@ export function patchLivePreviewRows(viewport, rows, markupByRow) {
     let cursor = viewport.firstChild;
     for (const { line, html, pending } of rows) {
         let row = existing.get(line);
-        if (!row || (!pending && markupByRow.get(row) !== html)) {
+        if (!row || (!pending && !preservedRows.has(row) && markupByRow.get(row) !== html)) {
             const template = viewport.ownerDocument.createElement('template');
             template.innerHTML = html;
             const replacement = template.content.firstElementChild;
@@ -46,7 +46,7 @@ export function patchLivePreviewRows(viewport, rows, markupByRow) {
             changed = true;
         }
         desired.add(row);
-        if (row !== cursor) {
+        if (row !== cursor && !preservedRows.has(row)) {
             viewport.insertBefore(row, cursor);
             changed = true;
         }

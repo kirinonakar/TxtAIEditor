@@ -16,6 +16,7 @@ import {
 } from './editor-core.js';
 import { highlightPreviewSearchInElement, renderLineContent } from './editor-highlighter.js';
 import { markdownPreviewDeleteRange, updateGroupedMarkdownElement } from './editor-markdown-preview-edit.js';
+import { capturePreviewInputScrollAnchor } from './editor-caret.js';
 import {
     activeColumnSelection,
     hasCustomSelection,
@@ -225,6 +226,7 @@ export function bindTextInputEvents({ renderer }) {
         if (!imeController.beginComposition(phase, compositionLine)) {
             return;
         }
+        capturePreviewInputScrollAnchor(element);
     });
 
     viewport.addEventListener('compositionupdate', event => {
@@ -354,6 +356,8 @@ export function bindTextInputEvents({ renderer }) {
             }
             return;
         }
+
+        capturePreviewInputScrollAnchor(element);
 
         if (isPendingImeSelectionCollapseFor(element, event)) {
             return;
