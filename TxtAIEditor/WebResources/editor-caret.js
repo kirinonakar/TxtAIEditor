@@ -831,7 +831,8 @@ function capturePreviewInputScrollAnchor(element) {
     if (!rect || rect.height <= 0 || rect.top < containerRect.top || rect.bottom > containerRect.bottom) return;
     previewInputScrollAnchor = {
         element, documentId: state.hostDocumentId, width: scrollContainer.clientWidth,
-        top: scrollContainer.scrollTop, caretRowTop: rect.top - element.getBoundingClientRect().top
+        top: scrollContainer.scrollTop, caretRowTop: rect.top - element.getBoundingClientRect().top,
+        caretViewportTop: rect.top - containerRect.top
     };
 }
 
@@ -847,7 +848,12 @@ function requestInputCaretReveal(element, offset) {
         // Compare within the edited line: remeasuring a block above moves both
         // its element and caret, but does not mean the caret wrapped to a new row.
         const rowDelta = rect ? rect.top - element.getBoundingClientRect().top - anchor.caretRowTop : Infinity;
-        if (Math.abs(rowDelta) <= 1) {
+        const nextViewportTop = anchor.caretViewportTop + rowDelta;
+        const movedUpWithinView = rowDelta < 0 && nextViewportTop >= 0 &&
+            nextViewportTop + (rect?.height || 0) <= scrollContainer.clientHeight;
+        // Deleting across a soft wrap moves the caret upward. Applying the
+        // typing bottom guard here would scroll down while Backspace moves up.
+        if (Math.abs(rowDelta) <= 1 || movedUpWithinView) {
             scroll = { top: anchor.top, left: scrollContainer.scrollLeft };
             previewInputScrollRestore = scroll;
             state.editScrollRestore = scroll;

@@ -67,6 +67,12 @@ function inlineSource(text, options, depth = 0) {
             html += `<span class="md-preview-trailing-space">${escapeHtml(rest)}</span>`;
             break;
         }
+        const spaces = !options.htmlSource && index > 0 && /^[ \t]{2,}/.exec(rest);
+        if (spaces) {
+            html += `<span class="md-preview-preserved-space">${escapeHtml(spaces[0])}</span>`;
+            index += spaces[0].length;
+            continue;
+        }
         const escaped = !options.htmlSource && /^\\([\\`*_{}\[\]()#+.!>~|=-])/.exec(rest);
         if (escaped) {
             html += syntax('\\') + escapeHtml(escaped[1]);

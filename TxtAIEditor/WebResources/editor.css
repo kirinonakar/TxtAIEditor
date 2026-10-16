@@ -939,7 +939,8 @@ body.markdown-preview-editing.inline-live-preview-enabled .md-preview-empty-head
     white-space: normal;
 }
 
-.md-preview-trailing-space {
+.md-preview-trailing-space,
+.md-preview-preserved-space {
     white-space: pre-wrap;
 }
 

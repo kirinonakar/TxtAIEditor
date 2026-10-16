@@ -42,6 +42,7 @@ import {
 } from './editor-core.js';
 import { scrollContainer, viewport } from './editor-dom.js';
 import {
+    capturePreviewInputScrollAnchor,
     caretRectForOffset,
     compositionSelectionRange,
     focusLine,
@@ -187,10 +188,10 @@ function commitLine(element) {
 
     if (isComposing) {
         reportCursorAndSelection(element, caretOffset);
+        requestInputCaretReveal(element, caretOffset);
         if (state.wordWrap && !imeController.rangeComposition) {
             measureRenderedRows(false);
         }
-        requestInputCaretReveal(element, caretOffset);
         return inputSnapshot;
     }
 
@@ -215,10 +216,10 @@ function commitLine(element) {
     if (refreshPreview) queueRender(true);
     reportCursorAndSelection(element, caretOffset);
 
+    requestInputCaretReveal(element, caretOffset);
     if (state.wordWrap && !refreshPreview) {
         measureRenderedRows(false);
     }
-    requestInputCaretReveal(element, caretOffset);
     return inputSnapshot;
 }
 
@@ -407,6 +408,7 @@ function captureSplitScrollAnchor(element, caretOffset) {
     const desiredViewportBottom = Math.min(naturalNextBottom, guardBottom);
 
     return {
+        preview: usesMarkdownPreviewEditing(state),
         scrollTop: scrollContainer.scrollTop,
         caretViewportTop,
         caretViewportBottom,
@@ -444,6 +446,27 @@ function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, toke
         const caretColumn = markdownPreviewTextPosition(element, targetColumn)?.sourceOffset ?? targetColumn;
         if (state.currentColumn !== caretColumn + 1) return;
         setCaret(element, caretColumn);
+        if (anchor.preview) {
+            const caretRect = caretRectForOffset(element, caretColumn);
+            if (!caretRect) return;
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const bottomMargin = Math.min(3 * viewportController.lineHeight,
+                Math.max(0, scrollContainer.clientHeight - caretRect.height));
+            // Headings, lists and the following blank row need not have the
+            // same height. Decide from the newly painted caret, not an estimate
+            // based on the old row's font or its grouped block height.
+            const delta = caretRect.top < containerRect.top
+                ? caretRect.top - containerRect.top
+                : Math.max(0, caretRect.bottom - (containerRect.bottom - bottomMargin));
+            if (Math.abs(delta) > 0.5) {
+                scrollContainer.scrollTop = clampScrollTop(
+                    scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(delta));
+            }
+            if (attempt < 2) {
+                alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, token, attempt + 1);
+            }
+            return;
+        }
         if (!anchor.shouldAdjustScroll) {
             // When the next visual row still fits, Enter should leave the
             // viewport exactly where it was. Re-rendering a wrapped text row can
@@ -557,7 +580,7 @@ function splitCurrentLine(element, options = {}) {
     const splitScrollAnchor = useElementCaret || previewSplit
         ? captureSplitScrollAnchor(element, caret)
         : null;
-    const shouldPreserveSplitScrollTop = !!splitScrollAnchor && !splitScrollAnchor.shouldAdjustScroll;
+    const shouldPreserveSplitScrollTop = !!splitScrollAnchor && (previewSplit || !splitScrollAnchor.shouldAdjustScroll);
     const virtualScrollAnchor = captureScrollAnchor();
     if (previewSplit && shouldPreserveSplitScrollTop) {
         // Keep the physical viewport throughout regrouping/measurement, rather
@@ -870,6 +893,9 @@ function insertPlainTextByModel(element, text) {
 }
 
 function updateSingleLine(element, text, caretColumn) {
+    // Model-handled Space/Delete/Backspace prevent native beforeinput. Capture
+    // before changing either the DOM or the virtual height, just as native input does.
+    capturePreviewInputScrollAnchor(element);
     const lineNumber = Number(element.dataset.line || 1);
     const previousText = state.cache.get(lineNumber) ?? '';
     const nextText = String(text ?? '');
@@ -877,7 +903,9 @@ function updateSingleLine(element, text, caretColumn) {
 
     state.cache.set(lineNumber, nextText);
     state.cacheVersion++;
-    invalidateMeasuredLineHeightsAround(lineNumber);
+    if (!usesMarkdownPreviewEditing(state) && element.dataset.markdownPreviewLine !== 'table') {
+        invalidateMeasuredLineHeightsAround(lineNumber);
+    }
     selectionController.selection = null;
     syncCustomSelectionClass();
     clearCustomSelectionVisuals();
@@ -908,14 +936,22 @@ function updateSingleLine(element, text, caretColumn) {
     post({ type: 'contentChanged' });
     if (refreshPreview) queueRender(true);
 
+    requestInputCaretReveal(element, nextColumn);
     if (state.wordWrap && !refreshPreview) {
         measureRenderedRows(false);
     }
-    requestInputCaretReveal(element, nextColumn);
 }
 
 function applyMergeLineForward(lineNumber, text, nextText) {
     const savedScrollTop = scrollContainer.scrollTop;
+    const savedScrollLeft = scrollContainer.scrollLeft;
+    const previewMerge = usesMarkdownPreviewEditing(state);
+    const previousHeight = previewMerge
+        ? viewportController.lineHeightFor(lineNumber, { useMeasured: true })
+        : 0;
+    if (previewMerge) {
+        state.editScrollRestore = { top: savedScrollTop, left: savedScrollLeft };
+    }
     preserveScrollTop(savedScrollTop);
 
     if (state.cache.get(lineNumber) !== text) {
@@ -924,8 +960,15 @@ function applyMergeLineForward(lineNumber, text, nextText) {
 
     shiftCachedLines(lineNumber + 1, -1);
     state.cache.set(lineNumber, text + nextText);
-    invalidateMeasuredLineHeightsAround(lineNumber);
+    // A source row may own a whole wrapped paragraph/list. Retain its height
+    // until the merged DOM is measured, rather than collapsing it to one line.
+    if (!previewMerge) invalidateMeasuredLineHeightsAround(lineNumber);
     state.lineCount = Math.max(1, state.lineCount - 1);
+    if (previewMerge) {
+        // Shifting the removed row's cached height backward can overwrite the
+        // surviving block owner with a covered row's zero height.
+        viewportController.setMeasuredLineHeight(lineNumber, previousHeight, state.lineCount);
+    }
     if (!cleanDirtyMarker(lineNumber)) {
         markDirty(lineNumber, 'mod');
     }
@@ -940,6 +983,21 @@ function applyMergeLineForward(lineNumber, text, nextText) {
     syncCustomSelectionClass();
     markLineBoundaryTransition(lineNumber, text.length);
     queueRender(true);
+    if (previewMerge) {
+        state.editingLine = lineNumber;
+        state.inlineLivePreviewSourceLine = lineNumber;
+        state.inlineLivePreviewEditableBlock = null;
+        renderImmediately();
+        const target = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
+        if (target?.getAttribute('contenteditable') === 'true') {
+            setCaret(target, text.length, 0, true, false);
+        } else {
+            queueFocusPreservingScroll(lineNumber, text.length, savedScrollTop, savedScrollLeft);
+        }
+        restoreScrollTop(savedScrollTop);
+        scrollContainer.scrollLeft = savedScrollLeft;
+        return;
+    }
     queueFocusPreservingScroll(lineNumber, text.length, savedScrollTop);
 }
 
