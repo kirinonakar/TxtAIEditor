@@ -67,7 +67,7 @@ function inlineSource(text, options, depth = 0) {
             html += `<span class="md-preview-trailing-space">${escapeHtml(rest)}</span>`;
             break;
         }
-        const spaces = !options.htmlSource && index > 0 && /^[ \t]{2,}/.exec(rest);
+        const spaces = !options.htmlSource && (index === 0 ? /^[ \t]+/ : /^[ \t]{2,}/).exec(rest);
         if (spaces) {
             html += `<span class="md-preview-preserved-space">${escapeHtml(spaces[0])}</span>`;
             index += spaces[0].length;
@@ -167,20 +167,23 @@ function editableAttributes(text, lineNumber, state, kind) {
 
 function listItemSource(text, info, options) {
     const prefix = text.slice(0, text.length - info.content.length);
+    const space = /[ \t]+$/.exec(prefix)?.[0] || '';
+    // Only the first separator belongs to the Markdown marker. Additional
+    // spaces at the visible text start must remain editable content.
+    const body = space.slice(1) + info.content;
     if (info.taskChecked !== null) {
-        const space = /[ \t]+$/.exec(prefix)?.[0] || '';
         return syntax(prefix.slice(0, prefix.length - space.length)) +
-            `<input type="checkbox" disabled${info.taskChecked ? ' checked' : ''}>` + escapeHtml(space) + content(inlineSource(info.content, options));
+            `<input type="checkbox" disabled${info.taskChecked ? ' checked' : ''}>` + escapeHtml(space.slice(0, 1)) + content(inlineSource(body, options));
     }
-    return syntax(prefix) + content(inlineSource(info.content, options));
+    return syntax(prefix.slice(0, prefix.length - Math.max(0, space.length - 1))) + content(inlineSource(body, options));
 }
 
-function trimmedInlineSource(text, options, cellPadding = false) {
+function trimmedInlineSource(text, options, cellPadding = false, structuralPrefix = Infinity) {
     // One boundary space is conventional table padding. Additional spaces are
     // editable content: hiding them snaps the caret back before a newly typed
     // space and puts the next Korean syllable in the preceding word.
     const leading = text.length - text.trimStart().length;
-    const start = cellPadding ? Math.min(1, leading) : leading;
+    const start = Math.min(leading, cellPadding ? 1 : structuralPrefix);
     const end = cellPadding && /[ \t]$/.test(text) ? Math.max(start, text.length - 1) : text.length;
     if (end <= start) return syntax(text.slice(0, start)) + content('', options) + syntax(text.slice(start));
     return syntax(text.slice(0, start)) + content(inlineSource(text.slice(start, end), options), options) + syntax(text.slice(end));
@@ -247,7 +250,7 @@ export function renderGroupedEditableMarkdown(lineNumber, state, options = {}, s
     const editableOptions = {
         ...options, sourceLine: 0,
         editableListItem: (text, line, info) => `<span ${editableAttributes(text, line, state, 'list')}>${listItemSource(text, info, options)}</span>`,
-        editableListContinuation: (text, line) => `<span ${editableAttributes(text, line, state, 'continuation')}>${trimmedInlineSource(text, options)}</span>`,
+        editableListContinuation: (text, line, prefix) => `<span ${editableAttributes(text, line, state, 'continuation')} data-markdown-continuation-prefix="${prefix}">${trimmedInlineSource(text, options, false, prefix)}</span>`,
         editableParagraphLine: (text, line) => `<span ${editableAttributes(text, line, state, 'paragraph')} data-markdown-paragraph-line="${line}">${content(inlineSource(text, options))}</span>`,
         editableHtmlBlock: (block, line) => editableHtmlBlock(block, line, state, options),
         editableCodeBlock: (block, line, lines, numbers) => editableCodeBlock(block, line, state, options, lines, numbers),
@@ -274,7 +277,7 @@ export function updateGroupedMarkdownElement(element, text, state) {
         element.innerHTML = match ? listItemSource(text, { content: match[6], taskChecked: match[4] === undefined ? null : match[4].toLowerCase() === 'x' }, options)
             : content(inlineSource(text, options));
     } else if (kind === 'continuation') {
-        element.innerHTML = trimmedInlineSource(text, options);
+        element.innerHTML = trimmedInlineSource(text, options, false, Number(element.dataset.markdownContinuationPrefix ?? Infinity));
     } else if (kind === 'html') {
         const htmlOptions = { ...options, htmlSource: true };
         element.innerHTML = content(inlineSource(text, htmlOptions), htmlOptions);
@@ -295,7 +298,7 @@ export function renderEditableMarkdownLine(text, lineNumber, state, previewOptio
         localResourceVersion: state.livePreviewLocalResourceVersion || '0',
         tabSize: state.tabSize || 4
     };
-    if (!text.trim()) return syntax(text) + content('');
+    if (!text.trim()) return content(inlineSource(text, options));
     const block = findEditablePreviewBlockContaining(lineNumber, state.lineCount,
         line => line === lineNumber ? text : state.cache.get(line), options);
     if ((!block && containsInlineMath(text)) || paragraphContainsInlineMath(block, line => line === lineNumber ? text : state.cache.get(line))) {
@@ -332,10 +335,11 @@ export function renderEditableMarkdownLine(text, lineNumber, state, previewOptio
     const list = /^([ \t]*)([-*+]|\d+\.)([ \t]+)(?:\[([ xX])\]([ \t]+))?(.*)$/.exec(text);
     if (list) {
         const prefix = text.slice(0, text.length - list[6].length);
+        const extraSpace = (/[ \t]+$/.exec(prefix)?.[0] || '').slice(1);
         const marker = list[4] !== undefined ? (list[4].toLowerCase() === 'x' ? '☑' : '☐')
             : /^\d/.test(list[2]) ? list[2] : '•';
         const indent = list[1].replace(/\t/g, ' '.repeat(options.tabSize)).length;
-        return syntax(prefix) + `<span class="md-preview-list" style="margin-left:${indent}ch" data-marker="${escapeHtml(marker)}">${content(inlineSource(list[6], options))}</span>`;
+        return syntax(prefix.slice(0, prefix.length - extraSpace.length)) + `<span class="md-preview-list" style="margin-left:${indent}ch" data-marker="${escapeHtml(marker)}">${content(inlineSource(extraSpace + list[6], options))}</span>`;
     }
     if (/^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/.test(text)) {
         return content(`<span class="md-preview-atom">${syntax(text)}<hr></span>`);
@@ -410,6 +414,55 @@ export function markdownPreviewTextPosition(element, offset, direction = 1) {
     return item ? { node: item.node, offset: item === previous
         ? (item.atom ? item.node.childNodes.length : item.empty ? 0 : item.node.textContent.length) : 0,
         sourceOffset: item === previous ? item.end : item.start } : null;
+}
+
+function markdownPreviewDelimiters(node, atEnd) {
+    const opener = node.previousSibling;
+    const closer = node.nextSibling;
+    if (!opener?.classList?.contains('md-preview-syntax') || !closer?.classList?.contains('md-preview-syntax')) return null;
+    const marker = opener.textContent;
+    const paired = closer.textContent === marker;
+    const valid = node.matches('strong') && paired && /^(?:\*\*\*?|___?)$/.test(marker) ||
+        node.matches('em') && paired && /^[*_]$/.test(marker) ||
+        node.matches('s') && paired && marker === '~~' ||
+        node.matches('mark') && paired && marker === '==' ||
+        node.matches('code') && paired && /^`+$/.test(marker) ||
+        node.matches('.md-preview-link') && marker === '[' && /^\]\([\s\S]*\)$/.test(closer.textContent) ||
+        atEnd && node.matches('h1,h2,h3,h4,h5,h6') && /^ {0,3}#{1,6}[ \t]$/.test(marker) && /^[ \t]+#+[ \t]*$/.test(closer.textContent);
+    return valid ? { opener, closer } : null;
+}
+
+function markdownPreviewBoundaryOffset(element, offset, atEnd) {
+    const position = markdownPreviewTextPosition(element, offset);
+    if (!position || position.sourceOffset !== offset) return offset;
+    let node = position.node.nodeType === Node.ELEMENT_NODE ? position.node : position.node.parentElement;
+    let result = offset;
+    while (node && node !== element && element.contains(node)) {
+        const delimiters = markdownPreviewDelimiters(node, atEnd);
+        if (delimiters) {
+            const boundary = markdownPreviewTextPosition(node, atEnd ? node.textContent.length : 0, atEnd ? -1 : 1);
+            if (boundary?.node === position.node && boundary.offset === position.offset) {
+                const before = document.createRange();
+                before.selectNodeContents(element);
+                if (atEnd) before.setEndAfter(delimiters.closer);
+                else before.setEndBefore(delimiters.opener);
+                result = atEnd ? Math.max(result, before.toString().length) : Math.min(result, before.toString().length);
+            }
+        }
+        node = node.parentElement;
+    }
+    return result;
+}
+
+export function markdownPreviewSpaceInsertionOffset(element, offset) {
+    // Spaces at a formatted text start belong before its hidden opening syntax.
+    return markdownPreviewBoundaryOffset(element, offset, false);
+}
+
+export function markdownPreviewLineBreakOffset(element, offset) {
+    // Include all closing syntax at a shared visible boundary, including nested
+    // formatting and link destinations, before splitting the source line.
+    return markdownPreviewBoundaryOffset(element, offset, true);
 }
 
 export function markdownPreviewDeleteRange(element, offset, direction, deleteStart, deleteEnd) {

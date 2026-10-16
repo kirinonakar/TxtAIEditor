@@ -77,12 +77,19 @@ function cleanupLatex(text) {
         .trim();
 }
 
-function renderLatex(text, display) {
+function renderLatex(text, display, bold = false) {
     const cleaned = cleanupLatex(text);
     if (!cleaned) return '';
     try {
         if (typeof katex !== 'undefined') {
-            const html = katex.renderToString(cleaned, { displayMode: display, throwOnError: false, trust: false });
+            const expression = bold ? `\\boldsymbol{${cleaned}}` : cleaned;
+            let html = katex.renderToString(expression, { displayMode: display, throwOnError: false, trust: false });
+            if (bold) {
+                // The weight is Markdown presentation, not a change to the
+                // expression copied from the rendered formula's TeX annotation.
+                html = html.replace(/(<annotation encoding="application\/x-tex">)[\s\S]*?(<\/annotation>)/,
+                    (_, open, close) => open + escapeHtml(cleaned) + close);
+            }
             return display
                 ? `<span class="math display">${html}</span>`
                 : `<span class="math inline">${html}</span>`;
@@ -292,8 +299,25 @@ function replaceInlineMath(value, render) {
         .replace(/(^|[^\w\\])\$([^$\n]+?)\$/g, (_, prefix, expr) => `${prefix}${render(expr, false)}`);
 }
 
-function stashInlineMath(value, stash) {
-    return replaceInlineMath(value, (expr, display) => stash(renderLatex(expr, display)));
+function stashInlineMath(value, stash, mathFragments) {
+    return replaceInlineMath(value, (expr, display) => {
+        const index = mathFragments.push({ expr, display }) - 1;
+        return stash(`<span data-txtai-math-index="${index}"></span>`);
+    });
+}
+
+function renderInlineMathFragments(html, mathFragments) {
+    if (!mathFragments.length) return html;
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    for (const placeholder of template.content.querySelectorAll('span[data-txtai-math-index]')) {
+        const fragment = mathFragments[Number(placeholder.dataset.txtaiMathIndex)];
+        if (!fragment) continue;
+        // Markdown and inline HTML emphasis must be known before KaTeX picks
+        // its glyph fonts. Inheriting CSS font-weight does not select bold math.
+        placeholder.outerHTML = renderLatex(fragment.expr, fragment.display, !!placeholder.closest('strong,b'));
+    }
+    return template.innerHTML;
 }
 
 function containsInlineMath(text) {
@@ -335,6 +359,7 @@ function stashHtmlTags(value, stash) {
 
 function inlineMarkdown(text, options = {}) {
     const fragments = [];
+    const mathFragments = [];
     const stash = html => {
         const token = `\u0001${fragments.length}\u0001`;
         fragments.push(html);
@@ -343,7 +368,7 @@ function inlineMarkdown(text, options = {}) {
     let out = String(text ?? '');
     out = stashCodeSpans(out, stash);
     out = out.replace(/!\[([^\]]*)\]\(([^)]*)\)/g, (_, alt, target) => stash(renderMarkdownImage(alt, target, options)));
-    out = stashInlineMath(out, stash);
+    out = stashInlineMath(out, stash, mathFragments);
     out = stashHtmlTags(out, stash);
     out = escapeHtml(out);
     out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_, label, href) => {
@@ -358,7 +383,7 @@ function inlineMarkdown(text, options = {}) {
     fragments.forEach((fragment, index) => {
         out = out.split(`\u0001${index}\u0001`).join(fragment);
     });
-    return sanitizeHtml(out, options);
+    return sanitizeHtml(renderInlineMathFragments(out, mathFragments), options);
 }
 
 function renderAozoraLine(line) {
@@ -1054,7 +1079,7 @@ function renderListContinuationParagraph(lines, startIndex, parentIndent, option
                 if (paragraphs.length) break;
                 const sourceLine = Number(options.sourceStartLine || 1) + index;
                 return {
-                    html: `<p data-markdown-list-line="${sourceLine}">${options.editableListContinuation(text, sourceLine)}</p>`,
+                    html: `<p data-markdown-list-line="${sourceLine}">${options.editableListContinuation(text, sourceLine, 0)}</p>`,
                     nextIndex: index + 1
                 };
             }
@@ -1094,7 +1119,7 @@ function renderListContinuationParagraph(lines, startIndex, parentIndent, option
     const html = paragraphs
         .filter(text => String(text || '').trim())
         .map((text, index) => `<p data-markdown-list-line="${Number(options.sourceStartLine || 1) + paragraphIndexes[index]}">${options.editableListContinuation
-            ? options.editableListContinuation(lines[paragraphIndexes[index]], Number(options.sourceStartLine || 1) + paragraphIndexes[index])
+            ? options.editableListContinuation(lines[paragraphIndexes[index]], Number(options.sourceStartLine || 1) + paragraphIndexes[index], lines[paragraphIndexes[index]].length - text.length)
             : inlineMarkdown(text.trim(), options)}</p>`)
         .join('');
     return { html, nextIndex: index };

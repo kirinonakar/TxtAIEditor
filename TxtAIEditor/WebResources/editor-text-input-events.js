@@ -15,7 +15,7 @@ import {
     syncCustomSelectionClass
 } from './editor-core.js';
 import { highlightPreviewSearchInElement, renderLineContent } from './editor-highlighter.js';
-import { markdownPreviewDeleteRange, updateGroupedMarkdownElement } from './editor-markdown-preview-edit.js';
+import { markdownPreviewDeleteRange, markdownPreviewSpaceInsertionOffset, updateGroupedMarkdownElement } from './editor-markdown-preview-edit.js';
 import { capturePreviewInputScrollAnchor } from './editor-caret.js';
 import {
     activeColumnSelection,
@@ -404,8 +404,9 @@ export function bindTextInputEvents({ renderer }) {
 
             const text = lineTextFromElement(target);
             const range = inputRangeInElement(event, target);
-            const start = range ? range.start : getCaretOffset(target);
-            const end = range ? range.end : start;
+            let start = range ? range.start : getCaretOffset(target);
+            let end = range ? range.end : start;
+            if (start === end) start = end = markdownPreviewSpaceInsertionOffset(target, start);
             makeEditablePlainText(target, start);
             updateSingleLine(target, text.slice(0, start) + ' ' + text.slice(end), start + 1);
             return;

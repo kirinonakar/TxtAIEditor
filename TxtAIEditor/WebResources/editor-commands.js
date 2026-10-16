@@ -59,7 +59,7 @@ import {
     setNativeSelectionRangeInElement
 } from './editor-caret.js';
 import { highlightPreviewSearchInElement, renderLineContent } from './editor-highlighter.js';
-import { markdownPreviewDeleteRange, markdownPreviewTextPosition, needsMarkdownPreviewBlockRefresh, updateGroupedMarkdownElement, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
+import { markdownPreviewDeleteRange, markdownPreviewLineBreakOffset, markdownPreviewSpaceInsertionOffset, markdownPreviewTextPosition, needsMarkdownPreviewBlockRefresh, updateGroupedMarkdownElement, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
 import {
     activeColumnSelection,
     cloneEditorSelection,
@@ -569,6 +569,7 @@ function splitCurrentLine(element, options = {}) {
         // Enter at a visual line's start must move those delimiters too.
         const visibleStart = markdownPreviewTextPosition(element, 0)?.sourceOffset || 0;
         if (caret <= visibleStart) caret = 0;
+        else caret = markdownPreviewLineBreakOffset(element, caret);
     }
 
     if (useElementCaret) {
@@ -887,7 +888,10 @@ function insertPlainTextByModel(element, text) {
 
     makeEditablePlainText(element);
     const current = lineTextFromElement(element);
-    const caret = getCaretOffset(element);
+    const offset = getCaretOffset(element);
+    const caret = text === ' ' ? markdownPreviewSpaceInsertionOffset(element, offset)
+        : text === '<br>' && element.dataset.markdownPreviewLine === 'table' ? markdownPreviewLineBreakOffset(element, offset)
+            : offset;
     const nextText = current.slice(0, caret) + text + current.slice(caret);
     updateSingleLine(element, nextText, caret + String(text || '').length);
 }
