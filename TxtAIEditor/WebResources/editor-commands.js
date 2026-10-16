@@ -87,6 +87,10 @@ import { createMarkdownCommandHandlers } from './editor-markdown-commands.js';
 import { createTextCommandActions } from './editor-text-command-actions.js';
 
 let splitScrollRestoreToken = 0;
+for (const eventName of ['pointerdown', 'wheel']) {
+    // Explicit scrolling/selection supersedes Enter's delayed caret alignment.
+    document.addEventListener(eventName, () => { splitScrollRestoreToken++; }, { capture: true, passive: true });
+}
 const LONG_LINE_EDIT_THRESHOLD = 500;
 
 function postLineUpdate(lineNumber, previousText, nextText, isComposing = false) {
@@ -423,8 +427,7 @@ function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, toke
         if (token !== splitScrollRestoreToken) return;
         // Input or navigation after Enter owns the caret now. In particular,
         // never rewind a new Korean composition to the inserted list marker.
-        if (imeController.isComposing || state.currentLine !== targetLineNumber ||
-            state.currentColumn !== targetColumn + 1) return;
+        if (imeController.isComposing || state.currentLine !== targetLineNumber) return;
 
         const element = viewport.querySelector(`.line-text[data-line="${targetLineNumber}"]`);
         if (!element || element.getAttribute('contenteditable') !== 'true') {
@@ -436,7 +439,11 @@ function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, toke
             return;
         }
 
-        setCaret(element, targetColumn);
+        // At a list/heading start the visible caret is after hidden syntax,
+        // even when the split requested source column zero.
+        const caretColumn = markdownPreviewTextPosition(element, targetColumn)?.sourceOffset ?? targetColumn;
+        if (state.currentColumn !== caretColumn + 1) return;
+        setCaret(element, caretColumn);
         if (!anchor.shouldAdjustScroll) {
             // When the next visual row still fits, Enter should leave the
             // viewport exactly where it was. Re-rendering a wrapped text row can
@@ -448,7 +455,7 @@ function alignSplitCaretAfterRender(targetLineNumber, targetColumn, anchor, toke
                 scrollContainer.scrollTop = preservedScrollTop;
             }
         }
-        const caretRect = caretRectForOffset(element, targetColumn);
+        const caretRect = caretRectForOffset(element, caretColumn);
         if (!caretRect) return;
 
         const containerRect = scrollContainer.getBoundingClientRect();
@@ -525,6 +532,8 @@ function splitCurrentLine(element, options = {}) {
         elementLineNumber > 0;
 
     const lineNumber = useElementCaret ? elementLineNumber : stateLineNumber;
+    const previewSplit = usesMarkdownPreviewEditing(state) && element?.isConnected &&
+        elementLineNumber === lineNumber;
     const text = useElementCaret
         ? lineTextFromElement(element)
         : (state.cache.get(lineNumber) ?? '');
@@ -545,7 +554,7 @@ function splitCurrentLine(element, options = {}) {
         state.cache.set(lineNumber, text);
     }
 
-    const splitScrollAnchor = useElementCaret
+    const splitScrollAnchor = useElementCaret || previewSplit
         ? captureSplitScrollAnchor(element, caret)
         : null;
     const shouldPreserveSplitScrollTop = !!splitScrollAnchor && !splitScrollAnchor.shouldAdjustScroll;
@@ -589,8 +598,13 @@ function splitCurrentLine(element, options = {}) {
     shiftCachedLines(nextLineNumber, 1);
     state.cache.set(nextLineNumber, indentedAfter);
     state.lineCount++;
-    invalidateMeasuredLineHeightsAround(lineNumber);
-    invalidateMeasuredLineHeightsAround(nextLineNumber);
+    if (!previewSplit) {
+        invalidateMeasuredLineHeightsAround(lineNumber);
+        invalidateMeasuredLineHeightsAround(nextLineNumber);
+    }
+    // A preview row can own a whole wrapped list/paragraph. Keep its last
+    // measured height until the new DOM is measured below: replacing it with
+    // one estimated line temporarily shrinks the scroll range and clamps it.
     if (!cleanDirtyMarker(lineNumber)) {
         markDirty(lineNumber, 'mod');
     }
@@ -641,14 +655,14 @@ function splitCurrentLine(element, options = {}) {
     }
 
     queueRender(true);
-    let continuedListReady = false;
-    if (continueList && renderImmediately()) {
-        // Build the new empty item before the next input event, rather than
-        // leaving focus in the old next item's DOM until the queued paint.
+    let splitTargetReady = false;
+    if (previewSplit && renderImmediately()) {
+        // Complete blank-row/list regrouping and measurement before placing
+        // the caret, rather than focusing the old next item's temporary DOM.
         const nextElement = viewport.querySelector(`.line-text[data-line="${nextLineNumber}"]`);
         if (nextElement?.getAttribute('contenteditable') === 'true') {
             setCaret(nextElement, nextCaretColumn);
-            continuedListReady = true;
+            splitTargetReady = true;
         }
         if (shouldPreserveSplitScrollTop) {
             scrollContainer.scrollTop = clampScrollTop(splitScrollAnchor.scrollTop);
@@ -656,7 +670,7 @@ function splitCurrentLine(element, options = {}) {
     }
     if (splitScrollAnchor) {
         alignSplitCaretAfterRender(nextLineNumber, nextCaretColumn, splitScrollAnchor, splitRestoreToken);
-    } else if (!continuedListReady) {
+    } else if (!splitTargetReady) {
         focusLine(nextLineNumber, nextCaretColumn, 3 * viewportController.lineHeight);
     }
 }

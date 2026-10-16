@@ -749,7 +749,7 @@ function syncFullDocumentTrailingSpace() {
     const lastRow = viewport.lastElementChild;
     const lastRowHeight = Math.max(1, lastRow?.offsetHeight || viewportController.lineHeight);
     const contentBottom = (lastRow?.offsetTop || 0) + lastRowHeight;
-    const trailingHeight = Math.max(0, scrollContainer.clientHeight - lastRowHeight,
+    const trailingHeight = Math.max(0, scrollContainer.clientHeight - viewportController.lineHeight,
         state.foldScrollExtent - contentBottom);
     viewport.style.setProperty('--full-document-trailing-height', `${trailingHeight}px`);
 }
@@ -905,8 +905,9 @@ function rawTotalVirtualHeight() {
 
 function trailingScrollHeight() {
     const viewHeight = Math.max(scrollContainer.clientHeight, viewportController.lineHeight);
-    const lastLineHeight = Math.max(1, lineHeightFor(effectiveLineCount()));
-    return Math.max(0, viewHeight - lastLineHeight);
+    // A measured source row may contain many wrapped lines or an entire block.
+    // Leave room below its last visual line, rather than below the whole block.
+    return Math.max(0, viewHeight - viewportController.lineHeight);
 }
 
 function maximumVirtualScrollTop() {

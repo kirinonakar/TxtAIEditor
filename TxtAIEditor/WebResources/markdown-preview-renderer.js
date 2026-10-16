@@ -1048,6 +1048,16 @@ function renderListContinuationParagraph(lines, startIndex, parentIndent, option
         const text = lines[index];
         if (listItemInfo(text, options)) break;
         if (!String(text || '').trim()) {
+            // Preview editing needs a physical line host between list items.
+            // Keep ordinary preview whitespace handling and fenced code intact.
+            if (options.editableListContinuation && !fencedCodeInfo(paragraphs[0] || '')) {
+                if (paragraphs.length) break;
+                const sourceLine = Number(options.sourceStartLine || 1) + index;
+                return {
+                    html: `<p data-markdown-list-line="${sourceLine}">${options.editableListContinuation(text, sourceLine)}</p>`,
+                    nextIndex: index + 1
+                };
+            }
             index++;
             continue;
         }
