@@ -644,11 +644,13 @@ namespace TxtAIEditor.Editor
 
         public async Task SetInlineLivePreviewAsync(bool enabled, string baseHref)
         {
+            _modelInlineLivePreviewEnabled = enabled;
+            _modelLivePreviewBaseHref = baseHref ?? string.Empty;
             var msg = new
             {
                 action = "setInlineLivePreview",
                 enabled = enabled,
-                baseHref = baseHref ?? string.Empty
+                baseHref = _modelLivePreviewBaseHref
             };
             await SendMessageAsync(msg);
         }

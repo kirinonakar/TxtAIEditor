@@ -43,6 +43,7 @@ import {
     mergeLineBackward,
     mergeLineForward,
     moveCaretVertical,
+    outdentMarkdownListAtStart,
     replaceSelectionForCompositionStart,
     replaceSelectionWith,
     resetModelRepeatState,
@@ -430,6 +431,7 @@ export function bindTextInputEvents({ renderer }) {
             }
 
             const caret = range ? range.start : getCaretOffset(target);
+            if (event.inputType === 'deleteContentBackward' && outdentMarkdownListAtStart(target, caret)) return;
             makeEditablePlainText(target, caret);
             const previewRange = markdownPreviewDeleteRange(target, caret,
                 event.inputType === 'deleteContentBackward' ? -1 : 1, graphemeDeleteStart, graphemeDeleteEnd);

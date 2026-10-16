@@ -559,6 +559,11 @@ function splitCurrentLine(element, options = {}) {
         : null;
     const shouldPreserveSplitScrollTop = !!splitScrollAnchor && !splitScrollAnchor.shouldAdjustScroll;
     const virtualScrollAnchor = captureScrollAnchor();
+    if (previewSplit && shouldPreserveSplitScrollTop) {
+        // Keep the physical viewport throughout regrouping/measurement, rather
+        // than allowing an upstream height correction and undoing it afterward.
+        state.editScrollRestore = { top: splitScrollAnchor.scrollTop, left: scrollContainer.scrollLeft };
+    }
 
     const before = text.slice(0, caret);
     const after = text.slice(caret);
@@ -1064,6 +1069,45 @@ function deleteForwardAtCaret(element = activeEditableElement()) {
     mergeLineForward(element);
 }
 
+function outdentMarkdownListAtStart(element, caret = element ? getCaretOffset(element) : 0) {
+    if (state.readOnly || imeController.isComposing || hasCustomSelection() ||
+        !usesMarkdownPreviewEditing(state) || element?.getAttribute('contenteditable') !== 'true' ||
+        element.dataset.markdownPreviewLine !== 'list' ||
+        window.getSelection()?.isCollapsed === false) return false;
+    const text = lineTextFromElement(element);
+    const indent = /^[ \t]+(?=(?:[-*+]|\d+\.)[ \t]+)/.exec(text)?.[0];
+    const visibleStart = markdownPreviewTextPosition(element, 0)?.sourceOffset;
+    if (!indent || visibleStart === undefined || caret > visibleStart) return false;
+    const lineNumber = Number(element.dataset.line);
+
+    const removed = indent.startsWith('\t') ? 1 : Math.min(state.tabSize || 4, /^ +/.exec(indent)[0].length);
+    const nextText = text.slice(removed);
+    const nextColumn = Math.max(0, caret - removed);
+    const scroll = { top: scrollContainer.scrollTop, left: scrollContainer.scrollLeft };
+    const previousText = state.cache.get(lineNumber) ?? '';
+    state.cache.set(lineNumber, nextText);
+    state.cacheVersion++;
+    state.currentLine = lineNumber;
+    state.currentColumn = nextColumn + 1;
+    state.editingLine = lineNumber;
+    state.inlineLivePreviewSourceLine = lineNumber;
+    state.inlineLivePreviewEditableBlock = null;
+    selectionController.anchor = { line: lineNumber, column: nextColumn };
+    state.editScrollRestore = scroll;
+    if (!cleanDirtyMarker(lineNumber)) markDirty(lineNumber, 'mod');
+    postLineUpdate(lineNumber, previousText, nextText);
+    post({ type: 'contentChanged' });
+    // Outdenting changes the surrounding ul/ol hierarchy. Rebuild it before
+    // the next input, keeping the previous measured height until it is ready.
+    queueRender(true);
+    renderImmediately();
+    const target = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
+    if (target?.getAttribute('contenteditable') === 'true') setCaret(target, nextColumn, 0, true, false);
+    scrollContainer.scrollTop = scroll.top;
+    scrollContainer.scrollLeft = scroll.left;
+    return true;
+}
+
 function deleteBackwardAtCaret(element = activeEditableElement()) {
     if (!element) return;
     if (document.activeElement !== element) {
@@ -1083,6 +1127,7 @@ function deleteBackwardAtCaret(element = activeEditableElement()) {
 
     const text = lineTextFromElement(element);
     const caret = getCaretOffset(element);
+    if (outdentMarkdownListAtStart(element, caret)) return;
     const previewRange = markdownPreviewDeleteRange(element, caret, -1, graphemeDeleteStart, graphemeDeleteEnd);
     if (previewRange) {
         updateSingleLine(element, text.slice(0, previewRange.start) + text.slice(previewRange.end), previewRange.start);
@@ -1778,6 +1823,7 @@ export {
     moveCaretVertical,
     moveCaretWord,
     normalizedModelRepeatKey,
+    outdentMarkdownListAtStart,
     pasteFromClipboard,
     prepareMultilineCompositionHost,
     releaseModelRepeatKey,

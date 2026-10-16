@@ -1227,6 +1227,9 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
     const trimmed = String(line ?? '').trim();
 
     if (!trimmed) {
+        // Editable preview needs one physical caret row per source blank line.
+        // Merging the run only renames its host when Enter moves to the next line.
+        if (options.editableParagraphLine) return { html: '', endLine: lineNumber };
         let endLine = lineNumber;
         for (let i = lineNumber + 1; i <= maxLine; i++) {
             const nextRaw = String(getLine(i) ?? '');

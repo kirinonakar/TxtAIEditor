@@ -1392,7 +1392,8 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
             // A grouped paragraph's later source lines have zero virtual height.
             // Their lineTop is the block's end, not the visible text caret.
             // Anchor the viewport here; input reveals its actual caret separately.
-            const anchoredScrollTop = Math.min(maxScrollTop, Math.max(0, lineTop(anchorLine) + anchorOffset));
+            const anchoredScrollTop = Math.min(maxScrollTop, Math.max(0,
+                state.editScrollRestore?.top ?? (lineTop(anchorLine) + anchorOffset)));
             if (Math.abs(scrollContainer.scrollTop - anchoredScrollTop) > 1) {
                 scrollContainer.scrollTop = anchoredScrollTop;
             }
