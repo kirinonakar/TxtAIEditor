@@ -1361,18 +1361,22 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
     const anchorLine = lineAt(scrollContainer.scrollTop);
     const anchorOffset = scrollContainer.scrollTop - lineTop(anchorLine);
     const containerRect = scrollContainer.getBoundingClientRect();
+    let previewAnchor = null;
+    let previewStartLine = 0;
     let changed = false;
     for (const row of viewport.querySelectorAll('.line-row')) {
         const lineNumber = Number(row.dataset.line || 0);
         if (!lineNumber) continue;
         const rowRect = row.getBoundingClientRect();
-        // Live preview keeps a large lookbehind window in the DOM. Its first
-        // line can move into the middle of a merged Markdown block as the
-        // virtual window advances, so rows far above the viewport may have a
-        // different temporary shape. Re-measuring those rows moves the current
-        // scroll anchor by their accumulated delta and can make the viewport
-        // oscillate at a render-window boundary.
-        if (state.inlineLivePreviewEnabled && rowRect.bottom <= containerRect.top) continue;
+        // Every painted row contributes to normal flow, including overscan
+        // above the viewport. Leaving those heights estimated makes the DOM
+        // extend beyond the virtual scroll limit after a large scroll.
+        if (state.inlineLivePreviewEnabled && row.style.position !== 'absolute') {
+            if (!previewStartLine) previewStartLine = lineNumber;
+            if (!previewAnchor && rowRect.bottom > containerRect.top && rowRect.height > 0) {
+                previewAnchor = { line: lineNumber, offset: containerRect.top - rowRect.top };
+            }
+        }
         const isSkipped = row.classList.contains('live-preview-skipped');
         const minimum = isSkipped ? 0 : viewportController.lineHeight;
         const measuredHeight = state.inlineLivePreviewEnabled
@@ -1382,10 +1386,24 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
         if (setMeasuredLineHeight(lineNumber, measured)) {
             changed = true;
         }
+        if (state.inlineLivePreviewEnabled && row.classList.contains('markdown-preview-group-row')) {
+            // Transfer source-line heights only after measuring their painted
+            // owner. Clearing them during markup generation temporarily shrinks
+            // the document before the replacement block has its real height.
+            const endLine = Math.min(state.lineCount, Number(row.dataset.previewEndLine || lineNumber));
+            for (let covered = lineNumber + 1; covered <= endLine; covered++) {
+                changed = setMeasuredLineHeight(covered, 0) || changed;
+            }
+        }
     }
 
     syncMarkdownListLineNumbers();
     if (changed) {
+        if (state.inlineLivePreviewEnabled && previewStartLine) {
+            // Apply the new origin together with the scroll correction. Updating
+            // scroll alone leaves the old origin visible until the next paint.
+            viewport.style.transform = `translateY(${viewportTopForLine(previewStartLine)}px)`;
+        }
         setupVirtualHeight();
         if (state.inlineLivePreviewEnabled) {
             const maxScrollTop = Math.max(0, totalVirtualHeight() - scrollContainer.clientHeight);
@@ -1393,7 +1411,9 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
             // Their lineTop is the block's end, not the visible text caret.
             // Anchor the viewport here; input reveals its actual caret separately.
             const anchoredScrollTop = Math.min(maxScrollTop, Math.max(0,
-                state.editScrollRestore?.top ?? (lineTop(anchorLine) + anchorOffset)));
+                state.editScrollRestore?.top ?? (previewAnchor
+                    ? lineTop(previewAnchor.line) + previewAnchor.offset
+                    : lineTop(anchorLine) + anchorOffset)));
             if (Math.abs(scrollContainer.scrollTop - anchoredScrollTop) > 1) {
                 scrollContainer.scrollTop = anchoredScrollTop;
             }

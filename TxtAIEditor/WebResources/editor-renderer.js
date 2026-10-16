@@ -60,6 +60,7 @@ function createEditorRenderer({
     let lastPointerClientY = null;
     let pendingInlineLivePreviewFocus = null;
     let inlineLivePreviewFocusSeq = 0;
+    let inlineLivePreviewScrollSeq = 0;
     let hexStickyHeader = null;
     let horizontalOverflowFrame = 0;
     const livePreviewProcessedImages = new Set();
@@ -68,6 +69,14 @@ function createEditorRenderer({
     let livePreviewLayout = null;
     const livePreviewRowMarkup = new WeakMap();
     const fullHtmlLivePreview = createFullHtmlLivePreviewRenderer();
+
+    // Deferred focus restoration belongs to one click. A subsequent gesture
+    // must not be pulled back by that click's animation frame or timer.
+    const cancelInlineLivePreviewScrollRestore = () => { inlineLivePreviewScrollSeq++; };
+    document.addEventListener('pointerdown', cancelInlineLivePreviewScrollRestore, true);
+    document.addEventListener('wheel', cancelInlineLivePreviewScrollRestore, { capture: true, passive: true });
+    document.addEventListener('keydown', cancelInlineLivePreviewScrollRestore, true);
+    document.addEventListener('compositionstart', cancelInlineLivePreviewScrollRestore, true);
 
     function ensureHexStickyHeader() {
         if (hexStickyHeader && hexStickyHeader.isConnected) {
@@ -350,7 +359,6 @@ function createEditorRenderer({
         let livePreviewContextAnchorRow = '';
         const livePreviewSkipRef = { val: 0 };
         let groupedPreviewEnd = 0;
-        let groupedHeightsChanged = false;
         for (let line = renderStart; line <= renderEnd; line++) {
             if ((editInPreview || usesMarkdownTableEditing(state)) && line <= groupedPreviewEnd) {
                 if (livePreviewContextAnchorRow) {
@@ -536,12 +544,6 @@ function createEditorRenderer({
                 if (grouped.empty || grouped.skipped || ownsMultilineHtml || /<(?:span|tr) class="line-text md-preview-embedded-line(?: |")/.test(grouped.html || '')) {
                     renderedLivePreviewLine = grouped;
                     groupedPreviewEnd = Math.max(groupedPreviewEnd, grouped.endLine || line);
-                    // The block's full height belongs to its first source row.
-                    // Covered rows must be zero even outside the DOM window;
-                    // otherwise long lists/tables add phantom blank scroll space.
-                    for (let covered = line + 1; covered <= groupedPreviewEnd; covered++) {
-                        groupedHeightsChanged = viewportController.setMeasuredLineHeight(covered, 0, state.lineCount) || groupedHeightsChanged;
-                    }
                     if (grouped.extendRangeEnd > renderEnd) {
                         requestMissingLines(renderEnd + 1, grouped.extendRangeEnd);
                         renderEnd = Math.min(state.lineCount, grouped.extendRangeEnd);
@@ -628,7 +630,6 @@ function createEditorRenderer({
         }
 
         if (livePreviewContextAnchorRow) rows.push(livePreviewContextAnchorRow);
-        if (groupedHeightsChanged) setupVirtualHeight();
         viewport.style.transform = renderFullDocument
             ? 'none'
             : `translateY(${viewportTopForLine(viewportLayoutStart)}px)`;
@@ -754,7 +755,7 @@ function createEditorRenderer({
     }
 
     function restoreInlineLivePreviewScroll(focus) {
-        if (!focus?.preserveScroll) return;
+        if (!focus?.preserveScroll || focus.scrollToken !== inlineLivePreviewScrollSeq) return;
 
         preserveScrollTop(focus.scrollTop);
         const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
@@ -884,6 +885,7 @@ function createEditorRenderer({
             line: safeLine,
             column: safeColumn,
             token,
+            scrollToken: ++inlineLivePreviewScrollSeq,
             preserveScroll,
             scrollTop: savedScrollTop,
             scrollLeft: savedScrollLeft
