@@ -43,9 +43,9 @@ namespace TxtAIEditor.Controls
         public void LocalizeTooltips(Func<string, string, string> getText)
         {
             ToolTipService.SetToolTip(MarkdownHeadingButton, getText("Heading", "제목"));
-            ToolTipService.SetToolTip(MarkdownBoldButton, getText("Bold", "굵게"));
-            ToolTipService.SetToolTip(MarkdownItalicButton, getText("Italic", "기울임"));
-            ToolTipService.SetToolTip(MarkdownUnderlineButton, getText("Underline", "밑줄"));
+            ToolTipService.SetToolTip(MarkdownBoldButton, $"{getText("Bold", "굵게")} (Ctrl+B)");
+            ToolTipService.SetToolTip(MarkdownItalicButton, $"{getText("Italic", "기울임")} (Ctrl+I)");
+            ToolTipService.SetToolTip(MarkdownUnderlineButton, $"{getText("Underline", "밑줄")} (Ctrl+U)");
             ToolTipService.SetToolTip(MarkdownHighlightButton, getText("Highlight", "형광펜"));
             ToolTipService.SetToolTip(MarkdownUlButton, getText("UnorderedList", "글머리 목록"));
             ToolTipService.SetToolTip(MarkdownCutLineButton, getText("CutLine", "현재 줄 자르기"));

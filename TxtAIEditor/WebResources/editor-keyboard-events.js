@@ -30,6 +30,7 @@ import {
     normalizeSelection
 } from './editor-selection.js';
 import {
+    applyMarkdownCommand,
     cancelImeBypassTextarea,
     changeLineIndent,
     commitLine,
@@ -555,6 +556,19 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
         }
 
         if (ctrl) {
+            const markdownCommand = !event.altKey && !event.shiftKey
+                ? ({ b: 'bold', i: 'italic', u: 'underline' })[key]
+                : null;
+            if (markdownCommand && (!isNativeHexInputTarget || activeTarget.id === 'ime-bypass-textarea') &&
+                !csvTableMode.isEnabled && state.language !== 'hex') {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                if (!state.readOnly && !imeController.isComposing && !event.isComposing && event.keyCode !== 229) {
+                    hideAutocomplete(300);
+                    if (!event.repeat) applyMarkdownCommand(markdownCommand);
+                }
+                return;
+            }
             if (key === 'c' || key === 'x' || key === 'v') {
                 const target = event.target;
                 const isNativeInputTarget = target && (

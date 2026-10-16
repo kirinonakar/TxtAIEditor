@@ -1587,6 +1587,19 @@ namespace TxtAIEditor.Core.Services
         const cellDiv = input.closest('.cell');
         if (!cellDiv) return;
 
+        const markdownCommand = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey
+            ? ({ b: 'bold', i: 'italic', u: 'underline' })[String(e.key || '').toLowerCase()]
+            : null;
+        if (markdownCommand && e.target.closest('.markdown-editor[contenteditable=""true""]')) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            if (!e.isComposing && e.keyCode !== 229 && !composingCellEditor && !e.repeat) {
+                hideNbAutocomplete();
+                applyMarkdownCommandToCell(cellDiv, markdownCommand);
+            }
+            return;
+        }
+
         if (nbAutocompleteState.isOpen) {
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
