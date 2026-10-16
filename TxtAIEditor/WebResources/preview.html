@@ -453,6 +453,17 @@
                 --border: #d8dee4;
             }
 
+            #print-container pre,
+            #print-container code,
+            #print-container th {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            #print-container th {
+                background: #e6e6e6;
+            }
+
             body:not(.wrap-enabled) .preview-row {
                 width: auto !important;
                 white-space: normal !important;

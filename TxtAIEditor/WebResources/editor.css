@@ -1896,6 +1896,17 @@ body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-
     }
 
     #print-container.live-preview-print pre,
+    #print-container.live-preview-print code,
+    #print-container.live-preview-print th {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    #print-container.live-preview-print th {
+        background: #e6e6e6;
+    }
+
+    #print-container.live-preview-print pre,
     #print-container.live-preview-print .math.display {
         white-space: pre-wrap;
         overflow: visible;
