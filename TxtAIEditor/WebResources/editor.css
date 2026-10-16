@@ -1048,6 +1048,10 @@ body.custom-selection-active.inline-live-preview-enabled .markdown-preview-edit-
     background: transparent;
 }
 
+ol.md-list-parenthesis > li::marker {
+    content: counter(list-item) ") ";
+}
+
 .markdown-preview-edit-row .md-preview-list {
     display: inline-block;
     position: relative;

@@ -1,3 +1,5 @@
+import { findEditablePreviewBlockContaining, listItemInfo } from './markdown-preview-renderer.js';
+
 function createTextCommandActions({
     beginEditTransaction,
     cleanDirtyMarker,
@@ -79,6 +81,60 @@ function createTextCommandActions({
         setTimeout(() => focusLine(startLine, 0), 0);
     }
 
+    function listStarts(block, getLine) {
+        const starts = new Map();
+        const stack = [];
+        for (let line = block.startLine; line <= block.endLine; line++) {
+            const item = listItemInfo(getLine(line), { tabSize: state.tabSize });
+            if (!item) continue;
+            while (stack.length && stack.at(-1).indent > item.indent) stack.pop();
+            if (stack.at(-1)?.indent === item.indent && stack.at(-1).type !== item.type) stack.pop();
+            if (stack.at(-1)?.indent !== item.indent) {
+                stack.push(item);
+                starts.set(line, item);
+            }
+        }
+        return starts;
+    }
+
+    function renumberIndentedLists(block, edits, direction) {
+        const starts = listStarts(block, line => state.cache.get(line));
+        const stack = [];
+        const lists = [];
+        for (let line = block.startLine; line <= block.endLine; line++) {
+            const text = edits.get(line) ?? state.cache.get(line);
+            const item = listItemInfo(text, { tabSize: state.tabSize });
+            if (!item) continue;
+            while (stack.length && stack.at(-1).indent > item.indent) stack.pop();
+            if (stack.at(-1)?.indent === item.indent && stack.at(-1).type !== item.type) stack.pop();
+            if (stack.at(-1)?.indent !== item.indent) {
+                const previousStart = starts.get(line);
+                // Preserve explicit starting numbers only when the same item
+                // still opens the same list. A newly formed list starts at 1.
+                const start = previousStart?.indent === item.indent && previousStart.type === item.type
+                    ? previousStart.startNum : 1;
+                const list = { indent: item.indent, type: item.type, next: start,
+                    suffix: item.marker.at(-1), lines: [] };
+                stack.push(list);
+                lists.push(list);
+            }
+            const list = stack.at(-1);
+            if (item.type !== 'ol') continue;
+            const original = listItemInfo(state.cache.get(line), { tabSize: state.tabSize });
+            if (original && original.indent !== item.indent) {
+                if (direction > 0) list.suffix = ')';
+                else if (!list.lines.length) list.suffix = item.indent === 0 ? '.' : ')';
+            }
+            list.lines.push({ line, text });
+        }
+        for (const list of lists) {
+            for (const { line, text } of list.lines) {
+                const next = text.replace(/^([ \t]*)\d+[.)]/, (_, indent) => `${indent}${list.next++}${list.suffix}`);
+                if (next !== text) edits.set(line, next);
+            }
+        }
+    }
+
     function changeLineIndent(direction) {
         if (state.readOnly) return;
 
@@ -87,6 +143,11 @@ function createTextCommandActions({
         const caretLine = state.currentLine;
         let caretColumn = Math.max(0, state.currentColumn - 1);
         const indentText = ' '.repeat(Math.max(1, state.tabSize || 4));
+        const edits = new Map();
+        const listBlocks = new Map();
+        const liveMarkdown = state.inlineLivePreviewEnabled &&
+            (['markdown', 'md'].includes(state.language) || state.editInMarkdownPreview &&
+                ['plaintext', 'latex'].includes(state.language));
         let changed = false;
 
         beginEditTransaction();
@@ -109,6 +170,20 @@ function createTextCommandActions({
                 }
 
                 if (next !== original) {
+                    edits.set(line, next);
+                    if (liveMarkdown && listItemInfo(original, { tabSize: state.tabSize }) &&
+                        ![...listBlocks.values()].some(block => line >= block.startLine && line <= block.endLine)) {
+                        const block = findEditablePreviewBlockContaining(line, state.lineCount,
+                            number => state.cache.get(number), { tabSize: state.tabSize, outermostList: true });
+                        if (block?.kind === 'list') listBlocks.set(block.startLine, block);
+                    }
+                }
+            }
+
+            for (const block of listBlocks.values()) renumberIndentedLists(block, edits, direction);
+            for (const [line, next] of edits) {
+                const original = state.cache.get(line);
+                if (next !== original) {
                     if (preserveCaret && line === caretLine) caretColumn = Math.max(0, caretColumn + next.length - original.length);
                     state.cache.set(line, next);
                     if (!cleanDirtyMarker(line)) {
@@ -121,6 +196,7 @@ function createTextCommandActions({
 
             if (!changed) return;
 
+            state.cacheVersion++;
             post({ type: 'contentChanged' });
         } finally {
             endEditTransaction();
@@ -312,7 +388,7 @@ function createTextCommandActions({
                 if (headerMatch) {
                     return headerMatch[1] + ' ' + headerMatch[2].trim();
                 }
-                const listMatch = line.match(/^(\s*)([-*+]|\d+\.)([^\s].*)$/);
+                const listMatch = line.match(/^(\s*)([-*+]|\d+[.)])([^\s].*)$/);
                 if (listMatch) {
                     return listMatch[1] + listMatch[2] + ' ' + listMatch[3].trim();
                 }

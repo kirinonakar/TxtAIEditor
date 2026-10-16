@@ -48,7 +48,7 @@ export function needsMarkdownPreviewBlockRefresh(state, lineNumber) {
     if ((!kind && containsInlineMath(text)) || (kind === 'paragraph' && containsInlineMath(text)) ||
         element?.closest('.line-row')?.classList.contains('live-preview-source-math')) return true;
     if (text.trim() && element?.closest('.line-row')?.classList.contains('live-preview-empty')) return true;
-    const list = /^[ \t]*(?:[-*+]|\d+\.)[ \t]+/.test(text);
+    const list = /^[ \t]*(?:[-*+]|\d+[.)])[ \t]+/.test(text);
     if ((kind === 'paragraph' && (list || /^ {0,3}#{1,6}[ \t]/.test(text))) || (kind === 'list' && !list)) return true;
     const block = state.inlineLivePreviewEditableBlock;
     return block &&
@@ -266,14 +266,14 @@ export function renderGroupedEditableMarkdown(lineNumber, state, options = {}, s
 export function updateGroupedMarkdownElement(element, text, state) {
     const kind = element?.dataset.markdownPreviewLine;
     if (!kind || !(usesMarkdownPreviewEditing(state) || kind === 'table' && usesMarkdownTableEditing(state))) return false;
-    if (kind === 'paragraph' && /^(?:[ \t]*(?:[-*+]|\d+\.)[ \t]+| {0,3}#{1,6}[ \t])/.test(text)) return false;
+    if (kind === 'paragraph' && /^(?:[ \t]*(?:[-*+]|\d+[.)])[ \t]+| {0,3}#{1,6}[ \t])/.test(text)) return false;
     const options = { baseHref: state.livePreviewBaseHref || '', tabSize: state.tabSize || 4,
         localResourceVersion: state.livePreviewLocalResourceVersion || '0' };
     if (kind === 'table') {
         element.innerHTML = tableRowSource(text, element.dataset.previewTableHeader === 'true',
             JSON.parse(element.dataset.previewTableAligns || '[]'), Number(element.dataset.previewTableColumns || 0), { ...options, editableCell: !state.readOnly });
     } else if (kind === 'list') {
-        const match = /^([ \t]*)([-*+]|\d+\.)([ \t]+)(?:\[([ xX])\]([ \t]+))?(.*)$/.exec(text);
+        const match = /^([ \t]*)([-*+]|\d+[.)])([ \t]+)(?:\[([ xX])\]([ \t]+))?(.*)$/.exec(text);
         element.innerHTML = match ? listItemSource(text, { content: match[6], taskChecked: match[4] === undefined ? null : match[4].toLowerCase() === 'x' }, options)
             : content(inlineSource(text, options));
     } else if (kind === 'continuation') {
@@ -332,7 +332,7 @@ export function renderEditableMarkdownLine(text, lineNumber, state, previewOptio
     }
     const quote = /^( {0,3}>[ \t]?)(.*)$/.exec(text);
     if (quote) return syntax(quote[1]) + `<blockquote>${content(inlineSource(quote[2], options))}</blockquote>`;
-    const list = /^([ \t]*)([-*+]|\d+\.)([ \t]+)(?:\[([ xX])\]([ \t]+))?(.*)$/.exec(text);
+    const list = /^([ \t]*)([-*+]|\d+[.)])([ \t]+)(?:\[([ xX])\]([ \t]+))?(.*)$/.exec(text);
     if (list) {
         const prefix = text.slice(0, text.length - list[6].length);
         const extraSpace = (/[ \t]+$/.exec(prefix)?.[0] || '').slice(1);

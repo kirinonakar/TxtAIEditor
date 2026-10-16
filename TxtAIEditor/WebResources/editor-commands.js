@@ -609,12 +609,12 @@ function splitCurrentLine(element, options = {}) {
     const listItem = usesMarkdownPreviewEditing(state) &&
         elementLineNumber === lineNumber && element?.dataset.markdownPreviewLine === 'list' &&
         caret === text.length
-        ? /^([ \t]*)([-*+]|\d+\.)([ \t]+)(?:\[([ xX])\]([ \t]+))?(.*)$/.exec(text)
+        ? /^([ \t]*)([-*+]|\d+[.)])([ \t]+)(?:\[([ xX])\]([ \t]+))?(.*)$/.exec(text)
         : null;
     const continueList = !!listItem && listItem[6].trim().length > 0;
     if (continueList) {
-        const marker = /^\d+\.$/.test(listItem[2])
-            ? `${Number.parseInt(listItem[2], 10) + 1}.`
+        const marker = /^\d+[.)]$/.test(listItem[2])
+            ? `${Number.parseInt(listItem[2], 10) + 1}${listItem[2].at(-1)}`
             : listItem[2];
         nextPrefix = listItem[1] + marker + listItem[3] +
             (listItem[4] !== undefined ? `[ ]${listItem[5]}` : '');
@@ -1137,7 +1137,7 @@ function outdentMarkdownListAtStart(element, caret = element ? getCaretOffset(el
         element.dataset.markdownPreviewLine !== 'list' ||
         window.getSelection()?.isCollapsed === false) return false;
     const text = lineTextFromElement(element);
-    const indent = /^[ \t]+(?=(?:[-*+]|\d+\.)[ \t]+)/.exec(text)?.[0];
+    const indent = /^[ \t]+(?=(?:[-*+]|\d+[.)])[ \t]+)/.exec(text)?.[0];
     const visibleStart = markdownPreviewTextPosition(element, 0)?.sourceOffset;
     if (!indent || visibleStart === undefined || caret > visibleStart) return false;
     const lineNumber = Number(element.dataset.line);

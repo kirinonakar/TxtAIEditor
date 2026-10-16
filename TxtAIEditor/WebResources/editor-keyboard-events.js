@@ -407,7 +407,7 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
             (['markdown', 'md'].includes(state.language) || usesMarkdownPreviewEditing(state)) &&
             !['code', 'code-empty'].includes(listTabElement.dataset.markdownPreviewLine) &&
             !listTabElement.closest('.live-preview-source-code, .live-preview-source-math') &&
-            /^[ \t]*(?:[-*+]|\d+\.)[ \t]+/.test(state.cache.get(Number(listTabElement.dataset.line)) || '');
+            /^[ \t]*(?:[-*+]|\d+[.)])[ \t]+/.test(state.cache.get(Number(listTabElement.dataset.line)) || '');
         if (markdownListTab) {
             event.preventDefault();
             hideAutocomplete();

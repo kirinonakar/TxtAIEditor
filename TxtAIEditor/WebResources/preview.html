@@ -136,6 +136,10 @@
         h6,
         p,
         blockquote,
+        ol.md-list-parenthesis > li::marker {
+            content: counter(list-item) ") ";
+        }
+
         ul,
         ol,
         pre {

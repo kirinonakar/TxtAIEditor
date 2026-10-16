@@ -715,7 +715,7 @@ function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {
             // 3. Headers
             workingText = workingText.replace(/^#{1,6}\s+.*/g, m => stash(`<span class="token-keyword">${escapeHtml(m)}</span>`));
             // 4. Lists
-            workingText = workingText.replace(/^\s*[-*+]\s+|^\s*\d+\.\s+/g, m => stash(`<span class="token-control">${escapeHtml(m)}</span>`));
+            workingText = workingText.replace(/^\s*[-*+]\s+|^\s*\d+[.)]\s+/g, m => stash(`<span class="token-control">${escapeHtml(m)}</span>`));
             // 5. Blockquotes
             workingText = workingText.replace(/^\s*>\s+/g, m => stash(`<span class="token-comment">${escapeHtml(m)}</span>`));
             // 6. Bold/Italic

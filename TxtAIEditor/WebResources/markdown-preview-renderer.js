@@ -421,7 +421,7 @@ function isMarkdownBlockBoundary(line) {
     return /^#{1,6}\s+/.test(trimmed) ||
         /^>\s?/.test(trimmed) ||
         /^[-*+]\s+/.test(trimmed) ||
-        /^\d+\.\s+/.test(trimmed) ||
+        /^\d+[.)]\s+/.test(trimmed) ||
         /^(\|.*\|)$/.test(trimmed);
 }
 
@@ -961,9 +961,9 @@ function leadingWhitespaceLength(line, tabSize = 4) {
 
 function listItemInfo(text, options = {}) {
     const tabSize = Number(options.tabSize || 4);
-    const match = /^([ \t]*)([-*+]|\d+\.)(?:[ \t]+\[([ xX])\])?[ \t]+(.*)$/.exec(text || '');
+    const match = /^([ \t]*)([-*+]|\d+[.)])(?:[ \t]+\[([ xX])\])?[ \t]+(.*)$/.exec(text || '');
     if (!match) return null;
-    const ordered = /\d+\./.test(match[2]);
+    const ordered = /^\d/.test(match[2]);
     return {
         type: ordered ? 'ol' : 'ul',
         indent: indentColumnLength(match[1], tabSize),
@@ -1042,26 +1042,28 @@ function collectMarkdownListBlock(startLine, maxLine, getLine, options = {}) {
 
 function findMarkdownListBlockContaining(lineNumber, maxLine, getLine, options = {}) {
     const targetLine = Math.min(Math.max(1, Number(lineNumber || 1)), maxLine);
+    let containingBlock = null;
     for (let startLine = targetLine; startLine >= 1; startLine--) {
         const text = getLine(startLine);
-        if (text === undefined) return null;
+        if (text === undefined) return containingBlock;
         // collectMarkdownListBlock cannot cross unindented non-list text.
         // Stop at that boundary instead of searching the entire cached prefix.
         if (String(text).trim() && !listItemInfo(text, options) &&
-            leadingWhitespaceLength(text, Number(options.tabSize || 4)) === 0) return null;
+            leadingWhitespaceLength(text, Number(options.tabSize || 4)) === 0) return containingBlock;
         if (!isMarkdownListStart(startLine, getLine, options)) continue;
 
         const block = collectMarkdownListBlock(startLine, maxLine, getLine, options);
         if (block && !block.pending && targetLine >= block.startLine && targetLine <= block.endLine) {
-            return {
+            containingBlock = {
                 kind: 'list',
                 startLine: block.startLine,
                 endLine: block.endLine
             };
+            if (!options.outermostList) return containingBlock;
         }
     }
 
-    return null;
+    return containingBlock;
 }
 
 function renderListContinuationParagraph(lines, startIndex, parentIndent, options = {}) {
@@ -1131,6 +1133,7 @@ function renderMarkdownListAt(lines, startIndex, indent, options = {}) {
 
     const tag = firstInfo.type;
     const startAttr = tag === 'ol' && firstInfo.startNum !== 1 ? ` start="${firstInfo.startNum}"` : '';
+    const markerClass = tag === 'ol' && firstInfo.marker.endsWith(')') ? ' class="md-list-parenthesis"' : '';
     const items = [];
     let index = startIndex;
 
@@ -1169,7 +1172,7 @@ function renderMarkdownListAt(lines, startIndex, indent, options = {}) {
         items.push(`<li${itemClass} data-markdown-list-line="${itemSourceLine}">${itemHtml}</li>`);
     }
 
-    return { html: `<${tag}${startAttr}>${items.join('')}</${tag}>`, nextIndex: index };
+    return { html: `<${tag}${startAttr}${markerClass}>${items.join('')}</${tag}>`, nextIndex: index };
 }
 
 function renderMarkdownListBlock(block, options = {}) {
@@ -1209,12 +1212,13 @@ function renderMarkdownLine(line, options = {}) {
     const listInfo = listItemInfo(raw, options);
     if (listInfo) {
         const startAttr = listInfo.type === 'ol' && listInfo.startNum !== 1 ? ` start="${listInfo.startNum}"` : '';
+        const markerClass = listInfo.type === 'ol' && listInfo.marker.endsWith(')') ? ' class="md-list-parenthesis"' : '';
         const indentStyle = listInfo.indent > 0 ? ` style="margin-left:${Math.max(0, listInfo.indent) * 0.75}ch"` : '';
         const itemClass = listInfo.taskChecked === null ? '' : ' class="task-list-item"';
         const itemHtml = listInfo.taskChecked === null
             ? inlineMarkdown(listInfo.content, options)
             : `<input type="checkbox" disabled${listInfo.taskChecked ? ' checked' : ''}> ${inlineMarkdown(listInfo.content, options)}`;
-        return `<${listInfo.type}${startAttr}${indentStyle}><li${itemClass}>${itemHtml}</li></${listInfo.type}>`;
+        return `<${listInfo.type}${startAttr}${markerClass}${indentStyle}><li${itemClass}>${itemHtml}</li></${listInfo.type}>`;
     }
     const singleLineHtml = /^<([A-Za-z][A-Za-z0-9:-]*)(?:\s[^<>]*?)?>[\s\S]*<\/\1\s*>$/.exec(trimmed);
     if (singleLineHtml) return sanitizeHtml(trimmed, options);
