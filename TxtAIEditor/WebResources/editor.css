@@ -1858,6 +1858,16 @@ body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-
 .bracket-depth-4 { color: var(--bracket-depth-4); }
 .bracket-depth-5 { color: var(--bracket-depth-5); }
 
+#print-container.live-preview-print {
+    white-space: normal !important;
+    word-break: normal !important;
+}
+
+#print-container .print-preview-row {
+    padding: 1px 10px 5px;
+    line-height: 1.55;
+}
+
 @media print {
 
     html,
@@ -1877,6 +1887,19 @@ body.custom-selection-active.inline-live-preview-enabled .line-row.live-preview-
         white-space: pre-wrap !important;
         overflow-wrap: anywhere !important;
         word-break: break-all !important;
+    }
+
+    #print-container.live-preview-print {
+        --bg: #fff;
+        --fg: #000;
+        --preview-code-bg: #f3f3f3;
+    }
+
+    #print-container.live-preview-print pre,
+    #print-container.live-preview-print .math.display {
+        white-space: pre-wrap;
+        overflow: visible;
+        overflow-wrap: anywhere;
     }
 
     .line-number {

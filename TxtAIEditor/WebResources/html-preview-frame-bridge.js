@@ -69,6 +69,13 @@ function htmlPreviewFrameBridge() {
     installStorageFallback('localStorage');
     installStorageFallback('sessionStorage');
 
+    window.addEventListener('message', event => {
+        if (event.source === window.parent &&
+            event.data?.source === 'txtaieditor-host' && event.data.action === 'print') {
+            window.print();
+        }
+    });
+
     function topOverlayOffset() {
         let offset = 0;
         const elements = document.body ? document.body.querySelectorAll('*') : [];

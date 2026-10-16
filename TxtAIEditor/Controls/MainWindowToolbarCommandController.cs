@@ -364,7 +364,9 @@ namespace TxtAIEditor.Controls
 
         private async Task PrintAsync()
         {
-            if (_printLivePreview != null && _printLivePreview())
+            var activeTab = _tabNavigationController.GetActiveTab();
+            if (activeTab?.InlineLivePreviewEnabled != true &&
+                _printLivePreview != null && _printLivePreview())
             {
                 return;
             }

@@ -128,7 +128,7 @@ configureEditorCoreRuntime({
     render
 });
 
-bindPrintSupport();
+bindPrintSupport(ensureInlinePreviewDependencies);
 
 const findReplaceController = createFindReplaceController({ revealLine });
 const { openFindPanel } = findReplaceController;
