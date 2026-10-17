@@ -50,7 +50,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- insert_to_file rule: both insert_after and insert_before are required; always provide both with 2+ unique context lines, and do not call the tool with either one omitted.");
             if (isPlanningMode)
             {
-                builder.AppendLine("- Planning: make_plan {\"markdown\":\"# Plan\\n...\"}; use only in planning mode. Provide only the Markdown plan content; the host chooses the filename, saves it under the TxtAIEditor plan folder, and opens it for user review.");
+                builder.AppendLine("- Planning: make_plan {\"markdown\":\"# Plan\\n...\"}; use only in planning mode. Provide only the Markdown plan content; the host chooses the filename, saves it under the 'tmp' folder at the workspace root, and opens it for user review.");
             }
             builder.AppendLine("- Editor tabs: insert_text {\"content\":\"...\"}; create_tab {\"title\":\"draft.md\",\"content\":\"...\"}; edit_tab {\"title\":\"tab title or ID\",\"content\":\"...\"}; save_tab {\"title\":\"optional\",\"path\":\"optional workspace path\"}; open_file {\"path\":\"relative/path.txt\"}.");
             builder.AppendLine("- Web: web_search_exa {\"query\":\"search query\",\"numResults\":5}; web_fetch {\"urls\":[\"https://example.com/page\"]}.");

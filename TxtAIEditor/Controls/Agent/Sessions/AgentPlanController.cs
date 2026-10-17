@@ -14,6 +14,9 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentPlanController
     {
+        private const string PlanFolderName = "tmp";
+        private const string FallbackPlanFolderName = "plan";
+
         private readonly Func<AgentRunContext?> _activeRunContextProvider;
         private readonly AgentConfirmationController _confirmationController;
         private readonly Func<IReadOnlyList<OpenedTab>> _openTabsProvider;
@@ -62,7 +65,7 @@ namespace TxtAIEditor.Controls
             builder.AppendLine("Investigate first, then call make_plan with the detailed Markdown plan.");
             builder.AppendLine($"The plan (Markdown content for the make_plan tool) MUST be written in {targetLanguage}.");
             builder.AppendLine("Do not edit, create, delete, move, format, build, restore, install, stage, commit, or save files in this run, except by calling make_plan once for the plan document.");
-            builder.AppendLine("Do not use ordinary file creation or tab saving tools for the plan. The make_plan tool chooses the filename and opens the saved plan.");
+            builder.AppendLine("Do not use ordinary file creation or tab saving tools for the plan. The make_plan tool chooses the filename, saves the plan in the 'tmp' folder at the workspace root, and opens the saved plan.");
             builder.AppendLine("The make_plan Markdown must include target files, edit scope, areas not to touch, evidence/context summary, step-by-step implementation, verification, and rollback/failure criteria.");
             builder.AppendLine();
             builder.AppendLine("[Original user request]");
@@ -175,7 +178,7 @@ namespace TxtAIEditor.Controls
             string selectionContext,
             CancellationToken cancellationToken)
         {
-            string planDirectory = Path.Combine(AgentSkillDirectories.UserSettingsDirectory, "plan");
+            string planDirectory = ResolvePlanDirectory(workspaceRoot);
             Directory.CreateDirectory(planDirectory);
 
             DateTime createdAt = DateTime.Now;
@@ -308,6 +311,26 @@ namespace TxtAIEditor.Controls
             builder.AppendLine(fence + "text");
             builder.AppendLine(text);
             builder.AppendLine(fence);
+        }
+
+        private static string ResolvePlanDirectory(string workspaceRoot)
+        {
+            if (!string.IsNullOrWhiteSpace(workspaceRoot))
+            {
+                try
+                {
+                    string root = Path.GetFullPath(workspaceRoot);
+                    if (Directory.Exists(root))
+                    {
+                        return Path.Combine(root, PlanFolderName);
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return Path.Combine(AgentSkillDirectories.UserSettingsDirectory, FallbackPlanFolderName);
         }
 
         private static string GetNextPlanFilePath(string planDirectory, DateTime createdAt)
