@@ -74,6 +74,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- When modifying files, consider the apply_patch tool first, and use other tools as needed.");
             builder.AppendLine("- Preserve user-provided file names exactly, including non-English names: 자산.csv stays 자산.csv, 분석2.md stays 분석2.md.");
             builder.AppendLine("- If [User-referenced file names] is present, prefer listed workspace matches for reads and the exact mentioned name for requested outputs.");
+            builder.AppendLine("- When a task needs temporary files, scratch notes, or test runs, create a 'tmp' folder at the workspace root and do that work there (for example tmp/draft.md, tmp/sample.cs, tmp/sample.ps1). Do not put temporary or throwaway files inside project source folders.");
             builder.AppendLine("- Preserve each existing file's encoding, LF/CRLF style, and final-newline state. Edit user or project files with the dedicated file tools, which preserve these properties and record changes in the edit ledger; do not use Set-Content for project-file edits.");
             builder.AppendLine("- For writes, provide an explicit path from the user, [Active tab] Path, or a prior file/tool result.");
             builder.AppendLine("- [Accepted file edits before this user task] records earlier accepted edits. [File edits made during this user task] records edits made by your tool calls for the current user request.");

@@ -136,14 +136,14 @@
         h6,
         p,
         blockquote,
-        ol.md-list-parenthesis > li::marker {
-            content: counter(list-item) ") ";
-        }
-
         ul,
         ol,
         pre {
             margin: 0;
+        }
+
+        ol.md-list-parenthesis > li::marker {
+            content: counter(list-item) ") ";
         }
 
         h1,
@@ -551,7 +551,11 @@
         let activeEditorSyncTarget = null;
 
         function maxPreviewScrollTop() {
-            return Math.max(0, totalVirtualHeight() - scroll.clientHeight);
+            // The spacer height only approximates the rendered rows; the browser's live
+            // scroll extent can be larger while rows are measured or when a row overflows
+            // its box (images, mermaid, wrapped blocks). Using the real extent keeps
+            // programmatic and anchor-preserving scrolls from stopping short of the last line.
+            return Math.max(0, Math.max(totalVirtualHeight(), scroll.scrollHeight) - scroll.clientHeight);
         }
 
         function clampPreviewScrollTop(value) {
