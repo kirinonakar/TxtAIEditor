@@ -561,6 +561,13 @@ function buildMarkdownTable(size) {
     return [header, separator, ...bodyRows].join('\n');
 }
 
+// A table inserted directly under another table would be read as extra rows of
+// that table, so keep one blank line between the two tables.
+function isMarkdownTableRowText(text) {
+    const trimmed = String(text ?? '').trim();
+    return trimmed.length > 2 && trimmed.startsWith('|') && trimmed.endsWith('|');
+}
+
 function findGeneratedMarkdownTable(range) {
     for (const size of [3, 2]) {
         const tableLines = buildMarkdownTable(size).split('\n');
@@ -616,11 +623,19 @@ function cycleMarkdownTable() {
     }
 
     const endLineText = state.cache.get(range.end.line) ?? '';
+    const startLineText = state.cache.get(range.start.line) ?? '';
+    // Keep one blank line so a table inserted right under another table is not
+    // parsed as extra rows of that table.
+    const lineAboveTable = range.start.column > 0
+        ? startLineText.slice(0, range.start.column)
+        : (range.start.line > 1 ? (state.cache.get(range.start.line - 1) ?? '') : null);
     const needsLeadingBreak = range.start.column > 0;
+    const needsBlankLine = isMarkdownTableRowText(lineAboveTable);
+    const leadingBreaks = (needsLeadingBreak ? 1 : 0) + (needsBlankLine ? 1 : 0);
     const needsTrailingBreak = range.end.column < endLineText.length;
     const table = buildMarkdownTable(2);
-    const replacement = `${needsLeadingBreak ? '\n' : ''}${table}${needsTrailingBreak ? '\n' : ''}`;
-    const firstCellOffset = (needsLeadingBreak ? 1 : 0) + 2;
+    const replacement = `${'\n'.repeat(leadingBreaks)}${table}${needsTrailingBreak ? '\n' : ''}`;
+    const firstCellOffset = leadingBreaks + 2;
     replaceMarkdownRange(range, replacement, firstCellOffset, firstCellOffset);
 }
 

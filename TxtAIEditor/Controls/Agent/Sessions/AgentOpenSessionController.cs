@@ -458,6 +458,19 @@ namespace TxtAIEditor.Controls
 
         public void NotifyWorkspaceChanged()
         {
+            // 폴더가 바뀌면 현재 세션의 워크스페이스도 새 폴더를 따라가야 한다.
+            // 실행 중인 세션은 런 시작 시 고정된 루트를 유지한다.
+            var session = EnsureSession(_currentSessionIdProvider());
+            if (!session.IsRunning && !_runningSessions.ContainsKey(session.Id))
+            {
+                string workspaceRoot = CaptureCurrentWorkspaceRoot();
+                if (!string.IsNullOrWhiteSpace(workspaceRoot))
+                {
+                    session.WorkspaceRoot = workspaceRoot;
+                }
+            }
+
+            UpdateUI();
             RefreshSessionTitleDisplay();
         }
 
