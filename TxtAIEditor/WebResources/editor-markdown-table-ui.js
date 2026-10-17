@@ -103,7 +103,7 @@ function ensureToolbar() {
         container.appendChild(menu);
         toolbar.appendChild(container);
     }
-    for (const action of ['cell-mode', 'clear-cells', 'copy-cells']) {
+    for (const action of ['cell-mode', 'clear-cells', 'copy-cells', 'table-delete']) {
         const button = document.createElement('button');
         button.type = 'button';
         button.dataset.tableAction = action;
@@ -227,7 +227,18 @@ export function performMarkdownTableAction(action) {
     const active = document.activeElement?.closest?.('.line-text');
     if (active?.dataset.markdownPreviewLine === 'table') commitLine(active);
     table = sourceTable();
-    const change = table && changeMarkdownTable(table, action, selected.focus.row, selected.focus.column, bounds());
+    if (!table) return false;
+    if (action === 'table-delete') {
+        clearTextSelection();
+        closeMenus();
+        resetMarkdownTableUi();
+        cancelPostEditFocusFollowUps();
+        replaceSelectionWith({ start: { line: table.startLine, column: 0 },
+            end: { line: table.endLine, column: (state.cache.get(table.endLine) || '').length } }, '',
+            { startOffset: 0, endOffset: 0, preserveScroll: true });
+        return true;
+    }
+    const change = changeMarkdownTable(table, action, selected.focus.row, selected.focus.column, bounds());
     if (!change) return false;
     const lines = change.text.split('\n');
     const relativeLine = tableSourceLine(change.table, change.row) - table.startLine;

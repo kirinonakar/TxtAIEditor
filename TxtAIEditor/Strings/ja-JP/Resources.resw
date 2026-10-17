@@ -4056,4 +4056,5 @@
   <data name="EditorMarkdownTableCellMode" xml:space="preserve"><value>セル選択</value></data>
   <data name="EditorMarkdownTableClearCells" xml:space="preserve"><value>内容をクリア</value></data>
   <data name="EditorMarkdownTableCopyCells" xml:space="preserve"><value>セルをコピー</value></data>
+  <data name="EditorMarkdownTableDelete" xml:space="preserve"><value>表を削除</value></data>
 </root>

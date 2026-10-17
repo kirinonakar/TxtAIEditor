@@ -4098,4 +4098,5 @@
   <data name="EditorMarkdownTableCellMode" xml:space="preserve"><value>셀 선택</value></data>
   <data name="EditorMarkdownTableClearCells" xml:space="preserve"><value>내용 지우기</value></data>
   <data name="EditorMarkdownTableCopyCells" xml:space="preserve"><value>셀 복사</value></data>
+  <data name="EditorMarkdownTableDelete" xml:space="preserve"><value>표 삭제</value></data>
 </root>

@@ -181,7 +181,8 @@ namespace TxtAIEditor.Editor
                 ("select-column", "EditorMarkdownTableSelectColumn", "Select column"),
                 ("cell-mode", "EditorMarkdownTableCellMode", "Select cells"),
                 ("clear-cells", "EditorMarkdownTableClearCells", "Clear cells"),
-                ("copy-cells", "EditorMarkdownTableCopyCells", "Copy cells")
+                ("copy-cells", "EditorMarkdownTableCopyCells", "Copy cells"),
+                ("table-delete", "EditorMarkdownTableDelete", "Delete table")
             };
             var tableText = new Dictionary<string, string>();
             foreach ((string key, string resource, string fallback) in tableLabels)

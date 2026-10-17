@@ -4056,4 +4056,5 @@
   <data name="EditorMarkdownTableCellMode" xml:space="preserve"><value>选择单元格</value></data>
   <data name="EditorMarkdownTableClearCells" xml:space="preserve"><value>清空内容</value></data>
   <data name="EditorMarkdownTableCopyCells" xml:space="preserve"><value>复制单元格</value></data>
+  <data name="EditorMarkdownTableDelete" xml:space="preserve"><value>删除表格</value></data>
 </root>

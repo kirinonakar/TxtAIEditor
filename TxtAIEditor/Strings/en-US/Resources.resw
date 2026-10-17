@@ -4098,4 +4098,5 @@ Plan: {0}</value>
   <data name="EditorMarkdownTableCellMode" xml:space="preserve"><value>Select cells</value></data>
   <data name="EditorMarkdownTableClearCells" xml:space="preserve"><value>Clear cells</value></data>
   <data name="EditorMarkdownTableCopyCells" xml:space="preserve"><value>Copy cells</value></data>
+  <data name="EditorMarkdownTableDelete" xml:space="preserve"><value>Delete table</value></data>
 </root>
