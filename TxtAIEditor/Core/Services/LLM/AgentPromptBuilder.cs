@@ -50,7 +50,7 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine("- insert_to_file rule: both insert_after and insert_before are required; always provide both with 2+ unique context lines, and do not call the tool with either one omitted.");
             if (isPlanningMode)
             {
-                builder.AppendLine("- Planning: make_plan {\"markdown\":\"# Plan\\n...\"}; use only in planning mode. Provide only the Markdown plan content; the host chooses the filename, saves it under the 'tmp' folder at the workspace root, and opens it for user review.");
+                builder.AppendLine("- Planning: make_plan {\"markdown\":\"# Plan\\n...\"}; use only in planning mode. Provide the Markdown plan content to save a new plan file; the host chooses the filename, saves it under the 'tmp' folder at the workspace root, and opens it for user review. To revise an existing saved plan, edit that plan file (allowed in a plan-revision run) and call make_plan with {\"path\":\"<plan file path>\"} to request approval again.");
             }
             builder.AppendLine("- Editor tabs: insert_text {\"content\":\"...\"}; create_tab {\"title\":\"draft.md\",\"content\":\"...\"}; edit_tab {\"title\":\"tab title or ID\",\"content\":\"...\"}; save_tab {\"title\":\"optional\",\"path\":\"optional workspace path\"}; open_file {\"path\":\"relative/path.txt\"}.");
             builder.AppendLine("- Web: web_search_exa {\"query\":\"search query\",\"numResults\":5}; web_fetch {\"urls\":[\"https://example.com/page\"]}.");
@@ -110,11 +110,11 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 builder.AppendLine();
                 builder.AppendLine("Planning mode:");
-                builder.AppendLine("- This is a plan-only run. Investigate the task, then call make_plan with the detailed Markdown implementation plan.");
+                builder.AppendLine("- This is a plan-only run. Investigate the task, then call make_plan with the detailed Markdown implementation plan. In a plan-revision run, revise the pending plan file with file edit tools and re-submit it by path instead.");
                 builder.AppendLine($"- The plan (Markdown content for the make_plan tool) MUST be written in {outputLanguage}.");
-                builder.AppendLine("- Do not create, modify, delete, move, format, stage, commit, build, restore, install, or otherwise change files or external state in planning mode, except for the make_plan tool.");
+                builder.AppendLine("- Do not create, modify, delete, move, format, stage, commit, build, restore, install, or otherwise change files or external state in planning mode, except for the make_plan tool and, in a plan-revision run, file edit tools limited to the pending plan file.");
                 builder.AppendLine("- Do not use create_file, overwrite_file, append_to_file, edit_tab, save_tab, or other ordinary write tools to create the plan file.");
-                builder.AppendLine("- The make_plan tool is visible only in planning mode. Its input must be only Markdown plan content; do not provide a path or filename.");
+                builder.AppendLine("- The make_plan tool is visible only in planning mode. Provide the Markdown plan content (markdown) to save a new plan file. To re-submit a previously revised plan file, provide its path (path) instead.");
                 string safeInspectionTools = "list_files, search_text, read_file, skill_use, read_image, web tools, run_rg, run_rga, or clearly read-only run_powershell commands";
                 builder.AppendLine($"- Use only safe inspection tools such as {safeInspectionTools}.");
                 builder.AppendLine("- The make_plan Markdown must include: goal, target files, edit scope, areas not to touch, current cause/context summary, concrete implementation steps, verification, and rollback/failure criteria.");

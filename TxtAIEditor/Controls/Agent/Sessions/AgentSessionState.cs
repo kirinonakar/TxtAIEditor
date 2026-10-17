@@ -19,6 +19,8 @@ namespace TxtAIEditor.Controls
         public string ModelSessionHistoryText { get; set; } = string.Empty;
         public string LastAnswerText { get; set; } = string.Empty;
         public string WorkspaceRoot { get; set; } = string.Empty;
+        // Saved plan awaiting approval; cleared when the plan is approved.
+        public string PendingPlanPath { get; set; } = string.Empty;
         public double SessionHistoryTokenCount { get; set; }
         public double CurrentRunTranscriptTokens { get; set; }
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
@@ -78,6 +80,9 @@ namespace TxtAIEditor.Controls
         public string PlanWorkspaceContext { get; set; } = string.Empty;
         public string PlanSelectionContext { get; set; } = string.Empty;
         public string GeneratedPlanPath { get; set; } = string.Empty;
+        // Plan file that may be revised in this run (session pending plan at run start).
+        public string PendingPlanPath { get; set; } = string.Empty;
+        public bool PlanResubmittedForApproval { get; set; }
         public string? QueuedFollowUpPrompt;
     }
 
@@ -91,6 +96,7 @@ namespace TxtAIEditor.Controls
         public string ModelSessionHistoryText { get; set; } = string.Empty;
         public string LastAnswerText { get; set; } = string.Empty;
         public string WorkspaceRoot { get; set; } = string.Empty;
+        public string PendingPlanPath { get; set; } = string.Empty;
         public double SessionHistoryTokenCount { get; set; }
         public double CurrentRunTranscriptTokens { get; set; }
         public List<AgentAttachmentState> Attachments { get; set; } = new();
@@ -108,6 +114,7 @@ namespace TxtAIEditor.Controls
                 ModelSessionHistoryText = session.ModelSessionHistoryText,
                 LastAnswerText = session.LastAnswerText,
                 WorkspaceRoot = session.WorkspaceRoot,
+                PendingPlanPath = session.PendingPlanPath,
                 SessionHistoryTokenCount = session.SessionHistoryTokenCount,
                 CurrentRunTranscriptTokens = session.CurrentRunTranscriptTokens,
                 Attachments = CloneAttachments(session.Attachments),

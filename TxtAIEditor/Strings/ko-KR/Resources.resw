@@ -2374,11 +2374,17 @@
   <data name="AgentPlanSavedOutputFormat" xml:space="preserve">
     <value>계획서를 저장하고 열었습니다: {0}</value>
   </data>
+  <data name="AgentPlanResubmittedOutputFormat" xml:space="preserve">
+    <value>수정된 계획서로 다시 승인을 요청합니다: {0}</value>
+  </data>
   <data name="AgentPlanOpenFailedFormat" xml:space="preserve">
     <value>계획서를 열지 못했습니다: {0}</value>
   </data>
   <data name="AgentPlanExecutionCancelledOutput" xml:space="preserve">
     <value>계획 실행이 취소되었습니다.</value>
+  </data>
+  <data name="AgentPlanRevisionHint" xml:space="preserve">
+    <value>계획을 수정하려면 수정 요청을 입력하세요. Agent가 계획서를 수정한 뒤 승인을 다시 요청합니다.</value>
   </data>
   <data name="AgentPlanSaveDirtyTabFailed" xml:space="preserve">
     <value>수정된 계획 탭을 저장하지 못해 실행을 시작하지 않았습니다.</value>

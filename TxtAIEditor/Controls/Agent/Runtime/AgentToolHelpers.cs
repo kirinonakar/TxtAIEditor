@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -275,6 +276,51 @@ namespace TxtAIEditor.Controls
                 or "merge_files"
                 or "split_file"
                 or "insert_to_file";
+        }
+
+        public static bool IsPlanRevisionEditTool(string normalizedToolName)
+        {
+            return normalizedToolName is "overwrite_file"
+                or "search_replace"
+                or "replace_range"
+                or "apply_patch"
+                or "append_to_file"
+                or "insert_to_file";
+        }
+
+        public static string ResolveFullPath(string? path, string? workspaceRoot)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                string resolved = Path.IsPathRooted(path)
+                    ? path
+                    : string.IsNullOrWhiteSpace(workspaceRoot)
+                        ? path
+                        : Path.Combine(workspaceRoot, path);
+                return Path.GetFullPath(resolved);
+            }
+            catch
+            {
+                return path;
+            }
+        }
+
+        public static bool AreSameFile(string? pathA, string? pathB, string? workspaceRoot)
+        {
+            if (string.IsNullOrWhiteSpace(pathA) || string.IsNullOrWhiteSpace(pathB))
+            {
+                return false;
+            }
+
+            return string.Equals(
+                ResolveFullPath(pathA, workspaceRoot),
+                ResolveFullPath(pathB, workspaceRoot),
+                StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool IsSuccessfulToolResult(string result)

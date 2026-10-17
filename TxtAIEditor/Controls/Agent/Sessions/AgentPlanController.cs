@@ -73,6 +73,26 @@ namespace TxtAIEditor.Controls
             return builder.ToString().Trim();
         }
 
+        public static string BuildPlanRevisionRequest(string userInstruction, string planPath, string targetLanguage = "Korean")
+        {
+            string examplePlanPath = planPath.Replace(Path.DirectorySeparatorChar, '/');
+            var builder = new StringBuilder();
+            builder.AppendLine("[Planning-mode task] (plan revision)");
+            builder.AppendLine("The previously saved plan was not approved. Revise that plan file instead of creating a new plan.");
+            builder.AppendLine($"- Plan file to revise: {planPath}");
+            builder.AppendLine("- In this revision run, file edit tools (apply_patch, search_replace, replace_range, overwrite_file, append_to_file, insert_to_file) are allowed only for that plan file; all other files are read-only.");
+            builder.AppendLine("- Read the current plan file first, then apply the requested changes. Keep the document structure and header sections intact.");
+            builder.AppendLine("- When the revision is complete, request approval again with exactly one make_plan tool_call that passes the plan file path:");
+            builder.AppendLine($"<tool_call>{{\"name\":\"make_plan\",\"arguments\":{{\"path\":\"{examplePlanPath}\"}}}}</tool_call>");
+            builder.AppendLine("- Do not create a new plan file. Pass the markdown argument only when you are providing the complete revised plan content.");
+            builder.AppendLine("- If the user's request is unrelated to this plan or asks for a new plan, ignore the above and run a normal planning run: investigate, then call make_plan with the markdown argument and no path.");
+            builder.AppendLine($"The plan MUST be written in {targetLanguage}.");
+            builder.AppendLine();
+            builder.AppendLine("[User revision request]");
+            builder.Append(userInstruction);
+            return builder.ToString().Trim();
+        }
+
         public async Task<string> MakePlanAsync(JsonElement arguments, CancellationToken cancellationToken)
         {
             AgentRunContext? runContext = _activeRunContextProvider();
@@ -87,24 +107,48 @@ namespace TxtAIEditor.Controls
             }
 
             string planMarkdown = GetFirstStringArgument(arguments, "markdown", "content", "plan", "md", "text");
-            if (string.IsNullOrWhiteSpace(planMarkdown))
+            string requestedPlanPath = GetFirstStringArgument(arguments, "path", "planPath", "plan_path", "file", "filePath", "file_path");
+            if (string.IsNullOrWhiteSpace(planMarkdown) && string.IsNullOrWhiteSpace(requestedPlanPath))
             {
-                return "make_plan failed: markdown content is empty.";
+                return "make_plan failed: provide markdown for a new plan, or the path of an existing plan file to re-submit it for approval.";
             }
 
             string workspaceRoot = runContext.WorkspaceRoot;
             try
             {
-                string planPath = await SavePlanFileAsync(
-                    runContext.OriginalUserInstruction,
-                    planMarkdown,
-                    workspaceRoot,
-                    runContext.PlanWorkspaceContext,
-                    runContext.PlanSelectionContext,
-                    cancellationToken);
+                string planPath;
+                bool resubmitted = !string.IsNullOrWhiteSpace(requestedPlanPath);
+                if (resubmitted)
+                {
+                    string validationError = ValidateResubmittedPlanPath(runContext, requestedPlanPath, workspaceRoot, out planPath);
+                    if (!string.IsNullOrEmpty(validationError))
+                    {
+                        return validationError;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(planMarkdown))
+                    {
+                        await UpdatePlanFileBodyAsync(planPath, planMarkdown, cancellationToken);
+                    }
+                }
+                else
+                {
+                    planPath = await SavePlanFileAsync(
+                        runContext.OriginalUserInstruction,
+                        planMarkdown,
+                        workspaceRoot,
+                        runContext.PlanWorkspaceContext,
+                        runContext.PlanSelectionContext,
+                        cancellationToken);
+                }
+
                 runContext.GeneratedPlanPath = planPath;
+                runContext.PendingPlanPath = planPath;
+                runContext.PlanResubmittedForApproval = resubmitted;
                 await OpenPlanFileForReviewAsync(runContext, planPath);
-                return $"make_plan saved: {planPath}\nworkspace_root: {workspaceRoot}";
+                return resubmitted
+                    ? $"make_plan resubmitted: {planPath}\nworkspace_root: {workspaceRoot}"
+                    : $"make_plan saved: {planPath}\nworkspace_root: {workspaceRoot}";
             }
             catch (Exception ex)
             {
@@ -137,8 +181,14 @@ namespace TxtAIEditor.Controls
             await _appendRunActivityAsync(runContext, string.Format(
                 _getString("AgentActivityPlanSavedFormat", "계획서 저장됨: {0}"),
                 planPath));
+            string planOutputFormatKey = runContext.PlanResubmittedForApproval
+                ? "AgentPlanResubmittedOutputFormat"
+                : "AgentPlanSavedOutputFormat";
+            string planOutputFormat = runContext.PlanResubmittedForApproval
+                ? "수정된 계획서로 다시 승인을 요청합니다: {0}"
+                : "계획서를 저장하고 열었습니다: {0}";
             await _appendRunOutputLineAsync(runContext, string.Format(
-                _getString("AgentPlanSavedOutputFormat", "계획서를 저장하고 열었습니다: {0}"),
+                _getString(planOutputFormatKey, planOutputFormat),
                 planPath));
 
             bool approved = await _confirmationController.ConfirmPlanExecutionAsync(planPath, cancellationToken);
@@ -147,6 +197,11 @@ namespace TxtAIEditor.Controls
                 await _appendRunOutputLineAsync(
                     runContext,
                     _getString("AgentPlanExecutionCancelledOutput", "계획 실행이 취소되었습니다."));
+                await _appendRunOutputLineAsync(
+                    runContext,
+                    _getString(
+                        "AgentPlanRevisionHint",
+                        "계획을 수정하려면 수정 요청을 입력하세요. Agent가 계획서를 수정한 뒤 승인을 다시 요청합니다."));
                 return string.Empty;
             }
 
@@ -193,6 +248,81 @@ namespace TxtAIEditor.Controls
 
             await File.WriteAllTextAsync(planPath, content, Encoding.UTF8, cancellationToken);
             return planPath;
+        }
+
+        private static string ValidateResubmittedPlanPath(
+            AgentRunContext runContext,
+            string requestedPlanPath,
+            string workspaceRoot,
+            out string fullPlanPath)
+        {
+            fullPlanPath = ResolveFullPath(requestedPlanPath, workspaceRoot);
+            if (string.IsNullOrWhiteSpace(fullPlanPath) || !File.Exists(fullPlanPath))
+            {
+                return $"make_plan failed: plan file not found: {requestedPlanPath}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(runContext.PendingPlanPath))
+            {
+                return AreSameFile(fullPlanPath, runContext.PendingPlanPath, workspaceRoot)
+                    ? string.Empty
+                    : $"make_plan failed: path must be the plan file awaiting approval: {runContext.PendingPlanPath}";
+            }
+
+            string planDirectory = ResolveFullPath(ResolvePlanDirectory(workspaceRoot), workspaceRoot);
+            string directoryPrefix = planDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (string.IsNullOrWhiteSpace(planDirectory) ||
+                !fullPlanPath.StartsWith(directoryPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return "make_plan failed: path must point to a plan file saved under the workspace plan folder.";
+            }
+
+            return string.Empty;
+        }
+
+        private static async Task UpdatePlanFileBodyAsync(string planPath, string planMarkdown, CancellationToken cancellationToken)
+        {
+            string existingContent = await File.ReadAllTextAsync(planPath, cancellationToken);
+            int planHeadingIndex = FindPlanHeadingIndex(existingContent);
+            string updatedContent;
+            if (planHeadingIndex >= 0)
+            {
+                int headingLineEnd = existingContent.IndexOf('\n', planHeadingIndex);
+                string prefix = headingLineEnd >= 0
+                    ? existingContent.Substring(0, headingLineEnd + 1)
+                    : existingContent + Environment.NewLine;
+                updatedContent = prefix + Environment.NewLine + planMarkdown.Trim() + Environment.NewLine;
+            }
+            else
+            {
+                updatedContent = planMarkdown.TrimEnd() + Environment.NewLine;
+            }
+
+            await File.WriteAllTextAsync(planPath, updatedContent, Encoding.UTF8, cancellationToken);
+        }
+
+        private static int FindPlanHeadingIndex(string content)
+        {
+            int lineStart = 0;
+            while (lineStart < content.Length)
+            {
+                int lineEnd = content.IndexOf('\n', lineStart);
+                int lineLength = (lineEnd < 0 ? content.Length : lineEnd) - lineStart;
+                string line = content.Substring(lineStart, lineLength).Trim();
+                if (line.Equals("## Plan", StringComparison.OrdinalIgnoreCase))
+                {
+                    return lineStart;
+                }
+
+                if (lineEnd < 0)
+                {
+                    break;
+                }
+
+                lineStart = lineEnd + 1;
+            }
+
+            return -1;
         }
 
         private async Task OpenPlanFileForReviewAsync(AgentRunContext runContext, string planPath)

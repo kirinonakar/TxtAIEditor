@@ -447,15 +447,16 @@ namespace TxtAIEditor.Controls
                 tools.Add(new LlmTool
                 {
                     Name = "make_plan",
-                    Description = "Save the implementation plan (Markdown). Use only in planning mode.",
+                    Description = "Save a new implementation plan (Markdown) or re-submit an existing plan file for approval. Use only in planning mode.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            markdown = new { type = "string", description = "Markdown plan content" }
+                            markdown = new { type = "string", description = "Markdown plan content for a new plan. When path is provided, it replaces the plan section of that file." },
+                            path = new { type = "string", description = "Existing plan file path. Use after editing the saved plan file to request approval again." }
                         },
-                        required = new[] { "markdown" }
+                        required = new string[0]
                     }
                 });
             }

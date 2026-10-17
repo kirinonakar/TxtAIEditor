@@ -2374,11 +2374,17 @@
   <data name="AgentPlanSavedOutputFormat" xml:space="preserve">
     <value>計画書を保存して開きました: {0}</value>
   </data>
+  <data name="AgentPlanResubmittedOutputFormat" xml:space="preserve">
+    <value>修正した計画書で再度承認を要求します: {0}</value>
+  </data>
   <data name="AgentPlanOpenFailedFormat" xml:space="preserve">
     <value>計画書を開けませんでした: {0}</value>
   </data>
   <data name="AgentPlanExecutionCancelledOutput" xml:space="preserve">
     <value>計画実行はキャンセルされました。</value>
+  </data>
+  <data name="AgentPlanRevisionHint" xml:space="preserve">
+    <value>計画を修正するには修正リクエストを入力してください。エージェントが計画書を修正し、再び承認を求めます。</value>
   </data>
   <data name="AgentPlanSaveDirtyTabFailed" xml:space="preserve">
     <value>編集された計画タブを保存できなかったため、実行を開始しませんでした。</value>

@@ -2374,11 +2374,17 @@ Plan: {0}</value>
   <data name="AgentPlanSavedOutputFormat" xml:space="preserve">
     <value>Saved and opened the plan: {0}</value>
   </data>
+  <data name="AgentPlanResubmittedOutputFormat" xml:space="preserve">
+    <value>Re-requested approval for the revised plan: {0}</value>
+  </data>
   <data name="AgentPlanOpenFailedFormat" xml:space="preserve">
     <value>Could not open the plan: {0}</value>
   </data>
   <data name="AgentPlanExecutionCancelledOutput" xml:space="preserve">
     <value>Plan execution was cancelled.</value>
+  </data>
+  <data name="AgentPlanRevisionHint" xml:space="preserve">
+    <value>To revise the plan, enter a revision request. The agent will update the plan file and request approval again.</value>
   </data>
   <data name="AgentPlanSaveDirtyTabFailed" xml:space="preserve">
     <value>The edited plan tab could not be saved, so execution was not started.</value>

@@ -203,8 +203,21 @@ namespace TxtAIEditor.Controls
 
             await _mcpController.EnsureActiveToolsAsync(CancellationToken.None);
             string targetLanguage = settings?.ResolveTargetLanguage() ?? "Korean";
+            var activeOpenSession = _openSessionController.EnsureSession(_currentSessionIdProvider());
+            string pendingPlanPath = requestedPlanningMode
+                ? activeOpenSession.PendingPlanPath ?? string.Empty
+                : string.Empty;
+            if (!string.IsNullOrWhiteSpace(pendingPlanPath) && !File.Exists(pendingPlanPath))
+            {
+                // The saved plan file is missing; fall back to a normal planning run.
+                pendingPlanPath = string.Empty;
+                activeOpenSession.PendingPlanPath = string.Empty;
+            }
+
             string conversationTurn = _promptContextService.BuildConversationTurn(requestedPlanningMode
-                ? AgentPlanController.BuildPlanningModeRequest(userInstruction, targetLanguage)
+                ? string.IsNullOrWhiteSpace(pendingPlanPath)
+                    ? AgentPlanController.BuildPlanningModeRequest(userInstruction, targetLanguage)
+                    : AgentPlanController.BuildPlanRevisionRequest(userInstruction, pendingPlanPath, targetLanguage)
                 : userInstruction);
             if (string.IsNullOrWhiteSpace(conversationTurn))
             {
@@ -214,7 +227,6 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var activeOpenSession = _openSessionController.EnsureSession(_currentSessionIdProvider());
             string preservedWorkspaceRoot = activeOpenSession.WorkspaceRoot;
             _openSessionController.SaveActiveFromUI();
             activeOpenSession.RewindSnapshots.Add(AgentSessionRewindSnapshot.Capture(activeOpenSession));
@@ -243,7 +255,8 @@ namespace TxtAIEditor.Controls
                 IsPlanningMode = requestedPlanningMode,
                 HasEnabledSkills = _skillController.HasSelectedSkills(),
                 HasEnabledMcp = _mcpController.HasSelectedMcpServers(),
-                OriginalUserInstruction = userInstruction
+                OriginalUserInstruction = userInstruction,
+                PendingPlanPath = pendingPlanPath
             };
             runContext.SessionHistory.Append(activeOpenSession.SessionHistoryText ?? string.Empty);
             string modelSessionHistory = activeOpenSession.ModelSessionHistoryText;
@@ -688,9 +701,7 @@ namespace TxtAIEditor.Controls
                         if (planningMode)
                         {
                             makePlanRetryCount++;
-                            string retryNote =
-                                "\n\n[Planning mode make_plan required]\n" +
-                                "Do not answer with the plan as plain text. Save it by including exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename.";
+                            string retryNote = BuildMakePlanRequiredRetryNote(runContext);
                             string retryDetail = _runTranscriptService.BuildRetryDetail(
                                 "make_plan_required",
                                 responseForTranscript,
@@ -874,11 +885,11 @@ namespace TxtAIEditor.Controls
                             toolResult = "make_plan failed: this tool is only available when planning mode is enabled.";
                             toolResultForTranscript = toolResult;
                         }
-                        else if (planningMode && IsMutatingTool(normalizedToolName) && normalizedToolName != "make_plan")
+                        else if (planningMode && IsMutatingTool(normalizedToolName) &&
+                            normalizedToolName != "make_plan" &&
+                            !IsAllowedPlanRevisionEdit(runContext, normalizedToolName, currentArguments))
                         {
-                            toolResult =
-                                "blocked: planning mode is plan-only and cannot run file/editor mutation tools. " +
-                                "Continue with safe inspection if needed, or write the detailed Markdown plan as the final answer.";
+                            toolResult = BuildPlanningMutationBlockedMessage(runContext);
                             toolResultForTranscript = toolResult;
                         }
                         else
@@ -1025,6 +1036,7 @@ namespace TxtAIEditor.Controls
                     var makePlanRes = toolCallResults.FirstOrDefault(tc => tc.NormalizedName == "make_plan" && IsSuccessfulToolResult(tc.Result));
                     if (planningMode && makePlanRes.Name != null)
                     {
+                        activeOpenSession.PendingPlanPath = runContext.GeneratedPlanPath;
                         approvedPlanExecutionPrompt = await _planController.WaitForSavedPlanApprovalAsync(
                             runContext,
                             userInstruction,
@@ -1032,6 +1044,7 @@ namespace TxtAIEditor.Controls
                         if (!string.IsNullOrWhiteSpace(approvedPlanExecutionPrompt))
                         {
                             approvedPlanWorkspaceRoot = runContext.WorkspaceRoot;
+                            activeOpenSession.PendingPlanPath = string.Empty;
                         }
 
                         AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
@@ -1402,6 +1415,53 @@ namespace TxtAIEditor.Controls
             }
 
             return foundHunk ? highestStartLine : null;
+        }
+
+        private static bool IsAllowedPlanRevisionEdit(
+            AgentRunContext runContext,
+            string normalizedToolName,
+            JsonElement arguments)
+        {
+            if (string.IsNullOrWhiteSpace(runContext.PendingPlanPath) ||
+                !IsPlanRevisionEditTool(normalizedToolName))
+            {
+                return false;
+            }
+
+            string targetPath = GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path");
+            return !string.IsNullOrWhiteSpace(targetPath) &&
+                AreSameFile(targetPath, runContext.PendingPlanPath, runContext.WorkspaceRoot);
+        }
+
+        private static string BuildPlanningMutationBlockedMessage(AgentRunContext runContext)
+        {
+            if (!string.IsNullOrWhiteSpace(runContext.PendingPlanPath))
+            {
+                return
+                    "blocked: in this plan-revision run you may edit only the pending plan file with file edit tools: " +
+                    runContext.PendingPlanPath +
+                    ". Use apply_patch, search_replace, replace_range, overwrite_file, append_to_file, or insert_to_file with that path, then call make_plan with the path to request approval again.";
+            }
+
+            return
+                "blocked: planning mode is plan-only and cannot run file/editor mutation tools. " +
+                "Continue with safe inspection if needed, or write the detailed Markdown plan as the final answer.";
+        }
+
+        private static string BuildMakePlanRequiredRetryNote(AgentRunContext runContext)
+        {
+            if (!string.IsNullOrWhiteSpace(runContext.PendingPlanPath))
+            {
+                string examplePlanPath = runContext.PendingPlanPath.Replace(Path.DirectorySeparatorChar, '/');
+                return
+                    "\n\n[Planning mode make_plan required]\n" +
+                    "Do not answer with the plan as plain text. Finish the revision and include exactly one make_plan tool_call with the revised plan file path:\n" +
+                    $"<tool_call>{{\"name\":\"make_plan\",\"arguments\":{{\"path\":\"{examplePlanPath}\"}}}}</tool_call>";
+            }
+
+            return
+                "\n\n[Planning mode make_plan required]\n" +
+                "Do not answer with the plan as plain text. Save it by including exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename.";
         }
 
         private async Task StartApprovedPlanSessionAsync(string executionPrompt, string workspaceRoot)

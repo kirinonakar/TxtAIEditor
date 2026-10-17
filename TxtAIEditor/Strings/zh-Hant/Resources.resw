@@ -2374,11 +2374,17 @@
   <data name="AgentPlanSavedOutputFormat" xml:space="preserve">
     <value>儲存並開啟計劃：{0}</value>
   </data>
+  <data name="AgentPlanResubmittedOutputFormat" xml:space="preserve">
+    <value>已提交修改後的計畫，再次請求核准：{0}</value>
+  </data>
   <data name="AgentPlanOpenFailedFormat" xml:space="preserve">
     <value>無法開啟計畫：{0}</value>
   </data>
   <data name="AgentPlanExecutionCancelledOutput" xml:space="preserve">
     <value>計劃執行被取消。</value>
+  </data>
+  <data name="AgentPlanRevisionHint" xml:space="preserve">
+    <value>如需修改計畫，請輸入修改請求。Agent 將修改計畫文件並再次請求核准。</value>
   </data>
   <data name="AgentPlanSaveDirtyTabFailed" xml:space="preserve">
     <value>無法儲存編輯的計劃選項卡，因此未開始執行。</value>

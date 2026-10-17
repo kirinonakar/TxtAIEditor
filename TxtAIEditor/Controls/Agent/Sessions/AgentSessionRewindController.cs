@@ -127,6 +127,7 @@ namespace TxtAIEditor.Controls
             session.Attachments = snapshot.CloneAttachments();
             session.SessionEdits = snapshot.CloneSessionEdits();
             session.WorkspaceRoot = snapshot.WorkspaceRoot;
+            session.PendingPlanPath = snapshot.PendingPlanPath;
             session.IsRunning = false;
             session.UpdatedAt = DateTime.Now;
             _clearThinkingState(session);
