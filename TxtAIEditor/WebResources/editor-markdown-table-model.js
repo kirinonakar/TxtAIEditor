@@ -46,18 +46,42 @@ function cloneTable(table) {
     return { ...table, rows: table.rows.map(cloneRow), separator: cloneRow(table.separator) };
 }
 
+export function markdownTableAlignment(separatorCell) {
+    const cell = String(separatorCell || '').replace(/\s+/g, '');
+    if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
+    if (cell.endsWith(':')) return 'right';
+    return cell.startsWith(':') ? 'left' : '';
+}
+
 export function changeMarkdownTable(table, action, row, column, bounds = null) {
+    const alignment = action === 'align-left' ? ':---' : action === 'align-center' ? ':---:'
+        : action === 'align-right' ? '---:' : null;
     if (!['row-before', 'row-after', 'row-delete', 'row-up', 'row-down', 'column-before', 'column-after',
-        'column-delete', 'column-left', 'column-right', 'clear-cells'].includes(action)) return null;
+        'column-delete', 'column-left', 'column-right', 'clear-cells'].includes(action) && !alignment) return null;
     const next = cloneTable(table);
-    for (const current of [...next.rows, next.separator]) {
+    for (const current of alignment ? [next.rows[0], next.separator] : [...next.rows, next.separator]) {
         while (current.cells.length < next.columns) current.cells.push({ text: current === next.separator ? ' --- ' : '  ' });
     }
     row = Math.max(0, Math.min(row, next.rows.length - 1));
     column = Math.max(0, Math.min(column, next.columns - 1));
+    if (alignment) {
+        // Rendered short rows include empty cells without source offsets. Give
+        // the focused cell an offset before restoring the editing caret.
+        while (next.rows[row].cells.length <= column) next.rows[row].cells.push({ text: '  ' });
+    }
     const blankRow = () => ({ prefix: table.rows[0].prefix, suffix: table.rows[0].suffix,
         cells: Array.from({ length: next.columns }, () => ({ text: '  ' })) });
-    if (action === 'row-before' || action === 'row-after') {
+    if (alignment) {
+        const left = Math.max(0, Math.min(bounds?.left ?? column, next.columns - 1));
+        const right = Math.max(left, Math.min(bounds?.right ?? column, next.columns - 1));
+        for (let c = left; c <= right; c++) {
+            const cell = next.separator.cells[c];
+            const leading = cell.text.match(/^\s*/)[0];
+            const trailing = cell.text.match(/\s*$/)[0];
+            const dashes = cell.text.replace(/[^-]/g, '');
+            cell.text = leading + alignment.replace('---', dashes) + trailing;
+        }
+    } else if (action === 'row-before' || action === 'row-after') {
         row = Math.max(1, row + (action === 'row-after' ? 1 : 0));
         next.rows.splice(row, 0, blankRow());
     } else if (action === 'row-delete') {

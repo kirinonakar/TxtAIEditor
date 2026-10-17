@@ -4079,6 +4079,10 @@ Plan: {0}</value>
   <data name="EditorContextMenuExpandAll" xml:space="preserve"><value>Expand All</value></data>
   <data name="EditorMarkdownTableRow" xml:space="preserve"><value>Row</value></data>
   <data name="EditorMarkdownTableColumn" xml:space="preserve"><value>Column</value></data>
+  <data name="EditorMarkdownTableAlignment" xml:space="preserve"><value>Alignment</value></data>
+  <data name="EditorMarkdownTableAlignLeft" xml:space="preserve"><value>Align left</value></data>
+  <data name="EditorMarkdownTableAlignCenter" xml:space="preserve"><value>Align center</value></data>
+  <data name="EditorMarkdownTableAlignRight" xml:space="preserve"><value>Align right</value></data>
   <data name="EditorMarkdownTableRowBefore" xml:space="preserve"><value>Insert row above</value></data>
   <data name="EditorMarkdownTableRowAfter" xml:space="preserve"><value>Insert row below</value></data>
   <data name="EditorMarkdownTableRowDelete" xml:space="preserve"><value>Delete row</value></data>

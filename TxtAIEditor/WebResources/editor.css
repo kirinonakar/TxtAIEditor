@@ -1257,7 +1257,8 @@ ol.md-list-parenthesis > li::marker {
     cursor: pointer;
 }
 
-.markdown-table-toolbar button:hover, .markdown-table-toolbar button[aria-pressed="true"] {
+.markdown-table-toolbar button:hover, .markdown-table-toolbar button[aria-pressed="true"],
+.markdown-table-toolbar button[aria-checked="true"] {
     background: var(--selection);
 }
 

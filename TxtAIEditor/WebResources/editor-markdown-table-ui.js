@@ -1,7 +1,7 @@
 import { scrollContainer, viewport } from './editor-dom.js';
 import { clearCustomSelectionVisuals, csvTableMode, imeController, post, renderImmediately, selectionController, state, syncCustomSelectionClass, viewportController } from './editor-core.js';
 import { commitLine, focusLine, replaceSelectionWith, setCaret } from './editor-commands.js';
-import { changeMarkdownTable, readMarkdownTable, tableSourceLine } from './editor-markdown-table-model.js';
+import { changeMarkdownTable, markdownTableAlignment, readMarkdownTable, tableSourceLine } from './editor-markdown-table-model.js';
 import { usesMarkdownTableEditing } from './editor-markdown-preview-edit.js';
 import { cancelPostEditFocusFollowUps } from './editor-edit-focus.js';
 
@@ -15,7 +15,8 @@ let currentRendered = null;
 
 const actions = {
     row: ['row-before', 'row-after', 'row-delete', 'row-up', 'row-down', 'select-row'],
-    column: ['column-before', 'column-after', 'column-delete', 'column-left', 'column-right', 'select-column']
+    column: ['column-before', 'column-after', 'column-delete', 'column-left', 'column-right', 'select-column'],
+    alignment: ['align-left', 'align-center', 'align-right']
 };
 
 function enabled() {
@@ -78,7 +79,7 @@ function ensureToolbar() {
     toolbar.className = 'markdown-table-toolbar';
     toolbar.hidden = true;
     toolbar.setAttribute('role', 'toolbar');
-    for (const group of ['row', 'column']) {
+    for (const group of ['row', 'column', 'alignment']) {
         const container = document.createElement('div');
         container.className = 'md-table-menu';
         const button = document.createElement('button');
@@ -96,7 +97,7 @@ function ensureToolbar() {
             const item = document.createElement('button');
             item.type = 'button';
             item.dataset.tableAction = action;
-            item.setAttribute('role', 'menuitem');
+            item.setAttribute('role', group === 'alignment' ? 'menuitemradio' : 'menuitem');
             menu.appendChild(item);
         }
         container.appendChild(menu);
@@ -234,8 +235,10 @@ export function performMarkdownTableAction(action) {
     const offset = lines.slice(0, relativeLine).reduce((length, line) => length + line.length + 1, 0) +
         targetCell.start + Math.min(1, targetCell.text.length - targetCell.text.trimStart().length);
     clearTextSelection();
-    selected.anchor = selected.focus = { row: change.row, column: change.column };
-    selected.rectangular = cellMode;
+    if (!action.startsWith('align-')) {
+        selected.anchor = selected.focus = { row: change.row, column: change.column };
+        selected.rectangular = cellMode;
+    }
     closeMenus();
     replaceSelectionWith({ start: { line: table.startLine, column: 0 },
         end: { line: table.endLine, column: (state.cache.get(table.endLine) || '').length } }, change.text,
@@ -277,6 +280,12 @@ export function syncMarkdownTableUi() {
         button.title = label(key);
         button.disabled = button.dataset.tableAction ? !canAct(key, table) : imeController.isComposing;
         if (key === 'cell-mode') button.setAttribute('aria-pressed', String(cellMode));
+        if (key.startsWith('align-')) {
+            const alignment = key.slice('align-'.length);
+            const checked = Array.from({ length: area.right - area.left + 1 }, (_, offset) =>
+                markdownTableAlignment(table.separator.cells[area.left + offset]?.text)).every(value => value === alignment);
+            button.setAttribute('aria-checked', String(checked));
+        }
     }
     positionToolbar();
 }

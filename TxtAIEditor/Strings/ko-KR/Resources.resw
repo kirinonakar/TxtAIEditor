@@ -4079,6 +4079,10 @@
   <data name="EditorContextMenuExpandAll" xml:space="preserve"><value>전체 펼치기</value></data>
   <data name="EditorMarkdownTableRow" xml:space="preserve"><value>행</value></data>
   <data name="EditorMarkdownTableColumn" xml:space="preserve"><value>열</value></data>
+  <data name="EditorMarkdownTableAlignment" xml:space="preserve"><value>정렬</value></data>
+  <data name="EditorMarkdownTableAlignLeft" xml:space="preserve"><value>왼쪽 정렬</value></data>
+  <data name="EditorMarkdownTableAlignCenter" xml:space="preserve"><value>가운데 정렬</value></data>
+  <data name="EditorMarkdownTableAlignRight" xml:space="preserve"><value>오른쪽 정렬</value></data>
   <data name="EditorMarkdownTableRowBefore" xml:space="preserve"><value>위에 행 추가</value></data>
   <data name="EditorMarkdownTableRowAfter" xml:space="preserve"><value>아래에 행 추가</value></data>
   <data name="EditorMarkdownTableRowDelete" xml:space="preserve"><value>행 삭제</value></data>

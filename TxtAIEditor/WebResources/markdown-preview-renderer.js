@@ -1,4 +1,4 @@
-import { parseMarkdownTableRow } from './editor-markdown-table-model.js';
+import { markdownTableAlignment as tableAlignment, parseMarkdownTableRow } from './editor-markdown-table-model.js';
 
 const mermaidCache = new Map();
 const DEFAULT_MAX_MERGED_PARAGRAPH_LINES = 12;
@@ -658,13 +658,6 @@ function splitTableRow(line) {
 function isTableSeparator(line) {
     const cells = splitTableRow(line);
     return !!cells?.length && cells.every(cell => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, '')));
-}
-
-function tableAlignment(separatorCell) {
-    const cell = String(separatorCell || '').replace(/\s+/g, '');
-    if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
-    if (cell.endsWith(':')) return 'right';
-    return '';
 }
 
 function isMarkdownTableStart(lineNumber, getLine) {

@@ -4037,6 +4037,10 @@
   <data name="EditorContextMenuExpandAll" xml:space="preserve"><value>すべて展開</value></data>
   <data name="EditorMarkdownTableRow" xml:space="preserve"><value>行</value></data>
   <data name="EditorMarkdownTableColumn" xml:space="preserve"><value>列</value></data>
+  <data name="EditorMarkdownTableAlignment" xml:space="preserve"><value>配置</value></data>
+  <data name="EditorMarkdownTableAlignLeft" xml:space="preserve"><value>左揃え</value></data>
+  <data name="EditorMarkdownTableAlignCenter" xml:space="preserve"><value>中央揃え</value></data>
+  <data name="EditorMarkdownTableAlignRight" xml:space="preserve"><value>右揃え</value></data>
   <data name="EditorMarkdownTableRowBefore" xml:space="preserve"><value>上に行を追加</value></data>
   <data name="EditorMarkdownTableRowAfter" xml:space="preserve"><value>下に行を追加</value></data>
   <data name="EditorMarkdownTableRowDelete" xml:space="preserve"><value>行を削除</value></data>

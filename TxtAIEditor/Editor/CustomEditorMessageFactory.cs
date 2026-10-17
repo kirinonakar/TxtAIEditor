@@ -163,6 +163,10 @@ namespace TxtAIEditor.Editor
             {
                 ("row", "EditorMarkdownTableRow", "Row"),
                 ("column", "EditorMarkdownTableColumn", "Column"),
+                ("alignment", "EditorMarkdownTableAlignment", "Alignment"),
+                ("align-left", "EditorMarkdownTableAlignLeft", "Align left"),
+                ("align-center", "EditorMarkdownTableAlignCenter", "Align center"),
+                ("align-right", "EditorMarkdownTableAlignRight", "Align right"),
                 ("row-before", "EditorMarkdownTableRowBefore", "Insert row above"),
                 ("row-after", "EditorMarkdownTableRowAfter", "Insert row below"),
                 ("row-delete", "EditorMarkdownTableRowDelete", "Delete row"),
