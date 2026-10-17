@@ -561,13 +561,6 @@ function buildMarkdownTable(size) {
     return [header, separator, ...bodyRows].join('\n');
 }
 
-// A table inserted directly under another table would be read as extra rows of
-// that table, so keep one blank line between the two tables.
-function isMarkdownTableRowText(text) {
-    const trimmed = String(text ?? '').trim();
-    return trimmed.length > 2 && trimmed.startsWith('|') && trimmed.endsWith('|');
-}
-
 function findGeneratedMarkdownTable(range) {
     for (const size of [3, 2]) {
         const tableLines = buildMarkdownTable(size).split('\n');
@@ -624,17 +617,23 @@ function cycleMarkdownTable() {
 
     const endLineText = state.cache.get(range.end.line) ?? '';
     const startLineText = state.cache.get(range.start.line) ?? '';
-    // Keep one blank line so a table inserted right under another table is not
-    // parsed as extra rows of that table.
-    const lineAboveTable = range.start.column > 0
+    // Surround a new table with one blank line above and below so it does not
+    // merge with adjacent text or with another table. An existing blank line is
+    // reused instead of adding a second one.
+    const needsLeadingSplit = range.start.column > 0;
+    const lineAboveTable = needsLeadingSplit
         ? startLineText.slice(0, range.start.column)
         : (range.start.line > 1 ? (state.cache.get(range.start.line - 1) ?? '') : null);
-    const needsLeadingBreak = range.start.column > 0;
-    const needsBlankLine = isMarkdownTableRowText(lineAboveTable);
-    const leadingBreaks = (needsLeadingBreak ? 1 : 0) + (needsBlankLine ? 1 : 0);
-    const needsTrailingBreak = range.end.column < endLineText.length;
+    const needsLeadingBlank = lineAboveTable !== null && lineAboveTable.trim().length > 0;
+    const leadingBreaks = (needsLeadingSplit ? 1 : 0) + (needsLeadingBlank ? 1 : 0);
+    const needsTrailingSplit = range.end.column < endLineText.length;
+    const lineBelowTable = needsTrailingSplit
+        ? endLineText.slice(range.end.column)
+        : (range.end.line < state.lineCount ? (state.cache.get(range.end.line + 1) ?? '') : null);
+    const needsTrailingBlank = lineBelowTable !== null && lineBelowTable.trim().length > 0;
+    const trailingBreaks = (needsTrailingSplit ? 1 : 0) + (needsTrailingBlank ? 1 : 0);
     const table = buildMarkdownTable(2);
-    const replacement = `${'\n'.repeat(leadingBreaks)}${table}${needsTrailingBreak ? '\n' : ''}`;
+    const replacement = `${'\n'.repeat(leadingBreaks)}${table}${'\n'.repeat(trailingBreaks)}`;
     const firstCellOffset = leadingBreaks + 2;
     replaceMarkdownRange(range, replacement, firstCellOffset, firstCellOffset);
 }
