@@ -1164,6 +1164,50 @@ ol.md-list-parenthesis > li::marker {
 .live-preview-row h2 { font-size: 1.2em; }
 .live-preview-row h3 { font-size: 1.08em; }
 
+/* A rule occupies one editor row, including when hidden source syntax wraps it.
+   Browser hr margins and block-in-inline boxes otherwise add phantom lines. */
+.live-preview-row hr {
+    display: inline-block;
+    width: 100%;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    /* Use the same native rule color and inset border as the preview panel. */
+    color: revert;
+    border: revert;
+    vertical-align: middle;
+}
+
+/* Match the preview panel's default hr bottom margin inside the measured row,
+   keeping the rule and gutter aligned above the added space. */
+.inline-live-preview-enabled .line-row.live-preview-row:has(> .line-text > hr:only-child, > .line-text > .md-preview-content:only-child > .md-preview-atom:only-child > hr) {
+    padding-bottom: 0.5em;
+}
+
+.inline-live-preview-enabled .line-row.live-preview-row:has(> .line-text > hr:only-child, > .line-text > .md-preview-content:only-child > .md-preview-atom:only-child > hr) > .line-text {
+    display: flex;
+    align-items: center;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.inline-live-preview-enabled .line-row.live-preview-row:has(> .line-text > hr:only-child, > .line-text > .md-preview-content:only-child > .md-preview-atom:only-child > hr) > .line-number {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.live-preview-row .md-preview-content:has(> .md-preview-atom:only-child > hr),
+.live-preview-row .md-preview-atom:has(> hr) {
+    display: block;
+    width: 100%;
+    line-height: 0;
+}
+
+.live-preview-row .md-preview-atom > hr {
+    display: block;
+}
+
 .live-preview-row a {
     color: #4da3ff;
     pointer-events: none;
