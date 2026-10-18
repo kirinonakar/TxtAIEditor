@@ -254,7 +254,10 @@ namespace TxtAIEditor.Controls
                 langCode);
             double tokens = AgentTokenEstimator.Estimate(systemPrompt) + AgentTokenEstimator.Estimate(baseUserContent);
 
-            return tokens + _currentRunTranscriptTokensProvider() + _attachmentController.EstimatedImageTokens + _toolCatalogTokensProvider();
+            // Finished runs are already included in the model session history. Adding their
+            // transcript counter again double-counts them and restores pre-compression size.
+            double currentRunTokens = _isRunningProvider() ? _currentRunTranscriptTokensProvider() : 0;
+            return tokens + currentRunTokens + _attachmentController.EstimatedImageTokens + _toolCatalogTokensProvider();
         }
 
         private string GetPromptText()

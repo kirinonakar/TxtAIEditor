@@ -184,7 +184,7 @@ namespace TxtAIEditor.Controls
                 callbacks.GetCurrentRunTranscriptTokens,
                 callbacks.RestoreSessionHistoryState,
                 callbacks.StopAgent,
-                () => callbacks.UpdateContextStatsImmediate(false),
+                () => callbacks.UpdateContextStatsImmediate(true),
                 AppBadgeNotificationService.UpdateBadge,
                 getString,
                 navigateToFolderAsync);
@@ -240,7 +240,15 @@ namespace TxtAIEditor.Controls
                 callbacks.GetActiveTabForContext,
                 callbacks.CaptureActiveSelectionSnapshot,
                 callbacks.GetCurrentSessionSettings,
-                sessionHistoryTextProvider,
+                () =>
+                {
+                    // Use the same history as the next run, including any compression.
+                    // The verbose history remains available separately for display/export.
+                    var session = openSessionController.EnsureSession(currentSessionIdProvider());
+                    return string.IsNullOrEmpty(session.ModelSessionHistoryText)
+                        ? session.SessionHistoryText
+                        : session.ModelSessionHistoryText;
+                },
                 getString);
             var contextStatsController = new AgentContextStatsController(
                 settingsService,
