@@ -473,7 +473,7 @@ export function createHostMessageHandler({
             applyMarkdownCommand(msg.command, msg.color);
             break;
         case 'revealLine':
-            revealLine(msg.lineNumber || 1, msg.indexOfMatch || 0, msg.matchLength || 0, msg.query || '');
+            revealLine(msg.lineNumber || 1, msg.indexOfMatch || 0, msg.matchLength || 0, msg.query || '', !!msg.preventFocus);
             break;
         case 'revealHexOffset':
             if (typeof revealHexOffset === 'function') {

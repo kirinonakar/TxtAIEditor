@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -495,13 +496,85 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            int totalLines = Math.Max(1, _sessionProvider(activeTab.Id)?.Model.LineCount ?? 1);
+            int currentLine = int.TryParse(_statusBar.LineText.Text, out int line) ? line : 1;
+            currentLine = Math.Clamp(currentLine, 1, totalLines);
             var lineBox = new TextBox
             {
                 PlaceholderText = _getString("GoToLinePlaceholder", "이동할 줄 번호 입력..."),
-                Width = 200
+                Text = currentLine.ToString()
             };
-            int currentLine = int.TryParse(_statusBar.LineText.Text, out int line) ? line : 1;
-            lineBox.Text = currentLine.ToString();
+            var lineSlider = new Slider
+            {
+                Header = _getString("StatusLineLabel", "줄"),
+                Minimum = 1,
+                Maximum = totalLines,
+                Value = currentLine,
+                StepFrequency = 1,
+                SmallChange = 1,
+                LargeChange = Math.Max(1, totalLines / 10),
+                IsEnabled = totalLines > 1,
+                IsThumbToolTipEnabled = true
+            };
+            var content = new StackPanel { Width = 300, Spacing = 8 };
+            content.Children.Add(lineBox);
+            content.Children.Add(lineSlider);
+            content.Children.Add(new TextBlock
+            {
+                Text = string.Format(_getString("StatusTotalLinesFormat", "전체 줄수: {0}"), totalLines)
+            });
+
+            bool syncingLine = false;
+            lineBox.TextChanged += (_, _) =>
+            {
+                if (!syncingLine && int.TryParse(lineBox.Text, out int targetLine))
+                {
+                    syncingLine = true;
+                    lineSlider.Value = Math.Clamp(targetLine, 1, totalLines);
+                    syncingLine = false;
+                }
+            };
+            lineSlider.ValueChanged += (_, args) =>
+            {
+                if (!syncingLine)
+                {
+                    syncingLine = true;
+                    lineBox.Text = ((int)Math.Round(args.NewValue)).ToString();
+                    syncingLine = false;
+                }
+            };
+            // The thumb handles pointer release itself, so listen to handled events too.
+            lineSlider.AddHandler(
+                UIElement.PointerReleasedEvent,
+                new Microsoft.UI.Xaml.Input.PointerEventHandler(async (_, _) =>
+                {
+                    if (!_isActiveTab(activeTab))
+                    {
+                        return;
+                    }
+
+                    int targetLine = Math.Clamp((int)Math.Round(lineSlider.Value), 1, totalLines);
+                    lineBox.Text = targetLine.ToString();
+                    if (_tabBridges.TryGetValue(activeTab.Id, out var bridgeGroup))
+                    {
+                        if (bridgeGroup.Bridge != null)
+                        {
+                            await bridgeGroup.Bridge.RevealLineAsync(targetLine, preventFocus: true);
+                        }
+                        else if (bridgeGroup.WebView?.CoreWebView2 != null)
+                        {
+                            bridgeGroup.WebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new
+                            {
+                                action = "revealLine",
+                                lineNumber = targetLine,
+                                preventFocus = true
+                            }));
+                        }
+
+                        SetCursorPosition(targetLine, 1);
+                    }
+                }),
+                true);
 
             bool terminalWasVisible = _isTerminalVisible();
             if (terminalWasVisible)
@@ -512,7 +585,7 @@ namespace TxtAIEditor.Controls
             var dialog = new ContentDialog
             {
                 Title = _getString("GoToLineTitle", "줄 이동 (Go to Line)"),
-                Content = lineBox,
+                Content = content,
                 PrimaryButtonText = _getString("GoToLineButton", "이동"),
                 CloseButtonText = _getString("GoToLineCancel", "취소"),
                 XamlRoot = _xamlRootProvider(),

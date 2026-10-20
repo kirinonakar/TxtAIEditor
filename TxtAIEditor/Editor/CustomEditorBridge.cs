@@ -557,9 +557,9 @@ namespace TxtAIEditor.Editor
             }
         }
 
-        public async Task RevealLineAsync(int lineNum, int indexOfMatch = 0, int matchLength = 0, string query = "")
+        public async Task RevealLineAsync(int lineNum, int indexOfMatch = 0, int matchLength = 0, string query = "", bool preventFocus = false)
         {
-            var msg = new { action = "revealLine", lineNumber = lineNum, indexOfMatch = indexOfMatch, matchLength = matchLength, query = query };
+            var msg = new { action = "revealLine", lineNumber = lineNum, indexOfMatch = indexOfMatch, matchLength = matchLength, query = query, preventFocus };
             await SendMessageAsync(msg);
         }
 
