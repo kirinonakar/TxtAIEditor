@@ -47,6 +47,7 @@ namespace TxtAIEditor.Controls
         private bool _hasMoreGitHistory;
         private int _loadedGitHistoryCount;
         private string _gitHistoryRepoPath = string.Empty;
+        private (string Text, bool IsNotDetected, int? ChangedCount, int UnpushedCount, string? StatusBranchText)? _lastBranchDisplay;
 
         public GitPanelController(
             IGitService gitService,
@@ -106,17 +107,26 @@ namespace TxtAIEditor.Controls
                 SetBranchText(GetGitNotDetectedText(), isNotDetected: true);
                 _leftSidebar.GitRepoPath.Text = _getString("GitRepoPathNone", "Root 경로없음");
                 UpdateInitButtonState(null);
-                _viewModel.GitFiles.Clear();
+                if (_viewModel.GitFiles.Count > 0)
+                {
+                    _viewModel.GitFiles.Clear();
+                }
                 _isRefreshingBranchList = true;
                 try
                 {
-                    _leftSidebar.GitBranches.Items.Clear();
+                    if (_leftSidebar.GitBranches.Items.Count > 0)
+                    {
+                        _leftSidebar.GitBranches.Items.Clear();
+                    }
                 }
                 finally
                 {
                     _isRefreshingBranchList = false;
                 }
-                _leftSidebar.GitHistory.Items.Clear();
+                if (_leftSidebar.GitHistory.Items.Count > 0)
+                {
+                    _leftSidebar.GitHistory.Items.Clear();
+                }
                 ResetGitHistoryPaging();
                 if (_refreshExplorerGitStatus != null)
                 {
@@ -131,9 +141,12 @@ namespace TxtAIEditor.Controls
             bool isGitNotDetected = GitBranchStatus.IsNotDetected(branch);
             string localizedBranch = isGitNotDetected ? GetGitNotDetectedText() : branch;
 
-            // Fetch everything asynchronously first to avoid race conditions and UI flickering
+            // Refresh all loaded history so unchanged results preserve paging and scroll position.
+            int historyCount = string.Equals(repoPath, _gitHistoryRepoPath, StringComparison.OrdinalIgnoreCase)
+                ? Math.Max(GitHistoryBatchSize, _loadedGitHistoryCount)
+                : GitHistoryBatchSize;
             var branchesTask = Task.Run(() => _gitService.GetBranchesAsync(repoPath));
-            var historyTask = Task.Run(() => _gitService.GetRecentHistoryAsync(repoPath, GitHistoryBatchSize));
+            var historyTask = Task.Run(() => _gitService.GetRecentHistoryAsync(repoPath, historyCount));
             var fileStatusesTask = Task.Run(() => _gitService.GetFileStatusesAsync(repoPath, includeAllUntrackedFiles: true));
             var unpushedCountTask = Task.Run(() => _gitService.GetUnpushedCommitCountAsync(repoPath));
 
@@ -155,61 +168,89 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            // Update UI components in a single synchronous block to prevent duplicate display and empty states
+            // Keep unchanged collections intact: Clear/Add recreates their containers and causes flicker.
             SetBranchText(
                 branchText,
                 isGitNotDetected,
                 changedCount,
                 unpushedCount,
                 localizedBranch);
-            _leftSidebar.GitRepoPath.Text = $"{repoPath}";
-            ToolTipService.SetToolTip(_leftSidebar.GitRepoPath, repoPath);
+            if (_leftSidebar.GitRepoPath.Text != repoPath)
+            {
+                _leftSidebar.GitRepoPath.Text = repoPath;
+                ToolTipService.SetToolTip(_leftSidebar.GitRepoPath, repoPath);
+            }
             UpdateInitButtonState(isGitNotDetected ? null : repoPath);
             _startAutoRefresh();
 
-            _isRefreshingBranchList = true;
-            try
+            var branchNames = branches.Select(branchName => branchName.Trim()).ToArray();
+            if (!_leftSidebar.GitBranches.Items.Cast<string>().SequenceEqual(branchNames))
             {
-                _leftSidebar.GitBranches.Items.Clear();
-                int selectedIndex = -1;
-                int i = 0;
-                foreach (var branchName in branches)
+                _isRefreshingBranchList = true;
+                try
                 {
-                    string cleanedBranchName = branchName.Trim();
-                    _leftSidebar.GitBranches.Items.Add(cleanedBranchName);
-                    if (cleanedBranchName.StartsWith("*", StringComparison.Ordinal))
+                    _leftSidebar.GitBranches.Items.Clear();
+                    int selectedIndex = -1;
+                    for (int i = 0; i < branchNames.Length; i++)
                     {
-                        selectedIndex = i;
+                        _leftSidebar.GitBranches.Items.Add(branchNames[i]);
+                        if (branchNames[i].StartsWith("*", StringComparison.Ordinal))
+                        {
+                            selectedIndex = i;
+                        }
                     }
-                    i++;
+                    if (selectedIndex >= 0)
+                    {
+                        _leftSidebar.GitBranches.SelectedIndex = selectedIndex;
+                    }
                 }
-                if (selectedIndex >= 0)
+                finally
                 {
-                    _leftSidebar.GitBranches.SelectedIndex = selectedIndex;
+                    _isRefreshingBranchList = false;
                 }
-            }
-            finally
-            {
-                _isRefreshingBranchList = false;
             }
 
-            _leftSidebar.GitHistory.Items.Clear();
-            foreach (var history in historyList)
+            bool historyChanged = !string.Equals(repoPath, _gitHistoryRepoPath, StringComparison.OrdinalIgnoreCase) ||
+                _leftSidebar.GitHistory.Items.Count != historyList.Count ||
+                _leftSidebar.GitHistory.Items.Cast<GitHistoryItem>().Zip(historyList).Any(pair =>
+                    pair.First.CommitHash != pair.Second.CommitHash ||
+                    pair.First.DisplayText != pair.Second.DisplayText ||
+                    pair.First.GraphText != pair.Second.GraphText ||
+                    pair.First.MessageText != pair.Second.MessageText ||
+                    pair.First.DecorationText != pair.Second.DecorationText ||
+                    pair.First.DateText != pair.Second.DateText ||
+                    pair.First.IsUnpushed != pair.Second.IsUnpushed ||
+                    pair.First.IsRemoteOnly != pair.Second.IsRemoteOnly);
+            if (historyChanged)
             {
-                _leftSidebar.GitHistory.Items.Add(history);
-            }
-            _gitHistoryRepoPath = repoPath;
-            _loadedGitHistoryCount = historyList.Count;
-            _hasMoreGitHistory = historyList.Count >= GitHistoryBatchSize;
-
-            _viewModel.GitFiles.Clear();
-            foreach (var kvp in fileStatuses)
-            {
-                if (kvp.Value == "!!" || kvp.Value.Trim() == "!!")
+                _leftSidebar.GitHistory.Items.Clear();
+                foreach (var history in historyList)
                 {
-                    continue; // Do not show ignored files in Git panel changes list
+                    _leftSidebar.GitHistory.Items.Add(history);
                 }
-                _viewModel.GitFiles.Add(CreateGitFileItem(kvp.Key, kvp.Value));
+                _gitHistoryRepoPath = repoPath;
+                _loadedGitHistoryCount = historyList.Count;
+                _hasMoreGitHistory = historyList.Count >= historyCount;
+            }
+
+            var gitFiles = fileStatuses
+                .Where(kvp => kvp.Value.Trim() != "!!")
+                .Select(kvp => CreateGitFileItem(kvp.Key, kvp.Value))
+                .ToArray();
+            bool filesChanged = _viewModel.GitFiles.Count != gitFiles.Length ||
+                _viewModel.GitFiles.Zip(gitFiles).Any(pair =>
+                    pair.First.Name != pair.Second.Name ||
+                    pair.First.Path != pair.Second.Path ||
+                    pair.First.StatusText != pair.Second.StatusText ||
+                    pair.First.ActionGlyph != pair.Second.ActionGlyph ||
+                    pair.First.IsStaged != pair.Second.IsStaged);
+            if (filesChanged)
+            {
+                _viewModel.GitFiles.Clear();
+                foreach (var item in gitFiles)
+                {
+                    _viewModel.GitFiles.Add(item);
+                }
             }
             
             if (_refreshExplorerGitStatus != null)
@@ -268,6 +309,13 @@ namespace TxtAIEditor.Controls
             int unpushedCount = 0,
             string? statusBranchText = null)
         {
+            var branchDisplay = (text, isNotDetected, changedCount, unpushedCount, statusBranchText);
+            if (_lastBranchDisplay == branchDisplay)
+            {
+                return;
+            }
+            _lastBranchDisplay = branchDisplay;
+
             string? stateTag = isNotDetected ? GitBranchStatus.NotDetectedTag : null;
             _leftSidebar.GitPanelBranch.Text = text;
             _leftSidebar.GitPanelBranch.Tag = stateTag;
