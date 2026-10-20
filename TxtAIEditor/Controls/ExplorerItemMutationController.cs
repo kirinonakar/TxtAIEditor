@@ -30,6 +30,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool> _isArchiveViewProvider;
         private readonly Func<bool> _isRemoteViewProvider;
         private readonly Func<Task> _refreshRemoteExplorerAsync;
+        private readonly Action _queueGitStatusRefresh;
 
         public ExplorerItemMutationController(
             LeftSidebarPane leftSidebar,
@@ -47,7 +48,8 @@ namespace TxtAIEditor.Controls
             Action<string, string> showError,
             Func<bool> isArchiveViewProvider,
             Func<bool> isRemoteViewProvider,
-            Func<Task> refreshRemoteExplorerAsync)
+            Func<Task> refreshRemoteExplorerAsync,
+            Action queueGitStatusRefresh)
         {
             _leftSidebar = leftSidebar;
             _viewModel = viewModel;
@@ -65,6 +67,7 @@ namespace TxtAIEditor.Controls
             _isArchiveViewProvider = isArchiveViewProvider;
             _isRemoteViewProvider = isRemoteViewProvider;
             _refreshRemoteExplorerAsync = refreshRemoteExplorerAsync;
+            _queueGitStatusRefresh = queueGitStatusRefresh;
         }
 
         public void WireEvents()
@@ -539,6 +542,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            bool localDeletionAttempted = false;
             try
             {
                 bool deletedRemoteItem = false;
@@ -553,6 +557,7 @@ namespace TxtAIEditor.Controls
                         continue;
                     }
 
+                    localDeletionAttempted = true;
                     if (item.IsFolder)
                     {
                         Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(
@@ -583,6 +588,14 @@ namespace TxtAIEditor.Controls
                 _showError(
                     _getString("DeleteErrorTitle", "삭제 오류"),
                     ex.Message);
+            }
+            finally
+            {
+                // A failed batch or folder deletion can still have removed some tracked files.
+                if (localDeletionAttempted)
+                {
+                    _queueGitStatusRefresh();
+                }
             }
         }
 

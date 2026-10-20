@@ -118,6 +118,7 @@ namespace TxtAIEditor.Composition
                 callbacks.IsExplorerArchiveView,
                 callbacks.IsExplorerRemoteView,
                 callbacks.RefreshRemoteExplorerAsync,
+                workspaceModule.QueueGitStatusRefresh,
                 callbacks.InitializePickerWindow,
                 () => commonServices.SettingsService.CurrentSettings.HomeFolderPath);
 

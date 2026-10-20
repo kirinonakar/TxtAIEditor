@@ -63,6 +63,7 @@ namespace TxtAIEditor.Controls
             Func<bool> isArchiveViewProvider,
             Func<bool> isRemoteViewProvider,
             Func<Task> refreshRemoteExplorerAsync,
+            Action queueGitStatusRefresh,
             Action<object> initializePickerWindow,
             Func<string>? homeFolderPathProvider = null)
         {
@@ -114,7 +115,8 @@ namespace TxtAIEditor.Controls
                 showError,
                 isArchiveViewProvider,
                 isRemoteViewProvider,
-                refreshRemoteExplorerAsync);
+                refreshRemoteExplorerAsync,
+                queueGitStatusRefresh);
             _archiveActionsController = new ExplorerArchiveActionsController(
                 leftSidebar,
                 statusBar,
