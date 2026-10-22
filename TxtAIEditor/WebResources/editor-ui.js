@@ -39,6 +39,7 @@ import { createEditorRenderer } from './editor-renderer.js';
 import { bindEditorEvents } from './editor-events.js';
 import { createHostMessageHandler } from './editor-host-messages.js';
 import { createLivePreviewPositionResolver } from './editor-live-preview-position.js';
+import { caretRectForOffset } from './editor-caret.js';
 import { bindPrintSupport } from './editor-print.js';
 
 const renderer = createEditorRenderer({
@@ -180,7 +181,58 @@ function centeredScrollTopForLine(lineNumber) {
         return clampScrollTop(lineTop(firstLine));
     }
 
+    if (state.inlineLivePreviewEnabled) {
+        const target = renderedLineTarget(lineNumber, false);
+        if (target) return centeredScrollTopForRect(target.rect);
+
+        // Covered source lines have zero height: their lineTop points past the
+        // owning preview block. Start at the owner until its DOM is available.
+        const block = findEditablePreviewBlockContaining(lineNumber, state.lineCount,
+            line => state.cache.get(line), { tabSize: state.tabSize || 4 });
+        lineNumber = block?.startLine ?? lineNumber;
+    }
+
     return clampScrollTop(lineTop(lineNumber) - Math.floor(scrollContainer.clientHeight / 2));
+}
+
+function renderedLineTarget(lineNumber, useActiveMatch = true) {
+    let row = viewport.querySelector(`.line-row[data-line="${lineNumber}"]`);
+    if (!state.inlineLivePreviewEnabled) {
+        return row ? { row, element: row, rect: row.getBoundingClientRect() } : null;
+    }
+
+    let sourceElement = viewport.querySelector(`.line-text[data-line="${lineNumber}"]`);
+    if (!sourceElement || sourceElement.closest('.line-row')?.classList.contains('live-preview-skipped')) {
+        sourceElement = viewport.querySelector(`[data-markdown-paragraph-line="${lineNumber}"], ` +
+            `[data-markdown-list-line="${lineNumber}"]`);
+    }
+    const sourceRow = sourceElement?.closest('.line-row');
+    if (sourceRow && !sourceRow.classList.contains('live-preview-skipped')) row = sourceRow;
+    if (!row || row.classList.contains('live-preview-skipped')) {
+        row = [...viewport.querySelectorAll('.line-row[data-preview-end-line]')].find(candidate =>
+            !candidate.classList.contains('live-preview-skipped') &&
+            Number(candidate.dataset.line) <= lineNumber &&
+            Number(candidate.dataset.previewEndLine) >= lineNumber);
+    }
+    if (!row) return null;
+
+    const element = sourceRow === row ? sourceElement : row;
+    const activeMatch = useActiveMatch && searchController.activeMatch?.lineNumber === lineNumber
+        ? element.querySelector('mark.active-match') : null;
+    let rect = activeMatch?.getBoundingClientRect();
+    if (!rect?.height && element.matches('.line-text')) {
+        rect = caretRectForOffset(element, Math.max(0, state.currentColumn - 1));
+    }
+    if (!rect?.height) rect = element.getBoundingClientRect();
+    if (!rect.height) rect = row.getBoundingClientRect();
+    return { row, element, rect };
+}
+
+function centeredScrollTopForRect(rect) {
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const margin = Math.max(0, Math.floor((scrollContainer.clientHeight - rect.height) / 2));
+    const visualDelta = rect.top - containerRect.top - margin;
+    return clampScrollTop(scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(visualDelta));
 }
 
 function postEditorScroll(scrollTop = scrollContainer.scrollTop) {
@@ -227,20 +279,13 @@ function alignActiveSearchMatchHorizontally(row) {
 }
 
 function alignRenderedLineInView(lineNumber) {
-    const row = viewport.querySelector(`.line-row[data-line="${lineNumber}"]`);
-    if (!row) {
+    const target = renderedLineTarget(lineNumber);
+    if (!target) {
         return { found: false, adjusted: false, loading: false };
     }
 
-    const rowRect = row.getBoundingClientRect();
-    const containerRect = scrollContainer.getBoundingClientRect();
-    const rowTopInContent = scrollContainer.scrollTop + rowRect.top - containerRect.top;
-    const targetScrollTop = rowRect.height >= scrollContainer.clientHeight
-        ? rowTopInContent
-        : rowTopInContent - Math.floor((scrollContainer.clientHeight - rowRect.height) / 2);
-    const visualDelta = targetScrollTop - scrollContainer.scrollTop;
-    const nextScrollTop = clampScrollTop(
-        scrollContainer.scrollTop + visualScrollDeltaToScrollTopDelta(visualDelta));
+    const { row, element, rect } = target;
+    const nextScrollTop = centeredScrollTopForRect(rect);
     const verticallyAdjusted = Math.abs(scrollContainer.scrollTop - nextScrollTop) > REVEAL_SCROLL_TOLERANCE;
 
     if (verticallyAdjusted) {
@@ -248,7 +293,7 @@ function alignRenderedLineInView(lineNumber) {
         postEditorScroll(nextScrollTop);
     }
 
-    const horizontallyAdjusted = alignActiveSearchMatchHorizontally(row);
+    const horizontallyAdjusted = alignActiveSearchMatchHorizontally(element);
 
     return {
         found: true,
