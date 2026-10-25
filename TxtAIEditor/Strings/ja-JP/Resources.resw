@@ -3782,6 +3782,7 @@
   <data name="RemoteUploadingStatus" xml:space="preserve"><value>アップロード中...</value></data>
   <data name="RemoteUploadFailedTitle" xml:space="preserve"><value>アップロード失敗</value></data>
   <data name="RemoteTransferRemainingFilesFormat" xml:space="preserve"><value>残り {0:N0} ファイル</value></data>
+  <data name="RemoteTransferFileCountFormat" xml:space="preserve"><value>{0:N0}/{1:N0} ファイル完了</value></data>
   <data name="JupyterVariablesButton" xml:space="preserve"><value>変数</value></data>
   <data name="JupyterVariablesPanelTitle" xml:space="preserve"><value>変数エクスプローラー</value></data>
   <data name="JupyterVariablesName" xml:space="preserve"><value>名前</value></data>

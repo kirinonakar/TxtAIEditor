@@ -3824,6 +3824,7 @@
   <data name="RemoteUploadingStatus" xml:space="preserve"><value>업로드 중...</value></data>
   <data name="RemoteUploadFailedTitle" xml:space="preserve"><value>업로드 실패</value></data>
   <data name="RemoteTransferRemainingFilesFormat" xml:space="preserve"><value>남은 파일 {0:N0}개</value></data>
+  <data name="RemoteTransferFileCountFormat" xml:space="preserve"><value>파일 {0:N0}/{1:N0}개 완료</value></data>
   <data name="JupyterVariablesButton" xml:space="preserve"><value>변수</value></data>
   <data name="JupyterVariablesPanelTitle" xml:space="preserve"><value>변수 탐색기</value></data>
   <data name="JupyterVariablesName" xml:space="preserve"><value>변수명</value></data>

@@ -77,6 +77,11 @@ namespace TxtAIEditor.Controls
             bool isCompleted = false;
             int totalItems = selectedItems.Count;
             double[] itemProgress = new double[totalItems];
+            int[] itemTotalFiles = Enumerable.Repeat(1, totalItems).ToArray();
+            int[] itemCompletedFiles = new int[totalItems];
+            bool showFileName = totalItems == 1 && !selectedItems[0].IsFolder;
+            string? lastStatusText = null;
+            int lastDisplayedPercent = -1;
             object progressSync = new();
 
             try
@@ -92,36 +97,44 @@ namespace TxtAIEditor.Controls
                             targetLocalDirectory,
                             (currentFile, remainingFiles, totalFiles, percent) =>
                             {
-                                if (isCompleted || cts.IsCancellationRequested)
-                                {
-                                    return;
-                                }
-
                                 double boundedPercent = Math.Clamp(percent, 0.0, 100.0);
                                 double currentItemProgress = totalFiles <= 0
                                     ? 100.0
                                     : (totalFiles - remainingFiles +
                                         (boundedPercent >= 100.0 ? 0.0 : boundedPercent / 100.0)) /
                                         totalFiles * 100.0;
-                                double overallProgress;
-                                int remainingItems;
                                 lock (progressSync)
                                 {
+                                    if (isCompleted || cts.IsCancellationRequested)
+                                    {
+                                        return;
+                                    }
+
                                     itemProgress[index] = Math.Max(
                                         itemProgress[index],
                                         Math.Clamp(currentItemProgress, 0.0, 100.0));
-                                    overallProgress = itemProgress.Average();
-                                    remainingItems = itemProgress.Count(value => value < 100.0);
-                                }
-
-                                _statusBar.ShowProgress(
-                                    FormatRemoteTransferStatus(
+                                    itemTotalFiles[index] = Math.Max(0, totalFiles);
+                                    itemCompletedFiles[index] = Math.Max(
+                                        itemCompletedFiles[index],
+                                        Math.Clamp(totalFiles - remainingFiles, 0, itemTotalFiles[index]));
+                                    double overallProgress = itemProgress.Average();
+                                    int totalFileCount = itemTotalFiles.Sum();
+                                    string statusText = FormatRemoteTransferStatus(
                                         downloadStatusPrefix,
-                                        string.IsNullOrWhiteSpace(currentFile) ? item.Name : currentFile,
-                                        remainingItems,
-                                        totalItems),
-                                    overallProgress,
-                                    () => cts.Cancel());
+                                        item.Name,
+                                        totalFileCount - itemCompletedFiles.Sum(),
+                                        totalFileCount,
+                                        showFileName);
+                                    int displayedPercent = (int)overallProgress;
+                                    if (statusText == lastStatusText && displayedPercent == lastDisplayedPercent)
+                                    {
+                                        return;
+                                    }
+
+                                    lastStatusText = statusText;
+                                    lastDisplayedPercent = displayedPercent;
+                                    _statusBar.ShowProgress(statusText, overallProgress, () => cts.Cancel());
+                                }
                             },
                             cts.Token);
                     }
@@ -145,8 +158,11 @@ namespace TxtAIEditor.Controls
             }
             finally
             {
-                isCompleted = true;
-                _statusBar.HideProgress();
+                lock (progressSync)
+                {
+                    isCompleted = true;
+                    _statusBar.HideProgress();
+                }
             }
         }
 
@@ -182,6 +198,7 @@ namespace TxtAIEditor.Controls
             using System.Threading.CancellationTokenSource cts = new();
             string uploadStatusPrefix = _getString("RemoteUploadingStatus", "업로드 중...");
             bool isCompleted = false;
+            object progressSync = new();
 
             try
             {
@@ -195,13 +212,15 @@ namespace TxtAIEditor.Controls
 
                 int totalFiles = uploadFiles.Count;
                 double[] fileProgress = new double[totalFiles];
-                object progressSync = new();
+                string lastStatusText = FormatRemoteTransferStatus(
+                    uploadStatusPrefix,
+                    uploadFiles[0].Name,
+                    totalFiles,
+                    totalFiles,
+                    showFileName: totalFiles == 1);
+                int lastDisplayedPercent = 0;
                 _statusBar.ShowProgress(
-                    FormatRemoteTransferStatus(
-                        uploadStatusPrefix,
-                        uploadFiles[0].Name,
-                        totalFiles,
-                        totalFiles),
+                    lastStatusText,
                     0,
                     () => cts.Cancel());
 
@@ -218,30 +237,34 @@ namespace TxtAIEditor.Controls
                             targetVirtualPath,
                             percent =>
                             {
-                                if (isCompleted || cts.IsCancellationRequested)
-                                {
-                                    return;
-                                }
-
-                                double overallProgress;
-                                int remainingFiles;
                                 lock (progressSync)
                                 {
+                                    if (isCompleted || cts.IsCancellationRequested)
+                                    {
+                                        return;
+                                    }
+
                                     fileProgress[index] = Math.Max(
                                         fileProgress[index],
                                         Math.Clamp(percent, 0.0, 100.0));
-                                    overallProgress = fileProgress.Average();
-                                    remainingFiles = fileProgress.Count(value => value < 100.0);
-                                }
-
-                                _statusBar.ShowProgress(
-                                    FormatRemoteTransferStatus(
+                                    double overallProgress = fileProgress.Average();
+                                    int remainingFiles = fileProgress.Count(value => value < 100.0);
+                                    string statusText = FormatRemoteTransferStatus(
                                         uploadStatusPrefix,
                                         file.Name,
                                         remainingFiles,
-                                        totalFiles),
-                                    overallProgress,
-                                    () => cts.Cancel());
+                                        totalFiles,
+                                        showFileName: totalFiles == 1);
+                                    int displayedPercent = (int)overallProgress;
+                                    if (statusText == lastStatusText && displayedPercent == lastDisplayedPercent)
+                                    {
+                                        return;
+                                    }
+
+                                    lastStatusText = statusText;
+                                    lastDisplayedPercent = displayedPercent;
+                                    _statusBar.ShowProgress(statusText, overallProgress, () => cts.Cancel());
+                                }
                             },
                             cts.Token);
                     }
@@ -267,8 +290,11 @@ namespace TxtAIEditor.Controls
             }
             finally
             {
-                isCompleted = true;
-                _statusBar.HideProgress();
+                lock (progressSync)
+                {
+                    isCompleted = true;
+                    _statusBar.HideProgress();
+                }
             }
         }
 
@@ -332,20 +358,21 @@ namespace TxtAIEditor.Controls
             string statusPrefix,
             string currentFile,
             int remainingFiles,
-            int totalFiles)
+            int totalFiles,
+            bool showFileName)
         {
-            string displayFile = AbbreviateFileName(currentFile);
-            if (totalFiles <= 1)
+            if (showFileName)
             {
-                return $"{statusPrefix} ({displayFile})";
+                return $"{statusPrefix} ({AbbreviateFileName(currentFile)})";
             }
 
-            string remainingText = string.Format(
+            string countText = string.Format(
                 _getString(
-                    "RemoteTransferRemainingFilesFormat",
-                    "남은 파일 {0:N0}개"),
-                Math.Max(0, remainingFiles));
-            return $"{statusPrefix} ({displayFile}, {remainingText})";
+                    "RemoteTransferFileCountFormat",
+                    "파일 {0:N0}/{1:N0}개 완료"),
+                Math.Clamp(totalFiles - remainingFiles, 0, totalFiles),
+                totalFiles);
+            return $"{statusPrefix} ({countText})";
         }
 
         private static string AbbreviateFileName(string fileName)
