@@ -56,7 +56,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
             if (requiresApiKey && string.IsNullOrEmpty(apiKey))
             {
-                return _localizationService.GetString("LlmErrorNoApiKeyOrToken", "에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 자격 증명을 먼저 저장해 주십시오.");
+                throw new LlmRequestException(_localizationService.GetString("LlmErrorNoApiKeyOrToken", "에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 자격 증명을 먼저 저장해 주십시오."));
             }
 
             // OpenCode Zen free models can be called without an API key; the gateway accepts the public stub token.
@@ -92,7 +92,7 @@ namespace TxtAIEditor.Core.Services.LLM
             };
 
             bool emittedOutput = false;
-            try
+            async Task<string> SendAsync()
             {
                 LlmTokenUsage? observedUsage = null;
                 Func<LlmTokenUsage, Task> onProviderUsage = async usage =>
@@ -117,7 +117,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         userContent,
                         async chunk =>
                         {
-                            emittedOutput = true;
+                            emittedOutput |= !string.IsNullOrEmpty(chunk);
                             fullResponse.Append(chunk);
                             await onChunk(chunk);
                         },
@@ -125,6 +125,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         attachments,
                         async reasoningChunk =>
                         {
+                            emittedOutput |= !string.IsNullOrEmpty(reasoningChunk);
                             reasoningResponse.Append(reasoningChunk);
                             if (onReasoning != null)
                             {
@@ -139,7 +140,11 @@ namespace TxtAIEditor.Core.Services.LLM
                         },
                         tools,
                         onProviderUsage,
-                        onNativeToolCall,
+                        async () =>
+                        {
+                            emittedOutput = true;
+                            if (onNativeToolCall != null) await onNativeToolCall();
+                        },
                         onApiType
                     );
                     if (observedUsage != null)
@@ -160,7 +165,11 @@ namespace TxtAIEditor.Core.Services.LLM
                         attachments,
                         tools,
                         onProviderUsage,
-                        onNativeToolCall,
+                        async () =>
+                        {
+                            emittedOutput = true;
+                            if (onNativeToolCall != null) await onNativeToolCall();
+                        },
                         onApiType
                     );
                     if (observedUsage != null)
@@ -170,7 +179,11 @@ namespace TxtAIEditor.Core.Services.LLM
                     return result;
                 }
             }
-            catch (OperationCanceledException)
+            try
+            {
+                return await LlmRequestRetryPolicy.ExecuteAsync(SendAsync, () => emittedOutput, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
@@ -181,6 +194,7 @@ namespace TxtAIEditor.Core.Services.LLM
             catch (Exception ex)
             {
                 if (allowVisionFallback &&
+                    !LlmRequestRetryPolicy.IsTransient(ex) &&
                     !emittedOutput &&
                     attachments?.Count > 0 &&
                     TryCreateVisionFallbackSettings(settings, out EditorSettings? fallbackSettings))
@@ -208,11 +222,6 @@ namespace TxtAIEditor.Core.Services.LLM
                         onNativeToolCall: onNativeToolCall,
                         onApiType: onApiType,
                         sessionId: sessionId);
-
-                    if (IsLlmErrorResponse(fallbackAnalysis))
-                    {
-                        return fallbackAnalysis;
-                    }
 
                     string fallbackContext =
                         $"[Vision fallback result: {fallbackSettings.LlmProvider} / {fallbackSettings.LlmModel}]\n" +
@@ -259,25 +268,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 }
 
                 string errorPrefix = _localizationService.GetString("LlmErrorCommunicationPrefix", "AI 통신 오류가 발생했습니다: ");
-                return $"{errorPrefix}{ex.Message}";
+                throw new LlmRequestException($"{errorPrefix}{ex.Message}", ex);
             }
-        }
-
-        private bool IsLlmErrorResponse(string response)
-        {
-            if (IsLlmEmptyResponse(response))
-            {
-                return true;
-            }
-
-            string communicationErrorPrefix = _localizationService.GetString(
-                "LlmErrorCommunicationPrefix",
-                "AI 통신 오류가 발생했습니다: ");
-            string missingCredentialError = _localizationService.GetString(
-                "LlmErrorNoApiKeyOrToken",
-                "에러: 해당 LLM API Key가 자격 증명 관리자에 등록되어 있지 않습니다. 설정을 열어 자격 증명을 먼저 저장해 주십시오.");
-            return response.StartsWith(communicationErrorPrefix, StringComparison.Ordinal) ||
-                response.Equals(missingCredentialError, StringComparison.Ordinal);
         }
 
         private bool IsLlmEmptyResponse(string response)

@@ -230,7 +230,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
                     if (!response.IsSuccessStatusCode)
                     {
-                        throw new HttpRequestException(string.Format(_localizationService.GetString("GoErrorApiCallFailed", "OpenCode Go API 호출 실패 ({0}): {1}"), response.StatusCode, responseBody));
+                        throw new LlmHttpException(response, string.Format(_localizationService.GetString("GoErrorApiCallFailed", "OpenCode Go API 호출 실패 ({0}): {1}"), response.StatusCode, responseBody));
                     }
 
                     using (var doc = JsonDocument.Parse(responseBody))
@@ -420,14 +420,14 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!response.IsSuccessStatusCode)
                     {
                         string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                        throw new HttpRequestException(string.Format(_localizationService.GetString("GoErrorStreamCallFailed", "OpenCode Go API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
+                        throw new LlmHttpException(response, string.Format(_localizationService.GetString("GoErrorStreamCallFailed", "OpenCode Go API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
                     }
 
                     var toolAccumulator = new StreamToolCallAccumulator();
                     bool hasToolCalls = false;
 
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
-                    using (var reader = new System.IO.StreamReader(stream))
+                    using (var reader = new LlmSseReader(stream))
                     {
                         bool truncated = false;
                         while (true)
@@ -634,7 +634,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
                     if (!response.IsSuccessStatusCode)
                     {
-                        throw new HttpRequestException(string.Format(_localizationService.GetString("GoErrorAnthropicApiCallFailed", "Anthropic API 호출 실패 ({0}): {1}"), response.StatusCode, responseBody));
+                        throw new LlmHttpException(response, string.Format(_localizationService.GetString("GoErrorAnthropicApiCallFailed", "Anthropic API 호출 실패 ({0}): {1}"), response.StatusCode, responseBody));
                     }
 
                     using (var doc = JsonDocument.Parse(responseBody))
@@ -776,11 +776,11 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!response.IsSuccessStatusCode)
                     {
                         string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                        throw new HttpRequestException(string.Format(_localizationService.GetString("GoErrorAnthropicStreamCallFailed", "Anthropic API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
+                        throw new LlmHttpException(response, string.Format(_localizationService.GetString("GoErrorAnthropicStreamCallFailed", "Anthropic API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
                     }
 
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
-                    using (var reader = new System.IO.StreamReader(stream))
+                    using (var reader = new LlmSseReader(stream))
                     {
                         string? currentEvent = null;
                         bool hasNativeToolCall = false;

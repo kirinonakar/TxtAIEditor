@@ -1534,6 +1534,23 @@ namespace TxtAIEditor.Controls
         {
             Func<EditorDocumentSession> getSession = () => _editorSessions.TryGetValue(tab.Id, out var s) ? s : session;
 
+            tab.PropertyChanged += async (_, args) =>
+            {
+                if (args.PropertyName == nameof(OpenedTab.FilePath) &&
+                    _tabBridges.TryGetValue(tab.Id, out var currentBridge) &&
+                    ReferenceEquals(currentBridge.Bridge, bridge))
+                {
+                    try
+                    {
+                        await bridge.SetPreviewBaseHrefAsync(_getPreviewBaseHref(tab));
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Failed to update document preview path: {ex.Message}");
+                    }
+                }
+            };
+
             editorWebView.GotFocus += (sender, args) =>
             {
                 _dispatcherQueue.TryEnqueue(() =>

@@ -642,6 +642,14 @@ namespace TxtAIEditor.Editor
             await SendMessageAsync(msg);
         }
 
+        public async Task SetPreviewBaseHrefAsync(string baseHref)
+        {
+            string nextBaseHref = baseHref ?? string.Empty;
+            if (string.Equals(_modelLivePreviewBaseHref, nextBaseHref, StringComparison.Ordinal)) return;
+            _modelLivePreviewBaseHref = nextBaseHref;
+            await SendMessageAsync(new { action = "setPreviewBaseHref", baseHref = nextBaseHref });
+        }
+
         public async Task SetInlineLivePreviewAsync(bool enabled, string baseHref)
         {
             _modelInlineLivePreviewEnabled = enabled;

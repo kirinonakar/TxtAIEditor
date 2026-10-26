@@ -153,11 +153,11 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!response.IsSuccessStatusCode)
                     {
                         string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                        throw new HttpRequestException(string.Format(_localizationService.GetString("OllamaErrorStreamCallFailed", "Ollama API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
+                        throw new LlmHttpException(response, string.Format(_localizationService.GetString("OllamaErrorStreamCallFailed", "Ollama API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
                     }
 
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
-                    using (var reader = new System.IO.StreamReader(stream))
+                    using (var reader = new LlmSseReader(stream))
                     {
                         var toolAccumulator = new StreamToolCallAccumulator();
                         bool hasToolCalls = false;
@@ -381,11 +381,11 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!response.IsSuccessStatusCode)
                     {
                         string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                        throw new HttpRequestException(string.Format(_localizationService.GetString("OllamaCloudErrorStreamCallFailed", "Ollama Cloud API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
+                        throw new LlmHttpException(response, string.Format(_localizationService.GetString("OllamaCloudErrorStreamCallFailed", "Ollama Cloud API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
                     }
 
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
-                    using (var reader = new System.IO.StreamReader(stream))
+                    using (var reader = new LlmSseReader(stream))
                     {
                         var toolAccumulator = new StreamToolCallAccumulator();
                         bool hasToolCalls = false;

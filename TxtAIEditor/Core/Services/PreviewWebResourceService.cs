@@ -25,7 +25,7 @@ namespace TxtAIEditor.Core.Services
         };
 
         public const string ResourceHostName = "txtaieditor.local";
-        public const string DocumentHostName = "txtaieditor-doc.local";
+        public const string DocumentHostName = PreviewDocumentResourceLocation.HostNameSuffix;
 
         public static string WebResourcesPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "WebResources");
 

@@ -66,7 +66,7 @@ namespace TxtAIEditor.Controls
             runContext.InFlightResponseTokens = 0;
             // Estimate the captured request once off the UI thread. Streaming stats then
             // only add the in-flight token count instead of reading the editor/history again.
-            runContext.ActualRequestTokens = await Task.Run(
+            int rawRequestEstimate = await Task.Run(
                 () => AgentContextCompressionService.EstimateModelRequestTokens(
                     runContext.LlmSettings,
                     fixedPromptContext,
@@ -79,6 +79,7 @@ namespace TxtAIEditor.Controls
                     agentToolsList,
                     imageAttachments),
                 cancellationToken);
+            runContext.ActualRequestTokens = runContext.RequestTokenCalibration.Estimate(rawRequestEstimate);
             runContext.ActualRequestTokensBase = runContext.CurrentRunTranscriptTokens;
             int printedLength = 0;
             bool toolCallPlaceholderShown = false;
@@ -157,9 +158,16 @@ namespace TxtAIEditor.Controls
                 };
             }
 
+            int? observedPromptTokens = null;
             Func<LlmTokenUsage, Task> onUsage = async usage =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (!runContext.VisionFallbackPending && usage.PromptTokens is > 0 &&
+                    string.Equals(usage.Provider, runContext.LlmSettings.LlmProvider, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(usage.Model, runContext.LlmSettings.LlmModel, StringComparison.OrdinalIgnoreCase))
+                {
+                    observedPromptTokens = usage.PromptTokens;
+                }
                 if (!runContext.LlmSettings.LlmAgentVerbose || !usage.HasAny)
                 {
                     return;
@@ -534,6 +542,11 @@ namespace TxtAIEditor.Controls
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            if (observedPromptTokens is > 0)
+            {
+                runContext.RequestTokenCalibration.Record(rawRequestEstimate, observedPromptTokens.Value);
+                runContext.ActualRequestTokens = observedPromptTokens.Value;
+            }
             response = responseBuilder.Length > 0 ? responseBuilder.ToString() : response;
             if (responseBuilder.Length == 0 &&
                 stepReasoningBuilder.Length > 0 &&

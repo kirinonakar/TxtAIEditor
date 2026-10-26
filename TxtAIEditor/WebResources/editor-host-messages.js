@@ -73,6 +73,16 @@ function syncRenderedDirtyLineClasses() {
 }
 
 let pendingModelResynchronization = null;
+let pendingPreviewBaseHrefRender = false;
+
+document.addEventListener('compositionend', () => {
+    if (!pendingPreviewBaseHrefRender) return;
+    queueMicrotask(() => {
+        if (isImeCompositionActive() || !pendingPreviewBaseHrefRender) return;
+        pendingPreviewBaseHrefRender = false;
+        queueRender(true);
+    });
+});
 
 function isImeCompositionActive() {
     return imeController.isCompositionActive;
@@ -544,6 +554,16 @@ export function createHostMessageHandler({
             break;
         case 'scrollSyncChanged':
             state.scrollSyncEnabled = !!msg.enabled;
+            break;
+        case 'setPreviewBaseHref':
+            state.livePreviewBaseHref = msg.baseHref || '';
+            state.livePreviewLocalResourceVersion = String(Date.now());
+            if (isImeCompositionActive()) {
+                pendingPreviewBaseHrefRender = true;
+            } else {
+                pendingPreviewBaseHrefRender = false;
+                queueRender(true);
+            }
             break;
         case 'setInlineLivePreview':
             const livePreviewScrollAnchor = captureScrollAnchor();

@@ -28,6 +28,7 @@ namespace TxtAIEditor
         public string ArchiveEntryPath { get; set; } = string.Empty;
         public bool IsArchiveEntry => !string.IsNullOrWhiteSpace(ArchivePath);
         public DateTime ModifiedTime { get; set; } = DateTime.MinValue;
+        public long? FileSize { get; set; }
 
         private string _subPath = string.Empty;
         public string SubPath

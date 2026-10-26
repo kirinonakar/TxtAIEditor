@@ -112,7 +112,8 @@ namespace TxtAIEditor.Core.Services
                     IsFolder = false,
                     ArchivePath = archivePath,
                     ArchiveEntryPath = childEntryPath,
-                    ModifiedTime = GetEntryModifiedTime(entry)
+                    ModifiedTime = GetEntryModifiedTime(entry),
+                    FileSize = GetEntrySize(entry)
                 });
             }
 
@@ -173,6 +174,7 @@ namespace TxtAIEditor.Core.Services
                         ArchivePath = archivePath,
                         ArchiveEntryPath = entryPath,
                         ModifiedTime = GetEntryModifiedTime(entry),
+                        FileSize = GetEntrySize(entry),
                         SubPath = GetRelativeParentPath(entryPath, currentDirectory)
                     });
                 }

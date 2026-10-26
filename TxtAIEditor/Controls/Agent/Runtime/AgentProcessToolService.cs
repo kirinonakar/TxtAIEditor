@@ -66,7 +66,7 @@ namespace TxtAIEditor.Controls
 
             // ripgrep exits with code 1 when no matches are found, which is normal
             // behavior and should not be treated as a tool failure by IsSuccessfulToolResult.
-            var rgExitCodeMatch = Regex.Match(result, @"\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase);
+            var rgExitCodeMatch = Regex.Match(result, @"(?:^|\n)\[exit_code\]\s+(-?\d+)\s*$", RegexOptions.IgnoreCase);
             if (rgExitCodeMatch.Success &&
                 int.TryParse(rgExitCodeMatch.Groups[1].Value, out int rgExitCode) &&
                 rgExitCode == 1 &&
@@ -107,7 +107,7 @@ namespace TxtAIEditor.Controls
             }
 
             // ripgrep-all also exits with code 1 when no matches are found.
-            var rgaExitCodeMatch = Regex.Match(result, @"\[exit_code\]\s+(-?\d+)", RegexOptions.IgnoreCase);
+            var rgaExitCodeMatch = Regex.Match(result, @"(?:^|\n)\[exit_code\]\s+(-?\d+)\s*$", RegexOptions.IgnoreCase);
             if (rgaExitCodeMatch.Success &&
                 int.TryParse(rgaExitCodeMatch.Groups[1].Value, out int rgaExitCode) &&
                 rgaExitCode == 1 &&
@@ -194,6 +194,18 @@ namespace TxtAIEditor.Controls
             {
                 return preferredEncoding.GetString(bytes);
             }
+        }
+
+        private static string DecodeTruncatedBytes(byte[] bytes, bool tail, Encoding preferredEncoding)
+        {
+            // A byte capture can split a UTF-8 scalar at the omitted boundary. Do not
+            // mistake that single partial scalar for an ANSI-encoded entire stream.
+            for (int trim = 0; trim <= 3 && trim < bytes.Length; trim++)
+            {
+                byte[] candidate = tail ? bytes.AsSpan(trim).ToArray() : bytes.AsSpan(0, bytes.Length - trim).ToArray();
+                if (TextEncodingService.IsValidUtf8(candidate)) return Encoding.UTF8.GetString(candidate);
+            }
+            return DecodeBytes(bytes, preferredEncoding);
         }
 
         private static string ParseCliXml(string clixml)
@@ -283,7 +295,6 @@ namespace TxtAIEditor.Controls
             Encoding? outputEncoding = null,
             IReadOnlyDictionary<string, string>? environmentVariables = null)
         {
-            var output = new StringBuilder();
             using var process = new Process();
             var encoding = outputEncoding ?? Encoding.UTF8;
             var startInfo = new ProcessStartInfo
@@ -323,30 +334,18 @@ namespace TxtAIEditor.Controls
                 return $"{fileName} failed to start: {ex.Message}";
             }
 
-            Task<byte[]> stdoutTask = ReadAllBytesAsync(process.StandardOutput.BaseStream, cancellationToken);
-            Task<byte[]> stderrTask = ReadAllBytesAsync(process.StandardError.BaseStream, cancellationToken);
-            Task exitTask = process.WaitForExitAsync(cancellationToken);
+            using var captureCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var stdoutTask = AgentProcessOutputCapture.ReadAsync(process.StandardOutput.BaseStream, captureCancellation.Token);
+            var stderrTask = AgentProcessOutputCapture.ReadAsync(process.StandardError.BaseStream, captureCancellation.Token);
+            Task exitTask = process.WaitForExitAsync(captureCancellation.Token);
+            Task completion = Task.WhenAll(exitTask, stdoutTask, stderrTask);
 
             try
             {
                 int effectiveTimeoutMs = Math.Clamp(timeoutMs, MinimumProcessTimeoutMs, MaximumProcessTimeoutMs);
-                Task completed = await Task.WhenAny(exitTask, Task.Delay(effectiveTimeoutMs, cancellationToken));
-                if (completed != exitTask)
-                {
-                    try
-                    {
-                        process.Kill(entireProcessTree: true);
-                    }
-                    catch
-                    {
-                    }
-
-                    return $"{fileName} timed out after {effectiveTimeoutMs}ms.";
-                }
-
-                await exitTask;
+                await completion.WaitAsync(TimeSpan.FromMilliseconds(effectiveTimeoutMs), cancellationToken);
             }
-            catch (OperationCanceledException)
+            catch (Exception ex) when (ex is OperationCanceledException or TimeoutException)
             {
                 try
                 {
@@ -359,34 +358,26 @@ namespace TxtAIEditor.Controls
                 {
                 }
 
-                throw;
+                captureCancellation.Cancel();
+                try { await completion; } catch { /* Observe pipe/exit cancellation. */ }
+                cancellationToken.ThrowIfCancellationRequested();
+                return $"{fileName} timed out after {Math.Clamp(timeoutMs, MinimumProcessTimeoutMs, MaximumProcessTimeoutMs)}ms.";
             }
 
-            string stdout = DecodeBytes(await stdoutTask, encoding);
-            string stderr = ParseCliXml(DecodeBytes(await stderrTask, encoding));
-
-            if (!string.IsNullOrWhiteSpace(stdout))
+            string DecodeCapture((byte[] Head, byte[] Tail, bool Truncated) capture)
             {
-                output.AppendLine(stdout.TrimEnd());
+                if (capture.Truncated)
+                    return DecodeTruncatedBytes(capture.Head, false, encoding) + "\n[output truncated in middle]\n" + DecodeTruncatedBytes(capture.Tail, true, encoding);
+                byte[] bytes = new byte[capture.Head.Length + capture.Tail.Length];
+                capture.Head.CopyTo(bytes, 0);
+                capture.Tail.CopyTo(bytes, capture.Head.Length);
+                return DecodeBytes(bytes, encoding);
             }
 
-            if (!string.IsNullOrWhiteSpace(stderr))
-            {
-                output.AppendLine("[stderr]");
-                output.AppendLine(stderr.TrimEnd());
-            }
+            string stdout = DecodeCapture(await stdoutTask);
+            string stderr = ParseCliXml(DecodeCapture(await stderrTask));
 
-            output.AppendLine($"[exit_code] {process.ExitCode}");
-
-            string text = output.ToString();
-            return text.Length > 20000 ? text.Substring(0, 20000) + "\n[output truncated]" : text;
-        }
-
-        private static async Task<byte[]> ReadAllBytesAsync(Stream stream, CancellationToken cancellationToken)
-        {
-            using var memoryStream = new MemoryStream();
-            await stream.CopyToAsync(memoryStream, cancellationToken);
-            return memoryStream.ToArray();
+            return AgentProcessOutputCapture.FormatOutput(stdout, stderr, process.ExitCode);
         }
 
         private static string ResolveExecutablePath(string fileName)

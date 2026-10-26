@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Controls
 {
@@ -15,6 +18,10 @@ namespace TxtAIEditor.Controls
         private TreeViewNode? _treeKeyboardFocusNode;
         private bool _isApplyingTreeSelection;
         private bool _isTreeSelectionCountUpdateQueued;
+        private string _fileSizeLabel = string.Empty;
+        private string _modifiedDateLabel = string.Empty;
+        private string _imageDimensionsLabel = string.Empty;
+        private readonly ImageConversionService _imageConversionService = new();
 
         public ExplorerSidebarView()
         {
@@ -143,6 +150,9 @@ namespace TxtAIEditor.Controls
 
         public void Localize(Func<string, string, string> getString, bool updateEmptyFolderStatus)
         {
+            _fileSizeLabel = getString("ExplorerFileSizeLabel", "용량");
+            _modifiedDateLabel = getString("ExplorerModifiedDateLabel", "수정 날짜");
+            _imageDimensionsLabel = getString("ExplorerImageDimensionsLabel", "이미지 크기");
             if (updateEmptyFolderStatus)
             {
                 ExplorerStatusText.Text = getString("NoFolderSelected", "폴더를 선택하세요.");
@@ -211,6 +221,59 @@ namespace TxtAIEditor.Controls
             ExplorerOverflowCreateNotebookMenuItem.Text = ExplorerCreateNotebookMenuItem.Text;
             ExplorerOverflowRemoteMenuItem.Text = remoteExplorerText;
             ExplorerOverflowOpenInWindowsMenuItem.Text = openInWindowsExplorerText;
+        }
+
+        private async void OnExplorerItemToolTipOpened(object sender, RoutedEventArgs e)
+        {
+            if (sender is not ToolTip toolTip || toolTip.Tag is not ExplorerItem item)
+            {
+                return;
+            }
+
+            var lines = new List<string> { item.ToolTipPath };
+            if (!item.IsFolder && item.FileSize is long size && size >= 0)
+            {
+                string[] units = { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
+                double value = size;
+                int unit = 0;
+                while (value >= 1024 && unit < units.Length - 1)
+                {
+                    value /= 1024;
+                    unit++;
+                }
+
+                string formattedSize = unit == 0 ? $"{size:N0} B" : $"{value:0.##} {units[unit]} ({size:N0} B)";
+                lines.Add($"{_fileSizeLabel}: {formattedSize}");
+            }
+
+            if (item.ModifiedTime != DateTime.MinValue)
+            {
+                lines.Add($"{_modifiedDateLabel}: {item.ModifiedTime.ToLocalTime():G}");
+            }
+
+            toolTip.Content = string.Join(Environment.NewLine, lines);
+
+            if (item.IsFolder || item.IsRemote || item.IsArchiveEntry ||
+                !SupportedFileTypes.IsImageFile(item.Path))
+            {
+                return;
+            }
+
+            try
+            {
+                // Read image headers off the UI thread only when the tooltip is shown.
+                ImageConversionSourceInfo info = await Task.Run(() =>
+                    _imageConversionService.ReadSourceInfoAsync(item.Path));
+                if (toolTip.IsOpen && ReferenceEquals(toolTip.Tag, item))
+                {
+                    lines.Add($"{_imageDimensionsLabel}: {info.Width} × {info.Height} px");
+                    toolTip.Content = string.Join(Environment.NewLine, lines);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed reading image dimensions for '{item.Path}': {ex.Message}");
+            }
         }
 
         private void OnExplorerNavigationToolbarSizeChanged(object sender, SizeChangedEventArgs e)

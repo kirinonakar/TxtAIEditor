@@ -2192,12 +2192,6 @@
   <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
     <value>工具调用格式重复出现错误，因此 Agent 执行被停止。请再次运行该任务。</value>
   </data>
-  <data name="AgentPendingToolIntentRetry" xml:space="preserve">
-    <value>模型只描述了下一步操作，但没有发出工具调用。正在重新请求工具调用。</value>
-  </data>
-  <data name="AgentSkillNotCalledRetry" xml:space="preserve">
-    <value>该模型描述了该技能，但没有调用它。重试工具调用。</value>
-  </data>
   <data name="AgentActivityTruncatedRetry" xml:space="preserve">
     <value>响应被截断；继续。</value>
   </data>
@@ -4064,4 +4058,8 @@
   <data name="EditorMarkdownTableClearCells" xml:space="preserve"><value>清空内容</value></data>
   <data name="EditorMarkdownTableCopyCells" xml:space="preserve"><value>复制单元格</value></data>
   <data name="EditorMarkdownTableDelete" xml:space="preserve"><value>删除表格</value></data>
+  <data name="ExplorerFileSizeLabel" xml:space="preserve"><value>大小</value></data>
+  <data name="ExplorerModifiedDateLabel" xml:space="preserve"><value>修改日期</value></data>
+  <data name="ExplorerImageDimensionsLabel" xml:space="preserve"><value>图像尺寸</value></data>
+  <data name="AgentTruncatedRetryLimit" xml:space="preserve"><value>响应多次被截断，Agent 已停止。请重试。</value></data>
 </root>

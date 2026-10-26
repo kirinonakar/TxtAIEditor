@@ -328,7 +328,7 @@ namespace TxtAIEditor.Controls
         {
             if (ConfirmFileEditAsync == null)
             {
-                return true;
+                return false;
             }
 
             return await ConfirmFileEditAsync(preview);

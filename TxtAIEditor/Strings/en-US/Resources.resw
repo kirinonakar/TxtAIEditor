@@ -2192,12 +2192,6 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentToolCallFormatRetryLimit" xml:space="preserve">
     <value>Tool call format errors repeated, so Agent execution was stopped. Please run the task again.</value>
   </data>
-  <data name="AgentPendingToolIntentRetry" xml:space="preserve">
-    <value>The model described the next action without a tool call. Requesting the tool call again.</value>
-  </data>
-  <data name="AgentSkillNotCalledRetry" xml:space="preserve">
-    <value>The model described the skill but did not call it. Retrying the tool call.</value>
-  </data>
   <data name="AgentActivityTruncatedRetry" xml:space="preserve">
     <value>Response was truncated; continuing.</value>
   </data>
@@ -4106,4 +4100,8 @@ Plan: {0}</value>
   <data name="EditorMarkdownTableClearCells" xml:space="preserve"><value>Clear cells</value></data>
   <data name="EditorMarkdownTableCopyCells" xml:space="preserve"><value>Copy cells</value></data>
   <data name="EditorMarkdownTableDelete" xml:space="preserve"><value>Delete table</value></data>
+  <data name="ExplorerFileSizeLabel" xml:space="preserve"><value>Size</value></data>
+  <data name="ExplorerModifiedDateLabel" xml:space="preserve"><value>Date modified</value></data>
+  <data name="ExplorerImageDimensionsLabel" xml:space="preserve"><value>Dimensions</value></data>
+  <data name="AgentTruncatedRetryLimit" xml:space="preserve"><value>Repeated response truncation stopped the agent. Please try again.</value></data>
 </root>

@@ -42,7 +42,8 @@ namespace TxtAIEditor.Controls
             bool hasEnabledMcp,
             IReadOnlyList<LlmTool> tools,
             IReadOnlyList<LlmMessageAttachment> attachments,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            AgentRequestTokenCalibration? tokenCalibration = null)
         {
             if (string.IsNullOrWhiteSpace(modelTranscript))
             {
@@ -69,6 +70,7 @@ namespace TxtAIEditor.Controls
                 hasEnabledMcp,
                 tools,
                 attachments);
+            requestTokens = tokenCalibration?.Estimate(requestTokens) ?? requestTokens;
 
             // The provider counts the requested completion budget against the context
             // window, and the character based estimate runs below the real tokenizer, so
@@ -113,6 +115,8 @@ namespace TxtAIEditor.Controls
                 return AgentContextCompressionResult.Unchanged(modelTranscript);
             }
 
+            // The old actual count describes a different prompt after compaction.
+            tokenCalibration?.Reset();
             return new AgentContextCompressionResult(compressedPrefix + tail, true);
         }
 

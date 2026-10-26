@@ -301,7 +301,8 @@ namespace TxtAIEditor.Controls
                 isGitRepoProvider,
                 async action => await uiDispatcher.RunAsync(action),
                 callbacks.AppendActivity,
-                getString);
+                getString,
+                callbacks.GetActiveRunContext);
             var planController = new AgentPlanController(
                 callbacks.GetActiveRunContext,
                 confirmationController,

@@ -290,9 +290,14 @@ namespace TxtAIEditor.Controls
             string approvedPlanExecutionPrompt = string.Empty;
             string approvedPlanWorkspaceRoot = activeOpenSession.WorkspaceRoot;
 
-            Task PersistRunSessionToHistoryAsync()
+            bool historyReady = false;
+            void FinishRun(string? responseLine, AgentRunStatus status = AgentRunStatus.Completed)
             {
-                return _sessionHistoryCoordinator.SaveRunSessionToHistoryAsync(runContext, userInstruction);
+                AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
+                    runContext, conversationTurn, transcript,
+                    initialTranscript, responseLine, modelTranscript);
+                historyReady = true;
+                runContext.Status = status;
             }
 
             _activeWorkspaceRunContext.Value = runContext;
@@ -339,19 +344,7 @@ namespace TxtAIEditor.Controls
 
                 bool completed = false;
                 bool reachedToolStepLimit = false;
-                int emptyResponseRetryCount = 0;
-                const int maxEmptyResponseRetries = 1;
-                int truncationRetryCount = 0;
-                const int maxTruncationRetries = 3;
-                int toolCallFormatRetryCount = 0;
-                const int maxToolCallFormatRetries = 2;
-                int makePlanRetryCount = 0;
-                const int maxMakePlanRetries = 2;
-                int skillMentionRetryCount = 0;
-                const int maxSkillMentionRetries = 2;
-                bool hasEmittedToolCall = false;
-                int pendingToolIntentRetryCount = 0;
-                const int maxPendingToolIntentRetries = 2;
+                var retries = new AgentStepRetryPolicy();
                 bool planningMode = requestedPlanningMode;
                 int maxToolSteps = runContext.LlmSettings.LlmMaxToolCalls >= 50 ? runContext.LlmSettings.LlmMaxToolCalls : 100;
                 var toolInvocationCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -401,7 +394,8 @@ namespace TxtAIEditor.Controls
                             runContext.HasEnabledMcp,
                             agentTools,
                             imageAttachments,
-                            cancellationToken);
+                            cancellationToken,
+                            runContext.RequestTokenCalibration);
                     if (compressionResult.Compressed)
                     {
                         modelTranscript = compressionResult.Transcript;
@@ -480,13 +474,12 @@ namespace TxtAIEditor.Controls
                         ? string.Empty
                         : Environment.NewLine + Environment.NewLine + retainedThinkingSection;
 
-                    if (truncated && !string.IsNullOrWhiteSpace(responseForTranscript))
+                    if (truncated)
                     {
                         await _runOutputController.StopRunThinkingActivityAsync(runContext);
 
-                        if (truncationRetryCount < maxTruncationRetries)
+                        if (retries.TryRetry(AgentRetryReason.Truncation))
                         {
-                            truncationRetryCount++;
                             string continuationNote =
                                 "\n\n[Agent response truncated]\n" +
                                 "Your previous response was cut off due to the output token limit. " +
@@ -511,15 +504,15 @@ namespace TxtAIEditor.Controls
                             await _runOutputController.AppendRunActivityAsync(runContext, truncationRetryMessage);
                             continue;
                         }
+                        throw new LlmRequestException(_getString("AgentTruncatedRetryLimit", "응답 잘림이 반복되어 Agent 실행을 중단했습니다. 다시 실행해 주세요."));
                     }
 
                     if (string.IsNullOrWhiteSpace(responseForTranscript))
                     {
                         await _runOutputController.StopRunThinkingActivityAsync(runContext);
 
-                        if (emptyResponseRetryCount < maxEmptyResponseRetries)
+                        if (retries.TryRetry(AgentRetryReason.EmptyResponse))
                         {
-                            emptyResponseRetryCount++;
                             string retryNote =
                                 "\n\n[Agent empty response]\n" +
                                 "The model returned no visible content. Continue with a final tool_call or a final answer.";
@@ -551,18 +544,7 @@ namespace TxtAIEditor.Controls
                             await _runOutputController.AppendRunActivityAsync(runContext, emptyResponseMessage);
                             await _runOutputController.AppendRunOutputLineAsync(runContext, emptyResponseMessage);
 
-                        AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
-                            runContext,
-                            conversationTurn,
-                            transcript + retainedThinkingTranscriptPart,
-                            initialTranscript,
-                            $"[Agent Response]: {emptyResponseMessage}",
-                            modelTranscript);
-                        _ = PersistRunSessionToHistoryAsync();
-
-                        runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(emptyResponseMessage);
-                        completed = true;
-                        break;
+                        throw new LlmRequestException(emptyResponseMessage);
                     }
 
                     await _runOutputController.StopRunThinkingActivityAsync(runContext);
@@ -638,7 +620,7 @@ namespace TxtAIEditor.Controls
                     {
                         if (responseHasToolSyntax || responseLooksLikeToolResultReplay)
                         {
-                            toolCallFormatRetryCount++;
+                            bool retryAllowed = retries.TryRetry(AgentRetryReason.ToolCallFormat);
                             AgentToolCallParser.TryGetToolCallFormatIssue(response, out string toolCallFormatIssue);
                             if (responseLooksLikeToolResultReplay)
                             {
@@ -673,7 +655,7 @@ namespace TxtAIEditor.Controls
                                 _updateContextStatsImmediate(true);
                             }
 
-                            if (toolCallFormatRetryCount > maxToolCallFormatRetries)
+                            if (!retryAllowed)
                             {
                                 string limitMessage = _getString(
                                     "AgentToolCallFormatRetryLimit",
@@ -681,18 +663,7 @@ namespace TxtAIEditor.Controls
                                 await _runOutputController.AppendRunActivityAsync(runContext, limitMessage);
                                 await _runOutputController.AppendRunOutputLineAsync(runContext, limitMessage);
 
-                                AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
-                                    runContext,
-                                    conversationTurn,
-                                    transcript,
-                                    initialTranscript,
-                                    $"[Agent Response]: {limitMessage}",
-                                    modelTranscript);
-                                _ = PersistRunSessionToHistoryAsync();
-
-                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(limitMessage);
-                                completed = true;
-                                break;
+                                throw new LlmRequestException(limitMessage);
                             }
 
                             continue;
@@ -700,7 +671,7 @@ namespace TxtAIEditor.Controls
 
                         if (planningMode)
                         {
-                            makePlanRetryCount++;
+                            bool retryAllowed = retries.TryRetry(AgentRetryReason.MakePlan);
                             string retryNote = BuildMakePlanRequiredRetryNote(runContext);
                             string retryDetail = _runTranscriptService.BuildRetryDetail(
                                 "make_plan_required",
@@ -722,7 +693,7 @@ namespace TxtAIEditor.Controls
                                 _updateContextStatsImmediate(true);
                             }
 
-                            if (makePlanRetryCount > maxMakePlanRetries)
+                            if (!retryAllowed)
                             {
                                 string limitMessage = _getString(
                                     "AgentMakePlanRetryLimit",
@@ -730,86 +701,9 @@ namespace TxtAIEditor.Controls
                                 await _runOutputController.AppendRunActivityAsync(runContext, limitMessage);
                                 await _runOutputController.AppendRunOutputLineAsync(runContext, limitMessage);
 
-                                AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
-                                    runContext,
-                                    conversationTurn,
-                                    transcript,
-                                    initialTranscript,
-                                    $"[Agent Response]: {limitMessage}",
-                                    modelTranscript);
-                                _ = PersistRunSessionToHistoryAsync();
-
-                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(limitMessage);
-                                completed = true;
-                                break;
+                                throw new LlmRequestException(limitMessage);
                             }
 
-                            continue;
-                        }
-
-                        if (!planningMode &&
-                            skillMentionRetryCount < maxSkillMentionRetries &&
-                            conversationTurn.Contains("[Enabled agent skills]", StringComparison.OrdinalIgnoreCase) &&
-                            _responseInspector.ResponseMentionsSkillIntent(response))
-                        {
-                            skillMentionRetryCount++;
-                            string retryNote =
-                                "\n\n[Skill not called]\n" +
-                                "You described intent to use a skill in prose but did not emit the skill_use tool_call. " +
-                                "Briefly state why if useful, then end with exactly one skill_use tool_call for the relevant skill:\n" +
-                                "<tool_call>{\"name\":\"skill_use\",\"arguments\":{\"name\":\"skill-name\"}}>";
-                            string retryDetail = _runTranscriptService.BuildRetryDetail(
-                                "skill_not_called",
-                                responseForTranscript,
-                                retryNote);
-                            retryDetail = retainedThinkingTranscriptPart + retryDetail;
-
-                            await _uiDispatcher.RunAsync(() =>
-                            {
-                                transcript += retryDetail;
-                                modelTranscript += retryDetail;
-                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
-                                _updateContextStatsImmediate(true);
-                            });
-
-                            string retryMessage = _getString(
-                                "AgentSkillNotCalledRetry",
-                                "스킬을 호출하지 않고 설명만 했습니다. 도구 호출을 다시 시도합니다.");
-                            await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
-                            await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
-                            if (_runOutputController.IsSessionVisible(runContext.SessionId))
-                            {
-                                _updateContextStatsImmediate(true);
-                            }
-                            continue;
-                        }
-
-                        if (!planningMode &&
-                            hasEmittedToolCall &&
-                            pendingToolIntentRetryCount < maxPendingToolIntentRetries &&
-                            _responseInspector.LooksLikeUnfinishedToolIntent(response))
-                        {
-                            pendingToolIntentRetryCount++;
-                            string retryNote = _responseInspector.BuildPendingToolIntentRetryNote();
-                            string retryDetail = _runTranscriptService.BuildRetryDetail(
-                                "pending_tool_intent",
-                                responseForTranscript,
-                                retryNote);
-                            retryDetail = retainedThinkingTranscriptPart + retryDetail;
-
-                            await _uiDispatcher.RunAsync(() =>
-                            {
-                                transcript += retryDetail;
-                                modelTranscript += retryDetail;
-                                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(retryDetail);
-                                _updateContextStatsImmediate(true);
-                            });
-
-                            string retryMessage = _getString(
-                                "AgentPendingToolIntentRetry",
-                                "다음 동작을 설명만 하고 도구 호출을 하지 않았습니다. 도구 호출을 다시 요청합니다.");
-                            await _runOutputController.AppendRunActivityAsync(runContext, retryMessage);
-                            await _runOutputController.AppendRunOutputLineAsync(runContext, retryMessage);
                             continue;
                         }
 
@@ -818,7 +712,7 @@ namespace TxtAIEditor.Controls
                             await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, response);
                         }
 
-                        toolCallFormatRetryCount = 0;
+                        retries.Reset(AgentRetryReason.ToolCallFormat);
                         runContext.LastAnswerText = AgentRunTextFormatter.BuildLastAnswerText(response, cleanResponse, runContext.LlmSettings.LlmAgentVerbose);
                         await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
                         if (runContext.StreamToTab)
@@ -829,14 +723,7 @@ namespace TxtAIEditor.Controls
                         string finalAnswerLog = AgentThinkingTranscriptFormatter.BuildFinalAnswerLog(
                             responseForTranscript,
                             retainedThinking);
-                        AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
-                            runContext,
-                            conversationTurn,
-                            transcript,
-                            initialTranscript,
-                            finalAnswerLog,
-                            modelTranscript);
-                        _ = PersistRunSessionToHistoryAsync();
+                        FinishRun(finalAnswerLog);
 
                         runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(finalAnswerLog);
                         completed = true;
@@ -845,7 +732,6 @@ namespace TxtAIEditor.Controls
 
                     bool stopAfterLoopGuard = false;
                     toolCalls = OrderToolCallsForExecution(toolCalls, runContext.WorkspaceRoot);
-                    hasEmittedToolCall = true;
                     var toolCallResults = new List<(string Name, JsonElement Args, string Result, string ResultForTranscript, bool Skipped, string NormalizedName)>();
                     bool hasWebSearchCallInBatch = false;
 
@@ -878,7 +764,7 @@ namespace TxtAIEditor.Controls
                         int currentInvocationCount = toolInvocationCounts[toolInvocationKey];
                         string toolResult;
                         string toolResultForTranscript;
-                        toolCallFormatRetryCount = 0;
+                        retries.Reset(AgentRetryReason.ToolCallFormat);
 
                         if (!planningMode && normalizedToolName == "make_plan")
                         {
@@ -1047,14 +933,7 @@ namespace TxtAIEditor.Controls
                             activeOpenSession.PendingPlanPath = string.Empty;
                         }
 
-                        AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
-                            runContext,
-                            conversationTurn,
-                            transcript,
-                            initialTranscript,
-                            "[Agent Response]: Plan saved for user review.",
-                            modelTranscript);
-                        _ = PersistRunSessionToHistoryAsync();
+                        FinishRun("[Agent Response]: Plan saved for user review.");
 
                         completed = true;
                         break;
@@ -1068,14 +947,7 @@ namespace TxtAIEditor.Controls
                         await _runOutputController.AppendRunActivityAsync(runContext, loopMessage);
                         await _runOutputController.AppendRunOutputLineAsync(runContext, loopMessage);
 
-                        AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
-                            runContext,
-                            conversationTurn,
-                            transcript,
-                            initialTranscript,
-                            $"[Agent Response]: {loopMessage}",
-                            modelTranscript);
-                        _ = PersistRunSessionToHistoryAsync();
+                        FinishRun(null, AgentRunStatus.Failed);
 
                         completed = true;
                         break;
@@ -1097,13 +969,7 @@ namespace TxtAIEditor.Controls
 
                             await _runOutputController.AppendRunOutputLineAsync(runContext, completeMsg);
 
-                            AgentRunTranscriptRecorder.AppendPromptTranscript(
-                                runContext,
-                                conversationTurn,
-                                transcript,
-                                initialTranscript,
-                                modelTranscript);
-                            _ = PersistRunSessionToHistoryAsync();
+                            FinishRun(null);
 
                             completed = true;
                             break;
@@ -1125,18 +991,12 @@ namespace TxtAIEditor.Controls
                     await _runOutputController.AppendRunActivityAsync(runContext, limitMsg);
                     await _runOutputController.AppendRunOutputLineAsync(runContext, limitMsg);
 
-                    AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
-                        runContext,
-                        conversationTurn,
-                        transcript,
-                        initialTranscript,
-                        "[Agent Response]: Tool step limit reached before a final answer.",
-                        modelTranscript);
-                    _ = PersistRunSessionToHistoryAsync();
+                    FinishRun(null, AgentRunStatus.Failed);
                 }
             }
             catch (OperationCanceledException)
             {
+                runContext.Status = AgentRunStatus.Stopped;
                 await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityStopped", "중단됨"));
                 await _runOutputController.AppendRunOutputLineAsync(runContext, _getString("AgentOutputStopped", "Agent 실행이 중단되었습니다."));
 
@@ -1154,32 +1014,42 @@ namespace TxtAIEditor.Controls
                     runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(interruptedTranscriptPart);
                 }
 
-                AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
-                    runContext,
-                    conversationTurn,
-                    transcript,
-                    initialTranscript,
-                    "[Agent Response]: Agent execution was interrupted by the user.",
-                    modelTranscript);
-                await PersistRunSessionToHistoryAsync();
+                FinishRun(null, AgentRunStatus.Stopped);
             }
             catch (Exception ex)
             {
-                await _runOutputController.AppendRunOutputLineAsync(runContext, string.Format(
+                runContext.Status = AgentRunStatus.Failed;
+                string failureMessage = string.Format(
                     _getString("AgentExceptionFormat", "Agent 실행 도중 예외가 발생했습니다: {0}"),
-                    ex.Message));
-
-                AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
-                    runContext,
-                    conversationTurn,
-                    transcript,
-                    initialTranscript,
-                    $"[Agent Response]: Agent execution encountered an exception: {ex.Message}",
-                    modelTranscript);
-                _ = PersistRunSessionToHistoryAsync();
+                    ex.Message);
+                await _runOutputController.AppendRunActivityAsync(runContext, failureMessage);
+                await _runOutputController.AppendRunOutputLineAsync(runContext, failureMessage);
+                // Errors and partial responses must not become next-turn assistant answers.
             }
             finally
             {
+                await _uiDispatcher.RunAsync(async () => await _runOutputController.FinishStreamToTabAsync(runContext));
+                activeOpenSession.SessionHistoryText = runContext.SessionHistory.ToString();
+                activeOpenSession.ModelSessionHistoryText = runContext.ModelSessionHistory.ToString();
+                activeOpenSession.SessionHistoryTokenCount = runContext.SessionHistoryTokenCount;
+                activeOpenSession.CurrentRunTranscriptTokens = runContext.CurrentRunTranscriptTokens;
+                activeOpenSession.SessionEdits = runContext.SessionEdits.ToList();
+                activeOpenSession.Attachments = runContext.Attachments.ToList();
+                activeOpenSession.LastAnswerText = runContext.LastAnswerText;
+                activeOpenSession.WorkspaceRoot = runContext.WorkspaceRoot;
+                if (historyReady)
+                {
+                    try
+                    {
+                        await _sessionHistoryCoordinator.SaveRunSessionToHistoryAsync(runContext, userInstruction);
+                    }
+                    catch (Exception ex)
+                    {
+                        runContext.Status = AgentRunStatus.Failed;
+                        await _runOutputController.AppendRunOutputLineAsync(runContext, string.Format(
+                            _getString("AgentActivityHistorySaveFailedFormat", "히스토리 저장 실패: {0}"), ex.Message));
+                    }
+                }
                 _activeWorkspaceRunContext.Value = null;
                 activeOpenSession.IsRunning = false;
                 _runningSessions.Remove(runContext.SessionId);
@@ -1192,15 +1062,6 @@ namespace TxtAIEditor.Controls
                 }
 
                 cancellationSource.Dispose();
-                await _uiDispatcher.RunAsync(async () => await _runOutputController.FinishStreamToTabAsync(runContext));
-                activeOpenSession.SessionHistoryText = runContext.SessionHistory.ToString();
-                activeOpenSession.ModelSessionHistoryText = runContext.ModelSessionHistory.ToString();
-                activeOpenSession.SessionHistoryTokenCount = runContext.SessionHistoryTokenCount;
-                activeOpenSession.CurrentRunTranscriptTokens = runContext.CurrentRunTranscriptTokens;
-                activeOpenSession.SessionEdits = runContext.SessionEdits.ToList();
-                activeOpenSession.Attachments = runContext.Attachments.ToList();
-                activeOpenSession.LastAnswerText = runContext.LastAnswerText;
-                activeOpenSession.WorkspaceRoot = runContext.WorkspaceRoot;
                 _openSessionController.ClearThinkingState(activeOpenSession);
                 bool completedInBackground = !_runOutputController.IsSessionVisible(runContext.SessionId);
                 if (_runOutputController.IsSessionVisible(runContext.SessionId))
@@ -1544,7 +1405,7 @@ namespace TxtAIEditor.Controls
             _ = _runOutputController.AppendRunActivityAsync(context, _getString("AgentActivityStopRequested", "중단 요청됨"));
 
             context.Cancellation?.Cancel();
-            _confirmationController.CancelPending();
+            _confirmationController.CancelPending(sessionId);
         }
 
         public void AddCurrentRunImageToolAttachment(LlmMessageAttachment attachment)

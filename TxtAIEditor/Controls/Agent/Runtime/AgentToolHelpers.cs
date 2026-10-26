@@ -330,6 +330,15 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
+            // A process may print arbitrary text, including file headers and failure
+            // phrases. Its terminal exit status takes precedence over those contents.
+            var exitCodeMatch = Regex.Match(result, @"(?:^|\r?\n)\[exit_code\]\s+(-?\d+)\s*(?:\r?\n\[ripgrep_no_matches\]\s*)?$", RegexOptions.IgnoreCase);
+            if (exitCodeMatch.Success)
+            {
+                return int.TryParse(exitCodeMatch.Groups[1].Value, out int exitCode) &&
+                    (exitCode == 0 || (exitCode == 1 && result.TrimEnd().EndsWith("[ripgrep_no_matches]", StringComparison.OrdinalIgnoreCase)));
+            }
+
             // Tool-generated failure messages always start at the beginning of the
             // result string. Only check the first line so that file content or search
             // results containing these substrings deeper in the body are not mistaken
@@ -353,6 +362,9 @@ namespace TxtAIEditor.Controls
             }
 
             if (firstLine.StartsWith("Tool failed:", StringComparison.OrdinalIgnoreCase) ||
+                firstLine.StartsWith("Unknown tool:", StringComparison.OrdinalIgnoreCase) ||
+                firstLine.StartsWith("blocked:", StringComparison.OrdinalIgnoreCase) ||
+                firstLine.Contains(" failed to start:", StringComparison.OrdinalIgnoreCase) ||
                 firstLine.Contains(" failed:", StringComparison.OrdinalIgnoreCase) ||
                 firstLine.Contains(" cancelled", StringComparison.OrdinalIgnoreCase) ||
                 firstLine.Contains(" timed out", StringComparison.OrdinalIgnoreCase))
@@ -360,29 +372,7 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
-            // Process exit code is appended at the end of output by RunProcessAsync.
-            // Match [exit_code] anchored to the end of string to avoid false matches in file content.
-            var exitCodeMatch = Regex.Match(result, @"\r?\n\[exit_code\]\s+(-?\d+)\s*$", RegexOptions.IgnoreCase);
-            if (!exitCodeMatch.Success)
-            {
-                exitCodeMatch = Regex.Match(result, @"^\[exit_code\]\s+(-?\d+)\s*$", RegexOptions.IgnoreCase);
-            }
-
-            if (!exitCodeMatch.Success)
-            {
-                return true;
-            }
-            if (!int.TryParse(exitCodeMatch.Groups[1].Value, out int exitCode))
-            {
-                return true;
-            }
-            // ripgrep/rga exit with code 1 when no matches are found, which is normal
-            // behavior and should not be treated as a tool failure.
-            if (exitCode == 1 && result.Contains("[ripgrep_no_matches]", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-            return exitCode == 0;
+            return true;
         }
 
         public static string ExtractPartialApplyPatchSummary(string result)

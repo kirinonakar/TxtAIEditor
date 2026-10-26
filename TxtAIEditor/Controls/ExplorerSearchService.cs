@@ -65,6 +65,7 @@ namespace TxtAIEditor.Controls
                             IsFolder = false,
                             IsArchive = _archiveExplorerService.IsSupportedArchiveFile(file.FullName),
                             ModifiedTime = file.LastWriteTime,
+                            FileSize = file.Length,
                             SubPath = Path.GetDirectoryName(relativePath) ?? string.Empty
                         });
                     }

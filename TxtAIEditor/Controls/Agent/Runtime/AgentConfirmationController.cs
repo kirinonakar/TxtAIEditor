@@ -15,7 +15,10 @@ namespace TxtAIEditor.Controls
         private readonly Func<Func<Task<bool>>, Task<bool>> _runOnUIThreadAsync;
         private readonly Action<string> _appendActivity;
         private readonly Func<string, string, string> _getString;
+        private readonly Func<AgentRunContext?> _activeRunContextProvider;
+        private readonly SemaphoreSlim _approvalGate = new(1, 1);
         private TaskCompletionSource<bool>? _diffApprovalTcs;
+        private string? _approvalSessionId;
 
         public AgentConfirmationController(
             ISettingsService settingsService,
@@ -24,7 +27,8 @@ namespace TxtAIEditor.Controls
             Func<string, bool> isGitRepoProvider,
             Func<Func<Task<bool>>, Task<bool>> runOnUIThreadAsync,
             Action<string> appendActivity,
-            Func<string, string, string> getString)
+            Func<string, string, string> getString,
+            Func<AgentRunContext?> activeRunContextProvider)
         {
             _settingsService = settingsService;
             _agentPane = agentPane;
@@ -33,6 +37,7 @@ namespace TxtAIEditor.Controls
             _runOnUIThreadAsync = runOnUIThreadAsync;
             _appendActivity = appendActivity;
             _getString = getString;
+            _activeRunContextProvider = activeRunContextProvider;
         }
 
         public void ApprovePending()
@@ -40,13 +45,39 @@ namespace TxtAIEditor.Controls
             _diffApprovalTcs?.TrySetResult(true);
         }
 
-        public void CancelPending()
+        public void CancelPending(string? sessionId = null)
         {
-            _diffApprovalTcs?.TrySetResult(false);
+            if (sessionId == null || string.Equals(sessionId, _approvalSessionId, StringComparison.Ordinal))
+                _diffApprovalTcs?.TrySetResult(false);
+        }
+
+        private async Task<bool> WaitForApprovalAsync(Action show, string? sessionId, CancellationToken cancellationToken)
+        {
+            await _approvalGate.WaitAsync(cancellationToken);
+            var approval = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                _approvalSessionId = sessionId;
+                _diffApprovalTcs = approval;
+                using var registration = cancellationToken.Register(() => approval.TrySetCanceled(cancellationToken));
+                show();
+                return await approval.Task;
+            }
+            finally
+            {
+                _diffApprovalTcs = null;
+                _approvalSessionId = null;
+                _agentPane.HideDiffConfirm();
+                _approvalGate.Release();
+            }
         }
 
         public async Task<bool> ConfirmFileEditAsync(AgentFileEditPreview preview)
         {
+            var context = _activeRunContextProvider();
+            CancellationToken cancellationToken = context?.Cancellation?.Token ?? CancellationToken.None;
+            cancellationToken.ThrowIfCancellationRequested();
             string displayPath = preview.RelativePath;
             await _runOnUIThreadAsync(() =>
             {
@@ -90,11 +121,8 @@ namespace TxtAIEditor.Controls
                     _getString(titleKey, defaultTitle),
                     Path.GetFileName(preview.RelativePath));
 
-                _agentPane.ShowDiffConfirm(headerText, summaryText);
-
-                _diffApprovalTcs = new TaskCompletionSource<bool>();
-                bool approved = await _diffApprovalTcs.Task;
-                _agentPane.HideDiffConfirm();
+                bool approved = await WaitForApprovalAsync(
+                    () => _agentPane.ShowDiffConfirm(headerText, summaryText), context?.SessionId, cancellationToken);
 
                 _appendActivity(approved
                     ? string.Format(_getString("AgentActivityDiffAppliedFormat", "변경 적용 승인: {0}"), displayPath)
@@ -106,6 +134,9 @@ namespace TxtAIEditor.Controls
 
         public async Task<bool> ConfirmPowerShellAsync(string command)
         {
+            var context = _activeRunContextProvider();
+            CancellationToken cancellationToken = context?.Cancellation?.Token ?? CancellationToken.None;
+            cancellationToken.ThrowIfCancellationRequested();
             var settings = _settingsService.CurrentSettings;
             if (settings.LlmAgentAutoApprovePowerShell &&
                 !AgentToolHelpers.IsDangerousPowerShellCommand(command))
@@ -124,11 +155,8 @@ namespace TxtAIEditor.Controls
                     _getString("AgentPowerShellConfirmSummaryFormat", "아래 명령을 실행하시겠습니까?\n\n{0}"),
                     string.Empty).TrimEnd();
 
-                _agentPane.ShowPowerShellConfirm(headerText, summaryText, wrappedCommand);
-
-                _diffApprovalTcs = new TaskCompletionSource<bool>();
-                bool approved = await _diffApprovalTcs.Task;
-                _agentPane.HideDiffConfirm();
+                bool approved = await WaitForApprovalAsync(
+                    () => _agentPane.ShowPowerShellConfirm(headerText, summaryText, wrappedCommand), context?.SessionId, cancellationToken);
 
                 _appendActivity(approved
                     ? _getString("AgentActivityPowerShellApproved", "PowerShell 실행 승인됨")
@@ -140,6 +168,7 @@ namespace TxtAIEditor.Controls
 
         public async Task<bool> ConfirmPlanExecutionAsync(string planPath, CancellationToken cancellationToken = default)
         {
+            string? sessionId = _activeRunContextProvider()?.SessionId;
             var settings = _settingsService.CurrentSettings;
             if (settings.LlmAgentAutoApprovePlanning)
             {
@@ -158,22 +187,8 @@ namespace TxtAIEditor.Controls
                         "열린 계획서를 검토, 수정, 저장한 뒤 승인하면 새 세션에서 계획을 실행합니다.\n\n계획서: {0}"),
                     planPath);
 
-                _agentPane.ShowDiffConfirm(headerText, summaryText);
-
-                var approvalTcs = new TaskCompletionSource<bool>();
-                _diffApprovalTcs = approvalTcs;
-                using CancellationTokenRegistration registration =
-                    cancellationToken.Register(() => approvalTcs.TrySetCanceled(cancellationToken));
-
-                bool approved;
-                try
-                {
-                    approved = await approvalTcs.Task;
-                }
-                finally
-                {
-                    _agentPane.HideDiffConfirm();
-                }
+                bool approved = await WaitForApprovalAsync(
+                    () => _agentPane.ShowDiffConfirm(headerText, summaryText), sessionId, cancellationToken);
 
                 _appendActivity(approved
                     ? _getString("AgentActivityPlanApproved", "계획 실행 승인됨")

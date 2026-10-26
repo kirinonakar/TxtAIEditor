@@ -53,7 +53,7 @@ namespace TxtAIEditor.Core.Services
                         continue;
                     }
 
-                    items.Add(new ExplorerItem { Name = file.Name, Path = file.FullName, IsFolder = false, ModifiedTime = file.LastWriteTime });
+                    items.Add(new ExplorerItem { Name = file.Name, Path = file.FullName, IsFolder = false, ModifiedTime = file.LastWriteTime, FileSize = file.Length });
                 }
             }
             catch (Exception ex)

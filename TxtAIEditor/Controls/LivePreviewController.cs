@@ -37,13 +37,12 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly DispatcherTimer _previewDebounceTimer;
         private readonly DispatcherTimer _renderAfterLayoutTimer;
-        private readonly Dictionary<string, string> _mappedEditorDocumentDirectories = new Dictionary<string, string>();
-        private readonly Dictionary<CoreWebView2, string> _mappedDocumentDirectoriesByWebView = new Dictionary<CoreWebView2, string>();
+        private readonly PreviewDocumentResourceRegistry _documentResources = new();
+        private readonly Dictionary<string, string> _documentBaseHrefs = new();
         private readonly Dictionary<string, int> _tabPreviewModes = new Dictionary<string, int>();
 
         private OpenedTab? _activeTabForPreview;
         private OpenedTab? _scheduledTabForPreview;
-        private string _mappedPreviewDocumentDirectory = string.Empty;
         private Task? _initializeTask;
         private bool _initializeAndRenderQueued;
         private bool _renderAfterLayoutQueued;
@@ -170,8 +169,9 @@ namespace TxtAIEditor.Controls
         public void RegisterDocumentResourceAccess(CoreWebView2 coreWebView)
         {
             coreWebView.AddWebResourceRequestedFilter(
-                $"http://{PreviewWebResourceService.DocumentHostName}/*",
-                CoreWebView2WebResourceContext.All);
+                $"http://*.{PreviewWebResourceService.DocumentHostName}/*",
+                CoreWebView2WebResourceContext.All,
+                CoreWebView2WebResourceRequestSourceKinds.All);
             coreWebView.WebResourceRequested += OnDocumentResourceRequested;
         }
 
@@ -539,7 +539,7 @@ namespace TxtAIEditor.Controls
                 string directory = string.Empty;
                 if (!string.IsNullOrWhiteSpace(tab.FilePath))
                 {
-                    directory = Path.GetDirectoryName(tab.FilePath) ?? string.Empty;
+                    directory = Path.GetDirectoryName(Path.GetFullPath(tab.FilePath)) ?? string.Empty;
                 }
 
                 if (string.IsNullOrWhiteSpace(directory) && !string.IsNullOrWhiteSpace(_currentFolderProvider()))
@@ -557,9 +557,18 @@ namespace TxtAIEditor.Controls
                     return string.Empty;
                 }
 
-                ConfigurePreviewDocumentFolderMapping(directory);
-                ConfigureEditorDocumentFolderMapping(tab, directory);
-                return $"http://{PreviewWebResourceService.DocumentHostName}/";
+                // Keep the document's directory in the URL so parent-relative images
+                // and images with identical names in other tabs resolve independently.
+                var location = PreviewDocumentResourceLocation.FromDirectory(directory);
+                _documentResources.Register(location);
+                bool pathChanged = _documentBaseHrefs.TryGetValue(tab.Id, out string? previousBaseHref) &&
+                    !string.Equals(previousBaseHref, location.BaseHref, StringComparison.Ordinal);
+                _documentBaseHrefs[tab.Id] = location.BaseHref;
+                if (pathChanged)
+                {
+                    Schedule(tab);
+                }
+                return location.BaseHref;
             }
             catch
             {
@@ -641,7 +650,7 @@ namespace TxtAIEditor.Controls
 
         public void ForgetEditorTab(string tabId, CoreWebView2? coreWebView)
         {
-            _mappedEditorDocumentDirectories.Remove(tabId);
+            _documentBaseHrefs.Remove(tabId);
             _tabPreviewModes.Remove(tabId);
             if (string.Equals(_activeTabForPreview?.Id, tabId, StringComparison.Ordinal))
             {
@@ -653,10 +662,6 @@ namespace TxtAIEditor.Controls
                 _scheduledTabForPreview = null;
             }
 
-            if (coreWebView != null)
-            {
-                _mappedDocumentDirectoriesByWebView.Remove(coreWebView);
-            }
         }
 
         public void Close()
@@ -1199,101 +1204,13 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private void ConfigurePreviewDocumentFolderMapping(string directory)
-        {
-            try
-            {
-                var coreWebView = PreviewWebViewIfCreated?.CoreWebView2;
-                if (coreWebView == null || string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
-                {
-                    return;
-                }
-
-                string normalizedDirectory = Path.GetFullPath(directory)
-                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                if (string.Equals(_mappedPreviewDocumentDirectory, normalizedDirectory, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-
-                coreWebView.SetVirtualHostNameToFolderMapping(
-                    PreviewWebResourceService.DocumentHostName,
-                    normalizedDirectory,
-                    CoreWebView2HostResourceAccessKind.Allow);
-                _mappedPreviewDocumentDirectory = normalizedDirectory;
-                _mappedDocumentDirectoriesByWebView[coreWebView] = normalizedDirectory;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to map preview document folder: {ex.Message}");
-            }
-        }
-
-        private void ConfigureEditorDocumentFolderMapping(OpenedTab tab, string directory)
-        {
-            try
-            {
-                if (!_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) ||
-                    bridgeGroup.WebView.CoreWebView2 == null ||
-                    string.IsNullOrWhiteSpace(directory) ||
-                    !Directory.Exists(directory))
-                {
-                    return;
-                }
-
-                string normalizedDirectory = Path.GetFullPath(directory)
-                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                if (_mappedEditorDocumentDirectories.TryGetValue(tab.Id, out var mappedDirectory) &&
-                    string.Equals(mappedDirectory, normalizedDirectory, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-
-                bridgeGroup.WebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                    PreviewWebResourceService.DocumentHostName,
-                    normalizedDirectory,
-                    CoreWebView2HostResourceAccessKind.Allow);
-                _mappedEditorDocumentDirectories[tab.Id] = normalizedDirectory;
-                _mappedDocumentDirectoriesByWebView[bridgeGroup.WebView.CoreWebView2] = normalizedDirectory;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to map editor document folder: {ex.Message}");
-            }
-        }
-
         private void OnDocumentResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
         {
             try
             {
-                string mappedDirectory = _mappedDocumentDirectoriesByWebView.TryGetValue(sender, out var webViewDirectory)
-                    ? webViewDirectory
-                    : _mappedPreviewDocumentDirectory;
-
-                if (string.IsNullOrWhiteSpace(mappedDirectory) ||
-                    !Uri.TryCreate(args.Request.Uri, UriKind.Absolute, out var requestUri) ||
-                    !string.Equals(requestUri.Host, PreviewWebResourceService.DocumentHostName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-
-                string relativePath = Uri.UnescapeDataString(requestUri.AbsolutePath.TrimStart('/'))
-                    .Replace('/', Path.DirectorySeparatorChar);
-                if (string.IsNullOrWhiteSpace(relativePath))
-                {
-                    args.Response = sender.Environment.CreateWebResourceResponse(
-                        PreviewWebResourceService.CreateEmptyResourceStream(),
-                        404,
-                        "Not Found",
-                        "Content-Type: text/plain");
-                    return;
-                }
-
-                string root = Path.GetFullPath(mappedDirectory)
-                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                string targetPath = Path.GetFullPath(Path.Combine(root, relativePath));
-                if (!targetPath.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
-                    !File.Exists(targetPath))
+                // Folder mappings added after navigation do not update existing
+                // resource loaders. Serve document files through the request event.
+                if (!_documentResources.TryResolveFile(args.Request.Uri, out string targetPath))
                 {
                     args.Response = sender.Environment.CreateWebResourceResponse(
                         PreviewWebResourceService.CreateEmptyResourceStream(),

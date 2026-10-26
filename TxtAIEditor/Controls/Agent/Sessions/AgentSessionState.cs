@@ -36,8 +36,12 @@ namespace TxtAIEditor.Controls
         public EditorSettings? LlmSettings { get; set; }
     }
 
+    internal enum AgentRunStatus { Running, Completed, Stopped, Failed }
+
     internal sealed class AgentRunContext
     {
+        public AgentRunStatus Status { get; set; } = AgentRunStatus.Running;
+        public AgentRequestTokenCalibration RequestTokenCalibration { get; } = new();
         public string SessionId { get; set; } = string.Empty;
         public CancellationTokenSource? Cancellation { get; set; }
         public StringBuilder SessionHistory { get; } = new();

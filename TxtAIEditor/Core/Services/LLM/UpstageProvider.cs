@@ -101,7 +101,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
                     if (!response.IsSuccessStatusCode)
                     {
-                        throw new HttpRequestException(string.Format(_localizationService.GetString("UpstageErrorApiCallFailed", "Upstage API 호출 실패 ({0}): {1}"), response.StatusCode, responseBody));
+                        throw new LlmHttpException(response, string.Format(_localizationService.GetString("UpstageErrorApiCallFailed", "Upstage API 호출 실패 ({0}): {1}"), response.StatusCode, responseBody));
                     }
 
                     using (var doc = JsonDocument.Parse(responseBody))
