@@ -179,7 +179,8 @@ namespace TxtAIEditor.Controls
             var diffWebView = new WebView2
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
+                VerticalAlignment = VerticalAlignment.Stretch,
+                UseSystemFocusVisuals = false
             };
             grid.Children.Add(diffWebView);
 
