@@ -222,6 +222,7 @@
             background: var(--bg);
             touch-action: none;
             user-select: none;
+            outline: none;
         }
         .horizontal-thumb {
             position: absolute;
@@ -233,12 +234,9 @@
             border-radius: 4px;
             will-change: transform;
         }
-        .horizontal-scrollbar:hover .horizontal-thumb {
+        .horizontal-scrollbar:hover .horizontal-thumb,
+        .horizontal-scrollbar:focus-visible .horizontal-thumb {
             background: rgba(121, 121, 121, 0.6);
-        }
-        .horizontal-scrollbar:focus-visible {
-            outline: 1px solid var(--fg);
-            outline-offset: -1px;
         }
 
         .diff-view {
