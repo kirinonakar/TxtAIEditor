@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Windowing;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Services;
@@ -144,6 +145,9 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            // Capture focus before restoring the window or hiding the sidebar moves it.
+            bool showAgentPanel = IsRightSidebarAgentFocused();
+
             _wasWindowMaximized = (_window.AppWindow.Presenter as OverlappedPresenter)?.State == OverlappedPresenterState.Maximized;
             if (_wasWindowMaximized && _window.AppWindow.Presenter is OverlappedPresenter presenter)
             {
@@ -179,9 +183,34 @@ namespace TxtAIEditor.Controls
 
             _shellPanelLayoutService.ApplyLeftSidebarVisibility(false);
             _shellPanelLayoutService.ApplyPreviewVisibility(false);
+            _stickyNoteBar.AgentIsChecked = showAgentPanel;
+            ApplyEditorAgentPanelVisibility(showAgentPanel);
             ResizeWindow(GetStickyNoteWindowSize());
             ApplySavedStickyNotePosition();
             _refreshTabLayout();
+        }
+
+        private bool IsRightSidebarAgentFocused()
+        {
+            if (!_shellPanelLayoutService.IsRightSidebarVisible ||
+                _rightSidebar.SelectedTabKey != "Agent" ||
+                _rightSidebar.XamlRoot is not XamlRoot xamlRoot)
+            {
+                return false;
+            }
+
+            for (DependencyObject? current = FocusManager.GetFocusedElement(xamlRoot) as DependencyObject;
+                 current != null;
+                 current = VisualTreeHelper.GetParent(current))
+            {
+                if (ReferenceEquals(current, _rightSidebar.AgentPane) ||
+                    ReferenceEquals(current, _rightSidebar.AgentTabItem))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void Exit()
