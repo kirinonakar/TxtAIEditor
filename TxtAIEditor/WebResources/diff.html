@@ -75,7 +75,7 @@
         #diff-panels {
             display: grid;
             grid-template-columns: var(--diff-columns);
-            grid-template-rows: 24px minmax(0, 1fr) 8px;
+            grid-template-rows: 24px minmax(0, 1fr) var(--scrollmap-width);
             flex: 1;
             min-height: 0;
             overflow: hidden;
@@ -136,6 +136,45 @@
             background: rgba(128, 128, 128, 0.2);
             color: var(--fg);
         }
+
+        #diff-message {
+            color: var(--removed-text);
+            max-width: 55%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        #right-view .line-number {
+            flex-basis: 76px;
+            width: 76px;
+            padding-left: 26px;
+        }
+        #chunk-actions {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 26px;
+            height: 100%;
+            pointer-events: none;
+        }
+        .revert-chunk-btn {
+            position: absolute;
+            left: 2px;
+            width: 22px;
+            height: 20px;
+            padding: 0;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            background: var(--header-bg);
+            color: var(--fg);
+            font-size: 16px;
+            line-height: 16px;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        .revert-chunk-btn:hover { background: var(--added-change-bg); }
+        .revert-chunk-btn:focus-visible { outline: 2px solid var(--fg); }
+        .revert-chunk-btn:disabled { opacity: 0.4; cursor: wait; }
 
         /* One native scroll surface moves both panes in the same compositor
            update. Headers, markers and horizontal controls stay outside it. */
@@ -337,6 +376,7 @@
     <div id="container">
         <div id="title-bar">
             <span id="diff-title">TxtAIEditor 파일 비교 도구 (File Compare)</span>
+            <span id="diff-message" role="status" aria-live="polite" hidden></span>
             <span id="diff-stats" style="font-weight: normal; color: var(--gutter-fg);">수집 중...</span>
         </div>
         <div id="diff-panels">
@@ -356,6 +396,7 @@
                     </div>
                     <div class="view-wrapper" id="right-wrapper">
                         <div class="diff-view" id="right-view"></div>
+                        <div id="chunk-actions"></div>
                     </div>
                 </div>
             </div>
@@ -789,6 +830,97 @@
             return { diffA: alignedA, diffB: alignedB };
         }
 
+        // Contiguous changed rows form one revertible chunk, including rows
+        // padded on either side by the replacement-line alignment.
+        function buildDiffChunks(diffA, diffB) {
+            const chunks = [];
+            let originalLine = 0;
+            let modifiedLine = 0;
+            let chunk = null;
+            for (let row = 0; row < diffA.length; row++) {
+                const changed = diffA[row].type !== 'unchanged' || diffB[row].type !== 'unchanged';
+                if (changed && !chunk) {
+                    chunk = { rowStart: row, rowEnd: row, originalStart: originalLine,
+                        modifiedStart: modifiedLine, originalCount: 0, modifiedCount: 0 };
+                    chunks.push(chunk);
+                }
+                const hasA = diffA[row].type !== 'empty';
+                const hasB = diffB[row].type !== 'empty';
+                if (changed) {
+                    chunk.rowEnd = row;
+                    if (hasA) chunk.originalCount++;
+                    if (hasB) chunk.modifiedCount++;
+                } else {
+                    chunk = null;
+                }
+                if (hasA) originalLine++;
+                if (hasB) modifiedLine++;
+            }
+            return chunks;
+        }
+
+        let comparisonData = null;
+        let diffChunks = [];
+        let revertPending = false;
+        const chunkButtons = new Map();
+
+        function renderChunkActions() {
+            const actions = document.getElementById('chunk-actions');
+            if (!comparisonData?.canRevert || !comparisonData.revertChunkTooltip) {
+                actions.replaceChildren();
+                chunkButtons.clear();
+                return;
+            }
+            const top = verticalWrapper.scrollTop;
+            const bottom = top + verticalWrapper.clientHeight;
+            let low = 0;
+            let high = diffChunks.length;
+            while (low < high) {
+                const middle = (low + high) >>> 1;
+                if ((diffChunks[middle].rowEnd + 1) * rowHeight <= top) low = middle + 1;
+                else high = middle;
+            }
+            const visible = new Set();
+            for (let index = low; index < diffChunks.length; index++) {
+                const chunk = diffChunks[index];
+                const start = chunk.rowStart * rowHeight;
+                const end = (chunk.rowEnd + 1) * rowHeight;
+                if (start >= bottom) break;
+                visible.add(index);
+                const existing = chunkButtons.get(index);
+                if (existing) {
+                    existing.style.top = `${Math.min(end - rowHeight, Math.max(start, top))}px`;
+                    existing.disabled = revertPending;
+                    continue;
+                }
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'revert-chunk-btn';
+                button.textContent = '↶';
+                button.title = comparisonData.revertChunkTooltip;
+                button.setAttribute('aria-label', comparisonData.revertChunkTooltip);
+                button.style.top = `${Math.min(end - rowHeight, Math.max(start, top))}px`;
+                button.disabled = revertPending;
+                button.addEventListener('click', () => {
+                    if (revertPending) return;
+                    revertPending = true;
+                    actions.querySelectorAll('button').forEach(item => { item.disabled = true; });
+                    document.getElementById('diff-message').hidden = true;
+                    post({ type: 'revertChunk', revision: comparisonData.revision,
+                        originalStart: chunk.originalStart, originalCount: chunk.originalCount,
+                        modifiedStart: chunk.modifiedStart, modifiedCount: chunk.modifiedCount });
+                });
+                actions.append(button);
+                chunkButtons.set(index, button);
+            }
+            for (const [index, button] of chunkButtons) {
+                if (!visible.has(index)) {
+                    button.remove();
+                    chunkButtons.delete(index);
+                }
+            }
+        }
+
         function renderLineText(item) {
             if (!item.changes) return escapeHtml(item.text);
             let html = '';
@@ -933,6 +1065,7 @@
         }
 
         function renderVisibleRows(force = false) {
+            renderChunkActions();
             const totalRows = globalDiffA.length;
             const viewHeight = verticalWrapper.clientHeight;
             const scrollTop = verticalWrapper.scrollTop;
@@ -1027,10 +1160,16 @@
 
         // ── Render ─────────────────────────────────────────────────────────
         function renderDiff(data) {
+            comparisonData = data;
+            revertPending = false;
+            document.getElementById('chunk-actions').replaceChildren();
+            chunkButtons.clear();
+            document.getElementById('diff-message').hidden = true;
             const lineDiff = computeLineDiff(data.textA, data.textB);
             const { diffA, diffB } = alignChangedLines(lineDiff.diffA, lineDiff.diffB);
             globalDiffA = diffA;
             globalDiffB = diffB;
+            diffChunks = buildDiffChunks(diffA, diffB);
             measuredFont = '';
 
             // Compute maximum line length
@@ -1261,6 +1400,18 @@
                     }
                     applyThemeSettings(msg.theme || 'Dark', msg.uiFontFamily, null);
                     renderDiff(msg);
+                } else if (msg.action === 'revertChunkResult') {
+                    if (!comparisonData || msg.requestRevision !== comparisonData.revision) return;
+                    revertPending = false;
+                    if (msg.success) {
+                        renderDiff({ ...comparisonData, textB: msg.textB, revision: msg.revision });
+                    } else {
+                        const message = document.getElementById('diff-message');
+                        message.textContent = msg.error || '';
+                        message.title = message.textContent;
+                        message.hidden = false;
+                        renderChunkActions();
+                    }
                 } else if (msg.action === 'updateOptions') {
                     applyThemeSettings(msg.theme || 'Dark', null, msg.fontFamily);
                 }

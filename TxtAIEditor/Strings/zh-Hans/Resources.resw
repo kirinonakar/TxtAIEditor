@@ -1838,6 +1838,18 @@
   <data name="DiffOpenFileTooltip" xml:space="preserve">
     <value>打开文件</value>
   </data>
+  <data name="DiffRevertChunkTooltip" xml:space="preserve">
+    <value>还原此区块（保存到修改后的文件）</value>
+  </data>
+  <data name="DiffRevertChunkStale" xml:space="preserve">
+    <value>内容在比较后已更改。请重新打开差异视图。</value>
+  </data>
+  <data name="DiffRevertChunkUnavailable" xml:space="preserve">
+    <value>修改后的文件有未保存的更改，或为只读/远程文件。请保存本地文件后重试。</value>
+  </data>
+  <data name="DiffRevertChunkFailed" xml:space="preserve">
+    <value>无法还原此区块。请检查文件状态和写入权限。</value>
+  </data>
   <data name="GitPreviousCommitFormat" xml:space="preserve">
     <value>{0}（上一次提交）</value>
   </data>

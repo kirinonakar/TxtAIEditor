@@ -1838,6 +1838,18 @@
   <data name="DiffOpenFileTooltip" xml:space="preserve">
     <value>ファイルを開く</value>
   </data>
+  <data name="DiffRevertChunkTooltip" xml:space="preserve">
+    <value>このチャンクを元に戻す（変更後のファイルに保存）</value>
+  </data>
+  <data name="DiffRevertChunkStale" xml:space="preserve">
+    <value>比較後に内容が変更されました。差分ビューを開き直してください。</value>
+  </data>
+  <data name="DiffRevertChunkUnavailable" xml:space="preserve">
+    <value>変更後のファイルに未保存の変更があるか、読み取り専用またはリモートファイルです。ローカルファイルを保存してから再試行してください。</value>
+  </data>
+  <data name="DiffRevertChunkFailed" xml:space="preserve">
+    <value>チャンクを元に戻せませんでした。ファイルの状態と書き込み権限を確認してください。</value>
+  </data>
   <data name="GitPreviousCommitFormat" xml:space="preserve">
     <value>{0} (前回のコミット)</value>
   </data>

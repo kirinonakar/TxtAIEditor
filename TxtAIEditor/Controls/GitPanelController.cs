@@ -37,7 +37,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Action<string, string> _showError;
         private readonly Action _startAutoRefresh;
-        private readonly Func<string, string, string?, string?, string?, string?, string?, Task> _openCompareTabAsync;
+        private readonly Func<string, string, string?, string?, string?, string?, string?, bool, Task> _openCompareTabAsync;
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
         private readonly Func<Task>? _refreshExplorerGitStatus;
@@ -62,7 +62,7 @@ namespace TxtAIEditor.Controls
             Func<string, string, string> getString,
             Action<string, string> showError,
             Action startAutoRefresh,
-            Func<string, string, string?, string?, string?, string?, string?, Task> openCompareTabAsync,
+            Func<string, string, string?, string?, string?, string?, string?, bool, Task> openCompareTabAsync,
             Action? beforeDialog = null,
             Action? afterDialog = null,
             Func<Task>? refreshExplorerGitStatus = null)
@@ -422,7 +422,8 @@ namespace TxtAIEditor.Controls
                 currentContent,
                 string.Format(_getString("GitCompareDiffTitleFormat", "Git 비교: {0}"), fileName),
                 string.Format(_getString("GitPreviousVersionFormat", "{0} (이전 버전)"), fileName),
-                string.Format(_getString("GitCurrentChangesFormat", "{0} (현재 변경 사항)"), fileName));
+                string.Format(_getString("GitCurrentChangesFormat", "{0} (현재 변경 사항)"), fileName),
+                true);
         }
 
         public async Task RestoreFileAsync(object sender, string repoPath)
@@ -1215,7 +1216,8 @@ namespace TxtAIEditor.Controls
                 contentB,
                 string.Format(_getString("GitCompareTitleFormat", "비교 [{0}]: {1}"), shortHash, fileName),
                 string.Format(_getString("GitPreviousCommitFormat", "{0} (이전 커밋)"), fileName),
-                string.Format(_getString("GitCommitHashFormat", "{0} (커밋 {1})"), fileName, shortHash));
+                string.Format(_getString("GitCommitHashFormat", "{0} (커밋 {1})"), fileName, shortHash),
+                false);
         }
 
         private static GitFileItem CreateGitFileItem(string fullPath, string status)

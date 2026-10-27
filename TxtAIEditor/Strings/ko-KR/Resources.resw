@@ -1838,6 +1838,18 @@
   <data name="DiffOpenFileTooltip" xml:space="preserve">
     <value>파일 열기</value>
   </data>
+  <data name="DiffRevertChunkTooltip" xml:space="preserve">
+    <value>이 청크 되돌리기 (수정본 파일에 저장)</value>
+  </data>
+  <data name="DiffRevertChunkStale" xml:space="preserve">
+    <value>비교 이후 내용이 변경되었습니다. diff 뷰를 다시 열어 주세요.</value>
+  </data>
+  <data name="DiffRevertChunkUnavailable" xml:space="preserve">
+    <value>수정본에 저장하지 않은 변경 사항이 있거나 읽기 전용/원격 파일입니다. 로컬 파일을 저장한 후 다시 시도해 주세요.</value>
+  </data>
+  <data name="DiffRevertChunkFailed" xml:space="preserve">
+    <value>청크를 되돌리지 못했습니다. 파일 상태와 쓰기 권한을 확인해 주세요.</value>
+  </data>
   <data name="GitPreviousCommitFormat" xml:space="preserve">
     <value>{0} (이전 커밋)</value>
   </data>

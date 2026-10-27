@@ -87,7 +87,8 @@ namespace TxtAIEditor.Composition
                 tabBridges,
                 callbacks.GetLocalizedString,
                 callbacks.NormalizeWebMessageJson,
-                webViewShortcut.Handle);
+                webViewShortcut.Handle,
+                getEditorSession);
 
             var livePreview = new LivePreviewController(
                 ui.PreviewGrid,

@@ -1838,6 +1838,18 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="DiffOpenFileTooltip" xml:space="preserve">
     <value>Open file</value>
   </data>
+  <data name="DiffRevertChunkTooltip" xml:space="preserve">
+    <value>Revert this chunk (save to the modified file)</value>
+  </data>
+  <data name="DiffRevertChunkStale" xml:space="preserve">
+    <value>The content has changed since this comparison. Reopen the diff view.</value>
+  </data>
+  <data name="DiffRevertChunkUnavailable" xml:space="preserve">
+    <value>The modified file has unsaved changes or is read-only/remote. Save the local file before retrying.</value>
+  </data>
+  <data name="DiffRevertChunkFailed" xml:space="preserve">
+    <value>Could not revert the chunk. Check the file status and write permissions.</value>
+  </data>
   <data name="GitPreviousCommitFormat" xml:space="preserve">
     <value>{0} (Previous Commit)</value>
   </data>
