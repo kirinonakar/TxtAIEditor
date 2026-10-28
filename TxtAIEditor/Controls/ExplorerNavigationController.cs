@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
@@ -38,6 +40,7 @@ namespace TxtAIEditor.Controls
         private readonly ExplorerBreadcrumbBuilder _breadcrumbBuilder;
         private System.Threading.CancellationTokenSource? _remoteCancellation;
         private System.Threading.CancellationTokenSource? _remoteFilterCancellation;
+        private CancellationTokenSource? _filterCancellation;
         private System.Threading.CancellationTokenSource? _flatDirectoryLoadCancellation;
         private string _currentArchiveRemotePath = string.Empty;
         private readonly HashSet<string> _loadingRemoteArchivePaths =
@@ -1861,6 +1864,15 @@ namespace TxtAIEditor.Controls
         private bool _isClearingExplorerFilter;
         private int _remoteFilterMatchCount;
         private bool _isRemoteFilterSearching;
+        private bool _isFilterSearching;
+
+        private void CancelFilterSearch()
+        {
+            CancellationTokenSource? pendingSearch = _filterCancellation;
+            _filterCancellation = null;
+            _isFilterSearching = false;
+            pendingSearch?.Cancel();
+        }
 
         private void CancelRemoteFilterSearch()
         {
@@ -1872,6 +1884,7 @@ namespace TxtAIEditor.Controls
 
         private void ClearExplorerFilterState()
         {
+            CancelFilterSearch();
             CancelRemoteFilterSearch();
             _isClearingExplorerFilter = true;
             try
@@ -1915,35 +1928,25 @@ namespace TxtAIEditor.Controls
 
         private async Task ApplyFilterAsync(string query)
         {
+            CancelFilterSearch();
+            CancelFlatDirectoryLoad();
             if (!IsViewingRemote && CurrentFolderPath == ExplorerDirectoryService.LocalRootPath)
             {
-                bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-                var drives = _itemSorter.Sort(_directoryService
-                    .CreateDirectoryItems(ExplorerDirectoryService.LocalRootPath)
-                    .Where(item => ExplorerSearchService.MatchesPattern(item.Name, query))).ToList();
-                foreach (ExplorerItem item in drives)
+                if (string.IsNullOrWhiteSpace(query))
                 {
-                    item.IsDark = isDark;
+                    LoadLocalRoot();
+                    return;
                 }
 
-                if (IsTreeMode)
-                {
-                    ClearExplorerTreeNodes();
-                    foreach (ExplorerItem item in drives)
-                    {
-                        _leftSidebar.ExplorerTree.RootNodes.Add(new Microsoft.UI.Xaml.Controls.TreeViewNode
-                        {
-                            Content = item,
-                            HasUnrealizedChildren = true
-                        });
-                    }
-                }
-                else
-                {
-                    _viewModel.ExplorerItems.ReplaceAll(drives);
-                }
-
-                SetExplorerStatusText(FormatExplorerItemCount(drives.Count));
+                bool hideUnwantedFoldersAtRoot = _hideUnwantedFolders;
+                await RunFilterSearchAsync((publishResult, cancellationToken) =>
+                    _searchService.SearchLocalRoots(
+                        _directoryService.CreateDirectoryItems(ExplorerDirectoryService.LocalRootPath)
+                            .Select(item => item.Path),
+                        query,
+                        hideUnwantedFoldersAtRoot,
+                        publishResult,
+                        cancellationToken));
                 return;
             }
 
@@ -1971,25 +1974,10 @@ namespace TxtAIEditor.Controls
             }
 
             string currentRoot = CurrentFolderPath;
-            var matchedItems = await Task.Run(() =>
-                _searchService.SearchLocal(currentRoot, query, _hideUnwantedFolders));
-
-            if (query == _lastFilterQuery && currentRoot == CurrentFolderPath)
+            bool hideUnwantedFolders = _hideUnwantedFolders;
+            if (await RunFilterSearchAsync((publishResult, cancellationToken) =>
+                _searchService.SearchLocal(currentRoot, query, hideUnwantedFolders, publishResult, cancellationToken)))
             {
-                _leftSidebar.DispatcherQueue.TryEnqueue(() =>
-                {
-                    _viewModel.ExplorerItems.Clear();
-                    bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-                    foreach (var item in _itemSorter.Sort(matchedItems))
-                    {
-                        item.IsDark = isDark;
-                        ApplyArchiveDisplayPath(item);
-                        _viewModel.ExplorerItems.Add(item);
-                    }
-
-                    SetExplorerStatusText(FormatExplorerFilterResult(_viewModel.ExplorerItems.Count));
-                });
-
                 await UpdateGitStatusesAsync();
             }
         }
@@ -2009,36 +1997,126 @@ namespace TxtAIEditor.Controls
 
             string archivePath = CurrentArchivePath;
             string archiveDirectory = CurrentArchiveDirectory;
-            var matchedItems = await Task.Run(() =>
+            bool hideUnwantedFolders = _hideUnwantedFolders;
+            await RunFilterSearchAsync((publishResult, cancellationToken) =>
                 _archiveExplorerService.SearchArchiveItems(
                     archivePath,
                     archiveDirectory,
                     query,
-                    ExplorerSearchService.MatchesPattern));
-
-            if (_hideUnwantedFolders)
-            {
-                matchedItems = matchedItems.Where(item =>
-                    !item.IsFolder ||
-                    !ExplorerSearchService.IsHiddenFolderName(item.Name)).ToList();
-            }
-
-            if (query == _lastFilterQuery &&
-                archivePath == CurrentArchivePath &&
-                archiveDirectory == CurrentArchiveDirectory)
-            {
-                _leftSidebar.DispatcherQueue.TryEnqueue(() =>
-                {
-                    _viewModel.ExplorerItems.Clear();
-                    bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-                    foreach (var item in _itemSorter.Sort(matchedItems))
+                    ExplorerSearchService.MatchesPattern,
+                    item =>
                     {
-                        item.IsDark = isDark;
-                        _viewModel.ExplorerItems.Add(item);
+                        if (!hideUnwantedFolders || !item.IsFolder ||
+                            !ExplorerSearchService.IsHiddenFolderName(item.Name))
+                        {
+                            publishResult(item);
+                        }
+                    },
+                    cancellationToken));
+        }
+
+        private async Task<bool> RunFilterSearchAsync(Action<Action<ExplorerItem>, CancellationToken> search)
+        {
+            using var cancellation = new CancellationTokenSource();
+            CancellationToken cancellationToken = cancellation.Token;
+            _filterCancellation = cancellation;
+            _isFilterSearching = true;
+            _viewModel.ExplorerItems.Clear();
+            if (IsTreeMode)
+            {
+                ClearExplorerTreeNodes();
+            }
+            int matchCount = 0;
+            SetExplorerStatusText(FormatExplorerFilterResult(0));
+
+            // Bound pending results so a fast scan cannot flood the UI dispatcher.
+            var channel = Channel.CreateBounded<ExplorerItem>(new BoundedChannelOptions(128)
+            {
+                SingleWriter = true,
+                SingleReader = true,
+                FullMode = BoundedChannelFullMode.Wait
+            });
+            Task searchTask = Task.Run(() =>
+            {
+                try
+                {
+                    search(item =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        channel.Writer.WriteAsync(item, cancellationToken).AsTask().GetAwaiter().GetResult();
+                    }, cancellationToken);
+                    channel.Writer.TryComplete();
+                }
+                catch (Exception ex)
+                {
+                    channel.Writer.TryComplete(ex);
+                }
+            });
+
+            bool failed = false;
+            try
+            {
+                while (await channel.Reader.WaitToReadAsync(cancellationToken))
+                {
+                    if (cancellationToken.IsCancellationRequested ||
+                        !ReferenceEquals(_filterCancellation, cancellation))
+                    {
+                        return false;
                     }
 
-                    SetExplorerStatusText(FormatExplorerFilterResult(_viewModel.ExplorerItems.Count));
-                });
+                    bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+                    for (int count = 0; count < 64 && channel.Reader.TryRead(out ExplorerItem? item); count++)
+                    {
+                        item.IsDark = isDark;
+                        ApplyArchiveDisplayPath(item);
+                        if (IsTreeMode)
+                        {
+                            _leftSidebar.ExplorerTree.RootNodes.Add(new Microsoft.UI.Xaml.Controls.TreeViewNode
+                            {
+                                Content = item,
+                                HasUnrealizedChildren = item.IsFolder
+                            });
+                        }
+                        else
+                        {
+                            _viewModel.ExplorerItems.Add(item);
+                        }
+                        matchCount++;
+                    }
+                    SetExplorerStatusText(FormatExplorerFilterResult(matchCount));
+                    await Task.Yield();
+                }
+
+                return ReferenceEquals(_filterCancellation, cancellation);
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+            catch (Exception ex)
+            {
+                failed = true;
+                if (ReferenceEquals(_filterCancellation, cancellation))
+                {
+                    SetExplorerStatusText(string.Format(
+                        _localizationService.GetString("RemoteOperationFailedFormat", "작업 실패: {0}"),
+                        ex.Message));
+                }
+                return false;
+            }
+            finally
+            {
+                cancellation.Cancel();
+                await searchTask;
+                if (ReferenceEquals(_filterCancellation, cancellation))
+                {
+                    _filterCancellation = null;
+                    _isFilterSearching = false;
+                    if (!failed)
+                    {
+                        SetExplorerStatusText(FormatExplorerFilterResult(matchCount));
+                    }
+                }
             }
         }
 
@@ -2048,12 +2126,12 @@ namespace TxtAIEditor.Controls
             string fallback = "{0:N0}개 결과";
             string format = _localizationService.GetString(key, fallback);
             string result = string.Format(format, matchCount);
-            if (!_isRemoteFilterSearching)
+            if (!_isRemoteFilterSearching && !_isFilterSearching)
             {
                 return result;
             }
 
-            // 원격 재귀 검색이 아직 진행 중이면 결과 뒤에 진행 표시를 붙인다.
+            // 재귀 검색이 아직 진행 중이면 결과 뒤에 진행 표시를 붙인다.
             string searchingFormat = _localizationService.GetString(
                 "ExplorerFilterResultSearchingFormat",
                 "{0} (검색중...)");

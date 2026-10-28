@@ -123,13 +123,15 @@ namespace TxtAIEditor.Core.Services
             return items;
         }
 
-        public IReadOnlyList<ExplorerItem> SearchArchiveItems(
+        public void SearchArchiveItems(
             string archivePath,
             string entryDirectory,
             string query,
-            Func<string, string, bool> matchesPattern)
+            Func<string, string, bool> matchesPattern,
+            Action<ExplorerItem> publishResult,
+            System.Threading.CancellationToken cancellationToken = default)
         {
-            var results = new List<ExplorerItem>();
+            cancellationToken.ThrowIfCancellationRequested();
             string currentDirectory = NormalizeEntryPath(entryDirectory);
             string prefix = string.IsNullOrEmpty(currentDirectory) ? string.Empty : currentDirectory + "/";
             var matchedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -137,6 +139,7 @@ namespace TxtAIEditor.Core.Services
             using IArchive archive = OpenArchive(archivePath);
             foreach (IArchiveEntry entry in archive.Entries)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string entryPath = NormalizeEntryPath(entry.Key ?? string.Empty);
                 if (string.IsNullOrEmpty(entryPath) ||
                     !entryPath.StartsWith(prefix, StringComparison.Ordinal))
@@ -157,7 +160,7 @@ namespace TxtAIEditor.Core.Services
                         matchedDirectories.Add(entryPath) &&
                         matchesPattern(directoryName, query))
                     {
-                        results.Add(CreateArchiveDirectoryItem(archivePath, entryPath, directoryName, GetEntryModifiedTime(entry), currentDirectory));
+                        publishResult(CreateArchiveDirectoryItem(archivePath, entryPath, directoryName, GetEntryModifiedTime(entry), currentDirectory));
                     }
 
                     continue;
@@ -166,7 +169,7 @@ namespace TxtAIEditor.Core.Services
                 string fileName = Path.GetFileName(entryPath.Replace('/', Path.DirectorySeparatorChar));
                 if (matchesPattern(fileName, query))
                 {
-                    results.Add(new ExplorerItem
+                    publishResult(new ExplorerItem
                     {
                         Name = fileName,
                         Path = CreateVirtualPath(archivePath, entryPath),
@@ -179,8 +182,6 @@ namespace TxtAIEditor.Core.Services
                     });
                 }
             }
-
-            return results;
         }
 
         public async Task<byte[]> ReadEntryBytesAsync(string archivePath, string entryPath)

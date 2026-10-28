@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading;
 using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Controls
@@ -21,9 +22,32 @@ namespace TxtAIEditor.Controls
             _archiveExplorerService = archiveExplorerService;
         }
 
-        public List<ExplorerItem> SearchLocal(string rootPath, string query, bool hideUnwantedFolders)
+        public void SearchLocalRoots(
+            IEnumerable<string> rootPaths,
+            string query,
+            bool hideUnwantedFolders,
+            Action<ExplorerItem> publishResult,
+            CancellationToken cancellationToken = default)
         {
-            var results = new List<ExplorerItem>();
+            foreach (string rootPath in rootPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                SearchLocal(rootPath, query, hideUnwantedFolders, item =>
+                {
+                    // Include the drive so results from different roots are distinguishable.
+                    item.SubPath = Path.GetDirectoryName(item.Path) ?? rootPath;
+                    publishResult(item);
+                }, cancellationToken);
+            }
+        }
+
+        public void SearchLocal(
+            string rootPath,
+            string query,
+            bool hideUnwantedFolders,
+            Action<ExplorerItem> publishResult,
+            CancellationToken cancellationToken = default)
+        {
             var directories = new Stack<string>();
             directories.Push(rootPath);
 
@@ -39,6 +63,7 @@ namespace TxtAIEditor.Controls
 
             while (directories.Count > 0)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string currentDirectory = directories.Pop();
                 try
                 {
@@ -49,8 +74,9 @@ namespace TxtAIEditor.Controls
                         continue;
                     }
 
-                    foreach (FileInfo file in directoryInfo.GetFiles())
+                    foreach (FileInfo file in directoryInfo.EnumerateFiles())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (file.Attributes.HasFlag(FileAttributes.Hidden) ||
                             !MatchesPattern(file.Name, query))
                         {
@@ -58,7 +84,7 @@ namespace TxtAIEditor.Controls
                         }
 
                         string relativePath = Path.GetRelativePath(rootPath, file.FullName);
-                        results.Add(new ExplorerItem
+                        publishResult(new ExplorerItem
                         {
                             Name = file.Name,
                             Path = file.FullName,
@@ -70,8 +96,9 @@ namespace TxtAIEditor.Controls
                         });
                     }
 
-                    foreach (DirectoryInfo subdirectory in directoryInfo.GetDirectories())
+                    foreach (DirectoryInfo subdirectory in directoryInfo.EnumerateDirectories())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (ShouldSkipDirectory(subdirectory, hideUnwantedFolders))
                         {
                             continue;
@@ -95,7 +122,7 @@ namespace TxtAIEditor.Controls
                         if (MatchesPattern(subdirectory.Name, query))
                         {
                             string relativePath = Path.GetRelativePath(rootPath, subdirectory.FullName);
-                            results.Add(new ExplorerItem
+                            publishResult(new ExplorerItem
                             {
                                 Name = subdirectory.Name,
                                 Path = subdirectory.FullName,
@@ -108,13 +135,15 @@ namespace TxtAIEditor.Controls
                         directories.Push(subdirectory.FullName);
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"Error scanning folder {currentDirectory}: {ex.Message}");
                 }
             }
-
-            return results;
         }
 
         public static bool IsHiddenFolderName(string name)

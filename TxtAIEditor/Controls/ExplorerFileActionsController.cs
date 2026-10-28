@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -275,6 +276,16 @@ namespace TxtAIEditor.Controls
             SetMenuText(flyout, 21, "ExplorerCopyFolderPath", "폴더 경로 복사");
             SetMenuText(flyout, 23, "ExplorerRename", "이름 바꾸기");
             SetMenuText(flyout, 24, "ExplorerDelete", "삭제");
+
+            // Append so the existing list and tree menu indices remain unchanged.
+            var openInWindowsExplorerItem = new MenuFlyoutItem
+            {
+                Text = _getString("ExplorerOpenInWindowsTooltip", "Windows 탐색기에서 열기"),
+                Icon = new SymbolIcon(Symbol.Folder)
+            };
+            openInWindowsExplorerItem.Click += OnOpenInWindowsExplorerClick;
+            flyout.Items.Add(new MenuFlyoutSeparator());
+            flyout.Items.Add(openInWindowsExplorerItem);
         }
 
         private void ConfigureContextFlyout(
@@ -401,6 +412,16 @@ namespace TxtAIEditor.Controls
             }
 
             SetMenuVisibility(flyout, 22, hasSingleItem || canDelete);
+
+            bool canOpenInWindowsExplorer = hasSingleItem && item != null &&
+                ExplorerItemCapabilities.CanUseLocalStorage(item);
+            SetMenuVisibility(flyout, 25, canOpenInWindowsExplorer);
+            SetMenuVisibility(flyout, 26, canOpenInWindowsExplorer);
+            if (flyout.Items.Count > 26 && flyout.Items[26] is MenuFlyoutItem openInWindowsExplorerItem)
+            {
+                openInWindowsExplorerItem.Tag = item;
+            }
+
             NormalizeContextFlyoutSeparators(flyout);
         }
 
@@ -549,6 +570,39 @@ namespace TxtAIEditor.Controls
             catch (Exception ex)
             {
                 _showError(_getString("RemoteOperationFailedTitle", "리모트 작업 실패"), ex.Message);
+            }
+        }
+
+        private void OnOpenInWindowsExplorerClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuFlyoutItem { Tag: ExplorerItem item } ||
+                !ExplorerItemCapabilities.CanUseLocalStorage(item))
+            {
+                return;
+            }
+
+            try
+            {
+                string path = Path.GetFullPath(item.Path);
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    UseShellExecute = false
+                };
+                if (item.IsFolder)
+                {
+                    startInfo.ArgumentList.Add(path);
+                }
+                else
+                {
+                    startInfo.Arguments = $"/select,\"{path}\"";
+                }
+
+                Process.Start(startInfo);
+            }
+            catch (Exception ex)
+            {
+                _showError(_getString("ExplorerOpenInWindowsTooltip", "Windows 탐색기에서 열기"), ex.Message);
             }
         }
 
