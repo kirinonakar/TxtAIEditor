@@ -326,6 +326,41 @@
             background: var(--empty-bg);
         }
 
+        #change-tooltip {
+            position: fixed;
+            z-index: 100;
+            width: max-content;
+            max-width: calc(100vw - 24px);
+            max-height: min(70vh, 640px);
+            overflow-x: hidden;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--header-bg);
+            color: var(--fg);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            font-size: 13px;
+            line-height: 20px;
+            pointer-events: auto;
+        }
+        .tooltip-section + .tooltip-section { margin-top: 10px; }
+        .tooltip-heading {
+            margin-bottom: 4px;
+            font-weight: 600;
+            overflow-wrap: anywhere;
+        }
+        .tooltip-line {
+            padding: 0 6px;
+            font-family: var(--font-family);
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            tab-size: 4;
+        }
+        .tooltip-line.row-removed { color: var(--removed-text); }
+        .tooltip-line.row-added { color: var(--added-text); }
+
         /* ── Scrollmap (custom scrollbar with diff markers) ── */
         .scrollmap {
             grid-row: 2;
@@ -413,6 +448,7 @@
             </div>
         </div>
     </div>
+    <div id="change-tooltip" role="tooltip" hidden></div>
 
     <script>
         const leftWrapper  = document.getElementById('left-wrapper');
@@ -863,6 +899,113 @@
         let revertPending = false;
         const chunkButtons = new Map();
 
+        // Look up the complete change, including rows outside the virtual DOM.
+        const changeTooltip = document.getElementById('change-tooltip');
+        let tooltipRow = null;
+        let tooltipChunk = null;
+        let tooltipShowTimer = 0;
+        let tooltipHideTimer = 0;
+
+        function hideChangeTooltip() {
+            clearTimeout(tooltipShowTimer);
+            clearTimeout(tooltipHideTimer);
+            tooltipRow?.removeAttribute('aria-describedby');
+            tooltipRow = null;
+            tooltipChunk = null;
+            changeTooltip.hidden = true;
+            changeTooltip.replaceChildren();
+        }
+
+        function findDiffChunk(rowIndex) {
+            let low = 0;
+            let high = diffChunks.length;
+            while (low < high) {
+                const middle = (low + high) >>> 1;
+                if (diffChunks[middle].rowEnd < rowIndex) low = middle + 1;
+                else high = middle;
+            }
+            const chunk = diffChunks[low];
+            return chunk && chunk.rowStart <= rowIndex ? chunk : null;
+        }
+
+        function showChangeTooltip(row, chunk) {
+            const content = document.createDocumentFragment();
+            for (const [items, type, header] of [
+                [globalDiffA, 'removed', 'left-header'],
+                [globalDiffB, 'added', 'right-header-text']
+            ]) {
+                const section = document.createElement('div');
+                section.className = 'tooltip-section';
+                const heading = document.createElement('div');
+                heading.className = 'tooltip-heading';
+                // Reuse the localized labels supplied by the host.
+                heading.textContent = document.getElementById(header).textContent;
+                section.append(heading);
+                for (let index = chunk.rowStart; index <= chunk.rowEnd; index++) {
+                    const item = items[index];
+                    if (item.type !== type) continue;
+                    const line = document.createElement('div');
+                    line.className = `tooltip-line row-${type}`;
+                    line.innerHTML = `<span class="diff-sign">${type === 'removed' ? '- ' : '+ '}</span>${renderLineText(item)}`;
+                    section.append(line);
+                }
+                if (section.childElementCount > 1) content.append(section);
+            }
+            changeTooltip.replaceChildren(content);
+            changeTooltip.hidden = false;
+            changeTooltip.scrollTop = 0;
+            changeTooltip.style.left = '12px';
+            changeTooltip.style.top = '12px';
+            const rect = row.getBoundingClientRect();
+            const size = changeTooltip.getBoundingClientRect();
+            const below = rect.bottom + 6;
+            const above = rect.top - size.height - 6;
+            const top = below + size.height <= window.innerHeight - 12 ? below :
+                (above >= 12 ? above : Math.max(12, window.innerHeight - size.height - 12));
+            changeTooltip.style.top = `${top}px`;
+            changeTooltip.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - size.width - 12))}px`;
+            row.setAttribute('aria-describedby', 'change-tooltip');
+        }
+
+        function scheduleTooltipHide() {
+            clearTimeout(tooltipShowTimer);
+            clearTimeout(tooltipHideTimer);
+            tooltipHideTimer = setTimeout(hideChangeTooltip, 150);
+        }
+
+        for (const view of [leftView, rightView]) {
+            view.addEventListener('pointerover', event => {
+                if (event.pointerType === 'touch' || event.buttons) return;
+                const row = event.target.closest('.diff-row');
+                if (!row || row.contains(event.relatedTarget)) return;
+                clearTimeout(tooltipHideTimer);
+                const chunk = row.dataset.rowIndex === undefined ? null :
+                    findDiffChunk(Number(row.dataset.rowIndex));
+                if (!chunk) { hideChangeTooltip(); return; }
+                if (tooltipChunk === chunk && !changeTooltip.hidden) {
+                    tooltipRow?.removeAttribute('aria-describedby');
+                    tooltipRow = row;
+                    row.setAttribute('aria-describedby', 'change-tooltip');
+                    return;
+                }
+                hideChangeTooltip();
+                tooltipRow = row;
+                tooltipChunk = chunk;
+                tooltipShowTimer = setTimeout(() => showChangeTooltip(row, chunk), 400);
+            });
+            view.addEventListener('pointerout', event => {
+                const row = event.target.closest('.diff-row');
+                if (row && !row.contains(event.relatedTarget)) scheduleTooltipHide();
+            });
+        }
+        changeTooltip.addEventListener('pointerenter', () => clearTimeout(tooltipHideTimer));
+        changeTooltip.addEventListener('pointerleave', scheduleTooltipHide);
+        verticalWrapper.addEventListener('pointerdown', hideChangeTooltip);
+        window.addEventListener('blur', hideChangeTooltip);
+        window.addEventListener('keydown', event => {
+            if (event.key === 'Escape') hideChangeTooltip();
+        });
+
         function renderChunkActions() {
             const actions = document.getElementById('chunk-actions');
             if (!comparisonData?.canRevert || !comparisonData.revertChunkTooltip) {
@@ -1034,10 +1177,11 @@
         let renderedStartIndex = 0;
         let renderedEndIndex = -1;
 
-        function createDiffRow(item) {
+        function createDiffRow(item, rowIndex) {
             const row = document.createElement('div');
             const changed = item.type === 'added' || item.type === 'removed';
             row.className = 'diff-row' + (item.type === 'unchanged' ? '' : ` row-${item.type}`);
+            if (item.type !== 'unchanged') row.dataset.rowIndex = rowIndex;
             const sign = item.type === 'added' ? '+ ' : (item.type === 'removed' ? '- ' : '  ');
             const content = item.type === 'empty' ? '' :
                 `<span class="diff-sign">${sign}</span>${changed ? renderLineText(item) : escapeHtml(item.text)}`;
@@ -1048,7 +1192,7 @@
         function updateVisibleRows(view, items, startIndex, endIndex, force) {
             function fragment(start, end) {
                 const result = document.createDocumentFragment();
-                for (let k = start; k <= end; k++) result.append(createDiffRow(items[k]));
+                for (let k = start; k <= end; k++) result.append(createDiffRow(items[k], k));
                 return result;
             }
             if (force || renderedEndIndex < startIndex || renderedStartIndex > endIndex) {
@@ -1094,6 +1238,7 @@
         }
 
         function setHorizontalOffset(value) {
+            if (value !== horizontalOffset) hideChangeTooltip();
             horizontalOffset = Math.min(horizontalMax, Math.max(0, value));
             // Paint the thumbs and glyphs in the same input event; there is no
             // asynchronous native scroll event or follower feedback to wait for.
@@ -1159,6 +1304,7 @@
 
         // ── Render ─────────────────────────────────────────────────────────
         function renderDiff(data) {
+            hideChangeTooltip();
             comparisonData = data;
             revertPending = false;
             document.getElementById('chunk-actions').replaceChildren();
@@ -1250,6 +1396,7 @@
 
         function onScroll() {
             if (scrollRenderPending || verticalWrapper.scrollTop === lastPaintedScrollTop) return;
+            hideChangeTooltip();
             scrollRenderPending = true;
             requestAnimationFrame(() => {
                 scrollRenderPending = false;
@@ -1345,6 +1492,7 @@
 
         // Rebuild on resize
         const resizeObs = new ResizeObserver(() => {
+            hideChangeTooltip();
             updateSpacerWidths();
             renderVisibleRows();
             buildScrollmapMarkers(leftScrollmap,  globalDiffA,  'removed');
