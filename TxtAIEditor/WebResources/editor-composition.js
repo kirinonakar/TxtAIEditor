@@ -321,15 +321,28 @@ function prepareMultilineCompositionHost(selection = normalizeSelection()) {
 
     const text = state.cache.get(start.line) ?? lineTextFromElement(targetElement);
     const startColumn = Math.max(0, Math.min(start.column, text.length));
-    const prefix = document.createTextNode(text.slice(0, startColumn));
+    // Split the highlighted DOM at the selection boundary instead of rebuilding
+    // either side from plain text. Keep the input host outside the token and
+    // selection spans so the first IME character remains visible.
+    const prefixRange = document.createRange();
+    prefixRange.selectNodeContents(targetElement);
+    prefixRange.collapse(true);
+    const walker = document.createTreeWalker(targetElement, NodeFilter.SHOW_TEXT);
+    let remaining = startColumn;
+    let node;
+    while ((node = walker.nextNode())) {
+        if (remaining <= node.length) {
+            prefixRange.setEnd(node, remaining);
+            break;
+        }
+        remaining -= node.length;
+    }
+    const prefix = prefixRange.extractContents();
     const inputHost = document.createElement('span');
     inputHost.className = 'range-composition-input-host';
     const compositionAnchor = document.createTextNode('');
     inputHost.appendChild(compositionAnchor);
-    const selected = document.createElement('span');
-    selected.className = 'selection-fragment';
-    selected.textContent = text.slice(startColumn);
-    targetElement.replaceChildren(prefix, inputHost, selected);
+    targetElement.prepend(prefix, inputHost);
 
     const endText = state.cache.get(end.line) ?? '';
     const endColumn = Math.max(0, Math.min(end.column, endText.length));
