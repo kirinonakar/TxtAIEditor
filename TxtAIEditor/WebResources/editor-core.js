@@ -1360,11 +1360,13 @@ function measureRenderedRows(renderOnChange = true, force = false) {
 function measureRenderedRowsSynchronously(renderOnChange = true, force = false) {
     if (!usesMeasuredLineHeights()) return;
 
-    const anchorLine = lineAt(scrollContainer.scrollTop);
-    const anchorOffset = scrollContainer.scrollTop - lineTop(anchorLine);
+    const savedScrollTop = scrollContainer.scrollTop;
+    const anchorLine = lineAt(savedScrollTop);
+    const anchorOffset = savedScrollTop - lineTop(anchorLine);
     const containerRect = scrollContainer.getBoundingClientRect();
     let previewAnchor = null;
     let previewStartLine = 0;
+    const heightUpdates = new Map();
     let changed = false;
     for (const row of viewport.querySelectorAll('.line-row')) {
         const lineNumber = Number(row.dataset.line || 0);
@@ -1376,7 +1378,7 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
         if (state.inlineLivePreviewEnabled && row.style.position !== 'absolute') {
             if (!previewStartLine) previewStartLine = lineNumber;
             if (!previewAnchor && rowRect.bottom > containerRect.top && rowRect.height > 0) {
-                previewAnchor = { line: lineNumber, offset: containerRect.top - rowRect.top };
+                previewAnchor = { line: lineNumber, top: lineTop(lineNumber) };
             }
         }
         const isSkipped = row.classList.contains('live-preview-skipped');
@@ -1385,18 +1387,24 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
             ? Math.max(rowRect.height || 0, row.scrollHeight || 0)
             : (rowRect.height || row.scrollHeight || 0);
         const measured = Math.max(minimum, roundCssPixelsToDevicePixels(measuredHeight));
-        if (setMeasuredLineHeight(lineNumber, measured)) {
-            changed = true;
-        }
+        heightUpdates.set(lineNumber, measured);
         if (state.inlineLivePreviewEnabled && row.classList.contains('markdown-preview-group-row')) {
             // Transfer source-line heights only after measuring their painted
             // owner. Clearing them during markup generation temporarily shrinks
             // the document before the replacement block has its real height.
             const endLine = Math.min(state.lineCount, Number(row.dataset.previewEndLine || lineNumber));
             for (let covered = lineNumber + 1; covered <= endLine; covered++) {
-                changed = setMeasuredLineHeight(covered, 0) || changed;
+                heightUpdates.set(covered, 0);
             }
         }
+    }
+
+    // Capture the anchor in the old height model before applying any updates.
+    // DOM positions contain fractional pixels while scrollHeight is integral;
+    // rebuilding an offset from those positions on every diagram completion
+    // would repeatedly add the same rounding error, even for changes below it.
+    for (const [line, height] of heightUpdates) {
+        changed = setMeasuredLineHeight(line, height) || changed;
     }
 
     syncMarkdownListLineNumbers();
@@ -1414,7 +1422,7 @@ function measureRenderedRowsSynchronously(renderOnChange = true, force = false) 
             // Anchor the viewport here; input reveals its actual caret separately.
             const anchoredScrollTop = Math.min(maxScrollTop, Math.max(0,
                 state.editScrollRestore?.top ?? (previewAnchor
-                    ? lineTop(previewAnchor.line) + previewAnchor.offset
+                    ? savedScrollTop + lineTop(previewAnchor.line) - previewAnchor.top
                     : lineTop(anchorLine) + anchorOffset)));
             if (Math.abs(scrollContainer.scrollTop - anchoredScrollTop) > 1) {
                 scrollContainer.scrollTop = anchoredScrollTop;
