@@ -350,6 +350,9 @@
   <data name="SettingsEditInMarkdownPreview" xml:space="preserve">
     <value>Markdownプレビューの状態で編集</value>
   </data>
+  <data name="SettingsUsePele" xml:space="preserve">
+    <value>Mermaid の代わりに Pele を使用</value>
+  </data>
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>デフォルトでMarkdownツールバーを表示する</value>
   </data>

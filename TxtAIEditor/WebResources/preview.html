@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TxtAIEditor Virtual Preview</title>
     <link rel="stylesheet" href="katex/katex.min.css">
+    <link rel="stylesheet" href="pele-theme.css">
     <script src="katex/katex.min.js"></script>
-    <script src="mermaid/mermaid.min.js"></script>
     <style>
         :root {
             --bg: transparent;
@@ -490,7 +490,7 @@
         const {
             escapeAttribute,
             escapeHtml,
-            initializeMermaid,
+            configureDiagramRenderer,
             renderPreviewLineAt,
             renderMermaidBlocks: renderSharedMermaidBlocks,
         } = await import(`./markdown-preview-renderer.js?v=${encodeURIComponent(moduleVersion)}`);
@@ -503,6 +503,7 @@
         const spacer = document.getElementById('virtual-spacer');
         const viewport = document.getElementById('preview-viewport');
         const htmlPreview = document.getElementById('html-preview');
+        const sourceMarkupByRow = new WeakMap();
 
         const state = {
             lineCount: 1,
@@ -527,8 +528,6 @@
             staleLines: new Set(),
             localResourceVersion: '0'
         };
-
-        initializeMermaid('Dark');
 
         function post(msg) {
             if (window.chrome && window.chrome.webview) {
@@ -850,19 +849,17 @@
             }
 
             state.theme = theme;
-            if (typeof mermaid !== 'undefined') {
-                initializeMermaid(theme);
-                const blocks = viewport.querySelectorAll('.mermaid-block');
-                blocks.forEach(block => {
-                    block.classList.remove('rendered', 'rendering');
-                    block.innerHTML = 'Rendering...';
+            configureDiagramRenderer(!!message.usePele, theme, font, previewSize);
+            const blocks = viewport.querySelectorAll('.mermaid-block');
+            blocks.forEach(block => {
+                block.classList.remove('rendered', 'rendering');
+                block.innerHTML = 'Rendering...';
+            });
+            if (blocks.length > 0) {
+                renderSharedMermaidBlocks(viewport, () => {
+                    state.lastRangeKey = '';
+                    measureRenderedRows();
                 });
-                if (blocks.length > 0) {
-                    renderSharedMermaidBlocks(viewport, () => {
-                        state.lastRangeKey = '';
-                        measureRenderedRows();
-                    });
-                }
             }
         }
 
@@ -1127,8 +1124,12 @@
                     if (existing.className !== expectedClass) {
                         existing.className = expectedClass;
                     }
-                    if (existing.innerHTML !== html) {
+                    // Diagram rendering and image loading enrich the live DOM.
+                    // Compare source markup so unchanged Pele SVGs keep their
+                    // measured height instead of reverting to a placeholder.
+                    if (sourceMarkupByRow.get(existing) !== html) {
                         existing.innerHTML = html;
+                        sourceMarkupByRow.set(existing, html);
                         newImagesAdded = true;
                     }
                     if (cursor === existing) cursor = existing.nextSibling;
@@ -1138,6 +1139,7 @@
                     el.className = expectedClass;
                     el.dataset.line = lineNumber;
                     el.innerHTML = html;
+                    sourceMarkupByRow.set(el, html);
                     viewport.insertBefore(el, cursor || null);
                     newImagesAdded = true;
                 }
@@ -1359,8 +1361,8 @@
             };
 
             const mermaidBlocks = printContainer.querySelectorAll('.mermaid-block:not(.rendered)');
-            if (mermaidBlocks.length > 0 && typeof mermaid !== 'undefined') {
-                renderSharedMermaidBlocks(printContainer, triggerPrint);
+            if (mermaidBlocks.length > 0) {
+                renderSharedMermaidBlocks(printContainer).then(triggerPrint);
                 setTimeout(triggerPrint, 1500); // Fallback in case a diagram render hangs.
             } else {
                 triggerPrint();

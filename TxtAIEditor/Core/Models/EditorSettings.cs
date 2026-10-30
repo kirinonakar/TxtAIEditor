@@ -54,6 +54,7 @@ namespace TxtAIEditor.Core.Models
         public bool ScrollSyncEnabled { get; set; } = true;
         public bool DefaultMarkdownEnabled { get; set; } = true;
         public bool EditInMarkdownPreview { get; set; } = true;
+        public bool UsePele { get; set; } = false;
         public bool DefaultMarkdownToolbarEnabled { get; set; } = true;
         public bool StartInTreeMode { get; set; } = false;
         public bool KeepInTrayOnClose { get; set; } = false;

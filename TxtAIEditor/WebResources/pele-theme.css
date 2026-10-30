@@ -1,0 +1,10 @@
+.mermaid-block .pele {
+    --pele-bg: var(--bg);
+    --pele-fg: var(--fg);
+    --pele-line: var(--fg);
+    --pele-muted: color-mix(in srgb, var(--fg) 65%, var(--bg));
+    --pele-surface: color-mix(in srgb, var(--fg) 8%, var(--bg));
+    --pele-surface-alt: color-mix(in srgb, var(--fg) 14%, var(--bg));
+    --pele-border: color-mix(in srgb, var(--fg) 40%, var(--bg));
+    --pele-accent: #5889d6;
+}

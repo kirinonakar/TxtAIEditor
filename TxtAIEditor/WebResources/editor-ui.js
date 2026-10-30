@@ -16,8 +16,9 @@ import {
     viewportController
 } from './editor-core.js';
 const {
+    configureDiagramRenderer,
+    ensureDiagramRenderer,
     findEditablePreviewBlockContaining,
-    initializeMermaid,
     inlineMarkdown,
     listItemInfo,
     renderMermaidBlocks,
@@ -99,9 +100,8 @@ function ensureInlinePreviewDependencies() {
     ensurePreviewStylesheet();
     previewDependencyPromise = Promise.all([
         loadPreviewScript('katex', 'katex/katex.min.js', 'katex'),
-        loadPreviewScript('mermaid', 'mermaid/mermaid.min.js', 'mermaid')
+        ensureDiagramRenderer()
     ]).then(() => {
-        initializeMermaid(new URLSearchParams(window.location.search).get('theme') || 'Dark');
         viewportController.invalidateRenderRange();
         queueRender(true);
     }).catch(error => {
@@ -119,6 +119,7 @@ const {
 } = renderer;
 
 configureEditorCoreRuntime({
+    configureDiagramRenderer,
     drawEditableSelectionOverlays,
     focusImeBypassTextarea,
     focusLine: focusLineWithRetry,

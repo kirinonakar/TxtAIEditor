@@ -1,6 +1,52 @@
 import { markdownTableAlignment as tableAlignment, parseMarkdownTableRow } from './editor-markdown-table-model.js';
 
 const mermaidCache = new Map();
+let diagramRenderer = 'mermaid';
+let diagramTheme = 'Dark';
+let diagramRevision = 0;
+let diagramFontKey = '';
+const diagramDependencies = new Map();
+
+function configureDiagramRenderer(usePele, theme = 'Dark', fontFamily = '', fontSize = 0) {
+    const renderer = usePele ? 'pele' : 'mermaid';
+    const fontKey = JSON.stringify([fontFamily, fontSize]);
+    if (diagramRenderer === renderer && diagramTheme === theme && diagramFontKey === fontKey) return;
+    diagramRenderer = renderer;
+    diagramTheme = theme;
+    diagramFontKey = fontKey;
+    diagramRevision++;
+    initializeMermaid(theme);
+}
+
+function ensureDiagramRenderer(renderer = diagramRenderer) {
+    if (diagramDependencies.has(renderer)) return diagramDependencies.get(renderer);
+    const dependency = renderer === 'pele'
+        ? import('./pele/pele.js')
+        : new Promise((resolve, reject) => {
+            if (typeof mermaid !== 'undefined') {
+                initializeMermaid();
+                resolve(mermaid);
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = new URL('./mermaid/mermaid.min.js', import.meta.url).href;
+            script.addEventListener('load', () => {
+                initializeMermaid();
+                resolve(mermaid);
+            }, { once: true });
+            script.addEventListener('error', () => {
+                script.remove();
+                reject(new Error('Failed to load Mermaid'));
+            }, { once: true });
+            document.head.appendChild(script);
+        });
+    const pending = dependency.catch(error => {
+        diagramDependencies.delete(renderer);
+        throw error;
+    });
+    diagramDependencies.set(renderer, pending);
+    return pending;
+}
 const DEFAULT_MAX_MERGED_PARAGRAPH_LINES = 12;
 const LATEX_ENVIRONMENT_ALIASES = new Map([
     ['displaymath', ''],
@@ -472,11 +518,12 @@ function collectFencedCodeBlock(startLine, maxLine, getLine, options = {}) {
 function renderFencedCodeBlock(block) {
     const lang = (block.language || '').toLowerCase();
     if (lang === 'mermaid') {
-        const cachedSvg = mermaidCache.get(block.code);
+        const cachedSvg = diagramRenderer === 'mermaid' ? mermaidCache.get(block.code) : null;
+        const attributes = `data-diagram-version="${diagramRevision}" data-code="${escapeAttribute(block.code)}"`;
         if (cachedSvg) {
-            return `<div class="mermaid-block rendered" data-code="${escapeAttribute(block.code)}">${cachedSvg}</div>`;
+            return `<div class="mermaid-block rendered" ${attributes}>${cachedSvg}</div>`;
         }
-        return `<div class="mermaid-block" data-code="${escapeAttribute(block.code)}">Rendering...</div>`;
+        return `<div class="mermaid-block" ${attributes}>Rendering...</div>`;
     }
     if (lang === 'latex' || lang === 'math') {
         return renderLatexLine(block.code);
@@ -1420,22 +1467,39 @@ function renderPreviewLineRange(startLine, endLine, maxLine, getLine, options = 
 
 let mermaidCounter = 0;
 async function renderMermaidBlocks(root, onRendered) {
-    if (typeof mermaid === 'undefined' || !root) return;
+    if (!root) return;
     const blocks = root.querySelectorAll('.mermaid-block:not(.rendered)');
     if (blocks.length === 0) return;
+    const renderer = diagramRenderer;
+    const revision = diagramRevision;
     for (const block of blocks) {
+        if (revision !== diagramRevision) return;
         if (block.classList.contains('rendering') || block.classList.contains('rendered')) continue;
         block.classList.add('rendering');
+        const token = Symbol();
+        block.diagramRenderToken = token;
         const code = block.dataset.code || '';
         const id = `mermaid-svg-${++mermaidCounter}`;
         try {
-            const { svg } = await mermaid.render(id, code);
+            const engine = await ensureDiagramRenderer(renderer);
+            if (revision !== diagramRevision || block.diagramRenderToken !== token) continue;
+            const style = renderer === 'pele' ? getComputedStyle(block) : null;
+            const { svg } = renderer === 'pele'
+                ? engine.render(code, {
+                    idPrefix: id,
+                    fontFamily: style.fontFamily,
+                    fontSize: parseFloat(style.fontSize) || 15,
+                    maxWidth: block.clientWidth || undefined
+                })
+                : await engine.render(id, code);
+            if (revision !== diagramRevision || block.diagramRenderToken !== token) continue;
             block.innerHTML = svg;
             block.classList.remove('rendering');
             block.classList.add('rendered');
-            mermaidCache.set(code, svg);
+            if (renderer === 'mermaid') mermaidCache.set(code, svg);
             if (typeof onRendered === 'function') onRendered();
         } catch (err) {
+            if (revision !== diagramRevision || block.diagramRenderToken !== token) continue;
             block.innerHTML = `<pre class="mermaid-error">${escapeHtml(err?.message || err)}</pre>`;
             block.classList.remove('rendering');
             block.classList.add('rendered');
@@ -1445,9 +1509,9 @@ async function renderMermaidBlocks(root, onRendered) {
     }
 }
 
-function initializeMermaid(theme = 'dark') {
+function initializeMermaid(theme = diagramTheme) {
+    mermaidCache.clear();
     if (typeof mermaid !== 'undefined') {
-        mermaidCache.clear();
         mermaid.initialize({
             startOnLoad: false,
             securityLevel: 'loose',
@@ -1457,7 +1521,9 @@ function initializeMermaid(theme = 'dark') {
 }
 
 export {
+    configureDiagramRenderer,
     containsInlineMath,
+    ensureDiagramRenderer,
     escapeAttribute,
     escapeHtml,
     fencedCodeInfo,

@@ -29,6 +29,7 @@ const HEX_SELECTION_CACHE_RETAIN_LIMIT = 2048;
 const FULL_DOCUMENT_RENDER_LINE_LIMIT = 1000;
 
 const runtime = {
+    configureDiagramRenderer: () => { },
     drawEditableSelectionOverlays: () => { },
     focusImeBypassTextarea: () => { },
     focusLine: () => { },
@@ -284,6 +285,7 @@ let appliedRenderOptionsKey = null;
 
 function applyOptions(msg) {
     const theme = msg.theme || 'Dark';
+    runtime.configureDiagramRenderer(!!msg.usePele, theme, msg.fontFamily, msg.fontSize);
     const bg = msg.customBackgroundColor || (theme === 'PastelDark' ? '#24273a' : (theme === 'Light' ? '#ffffff' : '#1e1e1e'));
     const preferredFg = msg.customForegroundColor || (theme === 'PastelDark' ? '#cad3f5' : (theme === 'Light' ? '#111111' : '#d4d4d4'));
     const fg = resolveReadableColor(bg, preferredFg, theme === 'PastelDark' ? '#cad3f5' : (theme === 'Light' ? '#111111' : '#d4d4d4'));
@@ -302,7 +304,7 @@ function applyOptions(msg) {
         msg.longLineProtectionFormat, msg.csvJsonKeyHeader, msg.csvJsonValueHeader,
         msg.foldCollapseText, msg.foldExpandText, msg.foldSelectionFormat,
         msg.markdownTableText,
-        !!msg.editInMarkdownPreview
+        !!msg.editInMarkdownPreview, !!msg.usePele, theme
     ]);
     const layoutChanged = appliedLayoutOptionsKey !== layoutOptionsKey;
     const renderChanged = appliedRenderOptionsKey !== renderOptionsKey;

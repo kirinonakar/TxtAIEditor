@@ -350,6 +350,9 @@
   <data name="SettingsEditInMarkdownPreview" xml:space="preserve">
     <value>在 Markdown 预览状态下编辑</value>
   </data>
+  <data name="SettingsUsePele" xml:space="preserve">
+    <value>使用 Pele 代替 Mermaid</value>
+  </data>
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>默认启用 Markdown 工具栏</value>
   </data>

@@ -408,6 +408,7 @@ namespace TxtAIEditor.Controls
                 action = "updateOptions",
                 theme = settings.Theme,
                 wordWrap = settings.WordWrap,
+                usePele = settings.UsePele,
                 showDirtyLines = settings.ShowDirtyLines,
                 bracketPairColorization = settings.BracketPairColorization,
                 fontSize = settings.FontSize,

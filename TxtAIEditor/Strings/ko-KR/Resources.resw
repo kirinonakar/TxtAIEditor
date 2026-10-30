@@ -350,6 +350,9 @@
   <data name="SettingsEditInMarkdownPreview" xml:space="preserve">
     <value>마크다운 미리보기 상태로 편집</value>
   </data>
+  <data name="SettingsUsePele" xml:space="preserve">
+    <value>Mermaid 대신 Pele 사용</value>
+  </data>
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>기본 마크다운 툴바 활성화</value>
   </data>

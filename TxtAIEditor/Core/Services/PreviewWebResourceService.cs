@@ -21,6 +21,8 @@ namespace TxtAIEditor.Core.Services
             "editor-commands.js",
             "editor-ui.js",
             "markdown-preview-renderer.js",
+            "pele-theme.css",
+            "pele/pele.js",
             "hangul-autocomplete.js"
         };
 

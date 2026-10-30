@@ -120,11 +120,17 @@ namespace TxtAIEditor.Core.Services
             return button;
         }
 
-        private const string ThirdPartyNoticesText = @"This software includes Mermaid, xterm.js, and KaTeX.
+        private const string ThirdPartyNoticesText = @"This software includes Mermaid, Pele, xterm.js, and KaTeX.
 
 Mermaid
 License: MIT License
 Copyright (c) 2014 - 2022 Knut Sveidqvist
+
+Pele 1.12.0
+License: MIT License
+Copyright (c) 2026 kepano
+https://github.com/obsidianmd/pele
+Full license and Lucide ISC notice: WebResources/pele/LICENSE
 
 xterm.js
 License: MIT License

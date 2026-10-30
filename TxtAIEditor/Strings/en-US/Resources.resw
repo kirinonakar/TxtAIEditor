@@ -350,6 +350,9 @@
   <data name="SettingsEditInMarkdownPreview" xml:space="preserve">
     <value>Edit in Markdown preview</value>
   </data>
+  <data name="SettingsUsePele" xml:space="preserve">
+    <value>Use Pele instead of Mermaid</value>
+  </data>
   <data name="SettingsMarkdownToolbar" xml:space="preserve">
     <value>Enable Markdown Toolbar by Default</value>
   </data>

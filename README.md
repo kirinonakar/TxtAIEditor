@@ -232,11 +232,16 @@ Copyright (c) 2026 **kirinonakar**. All rights reserved.
 
 ### Third-Party Licenses
 
-This software includes Mermaid, xterm.js, and KaTeX.
+This software includes Mermaid, Pele, xterm.js, and KaTeX.
 
 **Mermaid**  
 License: MIT License  
 Copyright (c) 2014 - 2022 Knut Sveidqvist  
+
+**[Pele](https://github.com/obsidianmd/pele)** (1.12.0)<br>
+License: MIT License<br>
+Copyright (c) 2026 kepano<br>
+The bundled [Pele license](TxtAIEditor/WebResources/pele/LICENSE) also includes the ISC notice for the Lucide reset icon.
 
 **xterm.js**  
 License: MIT License  
