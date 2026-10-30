@@ -277,15 +277,14 @@ namespace TxtAIEditor.Controls
             SetMenuText(flyout, 23, "ExplorerRename", "이름 바꾸기");
             SetMenuText(flyout, 24, "ExplorerDelete", "삭제");
 
-            // Append so the existing list and tree menu indices remain unchanged.
+            // Place this action directly below Open with default program in both menus.
             var openInWindowsExplorerItem = new MenuFlyoutItem
             {
                 Text = _getString("ExplorerOpenInWindowsTooltip", "Windows 탐색기에서 열기"),
                 Icon = new SymbolIcon(Symbol.Folder)
             };
             openInWindowsExplorerItem.Click += OnOpenInWindowsExplorerClick;
-            flyout.Items.Add(new MenuFlyoutSeparator());
-            flyout.Items.Add(openInWindowsExplorerItem);
+            flyout.Items.Insert(9, openInWindowsExplorerItem);
         }
 
         private void ConfigureContextFlyout(
@@ -337,7 +336,7 @@ namespace TxtAIEditor.Controls
             }
 
             bool canExtractArchive = hasSingleItem && ExplorerItemCapabilities.IsSupportedArchive(item);
-            if (flyout.Items.Count > 10 && flyout.Items[10] is MenuFlyoutItem extractArchiveItem)
+            if (flyout.Items.Count > 11 && flyout.Items[11] is MenuFlyoutItem extractArchiveItem)
             {
                 extractArchiveItem.Visibility = canExtractArchive ? Visibility.Visible : Visibility.Collapsed;
                 if (canExtractArchive && item != null)
@@ -349,39 +348,39 @@ namespace TxtAIEditor.Controls
             }
 
             bool canCompress = selectedItems.Count > 0 && selectedItems.All(ExplorerItemCapabilities.CanCompress);
-            SetMenuVisibility(flyout, 9, canExtractArchive || canCompress);
-            if (flyout.Items.Count > 11 && flyout.Items[11] is MenuFlyoutItem compressToZipItem)
+            SetMenuVisibility(flyout, 10, canExtractArchive || canCompress);
+            if (flyout.Items.Count > 12 && flyout.Items[12] is MenuFlyoutItem compressToZipItem)
             {
                 compressToZipItem.Visibility = canCompress ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 12 && flyout.Items[12] is MenuFlyoutItem compressToSevenZipItem)
+            if (flyout.Items.Count > 13 && flyout.Items[13] is MenuFlyoutItem compressToSevenZipItem)
             {
                 compressToSevenZipItem.Visibility = canCompress ? Visibility.Visible : Visibility.Collapsed;
             }
 
             bool canConvertImages = selectedItems.Count > 0 && selectedItems.All(ExplorerItemCapabilities.CanConvertImage);
-            SetMenuVisibility(flyout, 13, canExtractArchive || canCompress);
-            SetMenuVisibility(flyout, 14, canConvertImages);
+            SetMenuVisibility(flyout, 14, canExtractArchive || canCompress);
+            SetMenuVisibility(flyout, 15, canConvertImages);
 
             bool canDelete = selectedItems.Count > 0 && selectedItems.All(ExplorerItemCapabilities.CanDelete);
 
             bool canDownloadRemote = selectedItems.Count > 0 && selectedItems.All(ExplorerItemCapabilities.IsRemote);
             bool canUploadRemote = hasSingleItem && canDownloadRemote;
-            SetMenuVisibility(flyout, 15, canConvertImages || canDownloadRemote);
-            if (flyout.Items.Count > 16 && flyout.Items[16] is MenuFlyoutItem downloadRemoteItem)
+            SetMenuVisibility(flyout, 16, canConvertImages || canDownloadRemote);
+            if (flyout.Items.Count > 17 && flyout.Items[17] is MenuFlyoutItem downloadRemoteItem)
             {
                 downloadRemoteItem.Visibility = canDownloadRemote ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 17 && flyout.Items[17] is MenuFlyoutItem uploadRemoteItem)
+            if (flyout.Items.Count > 18 && flyout.Items[18] is MenuFlyoutItem uploadRemoteItem)
             {
                 uploadRemoteItem.Visibility = canUploadRemote ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            SetMenuVisibility(flyout, 18, canDownloadRemote);
+            SetMenuVisibility(flyout, 19, canDownloadRemote);
 
-            if (flyout.Items.Count > 19 && flyout.Items[19] is MenuFlyoutItem copyFileNameItem)
+            if (flyout.Items.Count > 20 && flyout.Items[20] is MenuFlyoutItem copyFileNameItem)
             {
                 copyFileNameItem.Visibility = hasSingleItem ? Visibility.Visible : Visibility.Collapsed;
                 copyFileNameItem.Text = item is { IsFolder: true }
@@ -389,35 +388,34 @@ namespace TxtAIEditor.Controls
                     : _getString("ExplorerCopyFileName", "파일이름 복사");
             }
 
-            if (flyout.Items.Count > 20 && flyout.Items[20] is MenuFlyoutItem copyFilePathItem)
+            if (flyout.Items.Count > 21 && flyout.Items[21] is MenuFlyoutItem copyFilePathItem)
             {
                 copyFilePathItem.Visibility = hasSingleItem && item is not { IsFolder: true }
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 21 && flyout.Items[21] is MenuFlyoutItem copyFolderPathItem)
+            if (flyout.Items.Count > 22 && flyout.Items[22] is MenuFlyoutItem copyFolderPathItem)
             {
                 copyFolderPathItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 23 && flyout.Items[23] is MenuFlyoutItem renameItem)
+            if (flyout.Items.Count > 24 && flyout.Items[24] is MenuFlyoutItem renameItem)
             {
                 renameItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 24 && flyout.Items[24] is MenuFlyoutItem deleteItem)
+            if (flyout.Items.Count > 25 && flyout.Items[25] is MenuFlyoutItem deleteItem)
             {
                 deleteItem.Visibility = canDelete ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            SetMenuVisibility(flyout, 22, hasSingleItem || canDelete);
+            SetMenuVisibility(flyout, 23, hasSingleItem || canDelete);
 
             bool canOpenInWindowsExplorer = hasSingleItem && item != null &&
                 ExplorerItemCapabilities.CanUseLocalStorage(item);
-            SetMenuVisibility(flyout, 25, canOpenInWindowsExplorer);
-            SetMenuVisibility(flyout, 26, canOpenInWindowsExplorer);
-            if (flyout.Items.Count > 26 && flyout.Items[26] is MenuFlyoutItem openInWindowsExplorerItem)
+            SetMenuVisibility(flyout, 9, canOpenInWindowsExplorer);
+            if (flyout.Items.Count > 9 && flyout.Items[9] is MenuFlyoutItem openInWindowsExplorerItem)
             {
                 openInWindowsExplorerItem.Tag = item;
             }

@@ -96,6 +96,19 @@ export function bindPointerSelectionEvents({
                 }
             }
 
+            const environmentRoot = /%[^%\s\\/"'<>|*?`]+%(?:[\\/])?/g;
+            while ((match = environmentRoot.exec(value)) !== null) {
+                if (match.index > col) break;
+                const before = match.index > 0 ? value[match.index - 1] : '';
+                if (match.index === 0 || separators.test(before) || before === ':' || before === '=') {
+                    roots.push({
+                        index: match.index,
+                        length: match[0].length,
+                        isStandaloneEnvironment: !/[\\/]$/.test(match[0])
+                    });
+                }
+            }
+
             if (roots.length === 0) return null;
             roots.sort((a, b) => b.index - a.index);
             return roots[0];
@@ -111,19 +124,20 @@ export function bindPointerSelectionEvents({
             // the scheme check below.
             const terminator = /[\"<>|*?`\t\r\n]/;
             let end = root.index + root.length;
-            while (end < value.length && !terminator.test(value[end])) {
+            while (!root.isStandaloneEnvironment && end < value.length && !terminator.test(value[end])) {
                 end++;
             }
 
             // A second absolute path on the same line ends the current one.
-            const nextRoot = /[a-zA-Z]:[\\/]|[\\/]{2}|(?:\.\.?)[\\/]/g;
+            const nextRoot = /[a-zA-Z]:[\\/]|[\\/]{2}|(?:\.\.?)[\\/]|%[^%\s\\/"'<>|*?`]+%(?:[\\/])?/g;
             nextRoot.lastIndex = root.index + root.length;
             let nextMatch;
             while ((nextMatch = nextRoot.exec(value)) !== null && nextMatch.index < end) {
                 const before = nextMatch.index > 0 ? value[nextMatch.index - 1] : '';
                 const isDrive = /^[a-zA-Z]:/.test(nextMatch[0]);
+                const isEnvironment = nextMatch[0].startsWith('%');
                 const boundary = nextMatch.index === 0 || separators.test(before) ||
-                    (isDrive && (before === ':' || before === '='));
+                    ((isDrive || isEnvironment) && (before === ':' || before === '='));
                 if (boundary) {
                     end = nextMatch.index;
                     break;

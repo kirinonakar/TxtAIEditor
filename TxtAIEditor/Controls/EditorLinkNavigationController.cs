@@ -97,7 +97,7 @@ namespace TxtAIEditor.Controls
 
         private string ResolvePath(string text)
         {
-            string resolvedPath = text;
+            string resolvedPath = Environment.ExpandEnvironmentVariables(text);
             var activeTab = _activeTabProvider();
             if (!Path.IsPathRooted(resolvedPath) &&
                 activeTab != null &&
