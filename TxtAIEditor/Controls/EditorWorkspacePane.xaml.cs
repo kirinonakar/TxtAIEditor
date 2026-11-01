@@ -857,7 +857,7 @@ namespace TxtAIEditor.Controls
             string dir = string.IsNullOrWhiteSpace(workingDirectory) || !System.IO.Directory.Exists(workingDirectory)
                 ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
                 : workingDirectory;
-            TerminalPane.RunCommandInWorkingDirectory(dir, command, activateVenv);
+            TerminalPane.OpenTerminalWithCommand(dir, command, activateVenv);
         }
 
         public bool HideTerminalPanelIfEmpty()
