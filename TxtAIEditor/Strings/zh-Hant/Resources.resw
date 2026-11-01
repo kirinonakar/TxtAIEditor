@@ -4029,9 +4029,11 @@
   <data name="ImageConvertCropApply" xml:space="preserve"><value>確認選取</value></data>
   <data name="ImageConvertCropPreview" xml:space="preserve"><value>所選區域預覽</value></data>
   <data name="ImageConvertCropReselect" xml:space="preserve"><value>重新選取區域</value></data>
-  <data name="ImageConvertCropHint" xml:space="preserve"><value>在影像上拖曳以選取要儲存的區域。調整大小會在裁切後套用。</value></data>
+  <data name="ImageConvertCropHint" xml:space="preserve"><value>拖曳以選取區域。拖曳角點可調整大小，拖曳區域內部可移動。調整大小會在裁切後套用。</value></data>
   <data name="ImageConvertCropBatchHint" xml:space="preserve"><value>第一張影像的選取區域會按相同比例套用到所有影像。</value></data>
   <data name="ImageConvertCropReset" xml:space="preserve"><value>選取整張影像</value></data>
+  <data name="ImageConvertCropClear" xml:space="preserve"><value>清除選取</value></data>
+  <data name="ImageConvertCropEmpty" xml:space="preserve"><value>尚未選取區域。</value></data>
   <data name="ImageConvertCropLoading" xml:space="preserve"><value>正在載入預覽...</value></data>
   <data name="ImageConvertCropPreviewError" xml:space="preserve"><value>無法載入預覽。請取消裁切或重新勾選以重試。</value></data>
   <data name="ImageConvertCropSelection" xml:space="preserve"><value>選取區域：X {0}, Y {1} · {2} × {3}px</value></data>

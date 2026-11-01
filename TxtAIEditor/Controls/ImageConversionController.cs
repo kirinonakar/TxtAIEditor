@@ -559,15 +559,36 @@ namespace TxtAIEditor.Controls
             dialogContent.Children.Add(optionsContent);
             dialogContent.Children.Add(selectionContent);
 
-            var dialog = new ContentDialog
-            {
-                Title = sourceCount > 1
+            string optionsTitle = sourceCount > 1
                     ? string.Format(
                         _getString("ImageConvertBatchDialogTitle", "이미지 일괄 변환 - {0}개"),
                         sourceCount)
                     : string.Format(
                         _getString("ImageConvertDialogTitle", "이미지 변환 - {0}"),
-                        Path.GetFileName(sourcePath)),
+                        Path.GetFileName(sourcePath));
+            var titleText = new TextBlock
+            {
+                Text = optionsTitle,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var titleGrid = new Grid { Width = root.Width, ColumnSpacing = 16 };
+            titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            titleGrid.Children.Add(titleText);
+            cropSelector.ResetButton.Visibility = Visibility.Collapsed;
+            cropSelector.ResetButton.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(cropSelector.ResetButton, 1);
+            titleGrid.Children.Add(cropSelector.ResetButton);
+            cropSelector.ClearButton.Visibility = Visibility.Collapsed;
+            cropSelector.ClearButton.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(cropSelector.ClearButton, 2);
+            titleGrid.Children.Add(cropSelector.ClearButton);
+
+            var dialog = new ContentDialog
+            {
+                Title = titleGrid,
                 Content = dialogContent,
                 PrimaryButtonText = _getString("ImageConvertConvertButton", "변환"),
                 CloseButtonText = _getString("ImageConvertCancelButton", "취소"),
@@ -579,12 +600,18 @@ namespace TxtAIEditor.Controls
             // Keep both views attached; changing Content during a button event can invalidate WinUI focus state.
             dialog.Resources["ContentDialogMaxWidth"] = Math.Max(240, xamlRoot.Size.Width - 32);
             dialog.Resources["ContentDialogMaxHeight"] = Math.Max(240, xamlRoot.Size.Height - 32);
-            object optionsTitle = dialog.Title;
             bool selectingCrop = false;
             bool applyingCrop = false;
             bool returningToOptions = false;
             bool dialogClosed = false;
             int selectionRevision = 0;
+            cropSelector.SelectionAvailabilityChanged += (_, __) =>
+            {
+                if (selectingCrop && !returningToOptions && !applyingCrop && !dialogClosed)
+                {
+                    dialog.IsPrimaryButtonEnabled = cropSelector.CanApplySelection;
+                }
+            };
 
             void ReturnToOptions(bool cancelSelection)
             {
@@ -615,7 +642,10 @@ namespace TxtAIEditor.Controls
                         selectionContent.Visibility = Visibility.Collapsed;
                         optionsContent.Visibility = Visibility.Visible;
                         selectingCrop = false;
-                        dialog.Title = optionsTitle;
+                        titleText.Text = optionsTitle;
+                        titleGrid.Width = root.Width;
+                        cropSelector.ResetButton.Visibility = Visibility.Collapsed;
+                        cropSelector.ClearButton.Visibility = Visibility.Collapsed;
                         dialog.PrimaryButtonText = _getString("ImageConvertConvertButton", "변환");
                         dialog.IsPrimaryButtonEnabled = true;
                         UpdateCropDimensions();
@@ -642,13 +672,16 @@ namespace TxtAIEditor.Controls
                 cropSelector.BeginSelection(xamlRoot.Size);
                 optionsContent.Visibility = Visibility.Collapsed;
                 selectionContent.Visibility = Visibility.Visible;
-                dialog.Title = _getString("ImageConvertCropTitle", "크롭 영역 선택");
+                titleText.Text = _getString("ImageConvertCropTitle", "크롭 영역 선택");
+                titleGrid.Width = selectionContent.Width;
+                cropSelector.ResetButton.Visibility = Visibility.Visible;
+                cropSelector.ClearButton.Visibility = Visibility.Visible;
                 dialog.PrimaryButtonText = _getString("ImageConvertCropApply", "선택 완료");
                 dialog.IsPrimaryButtonEnabled = false;
                 await cropSelector.LoadAsync(sourcePath, _imageConversionService);
                 if (selectingCrop && !returningToOptions && !dialogClosed && revision == selectionRevision)
                 {
-                    dialog.IsPrimaryButtonEnabled = cropSelector.IsReady;
+                    dialog.IsPrimaryButtonEnabled = cropSelector.CanApplySelection;
                 }
             };
 
@@ -681,7 +714,7 @@ namespace TxtAIEditor.Controls
                 if (selectingCrop)
                 {
                     args.Cancel = true;
-                    if (applyingCrop || returningToOptions || !cropSelector.IsReady || cropSelector.IsSelecting)
+                    if (applyingCrop || returningToOptions || !cropSelector.CanApplySelection)
                     {
                         return;
                     }
@@ -700,7 +733,7 @@ namespace TxtAIEditor.Controls
                         applyingCrop = false;
                         if (!returningToOptions && !dialogClosed)
                         {
-                            dialog.IsPrimaryButtonEnabled = true;
+                            dialog.IsPrimaryButtonEnabled = cropSelector.CanApplySelection;
                         }
                         deferral.Complete();
                     }
@@ -746,6 +779,7 @@ namespace TxtAIEditor.Controls
                 {
                     cropSelector.UpdateSelectionSize(xamlRoot.Size);
                 }
+                titleGrid.Width = selectingCrop ? selectionContent.Width : root.Width;
             }
 
             xamlRoot.Changed += OnRootChanged;

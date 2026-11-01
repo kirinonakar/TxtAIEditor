@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using Microsoft.UI;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -15,13 +16,15 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class ImageCropSelector : StackPanel, IDisposable
     {
+        private const double HandleSize = 10;
+        private const double HandleHitRadius = 12;
         private readonly Func<string, string, string> _getString;
         private readonly ImageConversionSourceInfo _sourceInfo;
         private readonly Image _image = new() { Stretch = Stretch.Uniform };
         private readonly Image _previewImage = new() { Stretch = Stretch.Uniform, Height = 160 };
         private readonly Grid _surface = new() { Height = 240 };
         private readonly StackPanel _selectionContent = new() { Spacing = 8 };
-        private readonly Canvas _overlay = new()
+        private readonly CropCanvas _overlay = new()
         {
             Background = new SolidColorBrush(Colors.Transparent),
             ManipulationMode = ManipulationModes.None
@@ -39,6 +42,7 @@ namespace TxtAIEditor.Controls
             IsHitTestVisible = false
         };
         private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
+        private readonly Border[] _handles = new Border[4];
         private readonly TextBlock _selectionStatus = new() { TextWrapping = TextWrapping.Wrap };
         private SoftwareBitmap? _bitmap;
         private ImageCropRegion _savedRegion;
@@ -47,13 +51,22 @@ namespace TxtAIEditor.Controls
         private uint? _pointerId;
         private Point _start;
         private ImageCropRegion _previousRegion;
+        private ImageCropCorner? _resizeCorner;
+        private bool _moveSelection;
+        private bool _canEditRegion;
+        private bool _previousCanEditRegion;
+        private bool _savedCanEditRegion;
 
         public ImageCropRegion Region { get; private set; } = ImageCropRegion.FullImage;
         public bool IsReady { get; private set; }
         public bool HasSelection { get; private set; }
         public bool IsSelecting => _pointerId.HasValue;
+        public bool CanApplySelection => IsReady && _canEditRegion && !IsSelecting;
         public FrameworkElement SelectionContent => _selectionContent;
+        public Button ResetButton { get; }
+        public Button ClearButton { get; }
         public event EventHandler? SelectionChanged;
+        public event EventHandler? SelectionAvailabilityChanged;
         public event EventHandler? SelectionRequested;
 
         public ImageCropSelector(
@@ -91,27 +104,61 @@ namespace TxtAIEditor.Controls
             _surface.Children.Add(_image);
             _surface.Children.Add(_overlay);
             _overlay.Children.Add(_selection);
+            for (int index = 0; index < _handles.Length; index++)
+            {
+                var handle = new Border
+                {
+                    Width = HandleSize,
+                    Height = HandleSize,
+                    Background = new SolidColorBrush(Colors.White),
+                    BorderBrush = new SolidColorBrush(Colors.Black),
+                    BorderThickness = new Thickness(1),
+                    IsHitTestVisible = false,
+                    Visibility = Visibility.Collapsed
+                };
+                _handles[index] = handle;
+                _overlay.Children.Add(handle);
+            }
             _selectionContent.Children.Add(new TextBlock
             {
-                Text = getString("ImageConvertCropHint", "이미지에서 드래그하여 저장할 영역을 선택하세요. 크롭 후 크기 조정이 적용됩니다."),
+                Text = getString("ImageConvertCropHint", "드래그하여 영역을 선택하세요. 모서리로 크기를 조절하고 안쪽을 드래그하여 이동할 수 있습니다. 크롭 후 크기 조정이 적용됩니다."),
                 TextWrapping = TextWrapping.Wrap
             });
             _selectionContent.Children.Add(_surface);
             _selectionContent.Children.Add(_selectionStatus);
-            var resetButton = new Button
+            ResetButton = new Button
             {
                 Content = getString("ImageConvertCropReset", "전체 영역 선택")
             };
-            resetButton.Click += (_, __) =>
+            ResetButton.Click += (_, __) =>
             {
                 CancelSelection();
                 Region = ImageCropRegion.FullImage;
+                _canEditRegion = true;
                 UpdateSelection();
             };
-            _selectionContent.Children.Add(resetButton);
+            ClearButton = new Button
+            {
+                Content = getString("ImageConvertCropClear", "선택 지우기")
+            };
+            ClearButton.Click += (_, __) =>
+            {
+                CancelSelection();
+                Region = ImageCropRegion.FullImage;
+                _canEditRegion = false;
+                UpdateSelection();
+            };
 
             _overlay.PointerPressed += OnPointerPressed;
             _overlay.PointerMoved += OnPointerMoved;
+            _overlay.PointerEntered += (_, e) => UpdatePointerCursor(e.GetCurrentPoint(_overlay).Position);
+            _overlay.PointerExited += (_, __) =>
+            {
+                if (!IsSelecting)
+                {
+                    _overlay.SetPointerCursor(InputSystemCursorShape.Arrow);
+                }
+            };
             _overlay.PointerReleased += OnPointerReleased;
             _overlay.PointerCanceled += (_, __) => CancelSelection();
             _overlay.PointerCaptureLost += (_, __) => CancelSelection();
@@ -122,6 +169,7 @@ namespace TxtAIEditor.Controls
         public FrameworkElement BeginSelection(Size availableSize)
         {
             _savedRegion = Region;
+            _savedCanEditRegion = _canEditRegion;
             UpdateSelectionSize(availableSize);
             return _selectionContent;
         }
@@ -137,12 +185,13 @@ namespace TxtAIEditor.Controls
         {
             CancelSelection();
             Region = _savedRegion;
+            _canEditRegion = _savedCanEditRegion;
             UpdateSelection();
         }
 
         public async Task<bool> ApplySelectionAsync()
         {
-            if (_bitmap == null || !IsReady || IsSelecting)
+            if (_bitmap == null || !CanApplySelection)
             {
                 return false;
             }
@@ -167,6 +216,7 @@ namespace TxtAIEditor.Controls
                 await source.SetBitmapAsync(preview);
                 _previewImage.Source = source;
                 HasSelection = true;
+                _canEditRegion = true;
                 _status.Text = GetSelectionText();
                 SelectionChanged?.Invoke(this, EventArgs.Empty);
                 return true;
@@ -234,7 +284,11 @@ namespace TxtAIEditor.Controls
             }
             _pointerId = null;
             Region = _previousRegion;
+            _canEditRegion = _previousCanEditRegion;
+            _resizeCorner = null;
+            _moveSelection = false;
             _overlay.ReleasePointerCaptures();
+            _overlay.SetPointerCursor(InputSystemCursorShape.Arrow);
             UpdateSelection();
         }
 
@@ -249,6 +303,10 @@ namespace TxtAIEditor.Controls
         private Point GetRelativePoint(PointerRoutedEventArgs e)
         {
             Rect rect = GetImageRect();
+            if (rect.Width <= 0 || rect.Height <= 0)
+            {
+                return _start;
+            }
             Point point = e.GetCurrentPoint(_overlay).Position;
             return new Point(Math.Clamp((point.X - rect.X) / rect.Width, 0, 1),
                 Math.Clamp((point.Y - rect.Y) / rect.Height, 0, 1));
@@ -256,16 +314,27 @@ namespace TxtAIEditor.Controls
 
         private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            if (!IsReady || IsSelecting || !e.GetCurrentPoint(_overlay).Properties.IsLeftButtonPressed ||
-                !GetImageRect().Contains(e.GetCurrentPoint(_overlay).Position))
+            var point = e.GetCurrentPoint(_overlay);
+            Rect imageRect = GetImageRect();
+            if (!IsReady || IsSelecting || !point.Properties.IsLeftButtonPressed || imageRect.Width <= 0 || imageRect.Height <= 0)
+            {
+                return;
+            }
+            ImageCropCorner? corner = HitTestCorner(point.Position);
+            if (!corner.HasValue && !imageRect.Contains(point.Position))
             {
                 return;
             }
             if (_overlay.CapturePointer(e.Pointer))
             {
                 _previousRegion = Region;
+                _previousCanEditRegion = _canEditRegion;
+                _resizeCorner = corner;
+                _moveSelection = !corner.HasValue && _canEditRegion && GetSelectionRect().Contains(point.Position);
                 _start = GetRelativePoint(e);
                 _pointerId = e.Pointer.PointerId;
+                UpdatePointerCursor(point.Position);
+                SelectionAvailabilityChanged?.Invoke(this, EventArgs.Empty);
                 e.Handled = true;
             }
         }
@@ -274,6 +343,10 @@ namespace TxtAIEditor.Controls
         {
             if (_pointerId != e.Pointer.PointerId)
             {
+                if (!IsSelecting)
+                {
+                    UpdatePointerCursor(e.GetCurrentPoint(_overlay).Position);
+                }
                 return;
             }
             UpdateRegion(GetRelativePoint(e));
@@ -282,15 +355,26 @@ namespace TxtAIEditor.Controls
 
         private void UpdateRegion(Point end)
         {
-            if (Math.Abs(end.X - _start.X) * _sourceInfo.Width < 1 ||
+            if (_resizeCorner is ImageCropCorner corner)
+            {
+                Region = _previousRegion.ResizeCorner(corner, end.X - _start.X, end.Y - _start.Y,
+                    _sourceInfo.Width, _sourceInfo.Height);
+            }
+            else if (_moveSelection)
+            {
+                Region = _previousRegion.Move(end.X - _start.X, end.Y - _start.Y, _sourceInfo.Width, _sourceInfo.Height);
+            }
+            else if (Math.Abs(end.X - _start.X) * _sourceInfo.Width < 1 ||
                 Math.Abs(end.Y - _start.Y) * _sourceInfo.Height < 1)
             {
                 Region = _previousRegion;
+                _canEditRegion = _previousCanEditRegion;
             }
             else
             {
                 Region = new ImageCropRegion(Math.Min(_start.X, end.X), Math.Min(_start.Y, end.Y),
                     Math.Max(_start.X, end.X), Math.Max(_start.Y, end.Y));
+                _canEditRegion = true;
             }
             UpdateSelection();
         }
@@ -303,7 +387,11 @@ namespace TxtAIEditor.Controls
             }
             UpdateRegion(GetRelativePoint(e));
             _pointerId = null;
+            _resizeCorner = null;
+            _moveSelection = false;
             _overlay.ReleasePointerCapture(e.Pointer);
+            UpdatePointerCursor(e.GetCurrentPoint(_overlay).Position);
+            SelectionAvailabilityChanged?.Invoke(this, EventArgs.Empty);
             e.Handled = true;
         }
 
@@ -313,18 +401,126 @@ namespace TxtAIEditor.Controls
             {
                 return;
             }
-            _selection.Visibility = IsReady ? Visibility.Visible : Visibility.Collapsed;
+            _selection.Visibility = IsReady && _canEditRegion ? Visibility.Visible : Visibility.Collapsed;
+            ResetButton.IsEnabled = IsReady;
+            ClearButton.IsEnabled = IsReady && _canEditRegion;
+            foreach (Border handle in _handles)
+            {
+                handle.Visibility = IsReady && _canEditRegion ? Visibility.Visible : Visibility.Collapsed;
+            }
             if (!IsReady)
             {
+                SelectionAvailabilityChanged?.Invoke(this, EventArgs.Empty);
                 return;
             }
-            Rect rect = GetImageRect();
+            Rect rect = GetSelectionRect();
+            Canvas.SetLeft(_selection, rect.X);
+            Canvas.SetTop(_selection, rect.Y);
+            _selection.Width = rect.Width;
+            _selection.Height = rect.Height;
+            for (int index = 0; index < _handles.Length; index++)
+            {
+                Point corner = GetCornerPoint(rect, (ImageCropCorner)index);
+                Canvas.SetLeft(_handles[index], corner.X - HandleSize / 2);
+                Canvas.SetTop(_handles[index], corner.Y - HandleSize / 2);
+            }
+            _selectionStatus.Text = _canEditRegion
+                ? GetSelectionText()
+                : _getString("ImageConvertCropEmpty", "선택된 영역이 없습니다.");
+            SelectionAvailabilityChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private Rect GetSelectionRect()
+        {
+            Rect imageRect = GetImageRect();
             ImageCropBounds bounds = Region.GetPixelBounds(_sourceInfo.Width, _sourceInfo.Height);
-            Canvas.SetLeft(_selection, rect.X + rect.Width * bounds.X / _sourceInfo.Width);
-            Canvas.SetTop(_selection, rect.Y + rect.Height * bounds.Y / _sourceInfo.Height);
-            _selection.Width = rect.Width * bounds.Width / _sourceInfo.Width;
-            _selection.Height = rect.Height * bounds.Height / _sourceInfo.Height;
-            _selectionStatus.Text = GetSelectionText();
+            return new Rect(imageRect.X + imageRect.Width * bounds.X / _sourceInfo.Width,
+                imageRect.Y + imageRect.Height * bounds.Y / _sourceInfo.Height,
+                imageRect.Width * bounds.Width / _sourceInfo.Width, imageRect.Height * bounds.Height / _sourceInfo.Height);
+        }
+
+        private static Point GetCornerPoint(Rect rect, ImageCropCorner corner) => corner switch
+        {
+            ImageCropCorner.TopLeft => new Point(rect.Left, rect.Top),
+            ImageCropCorner.TopRight => new Point(rect.Right, rect.Top),
+            ImageCropCorner.BottomRight => new Point(rect.Right, rect.Bottom),
+            _ => new Point(rect.Left, rect.Bottom)
+        };
+
+        private ImageCropCorner? HitTestCorner(Point point)
+        {
+            if (!IsReady || !_canEditRegion)
+            {
+                return null;
+            }
+            Rect rect = GetSelectionRect();
+            // Leave an interior move target even when a small selection's handles overlap.
+            double radius = Math.Min(HandleHitRadius, Math.Min(rect.Width, rect.Height) / 3);
+            double nearestDistance = radius * radius;
+            ImageCropCorner? nearest = null;
+            for (int index = 0; index < _handles.Length; index++)
+            {
+                Point corner = GetCornerPoint(rect, (ImageCropCorner)index);
+                double dx = point.X - corner.X;
+                double dy = point.Y - corner.Y;
+                double distance = dx * dx + dy * dy;
+                if (distance <= nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearest = (ImageCropCorner)index;
+                }
+            }
+            return nearest;
+        }
+
+        private void UpdatePointerCursor(Point point)
+        {
+            ImageCropCorner? corner = IsSelecting ? _resizeCorner : HitTestCorner(point);
+            InputSystemCursorShape shape;
+            if (corner.HasValue)
+            {
+                shape = corner is ImageCropCorner.TopLeft or ImageCropCorner.BottomRight
+                    ? InputSystemCursorShape.SizeNorthwestSoutheast
+                    : InputSystemCursorShape.SizeNortheastSouthwest;
+            }
+            else if (IsSelecting ? _moveSelection : IsReady && _canEditRegion && GetSelectionRect().Contains(point))
+            {
+                shape = InputSystemCursorShape.SizeAll;
+            }
+            else
+            {
+                shape = IsReady && (IsSelecting || GetImageRect().Contains(point))
+                    ? InputSystemCursorShape.Cross
+                    : InputSystemCursorShape.Arrow;
+            }
+            _overlay.SetPointerCursor(shape);
+        }
+
+        private sealed class CropCanvas : Canvas
+        {
+            private static readonly InputSystemCursor Arrow = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
+            private static readonly InputSystemCursor Cross = InputSystemCursor.Create(InputSystemCursorShape.Cross);
+            private static readonly InputSystemCursor Move = InputSystemCursor.Create(InputSystemCursorShape.SizeAll);
+            private static readonly InputSystemCursor NorthwestSoutheast = InputSystemCursor.Create(InputSystemCursorShape.SizeNorthwestSoutheast);
+            private static readonly InputSystemCursor NortheastSouthwest = InputSystemCursor.Create(InputSystemCursorShape.SizeNortheastSouthwest);
+            private InputSystemCursorShape? _shape;
+
+            public void SetPointerCursor(InputSystemCursorShape shape)
+            {
+                if (_shape == shape)
+                {
+                    return;
+                }
+                _shape = shape;
+                ProtectedCursor = shape switch
+                {
+                    InputSystemCursorShape.Cross => Cross,
+                    InputSystemCursorShape.SizeAll => Move,
+                    InputSystemCursorShape.SizeNorthwestSoutheast => NorthwestSoutheast,
+                    InputSystemCursorShape.SizeNortheastSouthwest => NortheastSouthwest,
+                    _ => Arrow
+                };
+            }
         }
 
         private string GetSelectionText()

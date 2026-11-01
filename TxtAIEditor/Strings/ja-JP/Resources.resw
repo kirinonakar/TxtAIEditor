@@ -4029,9 +4029,11 @@
   <data name="ImageConvertCropApply" xml:space="preserve"><value>選択を適用</value></data>
   <data name="ImageConvertCropPreview" xml:space="preserve"><value>選択範囲のプレビュー</value></data>
   <data name="ImageConvertCropReselect" xml:space="preserve"><value>範囲を再選択</value></data>
-  <data name="ImageConvertCropHint" xml:space="preserve"><value>画像上をドラッグして保存する範囲を選択してください。サイズ変更はトリミング後に適用されます。</value></data>
+  <data name="ImageConvertCropHint" xml:space="preserve"><value>ドラッグして範囲を選択してください。四隅で大きさを調整し、内側をドラッグして移動できます。サイズ変更はトリミング後に適用されます。</value></data>
   <data name="ImageConvertCropBatchHint" xml:space="preserve"><value>最初の画像の選択範囲をすべての画像に同じ比率で適用します。</value></data>
   <data name="ImageConvertCropReset" xml:space="preserve"><value>画像全体を選択</value></data>
+  <data name="ImageConvertCropClear" xml:space="preserve"><value>選択を解除</value></data>
+  <data name="ImageConvertCropEmpty" xml:space="preserve"><value>範囲が選択されていません。</value></data>
   <data name="ImageConvertCropLoading" xml:space="preserve"><value>プレビューを読み込み中...</value></data>
   <data name="ImageConvertCropPreviewError" xml:space="preserve"><value>プレビューを読み込めません。トリミングを解除するか、再度チェックしてください。</value></data>
   <data name="ImageConvertCropSelection" xml:space="preserve"><value>選択範囲: X {0}, Y {1} · {2} × {3}px</value></data>

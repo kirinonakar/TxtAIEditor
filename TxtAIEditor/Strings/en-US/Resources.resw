@@ -4071,9 +4071,11 @@ Plan: {0}</value>
   <data name="ImageConvertCropApply" xml:space="preserve"><value>Use selection</value></data>
   <data name="ImageConvertCropPreview" xml:space="preserve"><value>Selected area preview</value></data>
   <data name="ImageConvertCropReselect" xml:space="preserve"><value>Select area again</value></data>
-  <data name="ImageConvertCropHint" xml:space="preserve"><value>Drag on the image to select the area to save. Resizing is applied after cropping.</value></data>
+  <data name="ImageConvertCropHint" xml:space="preserve"><value>Drag to select an area. Drag a corner to resize, or drag inside to move it. Resizing is applied after cropping.</value></data>
   <data name="ImageConvertCropBatchHint" xml:space="preserve"><value>The selection on the first image is applied proportionally to all images.</value></data>
   <data name="ImageConvertCropReset" xml:space="preserve"><value>Select entire image</value></data>
+  <data name="ImageConvertCropClear" xml:space="preserve"><value>Clear selection</value></data>
+  <data name="ImageConvertCropEmpty" xml:space="preserve"><value>No area selected.</value></data>
   <data name="ImageConvertCropLoading" xml:space="preserve"><value>Loading preview...</value></data>
   <data name="ImageConvertCropPreviewError" xml:space="preserve"><value>Unable to load the preview. Turn Crop off or check it again to retry.</value></data>
   <data name="ImageConvertCropSelection" xml:space="preserve"><value>Selection: X {0}, Y {1} · {2} × {3}px</value></data>
