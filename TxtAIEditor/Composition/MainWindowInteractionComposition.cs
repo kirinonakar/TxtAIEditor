@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -192,7 +193,14 @@ namespace TxtAIEditor.Composition
                 callbacks.OpenNotebookSourceTabAsync,
                 callbacks.OpenNotebookViewerTabAsync,
                 callbacks.OpenTabInNewWindowAsync,
-                imageConversion.ShowAsync);
+                async (sourcePath, xamlRoot, theme) =>
+                {
+                    if (await imageConversion.ShowAsync(sourcePath, xamlRoot, theme))
+                    {
+                        callbacks.RefreshExplorerTreeFolder(
+                            Path.GetDirectoryName(sourcePath) ?? callbacks.GetCurrentFolderPath());
+                    }
+                });
 
             var fileOpenDrop = new FileOpenDropController(
                 ui.DragOverlay,

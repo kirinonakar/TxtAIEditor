@@ -4006,7 +4006,23 @@
   <data name="ImageConvertFormat" xml:space="preserve"><value>输出格式</value></data>
   <data name="ImageConvertFormatPng" xml:space="preserve"><value>PNG</value></data>
   <data name="ImageConvertFormatJpg" xml:space="preserve"><value>JPG</value></data>
-  <data name="ImageConvertQuality" xml:space="preserve"><value>JPG 质量（1-100）</value></data>
+  <data name="ImageConvertQuality" xml:space="preserve"><value>JPG / WebP 质量（1-100）</value></data>
+  <data name="ImageConvertFormatWebp" xml:space="preserve"><value>WebP</value></data>
+  <data name="ImageConvertWebpLossless" xml:space="preserve"><value>无损</value></data>
+  <data name="ImageConvertCompressionStrength" xml:space="preserve"><value>压缩强度（1-100）</value></data>
+  <data name="ImageConvertInvalidCompressionStrength" xml:space="preserve"><value>压缩强度必须是 1 到 100 之间的整数。</value></data>
+  <data name="ImageConvertCrop" xml:space="preserve"><value>裁剪</value></data>
+  <data name="ImageConvertCropTitle" xml:space="preserve"><value>选择裁剪区域</value></data>
+  <data name="ImageConvertCropApply" xml:space="preserve"><value>确认选择</value></data>
+  <data name="ImageConvertCropPreview" xml:space="preserve"><value>所选区域预览</value></data>
+  <data name="ImageConvertCropReselect" xml:space="preserve"><value>重新选择区域</value></data>
+  <data name="ImageConvertCropHint" xml:space="preserve"><value>在图像上拖动以选择要保存的区域。调整大小将在裁剪后应用。</value></data>
+  <data name="ImageConvertCropBatchHint" xml:space="preserve"><value>第一张图像的选择区域将按相同比例应用到所有图像。</value></data>
+  <data name="ImageConvertCropReset" xml:space="preserve"><value>选择整个图像</value></data>
+  <data name="ImageConvertCropLoading" xml:space="preserve"><value>正在加载预览...</value></data>
+  <data name="ImageConvertCropPreviewError" xml:space="preserve"><value>无法加载预览。请取消裁剪或重新勾选以重试。</value></data>
+  <data name="ImageConvertCropSelection" xml:space="preserve"><value>选择区域：X {0}, Y {1} · {2} × {3}px</value></data>
+  <data name="ImageConvertCropNotReady" xml:space="preserve"><value>请等待预览加载完成并选择区域。</value></data>
   <data name="ImageConvertResize" xml:space="preserve"><value>调整大小</value></data>
   <data name="ImageConvertWidth" xml:space="preserve"><value>宽度（px）</value></data>
   <data name="ImageConvertHeight" xml:space="preserve"><value>高度（px）</value></data>
@@ -4020,7 +4036,7 @@
   <data name="ImageConvertAnimatedHint" xml:space="preserve"><value>选中后会将每一帧保存为单独文件。未选中时只转换第一帧。</value></data>
   <data name="ImageConvertOutputSuffixHint" xml:space="preserve"><value>输出文件保存在同一文件夹，并添加 _convert 后缀。</value></data>
   <data name="ImageConvertInvalidSize" xml:space="preserve"><value>宽度和高度必须是大于等于 1 的整数像素值。</value></data>
-  <data name="ImageConvertInvalidQuality" xml:space="preserve"><value>JPG 质量必须是 1 到 100 之间的整数。</value></data>
+  <data name="ImageConvertInvalidQuality" xml:space="preserve"><value>JPG / WebP 质量必须是 1 到 100 之间的整数。</value></data>
   <data name="ImageConvertConvertButton" xml:space="preserve"><value>转换</value></data>
   <data name="ImageConvertCancelButton" xml:space="preserve"><value>取消</value></data>
   <data name="ImageConvertCloseButton" xml:space="preserve"><value>确定</value></data>

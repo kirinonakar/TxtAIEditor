@@ -4006,7 +4006,23 @@
   <data name="ImageConvertFormat" xml:space="preserve"><value>出力形式</value></data>
   <data name="ImageConvertFormatPng" xml:space="preserve"><value>PNG</value></data>
   <data name="ImageConvertFormatJpg" xml:space="preserve"><value>JPG</value></data>
-  <data name="ImageConvertQuality" xml:space="preserve"><value>JPG 品質 (1-100)</value></data>
+  <data name="ImageConvertQuality" xml:space="preserve"><value>JPG / WebP 品質 (1-100)</value></data>
+  <data name="ImageConvertFormatWebp" xml:space="preserve"><value>WebP</value></data>
+  <data name="ImageConvertWebpLossless" xml:space="preserve"><value>可逆圧縮</value></data>
+  <data name="ImageConvertCompressionStrength" xml:space="preserve"><value>圧縮強度 (1-100)</value></data>
+  <data name="ImageConvertInvalidCompressionStrength" xml:space="preserve"><value>圧縮強度は1から100までの整数で指定してください。</value></data>
+  <data name="ImageConvertCrop" xml:space="preserve"><value>トリミング</value></data>
+  <data name="ImageConvertCropTitle" xml:space="preserve"><value>トリミング範囲の選択</value></data>
+  <data name="ImageConvertCropApply" xml:space="preserve"><value>選択を適用</value></data>
+  <data name="ImageConvertCropPreview" xml:space="preserve"><value>選択範囲のプレビュー</value></data>
+  <data name="ImageConvertCropReselect" xml:space="preserve"><value>範囲を再選択</value></data>
+  <data name="ImageConvertCropHint" xml:space="preserve"><value>画像上をドラッグして保存する範囲を選択してください。サイズ変更はトリミング後に適用されます。</value></data>
+  <data name="ImageConvertCropBatchHint" xml:space="preserve"><value>最初の画像の選択範囲をすべての画像に同じ比率で適用します。</value></data>
+  <data name="ImageConvertCropReset" xml:space="preserve"><value>画像全体を選択</value></data>
+  <data name="ImageConvertCropLoading" xml:space="preserve"><value>プレビューを読み込み中...</value></data>
+  <data name="ImageConvertCropPreviewError" xml:space="preserve"><value>プレビューを読み込めません。トリミングを解除するか、再度チェックしてください。</value></data>
+  <data name="ImageConvertCropSelection" xml:space="preserve"><value>選択範囲: X {0}, Y {1} · {2} × {3}px</value></data>
+  <data name="ImageConvertCropNotReady" xml:space="preserve"><value>プレビューの読み込み後、範囲の選択を完了してください。</value></data>
   <data name="ImageConvertResize" xml:space="preserve"><value>サイズ変更</value></data>
   <data name="ImageConvertWidth" xml:space="preserve"><value>幅 (px)</value></data>
   <data name="ImageConvertHeight" xml:space="preserve"><value>高さ (px)</value></data>
@@ -4020,7 +4036,7 @@
   <data name="ImageConvertAnimatedHint" xml:space="preserve"><value>選択すると各フレームを個別のファイルとして保存します。選択しない場合は最初のフレームのみ変換します。</value></data>
   <data name="ImageConvertOutputSuffixHint" xml:space="preserve"><value>出力ファイルは同じフォルダーに _convert 接尾辞を付けて保存されます。</value></data>
   <data name="ImageConvertInvalidSize" xml:space="preserve"><value>幅と高さは1以上の整数ピクセル値で指定してください。</value></data>
-  <data name="ImageConvertInvalidQuality" xml:space="preserve"><value>JPG 品質は1から100までの整数で指定してください。</value></data>
+  <data name="ImageConvertInvalidQuality" xml:space="preserve"><value>JPG / WebP 品質は1から100までの整数で指定してください。</value></data>
   <data name="ImageConvertConvertButton" xml:space="preserve"><value>変換</value></data>
   <data name="ImageConvertCancelButton" xml:space="preserve"><value>キャンセル</value></data>
   <data name="ImageConvertCloseButton" xml:space="preserve"><value>OK</value></data>

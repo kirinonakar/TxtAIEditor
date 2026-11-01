@@ -152,12 +152,14 @@ namespace TxtAIEditor.Controls
                     {
                         OutputFormat = values.OutputFormat,
                         Quality = values.Quality,
+                        WebpLossless = values.WebpLossless,
                         ResizeEnabled = values.ResizeEnabled,
                         TargetWidth = values.TargetWidth,
                         TargetHeight = values.TargetHeight,
                         KeepAspectRatio = values.KeepAspectRatio,
                         InterpolationMode = values.InterpolationMode,
-                        ExtractFrames = values.ExtractFrames
+                        ExtractFrames = values.ExtractFrames,
+                        CropRegion = values.CropRegion
                     };
 
                     foreach (string path in paths)
@@ -230,8 +232,8 @@ namespace TxtAIEditor.Controls
             var root = new StackPanel
             {
                 Spacing = 10,
-                MinWidth = 410,
-                MaxWidth = 560
+                // Keep format labels and compression hints from resizing the options view.
+                Width = Math.Max(0, Math.Min(480, xamlRoot.Size.Width - 112))
             };
 
             root.Children.Add(new TextBlock
@@ -255,9 +257,22 @@ namespace TxtAIEditor.Controls
             formatCombo.Items.Add(CreateComboItem(
                 _getString("ImageConvertFormatJpg", "JPG"),
                 ImageConversionOutputFormat.Jpeg));
+            formatCombo.Items.Add(CreateComboItem(
+                _getString("ImageConvertFormatWebp", "WebP"),
+                ImageConversionOutputFormat.Webp));
             root.Children.Add(CreateField(
                 _getString("ImageConvertFormat", "출력 형식"),
                 formatCombo));
+
+            var losslessCheck = new CheckBox
+            {
+                Content = _getString("ImageConvertWebpLossless", "무손실"),
+                IsChecked = false,
+                Visibility = Visibility.Collapsed,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Height = InputHeight,
+                MinHeight = InputHeight
+            };
 
             var qualityBox = new NumberBox
             {
@@ -271,19 +286,50 @@ namespace TxtAIEditor.Controls
                 MaxHeight = InputHeight,
                 VerticalContentAlignment = VerticalAlignment.Center
             };
+            var qualityLabel = new TextBlock();
+            var qualityPanel = new StackPanel { Spacing = 4 };
+            qualityPanel.Children.Add(qualityLabel);
+            qualityPanel.Children.Add(qualityBox);
             var qualityField = new ContentControl
             {
-                Content = CreateField(
-                    _getString("ImageConvertQuality", "JPG 화질 (1-100)"),
-                    qualityBox),
-                IsEnabled = false
+                Content = qualityPanel
             };
-            root.Children.Add(qualityField);
+            var qualityGrid = new Grid { ColumnSpacing = 10 };
+            qualityGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            qualityGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            qualityGrid.Children.Add(qualityField);
+            Grid.SetColumn(losslessCheck, 1);
+            qualityGrid.Children.Add(losslessCheck);
+            root.Children.Add(qualityGrid);
 
-            formatCombo.SelectionChanged += (_, __) =>
+            bool IsWebpLossless() => GetSelectedFormat(formatCombo) == ImageConversionOutputFormat.Webp &&
+                losslessCheck.IsChecked == true;
+            bool UsesCompressionStrength() => GetSelectedFormat(formatCombo) == ImageConversionOutputFormat.Png || IsWebpLossless();
+
+            void UpdateQualityOptions()
             {
-                qualityField.IsEnabled = GetSelectedFormat(formatCombo) == ImageConversionOutputFormat.Jpeg;
+                losslessCheck.Visibility = GetSelectedFormat(formatCombo) == ImageConversionOutputFormat.Webp
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                qualityLabel.Text = UsesCompressionStrength()
+                    ? _getString("ImageConvertCompressionStrength", "압축 강도 (1-100)")
+                    : _getString("ImageConvertQuality", "JPG / WebP 화질 (1-100)");
+            }
+
+            formatCombo.SelectionChanged += (_, __) => UpdateQualityOptions();
+            losslessCheck.Checked += (_, __) => UpdateQualityOptions();
+            losslessCheck.Unchecked += (_, __) => UpdateQualityOptions();
+            UpdateQualityOptions();
+
+            var cropCheck = new CheckBox
+            {
+                Content = _getString("ImageConvertCrop", "크롭"),
+                IsChecked = false
             };
+            using var cropSelector = new ImageCropSelector(sourceInfo, _getString, sourceCount > 1);
+            Func<Task>? selectCropAsync = null;
+            root.Children.Add(cropCheck);
+            root.Children.Add(cropSelector);
 
             var resizeCheck = new CheckBox
             {
@@ -326,6 +372,8 @@ namespace TxtAIEditor.Controls
             root.Children.Add(resizeOptions);
 
             bool syncingAspectRatio = false;
+            uint aspectWidth = sourceInfo.Width;
+            uint aspectHeight = sourceInfo.Height;
             void SyncHeightFromWidth()
             {
                 if (syncingAspectRatio || keepAspectCheck.IsChecked != true || !IsValidNumber(widthBox.Value))
@@ -336,7 +384,7 @@ namespace TxtAIEditor.Controls
                 syncingAspectRatio = true;
                 heightBox.Value = Math.Max(
                     1,
-                    Math.Round(widthBox.Value * sourceInfo.Height / sourceInfo.Width));
+                    Math.Round(widthBox.Value * aspectHeight / aspectWidth));
                 syncingAspectRatio = false;
             }
 
@@ -350,7 +398,7 @@ namespace TxtAIEditor.Controls
                 syncingAspectRatio = true;
                 widthBox.Value = Math.Max(
                     1,
-                    Math.Round(heightBox.Value * sourceInfo.Width / sourceInfo.Height));
+                    Math.Round(heightBox.Value * aspectWidth / aspectHeight));
                 syncingAspectRatio = false;
             }
 
@@ -359,6 +407,48 @@ namespace TxtAIEditor.Controls
             keepAspectCheck.Checked += (_, __) => SyncHeightFromWidth();
             resizeCheck.Checked += (_, __) => resizeOptions.IsEnabled = true;
             resizeCheck.Unchecked += (_, __) => resizeOptions.IsEnabled = false;
+
+            void UpdateCropDimensions()
+            {
+                ImageCropBounds bounds = (cropCheck.IsChecked == true ? cropSelector.Region : ImageCropRegion.FullImage)
+                    .GetPixelBounds(sourceInfo.Width, sourceInfo.Height);
+                aspectWidth = bounds.Width;
+                aspectHeight = bounds.Height;
+                if (resizeCheck.IsChecked != true)
+                {
+                    syncingAspectRatio = true;
+                    widthBox.Value = aspectWidth;
+                    heightBox.Value = aspectHeight;
+                    syncingAspectRatio = false;
+                }
+                else
+                {
+                    SyncHeightFromWidth();
+                }
+            }
+
+            cropSelector.SelectionChanged += (_, __) => UpdateCropDimensions();
+            cropCheck.Checked += async (_, __) =>
+            {
+                cropSelector.Visibility = Visibility.Visible;
+                if (selectCropAsync != null)
+                {
+                    await selectCropAsync();
+                }
+            };
+            cropSelector.SelectionRequested += async (_, __) =>
+            {
+                if (selectCropAsync != null)
+                {
+                    await selectCropAsync();
+                }
+            };
+            cropCheck.Unchecked += (_, __) =>
+            {
+                cropSelector.CancelSelection();
+                cropSelector.Visibility = Visibility.Collapsed;
+                UpdateCropDimensions();
+            };
 
             CheckBox? extractFramesCheck = null;
             if (isAnimated)
@@ -433,6 +523,13 @@ namespace TxtAIEditor.Controls
             bool Validate()
             {
                 validationText.Visibility = Visibility.Collapsed;
+                if (cropCheck.IsChecked == true && !cropSelector.HasSelection)
+                {
+                    validationText.Text = _getString("ImageConvertCropNotReady", "미리보기를 불러온 뒤 영역 선택을 완료해 주세요.");
+                    validationText.Visibility = Visibility.Visible;
+                    return false;
+                }
+
                 if (resizeCheck.IsChecked == true &&
                     (!TryReadDimension(widthBox, out _) || !TryReadDimension(heightBox, out _)))
                 {
@@ -443,18 +540,24 @@ namespace TxtAIEditor.Controls
                     return false;
                 }
 
-                if (GetSelectedFormat(formatCombo) == ImageConversionOutputFormat.Jpeg &&
-                    !TryReadQuality(out _))
+                if (!TryReadQuality(out _))
                 {
-                    validationText.Text = _getString(
-                        "ImageConvertInvalidQuality",
-                        "JPG 화질은 1에서 100 사이의 정수여야 합니다.");
+                    validationText.Text = UsesCompressionStrength()
+                        ? _getString("ImageConvertInvalidCompressionStrength", "압축 강도는 1에서 100 사이의 정수여야 합니다.")
+                        : _getString("ImageConvertInvalidQuality", "JPG / WebP 화질은 1에서 100 사이의 정수여야 합니다.");
                     validationText.Visibility = Visibility.Visible;
                     return false;
                 }
 
                 return true;
             }
+
+            var optionsContent = new ScrollViewer { Content = root };
+            FrameworkElement selectionContent = cropSelector.SelectionContent;
+            selectionContent.Visibility = Visibility.Collapsed;
+            var dialogContent = new Grid();
+            dialogContent.Children.Add(optionsContent);
+            dialogContent.Children.Add(selectionContent);
 
             var dialog = new ContentDialog
             {
@@ -465,7 +568,7 @@ namespace TxtAIEditor.Controls
                     : string.Format(
                         _getString("ImageConvertDialogTitle", "이미지 변환 - {0}"),
                         Path.GetFileName(sourcePath)),
-                Content = new ScrollViewer { Content = root },
+                Content = dialogContent,
                 PrimaryButtonText = _getString("ImageConvertConvertButton", "변환"),
                 CloseButtonText = _getString("ImageConvertCancelButton", "취소"),
                 DefaultButton = ContentDialogButton.Primary,
@@ -473,9 +576,137 @@ namespace TxtAIEditor.Controls
                 RequestedTheme = theme
             };
 
-            ImageConversionDialogValues? values = null;
-            dialog.PrimaryButtonClick += (_, args) =>
+            // Keep both views attached; changing Content during a button event can invalidate WinUI focus state.
+            dialog.Resources["ContentDialogMaxWidth"] = Math.Max(240, xamlRoot.Size.Width - 32);
+            dialog.Resources["ContentDialogMaxHeight"] = Math.Max(240, xamlRoot.Size.Height - 32);
+            object optionsTitle = dialog.Title;
+            bool selectingCrop = false;
+            bool applyingCrop = false;
+            bool returningToOptions = false;
+            bool dialogClosed = false;
+            int selectionRevision = 0;
+
+            void ReturnToOptions(bool cancelSelection)
             {
+                if (returningToOptions || dialogClosed)
+                {
+                    return;
+                }
+                returningToOptions = true;
+                selectionRevision++;
+                dialog.IsPrimaryButtonEnabled = false;
+                // Let the current close/click event finish before changing focusable controls.
+                if (!dialog.DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (dialogClosed)
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        if (cancelSelection)
+                        {
+                            cropSelector.RevertSelection();
+                        }
+                        if (cancelSelection || !cropSelector.HasSelection)
+                        {
+                            cropCheck.IsChecked = false;
+                        }
+                        selectionContent.Visibility = Visibility.Collapsed;
+                        optionsContent.Visibility = Visibility.Visible;
+                        selectingCrop = false;
+                        dialog.Title = optionsTitle;
+                        dialog.PrimaryButtonText = _getString("ImageConvertConvertButton", "변환");
+                        dialog.IsPrimaryButtonEnabled = true;
+                        UpdateCropDimensions();
+                    }
+                    finally
+                    {
+                        returningToOptions = false;
+                    }
+                }))
+                {
+                    returningToOptions = false;
+                }
+            }
+
+            selectCropAsync = async () =>
+            {
+                if (selectingCrop || returningToOptions || dialogClosed)
+                {
+                    return;
+                }
+                selectingCrop = true;
+                int revision = ++selectionRevision;
+                validationText.Visibility = Visibility.Collapsed;
+                cropSelector.BeginSelection(xamlRoot.Size);
+                optionsContent.Visibility = Visibility.Collapsed;
+                selectionContent.Visibility = Visibility.Visible;
+                dialog.Title = _getString("ImageConvertCropTitle", "크롭 영역 선택");
+                dialog.PrimaryButtonText = _getString("ImageConvertCropApply", "선택 완료");
+                dialog.IsPrimaryButtonEnabled = false;
+                await cropSelector.LoadAsync(sourcePath, _imageConversionService);
+                if (selectingCrop && !returningToOptions && !dialogClosed && revision == selectionRevision)
+                {
+                    dialog.IsPrimaryButtonEnabled = cropSelector.IsReady;
+                }
+            };
+
+            dialog.CloseButtonClick += (_, args) =>
+            {
+                if (selectingCrop)
+                {
+                    args.Cancel = true;
+                    if (!applyingCrop)
+                    {
+                        ReturnToOptions(cancelSelection: true);
+                    }
+                }
+            };
+            dialog.Closing += (_, args) =>
+            {
+                if (selectingCrop)
+                {
+                    args.Cancel = true;
+                    if (!applyingCrop)
+                    {
+                        ReturnToOptions(cancelSelection: true);
+                    }
+                }
+            };
+
+            ImageConversionDialogValues? values = null;
+            dialog.PrimaryButtonClick += async (_, args) =>
+            {
+                if (selectingCrop)
+                {
+                    args.Cancel = true;
+                    if (applyingCrop || returningToOptions || !cropSelector.IsReady || cropSelector.IsSelecting)
+                    {
+                        return;
+                    }
+                    var deferral = args.GetDeferral();
+                    applyingCrop = true;
+                    dialog.IsPrimaryButtonEnabled = false;
+                    try
+                    {
+                        if (await cropSelector.ApplySelectionAsync())
+                        {
+                            ReturnToOptions(cancelSelection: false);
+                        }
+                    }
+                    finally
+                    {
+                        applyingCrop = false;
+                        if (!returningToOptions && !dialogClosed)
+                        {
+                            dialog.IsPrimaryButtonEnabled = true;
+                        }
+                        deferral.Complete();
+                    }
+                    return;
+                }
+
                 if (!Validate())
                 {
                     args.Cancel = true;
@@ -496,16 +727,39 @@ namespace TxtAIEditor.Controls
                 values = new ImageConversionDialogValues(
                     GetSelectedFormat(formatCombo),
                     quality,
+                    IsWebpLossless(),
                     resizeCheck.IsChecked == true,
                     targetWidth,
                     targetHeight,
                     keepAspectCheck.IsChecked == true,
                     GetSelectedInterpolation(interpolationCombo),
-                    extractFramesCheck?.IsChecked == true);
+                    extractFramesCheck?.IsChecked == true,
+                    cropCheck.IsChecked == true ? cropSelector.Region : null);
             };
 
-            await dialog.ShowAsync();
-            return values;
+            void OnRootChanged(XamlRoot sender, XamlRootChangedEventArgs args)
+            {
+                root.Width = Math.Max(0, Math.Min(480, xamlRoot.Size.Width - 112));
+                dialog.Resources["ContentDialogMaxWidth"] = Math.Max(240, xamlRoot.Size.Width - 32);
+                dialog.Resources["ContentDialogMaxHeight"] = Math.Max(240, xamlRoot.Size.Height - 32);
+                if (selectingCrop)
+                {
+                    cropSelector.UpdateSelectionSize(xamlRoot.Size);
+                }
+            }
+
+            xamlRoot.Changed += OnRootChanged;
+            try
+            {
+                await dialog.ShowAsync();
+                return values;
+            }
+            finally
+            {
+                dialogClosed = true;
+                selectionRevision++;
+                xamlRoot.Changed -= OnRootChanged;
+            }
         }
 
         private async Task<ContentDialogResult> ShowConfirmationAsync(
@@ -640,11 +894,13 @@ namespace TxtAIEditor.Controls
         private sealed record ImageConversionDialogValues(
             ImageConversionOutputFormat OutputFormat,
             int Quality,
+            bool WebpLossless,
             bool ResizeEnabled,
             uint? TargetWidth,
             uint? TargetHeight,
             bool KeepAspectRatio,
             BitmapInterpolationMode InterpolationMode,
-            bool ExtractFrames);
+            bool ExtractFrames,
+            ImageCropRegion? CropRegion);
     }
 }

@@ -4048,7 +4048,23 @@
   <data name="ImageConvertFormat" xml:space="preserve"><value>출력 형식</value></data>
   <data name="ImageConvertFormatPng" xml:space="preserve"><value>PNG</value></data>
   <data name="ImageConvertFormatJpg" xml:space="preserve"><value>JPG</value></data>
-  <data name="ImageConvertQuality" xml:space="preserve"><value>JPG 화질 (1-100)</value></data>
+  <data name="ImageConvertQuality" xml:space="preserve"><value>JPG / WebP 화질 (1-100)</value></data>
+  <data name="ImageConvertFormatWebp" xml:space="preserve"><value>WebP</value></data>
+  <data name="ImageConvertWebpLossless" xml:space="preserve"><value>무손실</value></data>
+  <data name="ImageConvertCompressionStrength" xml:space="preserve"><value>압축 강도 (1-100)</value></data>
+  <data name="ImageConvertInvalidCompressionStrength" xml:space="preserve"><value>압축 강도는 1에서 100 사이의 정수여야 합니다.</value></data>
+  <data name="ImageConvertCrop" xml:space="preserve"><value>크롭</value></data>
+  <data name="ImageConvertCropTitle" xml:space="preserve"><value>크롭 영역 선택</value></data>
+  <data name="ImageConvertCropApply" xml:space="preserve"><value>선택 완료</value></data>
+  <data name="ImageConvertCropPreview" xml:space="preserve"><value>선택 영역 미리보기</value></data>
+  <data name="ImageConvertCropReselect" xml:space="preserve"><value>영역 다시 선택</value></data>
+  <data name="ImageConvertCropHint" xml:space="preserve"><value>이미지에서 드래그하여 저장할 영역을 선택하세요. 크롭 후 크기 조정이 적용됩니다.</value></data>
+  <data name="ImageConvertCropBatchHint" xml:space="preserve"><value>첫 이미지에서 선택한 영역을 모든 이미지에 같은 비율로 적용합니다.</value></data>
+  <data name="ImageConvertCropReset" xml:space="preserve"><value>전체 영역 선택</value></data>
+  <data name="ImageConvertCropLoading" xml:space="preserve"><value>미리보기를 불러오는 중...</value></data>
+  <data name="ImageConvertCropPreviewError" xml:space="preserve"><value>미리보기를 불러올 수 없습니다. 크롭을 해제하거나 다시 체크해 주세요.</value></data>
+  <data name="ImageConvertCropSelection" xml:space="preserve"><value>선택 영역: X {0}, Y {1} · {2} × {3}px</value></data>
+  <data name="ImageConvertCropNotReady" xml:space="preserve"><value>미리보기를 불러온 뒤 영역 선택을 완료해 주세요.</value></data>
   <data name="ImageConvertResize" xml:space="preserve"><value>크기 조정</value></data>
   <data name="ImageConvertWidth" xml:space="preserve"><value>너비 (px)</value></data>
   <data name="ImageConvertHeight" xml:space="preserve"><value>높이 (px)</value></data>
@@ -4062,7 +4078,7 @@
   <data name="ImageConvertAnimatedHint" xml:space="preserve"><value>선택하면 각 프레임을 별도 파일로 저장합니다. 선택하지 않으면 첫 프레임만 변환합니다.</value></data>
   <data name="ImageConvertOutputSuffixHint" xml:space="preserve"><value>출력 파일은 원본과 같은 폴더에 _convert 접미사를 붙여 저장합니다.</value></data>
   <data name="ImageConvertInvalidSize" xml:space="preserve"><value>너비와 높이는 1 이상의 정수 픽셀 값이어야 합니다.</value></data>
-  <data name="ImageConvertInvalidQuality" xml:space="preserve"><value>JPG 화질은 1에서 100 사이의 정수여야 합니다.</value></data>
+  <data name="ImageConvertInvalidQuality" xml:space="preserve"><value>JPG / WebP 화질은 1에서 100 사이의 정수여야 합니다.</value></data>
   <data name="ImageConvertConvertButton" xml:space="preserve"><value>변환</value></data>
   <data name="ImageConvertCancelButton" xml:space="preserve"><value>취소</value></data>
   <data name="ImageConvertCloseButton" xml:space="preserve"><value>확인</value></data>
