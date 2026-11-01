@@ -59,14 +59,15 @@ namespace TxtAIEditor.Controls
             return null;
         }
 
-        public bool TrySetValueDirect(string elementRef, IntPtr window, string value)
+        public DirectValueWriteResult? TrySetValueDirect(string elementRef, IntPtr window, string value)
         {
             return WithResolvedElement(elementRef, window, (element, data) => TrySetElementValueDirect(element, value));
         }
 
-        private bool TrySetElementValueDirect(IUIAutomationElement element, string value)
+        private DirectValueWriteResult? TrySetElementValueDirect(IUIAutomationElement element, string value)
         {
-            return TryUsePattern<IUIAutomationValuePattern>(element, 10002, pattern =>
+            bool valueVerified = false;
+            bool supported = TryUsePattern<IUIAutomationValuePattern>(element, 10002, pattern =>
             {
                 ThrowIfFailed(pattern.GetCurrentIsReadOnly(out int readOnly));
                 if (readOnly != 0)
@@ -75,15 +76,25 @@ namespace TxtAIEditor.Controls
                 }
 
                 Dispatch(() => pattern.SetValue(value));
-                ThrowIfFailed(pattern.GetCurrentValue(out string actual));
-                if (!string.Equals(value, actual, StringComparison.Ordinal))
+                // SetValue success and readback verification are separate outcomes.
+                // Providers may format numbers/units, publish a stale value, or replace
+                // the element after applying the write. None proves the write failed.
+                try
                 {
-                    throw new InvalidOperationException("UIA SetValue was dispatched, but the returned value differs. Inspect a fresh snapshot before retrying; no physical input was sent.");
+                    valueVerified = pattern.GetCurrentValue(out string actual) >= 0 &&
+                        string.Equals(value, actual, StringComparison.Ordinal);
+                }
+                catch (Exception ex) when (ex is COMException or InvalidComObjectException)
+                {
+                    // The caller still returns a fresh snapshot for inspection.
                 }
 
                 return true;
             }, out _);
+            return supported ? new DirectValueWriteResult(valueVerified) : null;
         }
+
+        internal readonly record struct DirectValueWriteResult(bool ValueVerified);
 
         private bool Dispatch(Func<int> action)
         {

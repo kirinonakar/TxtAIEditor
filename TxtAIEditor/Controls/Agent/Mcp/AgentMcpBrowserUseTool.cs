@@ -790,12 +790,18 @@ namespace TxtAIEditor.Controls
             bool replace = AgentToolHelpers.GetBoolArgument(arguments, "replace", false);
             bool pressEnter = AgentToolHelpers.GetBoolArgument(arguments, "pressEnter", false);
             cancellationToken.ThrowIfCancellationRequested();
-            if (_settingsProvider().BrowserUseUiaDirectExecution && elementRef.Length > 0 && replace && !pressEnter &&
-                _accessibility.TrySetValueDirect(elementRef, browserWindow, text))
+            if (_settingsProvider().BrowserUseUiaDirectExecution && elementRef.Length > 0 && replace && !pressEnter)
             {
-                await Task.Delay(150, cancellationToken);
-                return $"MCP tool result: Browser Use set {text.Length:N0} characters with ValuePattern.SetValue; value verified.\ninput_mode: uia_direct" +
-                    BuildPostActionContext(browserWindow);
+                var writeResult = _accessibility.TrySetValueDirect(elementRef, browserWindow, text);
+                if (writeResult is { } completed)
+                {
+                    await Task.Delay(150, cancellationToken);
+                    string verification = completed.ValueVerified
+                        ? "\nvalue_verification: exact_match"
+                        : "\nvalue_verification: unconfirmed\nnote: SetValue completed successfully, but immediate UIA readback did not confirm an exact match. The app may format the value or update asynchronously. Inspect the fresh snapshot below before deciding whether any correction is needed; do not automatically repeat the write.";
+                    return $"MCP tool result: Browser Use completed ValuePattern.SetValue for {text.Length:N0} characters.\ninput_mode: uia_direct" +
+                        verification + BuildPostActionContext(browserWindow);
+                }
             }
 
             // An explicit ref must target that field even when ValuePattern is absent.
