@@ -3204,6 +3204,13 @@
   <data name="AgentMcpEndpointPlaceholder" xml:space="preserve">
     <value>https://server.example/mcp</value>
   </data>
+  <data name="AgentMcpStandardPasteButton" xml:space="preserve"><value>標準形式を貼り付け</value></data>
+  <data name="AgentMcpStandardPastePlaceholder" xml:space="preserve"><value>mcpServers を含む JSON 設定を貼り付けてください。</value></data>
+  <data name="AgentMcpStandardPasteServerLabel" xml:space="preserve"><value>入力するサーバーを選択</value></data>
+  <data name="AgentMcpStandardPasteInfo" xml:space="preserve"><value>JSON 設定を貼り付けて「適用」を押すと、下の項目が自動入力されます。</value></data>
+  <data name="AgentMcpStandardPasteApplyButton" xml:space="preserve"><value>適用</value></data>
+  <data name="AgentMcpStandardPasteInvalid" xml:space="preserve"><value>有効な mcpServers JSON を入力してください。サーバーには command または HTTP URL が必要です。args は文字列配列、env と headers は文字列値のオブジェクトにしてください。</value></data>
+  <data name="AgentMcpStandardPasteHeadersUnsupported" xml:space="preserve"><value>この入力欄は認証ヘッダーを1つまでサポートします。複数のヘッダーが必要な設定には MCP のインポートを使用してください。</value></data>
   <data name="AgentMcpNameLabel" xml:space="preserve">
     <value>MCP 名</value>
   </data>

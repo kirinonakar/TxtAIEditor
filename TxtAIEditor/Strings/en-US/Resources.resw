@@ -3204,6 +3204,13 @@ Plan: {0}</value>
   <data name="AgentMcpEndpointPlaceholder" xml:space="preserve">
     <value>https://server.example/mcp</value>
   </data>
+  <data name="AgentMcpStandardPasteButton" xml:space="preserve"><value>Paste standard configuration</value></data>
+  <data name="AgentMcpStandardPastePlaceholder" xml:space="preserve"><value>Paste a JSON configuration containing mcpServers.</value></data>
+  <data name="AgentMcpStandardPasteServerLabel" xml:space="preserve"><value>Select a server to fill in</value></data>
+  <data name="AgentMcpStandardPasteInfo" xml:space="preserve"><value>Paste the JSON configuration, then click Apply to fill in the fields below.</value></data>
+  <data name="AgentMcpStandardPasteApplyButton" xml:space="preserve"><value>Apply</value></data>
+  <data name="AgentMcpStandardPasteInvalid" xml:space="preserve"><value>Enter valid mcpServers JSON. Each server needs a command or HTTP URL. args must be an array of strings; env and headers must be objects with string values.</value></data>
+  <data name="AgentMcpStandardPasteHeadersUnsupported" xml:space="preserve"><value>This form supports one authentication header. Use Import MCP for configurations that require multiple headers.</value></data>
   <data name="AgentMcpNameLabel" xml:space="preserve">
     <value>MCP Name</value>
   </data>

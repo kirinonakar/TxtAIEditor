@@ -3204,6 +3204,13 @@
   <data name="AgentMcpEndpointPlaceholder" xml:space="preserve">
     <value>https://server.example/mcp</value>
   </data>
+  <data name="AgentMcpStandardPasteButton" xml:space="preserve"><value>粘贴标准配置</value></data>
+  <data name="AgentMcpStandardPastePlaceholder" xml:space="preserve"><value>请粘贴包含 mcpServers 的 JSON 配置。</value></data>
+  <data name="AgentMcpStandardPasteServerLabel" xml:space="preserve"><value>选择要填入的服务器</value></data>
+  <data name="AgentMcpStandardPasteInfo" xml:space="preserve"><value>粘贴 JSON 配置后点击“应用”，即可自动填写下方项目。</value></data>
+  <data name="AgentMcpStandardPasteApplyButton" xml:space="preserve"><value>应用</value></data>
+  <data name="AgentMcpStandardPasteInvalid" xml:space="preserve"><value>请输入有效的 mcpServers JSON。服务器需要 command 或 HTTP URL。args 必须为字符串数组，env 和 headers 必须为值为字符串的对象。</value></data>
+  <data name="AgentMcpStandardPasteHeadersUnsupported" xml:space="preserve"><value>此表单最多支持一个身份验证标头。需要多个标头的配置请使用 MCP 导入。</value></data>
   <data name="AgentMcpNameLabel" xml:space="preserve">
     <value>MCP 名称</value>
   </data>

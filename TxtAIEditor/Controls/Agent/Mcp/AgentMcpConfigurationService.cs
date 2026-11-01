@@ -131,6 +131,69 @@ namespace TxtAIEditor.Controls
             return servers;
         }
 
+        public static List<AgentMcpServer> DeserializeStandardServers(string json)
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty("mcpServers", out var servers) ||
+                servers.ValueKind != JsonValueKind.Object ||
+                !servers.EnumerateObject().Any())
+            {
+                throw new JsonException();
+            }
+
+            foreach (JsonProperty server in servers.EnumerateObject())
+            {
+                if (string.IsNullOrWhiteSpace(server.Name) || server.Value.ValueKind != JsonValueKind.Object)
+                {
+                    throw new JsonException();
+                }
+
+                JsonElement settings = server.Value;
+                foreach (string propertyName in new[] { "command", "url", "endpoint", "transport", "cwd", "workingDirectory", "targetDirectory" })
+                {
+                    if (settings.TryGetProperty(propertyName, out var value) && value.ValueKind != JsonValueKind.String)
+                    {
+                        throw new JsonException();
+                    }
+                }
+
+                string command = TryGetStringProperty(settings, "command");
+                string endpoint = FirstNonEmpty(TryGetStringProperty(settings, "url"), TryGetStringProperty(settings, "endpoint"));
+                if (AgentMcpTransportTypes.IsStdio(AgentMcpTransportTypes.Normalize(TryGetStringProperty(settings, "transport"), command))
+                    ? string.IsNullOrWhiteSpace(command)
+                    : !IsValidHttpEndpoint(endpoint))
+                {
+                    throw new JsonException();
+                }
+
+                if (settings.TryGetProperty("args", out var arguments) &&
+                    (arguments.ValueKind != JsonValueKind.Array ||
+                     arguments.EnumerateArray().Any(value => value.ValueKind != JsonValueKind.String)))
+                {
+                    throw new JsonException();
+                }
+
+                foreach (string propertyName in new[] { "env", "headers" })
+                {
+                    if (settings.TryGetProperty(propertyName, out var values) &&
+                        (values.ValueKind != JsonValueKind.Object ||
+                         values.EnumerateObject().Any(value => string.IsNullOrWhiteSpace(value.Name) || value.Value.ValueKind != JsonValueKind.String)))
+                    {
+                        throw new JsonException();
+                    }
+                }
+
+                // The manual form currently exposes one API key header. Never silently drop others.
+                if (settings.TryGetProperty("headers", out var headers) && headers.EnumerateObject().Count() > 1)
+                {
+                    throw new NotSupportedException();
+                }
+            }
+
+            return DeserializeImportedServers(json);
+        }
+
         private static Dictionary<string, string> ReadHeadersProperty(JsonElement element)
         {
             return ReadStringDictionaryProperty(element, "headers");

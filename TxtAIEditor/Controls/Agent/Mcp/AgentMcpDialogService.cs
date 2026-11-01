@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -86,7 +87,8 @@ namespace TxtAIEditor.Controls
             return ShowAsync(
                 new AgentMcpDialogInput { AuthType = AuthTypeNone },
                 _getString("AgentMcpAddText", "MCP 추가"),
-                _getString("AgentMcpSaveAddButton", "추가"));
+                _getString("AgentMcpSaveAddButton", "추가"),
+                allowStandardPaste: true);
         }
 
         public Task<AgentMcpDialogInput?> ShowEditAsync(AgentMcpDialogInput initial)
@@ -398,7 +400,8 @@ namespace TxtAIEditor.Controls
         private async Task<AgentMcpDialogInput?> ShowAsync(
             AgentMcpDialogInput initial,
             string title,
-            string primaryButtonText)
+            string primaryButtonText,
+            bool allowStandardPaste = false)
         {
             var nameBox = CreateTextBox(_getString("AgentMcpNamePlaceholder", "MCP 이름 입력..."));
             nameBox.Text = initial.Name;
@@ -577,6 +580,43 @@ namespace TxtAIEditor.Controls
                 Width = 420,
                 Margin = new Thickness(0, 0, 16, 0)
             };
+            var standardPasteButton = new Button
+            {
+                Content = _getString("AgentMcpStandardPasteButton", "표준양식 붙여넣기"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Visibility = allowStandardPaste ? Visibility.Visible : Visibility.Collapsed
+            };
+            var standardJsonBox = CreateJsonTextBox(_getString("AgentMcpStandardPastePlaceholder", "mcpServers가 포함된 JSON 설정을 붙여넣으세요."));
+            standardJsonBox.MinHeight = 120;
+            standardJsonBox.MaxHeight = 180;
+            var standardServerBox = new ComboBox
+            {
+                Header = _getString("AgentMcpStandardPasteServerLabel", "입력할 서버 선택"),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Visibility = Visibility.Collapsed
+            };
+            var standardPasteStatus = CreateInfoText(_getString(
+                "AgentMcpStandardPasteInfo",
+                "JSON 설정을 붙여넣고 적용을 누르면 아래 항목이 자동 입력됩니다."));
+            var standardApplyButton = new Button
+            {
+                Content = _getString("AgentMcpStandardPasteApplyButton", "적용"),
+                IsEnabled = false
+            };
+            var standardCancelButton = new Button
+            {
+                Content = _getString("AgentPresetSaveCancelButton", "취소")
+            };
+            var standardPasteActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            standardPasteActions.Children.Add(standardApplyButton);
+            standardPasteActions.Children.Add(standardCancelButton);
+            var standardPastePanel = new StackPanel { Spacing = 8, Visibility = Visibility.Collapsed };
+            standardPastePanel.Children.Add(standardJsonBox);
+            standardPastePanel.Children.Add(standardServerBox);
+            standardPastePanel.Children.Add(standardPasteStatus);
+            standardPastePanel.Children.Add(standardPasteActions);
+            stack.Children.Add(standardPasteButton);
+            stack.Children.Add(standardPastePanel);
             stack.Children.Add(CreateLabel(_getString("AgentMcpNameLabel", "MCP 이름")));
             stack.Children.Add(nameBox);
             stack.Children.Add(CreateLabel(_getString("AgentMcpTransportLabel", "연결 방식")));
@@ -628,6 +668,87 @@ namespace TxtAIEditor.Controls
                 DefaultButton = ContentDialogButton.None,
                 XamlRoot = _agentPane.XamlRoot,
                 RequestedTheme = _agentPane.ActualTheme
+            };
+
+            standardPasteButton.Click += (_, _) =>
+            {
+                standardPastePanel.Visibility = Visibility.Visible;
+                dialog.IsPrimaryButtonEnabled = false;
+                standardJsonBox.Focus(FocusState.Programmatic);
+            };
+
+            void CloseStandardPaste()
+            {
+                standardPastePanel.Visibility = Visibility.Collapsed;
+                standardJsonBox.Text = string.Empty;
+                dialog.IsPrimaryButtonEnabled = true;
+                standardPasteButton.Focus(FocusState.Programmatic);
+            }
+
+            standardCancelButton.Click += (_, _) => CloseStandardPaste();
+            standardApplyButton.Click += (_, _) =>
+            {
+                if (standardServerBox.SelectedItem is not ComboBoxItem { Tag: AgentMcpServer server })
+                {
+                    return;
+                }
+
+                nameBox.Text = server.Name;
+                transportBox.SelectedItem = transportBox.Items.OfType<ComboBoxItem>()
+                    .First(item => string.Equals(item.Tag as string, server.Transport, StringComparison.OrdinalIgnoreCase));
+                endpointBox.Text = server.Endpoint;
+                statelessCheckBox.IsChecked = server.Stateless;
+                commandBox.Text = server.Command;
+                argumentsBox.Text = JsonSerializer.Serialize(server.Arguments);
+                workingDirectoryBox.Text = server.WorkingDirectory;
+                targetDirectoryBox.Text = server.TargetDirectory;
+                environmentBox.Text = JsonSerializer.Serialize(server.Environment);
+                var header = server.Headers.FirstOrDefault();
+                authTypeBox.SelectedItem = authTypeBox.Items.OfType<ComboBoxItem>()
+                    .First(item => string.Equals(item.Tag as string,
+                        server.Headers.Count > 0 ? AuthTypeApiKey : AuthTypeNone, StringComparison.OrdinalIgnoreCase));
+                headerNameBox.Text = header.Key ?? string.Empty;
+                apiKeyBox.Password = header.Value ?? string.Empty;
+                oauthTokenBox.Password = string.Empty;
+                oauthClientIdBox.Text = string.Empty;
+                oauthClientSecretBox.Password = string.Empty;
+                oauthAuthorizationEndpointBox.Text = string.Empty;
+                oauthTokenEndpointBox.Text = string.Empty;
+                oauthScopesBox.Text = string.Empty;
+                UpdateFieldVisibility();
+                CloseStandardPaste();
+            };
+            standardJsonBox.TextChanged += (_, _) =>
+            {
+                standardServerBox.Items.Clear();
+                standardServerBox.Visibility = Visibility.Collapsed;
+                standardApplyButton.IsEnabled = false;
+                if (string.IsNullOrWhiteSpace(standardJsonBox.Text))
+                {
+                    standardPasteStatus.Text = _getString("AgentMcpStandardPasteInfo", "JSON 설정을 붙여넣고 적용을 누르면 아래 항목이 자동 입력됩니다.");
+                    return;
+                }
+
+                try
+                {
+                    List<AgentMcpServer> servers = AgentMcpConfigurationService.DeserializeStandardServers(standardJsonBox.Text);
+                    foreach (AgentMcpServer server in servers)
+                    {
+                        standardServerBox.Items.Add(new ComboBoxItem { Content = server.Name, Tag = server });
+                    }
+                    standardServerBox.Visibility = servers.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+                    standardServerBox.SelectedIndex = 0;
+                    standardApplyButton.IsEnabled = true;
+                    standardPasteStatus.Text = _getString("AgentMcpStandardPasteInfo", "JSON 설정을 붙여넣고 적용을 누르면 아래 항목이 자동 입력됩니다.");
+                }
+                catch (JsonException)
+                {
+                    standardPasteStatus.Text = _getString("AgentMcpStandardPasteInvalid", "올바른 mcpServers JSON을 입력해주세요. 서버에는 command 또는 HTTP URL이 필요하며, args는 문자열 배열, env와 headers는 문자열 값의 객체여야 합니다.");
+                }
+                catch (NotSupportedException)
+                {
+                    standardPasteStatus.Text = _getString("AgentMcpStandardPasteHeadersUnsupported", "이 입력창은 인증 헤더 1개까지 지원합니다. 여러 헤더가 필요한 설정은 MCP 가져오기를 사용해주세요.");
+                }
             };
 
             var result = await ShowDialogAsync(dialog);
