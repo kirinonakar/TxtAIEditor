@@ -4108,4 +4108,5 @@
   <data name="ExplorerModifiedDateLabel" xml:space="preserve"><value>修改日期</value></data>
   <data name="ExplorerImageDimensionsLabel" xml:space="preserve"><value>影像尺寸</value></data>
   <data name="AgentTruncatedRetryLimit" xml:space="preserve"><value>回應多次被截斷，Agent 已停止。請重試。</value></data>
+  <data name="AgentMcpPluginManagerDetail" xml:space="preserve"><value>內建外掛 - 列出、搜尋、啟用和停用 MCP 與 Skill</value></data>
 </root>

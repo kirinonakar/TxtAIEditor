@@ -178,6 +178,15 @@ namespace TxtAIEditor.Controls
             return section + Environment.NewLine + "[End global agent rules]";
         }
 
+        public string BuildFixedPromptContextForRun()
+        {
+            string skills = _skillController.BuildSelectedSkillSection();
+            return BuildFixedPromptContext() + Environment.NewLine + Environment.NewLine +
+                "[Current plugin selection for this model turn]" + Environment.NewLine +
+                "The enabled MCP catalog above and skill list below are authoritative for this turn. They supersede older plugin selections in conversation history. Read a relevant enabled skill with skill_use before applying it." + Environment.NewLine +
+                (string.IsNullOrWhiteSpace(skills) ? "No agent skills are currently enabled." : skills);
+        }
+
         public string BuildSessionHistoryForPrompt(
             string instruction,
             string workspaceContext,

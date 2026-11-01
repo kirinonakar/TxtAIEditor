@@ -142,23 +142,7 @@ namespace TxtAIEditor.Controls
 
         private static string ExtractSkillDescription(string content)
         {
-            if (!content.StartsWith("---", StringComparison.Ordinal))
-            {
-                return string.Empty;
-            }
-
-            int closingIndex = content.IndexOf("\n---", 3, StringComparison.Ordinal);
-            if (closingIndex < 0)
-            {
-                return string.Empty;
-            }
-
-            Match match = Regex.Match(
-                content.Substring(3, closingIndex - 3),
-                @"(?im)^\s*description\s*:\s*(?<value>.+?)\s*$");
-            return match.Success
-                ? match.Groups["value"].Value.Trim().Trim('"', '\'')
-                : string.Empty;
+            return AgentSkillController.ExtractDescription(content);
         }
 
         internal static string ExpandRuntimeVariables(AgentMcpServer server, string value)

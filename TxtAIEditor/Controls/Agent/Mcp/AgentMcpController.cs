@@ -34,6 +34,8 @@ namespace TxtAIEditor.Controls
         private readonly Action? _afterDialog;
         private readonly AgentMcpComfyUiTool _comfyUiTool;
         private readonly AgentMcpBrowserUseTool _browserUseTool;
+        private readonly AgentSkillController _skillController;
+        private readonly AgentMcpPluginManagerTool _pluginManagerTool;
         private readonly AgentMcpRuntime _runtime;
         private readonly string _mcpFilePath;
         private readonly string _agentPluginsFilePath;
@@ -61,6 +63,7 @@ namespace TxtAIEditor.Controls
             Func<string, Task>? fileModifiedAsync,
             Action? beforeDialog,
             Action? afterDialog,
+            AgentSkillController skillController,
             Action<TxtAIEditor.Core.Services.LLM.LlmMessageAttachment>? addImageAttachment = null,
             Action<IReadOnlyList<AgentPluginSkill>>? activePluginSkillsChanged = null,
             Func<Task<IReadOnlyList<AgentMcpSkillOption>>>? installedSkillsProvider = null,
@@ -85,6 +88,8 @@ namespace TxtAIEditor.Controls
             _dialogService = new AgentMcpDialogService(_agentPane, _initializePickerWindow, _getString, _beforeDialog, _afterDialog);
             _comfyUiTool = new AgentMcpComfyUiTool(workspaceRootProvider, () => _settingsService.CurrentSettings, fileModifiedAsync);
             _browserUseTool = new AgentMcpBrowserUseTool(() => _settingsService.CurrentSettings, addImageAttachment);
+            _skillController = skillController;
+            _pluginManagerTool = new AgentMcpPluginManagerTool(GetPluginManagerEntriesAsync, SetPluginActive);
 
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
@@ -238,6 +243,7 @@ namespace TxtAIEditor.Controls
             }
 
             _selectedServerIds.RemoveWhere(id =>
+                !id.Equals(AgentMcpPluginManagerTool.ServerId, StringComparison.OrdinalIgnoreCase) &&
                 !_comfyUiTool.IsServerId(id) &&
                 !_browserUseTool.IsServerId(id) &&
                 _servers.All(server => !server.Id.Equals(id, StringComparison.OrdinalIgnoreCase)));
@@ -880,6 +886,17 @@ namespace TxtAIEditor.Controls
 
         public async Task ToggleMcpAsync(string serverName)
         {
+            if (AgentMcpPluginManagerTool.IsServerName(serverName))
+            {
+                if (!_selectedServerIds.Add(AgentMcpPluginManagerTool.ServerId))
+                {
+                    _selectedServerIds.Remove(AgentMcpPluginManagerTool.ServerId);
+                }
+                RebuildAliases();
+                UpdateUI();
+                return;
+            }
+
             if (_browserUseTool.IsServerName(serverName))
             {
                 if (!_selectedServerIds.Add(_browserUseTool.ServerId))
@@ -940,7 +957,8 @@ namespace TxtAIEditor.Controls
 
         public async Task DeleteMcpAsync(string serverName)
         {
-            if (_comfyUiTool.IsServerName(serverName) || _browserUseTool.IsServerName(serverName))
+            if (AgentMcpPluginManagerTool.IsServerName(serverName) ||
+                _comfyUiTool.IsServerName(serverName) || _browserUseTool.IsServerName(serverName))
             {
                 return;
             }
@@ -968,6 +986,14 @@ namespace TxtAIEditor.Controls
 
         public void RemoveSelectedMcp(string serverName)
         {
+            if (AgentMcpPluginManagerTool.IsServerName(serverName))
+            {
+                _selectedServerIds.Remove(AgentMcpPluginManagerTool.ServerId);
+                RebuildAliases();
+                UpdateUI();
+                return;
+            }
+
             if (_browserUseTool.IsServerName(serverName))
             {
                 _selectedServerIds.Remove(_browserUseTool.ServerId);
@@ -1029,6 +1055,10 @@ namespace TxtAIEditor.Controls
         public string GetSelectedMcpLabel()
         {
             var labels = new List<string>();
+            if (_selectedServerIds.Contains(AgentMcpPluginManagerTool.ServerId))
+            {
+                labels.Add(AgentMcpPluginManagerTool.ServerName);
+            }
             if (_selectedServerIds.Contains(_comfyUiTool.ServerId))
             {
                 labels.Add(_comfyUiTool.ServerName);
@@ -1040,20 +1070,75 @@ namespace TxtAIEditor.Controls
             }
 
             labels.AddRange(_agentPlugins
-                .Where(plugin => _selectedAgentPluginIds.Contains(plugin.Id))
+                .Where(IsPluginMcpSelectionComplete)
                 .Select(GetAgentPluginMenuName));
             labels.AddRange(GetSelectedServers()
-                .Where(server => !server.IsAgentPlugin)
+                .Where(ShowIndividualServerChip)
                 .Select(server => server.Name));
             return string.Join(", ", labels);
         }
 
         public bool HasSelectedMcpServers()
         {
-            return _selectedServerIds.Contains(_comfyUiTool.ServerId) ||
+            return _selectedServerIds.Contains(AgentMcpPluginManagerTool.ServerId) ||
+                _selectedServerIds.Contains(_comfyUiTool.ServerId) ||
                 _selectedServerIds.Contains(_browserUseTool.ServerId) ||
                 _selectedAgentPluginIds.Count > 0 ||
                 GetSelectedServers().Count > 0;
+        }
+
+        private async Task<IReadOnlyList<AgentPluginEntry>> GetPluginManagerEntriesAsync()
+        {
+            var entries = new List<AgentPluginEntry>
+            {
+                new("mcp:" + AgentMcpPluginManagerTool.ServerId, "mcp", AgentMcpPluginManagerTool.ServerName,
+                    "List, search, activate and deactivate installed MCPs and skills.",
+                    _selectedServerIds.Contains(AgentMcpPluginManagerTool.ServerId)),
+                new("mcp:" + _comfyUiTool.ServerId, "mcp", _comfyUiTool.ServerName,
+                    "Generate images using ComfyUI workflows.", _selectedServerIds.Contains(_comfyUiTool.ServerId)),
+                new("mcp:" + _browserUseTool.ServerId, "mcp", _browserUseTool.ServerName,
+                    "Browser and Windows application tools.", _selectedServerIds.Contains(_browserUseTool.ServerId))
+            };
+            entries.AddRange(_servers.Select(server => new AgentPluginEntry(
+                "mcp:" + server.Id, "mcp", server.Name, server.AgentPluginName,
+                _selectedServerIds.Contains(server.Id))));
+            entries.AddRange(await _skillController.GetPluginManagerEntriesAsync());
+            return entries;
+        }
+
+        private void SetPluginActive(AgentPluginEntry entry, bool active)
+        {
+            if (entry.Type == "skill")
+            {
+                _skillController.SetSkillActive(entry.Name, active);
+                return;
+            }
+
+            string serverId = entry.Id.Substring("mcp:".Length);
+            bool changed = active ? _selectedServerIds.Add(serverId) : _selectedServerIds.Remove(serverId);
+            if (!changed)
+            {
+                return;
+            }
+            if (!active && _servers.Any(server => server.Id.Equals(serverId, StringComparison.OrdinalIgnoreCase)))
+            {
+                StopServer(serverId);
+            }
+            if (_comfyUiTool.IsServerId(serverId))
+            {
+                UpdateComfyUiRelatedSkills();
+            }
+        }
+
+        public async Task ApplyPendingPluginChangesAsync(CancellationToken cancellationToken)
+        {
+            if (!_pluginManagerTool.ApplyPendingChanges(cancellationToken))
+            {
+                return;
+            }
+            RebuildAliases();
+            UpdateUI();
+            await EnsureActiveToolsAsync(cancellationToken);
         }
 
         public async Task EnsureActiveToolsAsync(CancellationToken cancellationToken)
@@ -1086,9 +1171,10 @@ namespace TxtAIEditor.Controls
         public string BuildSelectedMcpSection()
         {
             var selectedServers = GetSelectedServers();
+            bool hasPluginManager = _selectedServerIds.Contains(AgentMcpPluginManagerTool.ServerId);
             bool hasComfyUi = _selectedServerIds.Contains(_comfyUiTool.ServerId);
             bool hasBrowserUse = _selectedServerIds.Contains(_browserUseTool.ServerId);
-            if (selectedServers.Count == 0 && !hasComfyUi && !hasBrowserUse)
+            if (selectedServers.Count == 0 && !hasComfyUi && !hasBrowserUse && !hasPluginManager)
             {
                 return string.Empty;
             }
@@ -1100,6 +1186,13 @@ namespace TxtAIEditor.Controls
             builder.AppendLine("MCP tool aliases use the form mcp_server_tool and are executed through MCP tools/call or the matching built-in plugin.");
             builder.AppendLine("Never emit a tool_call with an empty or invented name. If a tool action is intended, copy one exact enabled alias and provide all required arguments.");
             builder.AppendLine();
+
+            if (hasPluginManager)
+            {
+                AppendMcpAliasSection(builder, AgentMcpPluginManagerTool.ServerName, AgentMcpPluginManagerTool.ServerId);
+                builder.AppendLine("Plugin manager lists and searches installed MCPs and skills, including inactive ones. Activation changes apply before the next model request, including its tool catalog and current skill metadata. Use exact returned ids to disambiguate names.");
+                builder.AppendLine();
+            }
 
             if (hasComfyUi)
             {
@@ -1224,6 +1317,11 @@ namespace TxtAIEditor.Controls
             JsonElement arguments,
             CancellationToken cancellationToken)
         {
+            if (alias.ServerId.Equals(AgentMcpPluginManagerTool.ServerId, StringComparison.OrdinalIgnoreCase))
+            {
+                return await _pluginManagerTool.ExecuteAsync(alias.ToolName, arguments, cancellationToken);
+            }
+
             if (_comfyUiTool.CanHandleAlias(alias))
             {
                 return await _comfyUiTool.ExecuteAsync(alias, arguments, cancellationToken);
@@ -1309,6 +1407,14 @@ namespace TxtAIEditor.Controls
             {
                 _toolAliases.Clear();
             var usedAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (_selectedServerIds.Contains(AgentMcpPluginManagerTool.ServerId))
+            {
+                foreach (AgentMcpToolAlias alias in AgentMcpPluginManagerTool.CreateAliases())
+                {
+                    usedAliases.Add(alias.Alias);
+                    _toolAliases[alias.Alias] = alias;
+                }
+            }
             if (_selectedServerIds.Contains(_comfyUiTool.ServerId))
             {
                 foreach (AgentMcpToolAlias alias in _comfyUiTool.CreateAliases())
@@ -1379,6 +1485,7 @@ namespace TxtAIEditor.Controls
         {
             var items = new List<AgentMcpItem>
             {
+                AgentMcpPluginManagerTool.CreateMenuItem(_selectedServerIds.Contains(AgentMcpPluginManagerTool.ServerId), _getString),
                 _comfyUiTool.CreateMenuItem(_selectedServerIds.Contains(_comfyUiTool.ServerId), _getString, _comfyUiStatus),
                 _browserUseTool.CreateMenuItem(_selectedServerIds.Contains(_browserUseTool.ServerId), _getString)
             };
@@ -1405,14 +1512,14 @@ namespace TxtAIEditor.Controls
                         Name = GetAgentPluginMenuName(plugin),
                         Endpoint = componentSummary,
                         Detail = detail,
-                        IsSelected = _selectedAgentPluginIds.Contains(plugin.Id),
+                        IsSelected = IsPluginMcpSelectionComplete(plugin),
                         IsAgentPlugin = true,
                         CanEdit = false
                     };
                 }));
 
             items.AddRange(_servers
-                .Where(server => !server.IsAgentPlugin)
+                .Where(server => !server.IsAgentPlugin || ShowIndividualServerChip(server))
                 .OrderBy(server => server.Name, StringComparer.CurrentCultureIgnoreCase)
                 .Select(server =>
                 {
@@ -1446,11 +1553,18 @@ namespace TxtAIEditor.Controls
                         Name = server.Name,
                         Endpoint = connectionDetail,
                         Detail = detail,
-                        IsSelected = _selectedServerIds.Contains(server.Id)
+                        IsSelected = _selectedServerIds.Contains(server.Id),
+                        CanEdit = !server.IsAgentPlugin,
+                        CanDelete = !server.IsAgentPlugin,
+                        CanConfigure = !server.IsAgentPlugin
                     };
                 })
                 .ToList());
             var selectedNames = new List<string>();
+            if (_selectedServerIds.Contains(AgentMcpPluginManagerTool.ServerId))
+            {
+                selectedNames.Add(AgentMcpPluginManagerTool.ServerName);
+            }
             if (_selectedServerIds.Contains(_comfyUiTool.ServerId))
             {
                 selectedNames.Add(_comfyUiTool.ServerName);
@@ -1462,10 +1576,10 @@ namespace TxtAIEditor.Controls
             }
 
             selectedNames.AddRange(_agentPlugins
-                .Where(plugin => _selectedAgentPluginIds.Contains(plugin.Id))
+                .Where(IsPluginMcpSelectionComplete)
                 .Select(GetAgentPluginMenuName));
             selectedNames.AddRange(GetSelectedServers()
-                .Where(server => !server.IsAgentPlugin)
+                .Where(ShowIndividualServerChip)
                 .Select(server => server.Name));
 
             void ApplyUI()
@@ -1659,7 +1773,7 @@ namespace TxtAIEditor.Controls
 
         private async Task ToggleAgentPluginAsync(AgentPluginPackage plugin)
         {
-            if (_selectedAgentPluginIds.Contains(plugin.Id))
+            if (IsPluginMcpSelectionComplete(plugin))
             {
                 DeactivateAgentPlugin(plugin);
                 RebuildAliases();
@@ -1731,6 +1845,14 @@ namespace TxtAIEditor.Controls
 
         private void NotifyActivePluginSkills()
         {
+            _skillController.SetInstalledPluginSkills(_agentPlugins.SelectMany(plugin =>
+                plugin.Skills.Select(skill => new AgentPluginSkill
+                {
+                    Name = $"{GetAgentPluginMenuName(plugin)}/{skill.Name}",
+                    Description = skill.Description,
+                    SkillFilePath = skill.SkillFilePath
+                })));
+
             if (_activePluginSkillsChanged == null)
             {
                 return;
@@ -1756,6 +1878,19 @@ namespace TxtAIEditor.Controls
             return _servers
                 .Where(server => server.AgentPluginId.Equals(plugin.Id, StringComparison.OrdinalIgnoreCase))
                 .ToList();
+        }
+
+        private bool IsPluginMcpSelectionComplete(AgentPluginPackage plugin)
+        {
+            return _selectedAgentPluginIds.Contains(plugin.Id) &&
+                GetPluginServers(plugin).All(server => _selectedServerIds.Contains(server.Id));
+        }
+
+        private bool ShowIndividualServerChip(AgentMcpServer server)
+        {
+            AgentPluginPackage? plugin = _agentPlugins.FirstOrDefault(item =>
+                item.Id.Equals(server.AgentPluginId, StringComparison.OrdinalIgnoreCase));
+            return plugin == null || !IsPluginMcpSelectionComplete(plugin);
         }
 
         private AgentPluginPackage? FindAgentPluginByMenuName(string menuName)

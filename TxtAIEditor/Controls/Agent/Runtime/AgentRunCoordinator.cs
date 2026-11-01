@@ -201,6 +201,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            await _mcpController.ApplyPendingPluginChangesAsync(CancellationToken.None);
             await _mcpController.EnsureActiveToolsAsync(CancellationToken.None);
             string targetLanguage = settings?.ResolveTargetLanguage() ?? "Korean";
             var activeOpenSession = _openSessionController.EnsureSession(_currentSessionIdProvider());
@@ -353,6 +354,13 @@ namespace TxtAIEditor.Controls
                 for (int step = 0; step < maxToolSteps; step++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    fixedPromptContext = await _uiDispatcher.RunAsync<string>(async () =>
+                    {
+                        await _mcpController.ApplyPendingPluginChangesAsync(cancellationToken);
+                        runContext.HasEnabledSkills = _skillController.HasSelectedSkills();
+                        runContext.HasEnabledMcp = _mcpController.HasSelectedMcpServers();
+                        return _promptContextService.BuildFixedPromptContextForRun();
+                    });
                     string? queuedFollowUpPrompt = TakeQueuedFollowUpPrompt(runContext);
                     if (!string.IsNullOrWhiteSpace(queuedFollowUpPrompt))
                     {

@@ -4108,4 +4108,5 @@
   <data name="ExplorerModifiedDateLabel" xml:space="preserve"><value>更新日時</value></data>
   <data name="ExplorerImageDimensionsLabel" xml:space="preserve"><value>画像サイズ</value></data>
   <data name="AgentTruncatedRetryLimit" xml:space="preserve"><value>応答の途切れが繰り返されたため、エージェントを停止しました。もう一度実行してください。</value></data>
+  <data name="AgentMcpPluginManagerDetail" xml:space="preserve"><value>内蔵プラグイン - MCP・Skill の一覧、検索、有効化の管理</value></data>
 </root>

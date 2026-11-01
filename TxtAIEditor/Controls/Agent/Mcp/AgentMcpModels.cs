@@ -61,6 +61,7 @@ namespace TxtAIEditor.Controls
         public bool IsAgentPlugin { get; set; }
         public bool CanEdit { get; set; } = true;
         public bool CanDelete { get; set; } = true;
+        public bool CanConfigure { get; set; } = true;
     }
 
     internal sealed class AgentMcpToolAlias

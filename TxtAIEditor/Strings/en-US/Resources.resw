@@ -4150,4 +4150,5 @@ Plan: {0}</value>
   <data name="ExplorerModifiedDateLabel" xml:space="preserve"><value>Date modified</value></data>
   <data name="ExplorerImageDimensionsLabel" xml:space="preserve"><value>Dimensions</value></data>
   <data name="AgentTruncatedRetryLimit" xml:space="preserve"><value>Repeated response truncation stopped the agent. Please try again.</value></data>
+  <data name="AgentMcpPluginManagerDetail" xml:space="preserve"><value>Built-in plugin - list, search, activate and deactivate MCPs and skills</value></data>
 </root>

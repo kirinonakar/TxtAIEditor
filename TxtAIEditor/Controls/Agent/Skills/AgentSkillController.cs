@@ -23,6 +23,8 @@ namespace TxtAIEditor.Controls
         private readonly IReadOnlyList<string> _skillDirectories;
         private readonly List<AgentSkill> _skills = new();
         private readonly Dictionary<string, AgentSkill> _activePluginSkills = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, AgentSkill> _installedPluginSkills = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _removedPluginSkills = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, HashSet<string>> _builtInRelatedSkills = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _removedBuiltInRelatedSkills = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _selectedSkillNames = new(StringComparer.OrdinalIgnoreCase);
@@ -104,7 +106,7 @@ namespace TxtAIEditor.Controls
                 .Where(skill => !string.IsNullOrWhiteSpace(skill.Name))
                 .OrderBy(skill => skill.Name, StringComparer.CurrentCultureIgnoreCase));
 
-            _selectedSkillNames.RemoveWhere(name => _skills.All(skill => !skill.Name.Equals(name, StringComparison.OrdinalIgnoreCase)));
+            _selectedSkillNames.RemoveWhere(name => FindSkill(name) == null);
             _hasLoaded = true;
             UpdateUI();
         }
@@ -152,6 +154,11 @@ namespace TxtAIEditor.Controls
                 return string.IsNullOrWhiteSpace(availableSkills)
                     ? $"skill_use failed: skill not found: {nameOrPath}. No installed skills were found."
                     : $"skill_use failed: skill not found: {nameOrPath}. Available skills: {availableSkills}";
+            }
+
+            if (!IsSkillActive(skill.Name))
+            {
+                return $"skill_use failed: skill is inactive: {skill.Name}. Enable it in AgentPanel or with Plugin manager before reading it.";
             }
 
             if (!File.Exists(skill.SkillFilePath))
@@ -205,6 +212,56 @@ namespace TxtAIEditor.Controls
                 .ToList();
         }
 
+        public async Task<IReadOnlyList<AgentPluginEntry>> GetPluginManagerEntriesAsync()
+        {
+            await LoadIfNeededAsync();
+            // Registry metadata may have been installed by an older description parser.
+            foreach (AgentSkill skill in _installedPluginSkills.Values.ToList())
+            {
+                try
+                {
+                    skill.Description = ExtractDescription(await File.ReadAllTextAsync(skill.SkillFilePath));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to read plugin skill description '{skill.SkillFilePath}': {ex.Message}");
+                }
+            }
+            return EnumerateInstalledSkills()
+                .Select(skill => new AgentPluginEntry("skill:" + skill.Name, "skill", skill.Name,
+                    skill.Description, IsSkillActive(skill.Name)))
+                .ToList();
+        }
+
+        private IEnumerable<AgentSkill> EnumerateInstalledSkills()
+        {
+            return _skills.Concat(_installedPluginSkills.Values)
+                .GroupBy(skill => skill.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.Last());
+        }
+
+        public void SetInstalledPluginSkills(IEnumerable<AgentPluginSkill> pluginSkills)
+        {
+            _installedPluginSkills.Clear();
+            foreach (AgentPluginSkill skill in pluginSkills)
+            {
+                if (string.IsNullOrWhiteSpace(skill.Name) || string.IsNullOrWhiteSpace(skill.SkillFilePath))
+                {
+                    continue;
+                }
+                _installedPluginSkills[skill.Name] = new AgentSkill
+                {
+                    Name = skill.Name,
+                    Description = skill.Description,
+                    SkillFilePath = skill.SkillFilePath
+                };
+            }
+            _selectedSkillNames.RemoveWhere(name => !_installedPluginSkills.ContainsKey(name) &&
+                _skills.All(skill => !skill.Name.Equals(name, StringComparison.OrdinalIgnoreCase)));
+            _removedPluginSkills.RemoveWhere(name => !_installedPluginSkills.ContainsKey(name));
+            UpdateUI();
+        }
+
         public void SetBuiltInRelatedSkills(string pluginId, IReadOnlyList<string> skillNames)
         {
             string key = pluginId?.Trim() ?? string.Empty;
@@ -248,14 +305,22 @@ namespace TxtAIEditor.Controls
 
         public void ToggleSkill(string skillName)
         {
-            if (FindSkill(skillName) == null)
+            SetSkillActive(skillName, !IsSkillActive(skillName));
+        }
+
+        public void SetSkillActive(string skillName, bool active)
+        {
+            if (FindSkill(skillName) == null || IsSkillActive(skillName) == active)
             {
                 return;
             }
-
-            if (IsSkillActive(skillName))
+            if (!active)
             {
                 _selectedSkillNames.Remove(skillName);
+                if (_installedPluginSkills.ContainsKey(skillName))
+                {
+                    _removedPluginSkills.Add(skillName);
+                }
                 if (IsBuiltInRelatedSkill(skillName))
                 {
                     _removedBuiltInRelatedSkills.Add(skillName);
@@ -265,6 +330,7 @@ namespace TxtAIEditor.Controls
             {
                 _selectedSkillNames.Add(skillName);
                 _removedBuiltInRelatedSkills.Remove(skillName);
+                _removedPluginSkills.Remove(skillName);
             }
 
             UpdateSelectionUI();
@@ -272,18 +338,13 @@ namespace TxtAIEditor.Controls
 
         public void RemoveSelectedSkill(string skillName)
         {
-            _selectedSkillNames.Remove(skillName);
-            if (IsBuiltInRelatedSkill(skillName))
-            {
-                _removedBuiltInRelatedSkills.Add(skillName);
-            }
-
-            UpdateSelectionUI();
+            SetSkillActive(skillName, false);
         }
 
         public void ClearSelectedSkills()
         {
             _selectedSkillNames.Clear();
+            _removedPluginSkills.UnionWith(_activePluginSkills.Keys);
             foreach (string name in EnumerateBuiltInRelatedSkillNames())
             {
                 _removedBuiltInRelatedSkills.Add(name);
@@ -340,6 +401,7 @@ namespace TxtAIEditor.Controls
 
         public void SetActivePluginSkills(IEnumerable<AgentPluginSkill> pluginSkills)
         {
+            var previousNames = new HashSet<string>(_activePluginSkills.Keys, StringComparer.OrdinalIgnoreCase);
             _activePluginSkills.Clear();
             foreach (AgentPluginSkill skill in pluginSkills)
             {
@@ -356,44 +418,14 @@ namespace TxtAIEditor.Controls
                 };
             }
 
-            QueueContextChanged();
+            previousNames.SymmetricExceptWith(_activePluginSkills.Keys);
+            _removedPluginSkills.ExceptWith(previousNames);
+            UpdateUI();
         }
 
         private List<AgentSkill> GetSelectedSkills()
         {
-            var selected = _skills
-                .Where(skill => _selectedSkillNames.Contains(skill.Name))
-                .ToList();
-            foreach (string relatedSkillName in EnumerateBuiltInRelatedSkillNames())
-            {
-                if (selected.Any(skill => skill.Name.Equals(relatedSkillName, StringComparison.OrdinalIgnoreCase)))
-                {
-                    continue;
-                }
-
-                AgentSkill? relatedSkill = _skills.FirstOrDefault(skill =>
-                    skill.Name.Equals(relatedSkillName, StringComparison.OrdinalIgnoreCase));
-                if (relatedSkill != null)
-                {
-                    selected.Add(relatedSkill);
-                }
-            }
-
-            foreach (AgentSkill pluginSkill in _activePluginSkills.Values)
-            {
-                int existingIndex = selected.FindIndex(skill =>
-                    skill.Name.Equals(pluginSkill.Name, StringComparison.OrdinalIgnoreCase));
-                if (existingIndex >= 0)
-                {
-                    selected[existingIndex] = pluginSkill;
-                }
-                else
-                {
-                    selected.Add(pluginSkill);
-                }
-            }
-
-            return selected;
+            return EnumerateInstalledSkills().Where(skill => IsSkillActive(skill.Name)).ToList();
         }
 
         private IEnumerable<string> EnumerateBuiltInRelatedSkillNames()
@@ -418,22 +450,22 @@ namespace TxtAIEditor.Controls
         private bool IsSkillActive(string skillName)
         {
             return _selectedSkillNames.Contains(skillName) ||
+                (_activePluginSkills.ContainsKey(skillName) && !_removedPluginSkills.Contains(skillName)) ||
                 (IsBuiltInRelatedSkill(skillName) && !_removedBuiltInRelatedSkills.Contains(skillName));
         }
 
         private List<string> GetSelectedSkillNamesForUi()
         {
-            return _selectedSkillNames
-                .Concat(EnumerateBuiltInRelatedSkillNames())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            return GetSelectedSkills().Select(skill => skill.Name).ToList();
         }
 
         private AgentSkill? FindSkill(string name)
         {
             return _activePluginSkills.TryGetValue(name, out AgentSkill? pluginSkill)
                 ? pluginSkill
-                : _skills.FirstOrDefault(skill => skill.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                : _installedPluginSkills.TryGetValue(name, out AgentSkill? installedSkill)
+                    ? installedSkill
+                    : _skills.FirstOrDefault(skill => skill.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
         }
 
         private AgentSkill? FindSkillByPath(string path)
@@ -444,7 +476,7 @@ namespace TxtAIEditor.Controls
                 return null;
             }
 
-            AgentSkill? pluginSkill = _activePluginSkills.Values.FirstOrDefault(skill =>
+            AgentSkill? pluginSkill = _installedPluginSkills.Values.FirstOrDefault(skill =>
                 string.Equals(
                     NormalizePathForCompare(skill.SkillFilePath),
                     normalizedPath,
@@ -458,7 +490,8 @@ namespace TxtAIEditor.Controls
 
         private void UpdateUI()
         {
-            var skillItems = _skills
+            var skillItems = EnumerateInstalledSkills()
+                .OrderBy(skill => skill.Name, StringComparer.CurrentCultureIgnoreCase)
                 .Select(skill => new AgentSkillItem
                 {
                     Name = skill.Name,
@@ -554,7 +587,7 @@ namespace TxtAIEditor.Controls
             return Path.GetFileNameWithoutExtension(skillFilePath);
         }
 
-        private static string ExtractDescription(string content)
+        internal static string ExtractDescription(string content)
         {
             if (string.IsNullOrWhiteSpace(content))
             {
@@ -592,13 +625,33 @@ namespace TxtAIEditor.Controls
             string frontMatter = content.Substring(3, closingIndex - 3);
             var match = Regex.Match(
                 frontMatter,
-                @"(?im)^\s*description\s*:\s*(?<value>.+?)\s*$");
+                @"(?im)^[ \t]*description[ \t]*:[ \t]*(?<value>[^\r\n]*)");
             if (!match.Success)
             {
                 return string.Empty;
             }
 
-            return match.Groups["value"].Value.Trim().Trim('"', '\'');
+            string value = match.Groups["value"].Value.Trim();
+            if (value.Length == 0 || value is "|" or "|-" or "|+" or ">" or ">-" or ">+")
+            {
+                var builder = new StringBuilder();
+                using var reader = new StringReader(frontMatter.Substring(match.Index + match.Length));
+                string? line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (string.IsNullOrWhiteSpace(line))
+                    {
+                        continue;
+                    }
+                    if (!char.IsWhiteSpace(line[0]))
+                    {
+                        break;
+                    }
+                    builder.AppendLine(line.Trim());
+                }
+                return builder.ToString();
+            }
+            return value.Trim('"', '\'');
         }
 
         private static string ExtractHeadingDescription(string content)
@@ -673,14 +726,7 @@ namespace TxtAIEditor.Controls
 
         private static string NormalizeDescription(string value)
         {
-            string normalized = Regex.Replace(value ?? string.Empty, @"\s+", " ").Trim();
-            const int maxDescriptionChars = 500;
-            if (normalized.Length <= maxDescriptionChars)
-            {
-                return normalized;
-            }
-
-            return normalized.Substring(0, maxDescriptionChars).TrimEnd() + "...";
+            return Regex.Replace(value ?? string.Empty, @"\s+", " ").Trim();
         }
 
         private static string NormalizePathForCompare(string path)
@@ -702,9 +748,13 @@ namespace TxtAIEditor.Controls
 
         private static string GetDescriptionForPrompt(AgentSkill skill)
         {
-            return string.IsNullOrWhiteSpace(skill.Description)
-                ? "(No description found.)"
-                : skill.Description;
+            if (string.IsNullOrWhiteSpace(skill.Description))
+            {
+                return "(No description found.)";
+            }
+            const int maxDescriptionChars = 500;
+            return skill.Description.Length <= maxDescriptionChars ? skill.Description :
+                skill.Description.Substring(0, maxDescriptionChars).TrimEnd() + "...";
         }
 
         private static string GetSkillDirectory(AgentSkill skill)

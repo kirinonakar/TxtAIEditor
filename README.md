@@ -110,6 +110,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Model Context Protocol (MCP) Support:** Dynamically connects HTTP or stdio MCP servers to expose custom tools to the agent, with built-in support for:
     *   **Browser Use & Computer Use Plugin:** Control the Windows default browser and interact with PC-level application windows using screen capture, clicks, and keyboard inputs.
     *   **ComfyUI Workflow Plugin:** Generate images directly from API JSON/parameters.
+    *   **Plugin manager:** Enable it in the MCP menu to list, search, and activate/deactivate installed MCPs and skills.
 *   **Custom Personas & Skills:** Supports custom personas/system instructions, and extensible local/custom skills (with auto-generation via `skill-creator`).
 *   **Recommended Extensions:** For full feature support, installing [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`), [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`), [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`), and [pdftotext](https://poppler.freedesktop.org/) is recommended.
 

@@ -233,6 +233,12 @@ namespace TxtAIEditor.Controls
 
                 if (!item.CanEdit && !item.CanDelete)
                 {
+                    if (!item.CanConfigure)
+                    {
+                        _agentMcpListPanel.Children.Add(rowGrid);
+                        continue;
+                    }
+
                     var settingsBtn = new Button
                     {
                         Content = new FontIcon { Glyph = "\uE713", FontSize = 10 },
