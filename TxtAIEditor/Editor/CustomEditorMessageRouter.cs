@@ -29,6 +29,7 @@ namespace TxtAIEditor.Editor
         public event Action<int, int>? CursorChanged;
         public event Action? EditorReady;
         public event Action<string>? ShortcutPressed;
+        public event Func<(bool CanUndo, bool CanRedo)>? UndoRedoStateRequested;
         public event Action<int, int, int>? LinesRequested;
         public event Action<EditorEditRequest>? EditRequested;
         public event Action<long, string>? HexEditRequested;
@@ -151,6 +152,16 @@ namespace TxtAIEditor.Editor
                     break;
                 case "shortcut":
                     HandleShortcut(root);
+                    break;
+                case "requestUndoRedoState":
+                    var history = UndoRedoStateRequested?.Invoke() ?? (CanUndo: false, CanRedo: false);
+                    _ = _sendMessageAsync(new
+                    {
+                        action = "undoRedoState",
+                        requestId = GetInt32(root, "requestId"),
+                        canUndo = history.CanUndo,
+                        canRedo = history.CanRedo
+                    });
                     break;
                 case "editorScroll":
                     HandleEditorScroll(root);

@@ -40,6 +40,7 @@ namespace TxtAIEditor.Editor
         public event Action<int, int>? CursorChanged { add => _messageRouter.CursorChanged += value; remove => _messageRouter.CursorChanged -= value; }
         public event Action? EditorReady { add => _messageRouter.EditorReady += value; remove => _messageRouter.EditorReady -= value; }
         public event Action<string>? ShortcutPressed { add => _messageRouter.ShortcutPressed += value; remove => _messageRouter.ShortcutPressed -= value; }
+        public event Func<(bool CanUndo, bool CanRedo)>? UndoRedoStateRequested { add => _messageRouter.UndoRedoStateRequested += value; remove => _messageRouter.UndoRedoStateRequested -= value; }
         public event Action<int, int, int>? LinesRequested { add => _messageRouter.LinesRequested += value; remove => _messageRouter.LinesRequested -= value; }
         public event Action<EditorEditRequest>? EditRequested { add => _messageRouter.EditRequested += value; remove => _messageRouter.EditRequested -= value; }
         public event Action<long, string>? HexEditRequested { add => _messageRouter.HexEditRequested += value; remove => _messageRouter.HexEditRequested -= value; }

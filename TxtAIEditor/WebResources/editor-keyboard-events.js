@@ -4,7 +4,6 @@ import {
 } from './editor-dom.js';
 import {
     activeEditableElement,
-    clearCustomSelectionVisuals,
     csvTableMode,
     dragDropController,
     hexEditorMode,
@@ -31,7 +30,6 @@ import {
 } from './editor-selection.js';
 import {
     applyMarkdownCommand,
-    cancelImeBypassTextarea,
     changeLineIndent,
     commitLine,
     compositionSelectionRange,
@@ -55,7 +53,8 @@ import {
     scheduleModelRepeatEdit,
     selectAll,
     submitHexEdit,
-    splitCurrentLine
+    splitCurrentLine,
+    undoRedo
 } from './editor-commands.js';
 import {
     autocompleteState,
@@ -234,50 +233,12 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
         }
     }
 
-    function clearSelectionBeforeUndoRedo() {
-        cancelImeBypassTextarea();
-
-        const selection = normalizeSelection();
-        const fallbackLine = selection ? selection.start.line : 1;
-        const fallbackColumn = selection ? selection.start.column : 0;
-        const caretLine = Math.min(
-            state.lineCount,
-            Math.max(1, Number(state.currentLine || fallbackLine)));
-        const lineText = state.cache.get(caretLine) || '';
-        const caretColumn = Math.max(
-            0,
-            Math.min(Number(state.currentColumn || fallbackColumn + 1) - 1, lineText.length));
-
-        selectionController.selection = null;
-        selectionController.anchor = { line: caretLine, column: caretColumn };
-        hexEditorMode.resetSelection();
-
-        try {
-            window.getSelection()?.removeAllRanges();
-        } catch (e) { }
-
-        clearCustomSelectionVisuals();
-        syncCustomSelectionClass();
-        queueRender(true);
-        setTimeout(() => {
-            if (!imeController.isComposing && !imeController.textareaBypassActive) {
-                focusLine(caretLine, caretColumn);
-            }
-        }, 0);
-        reportCursorAndSelection();
-    }
-
     function handleUndoRedoShortcut(event, name) {
         event.preventDefault();
         event.stopImmediatePropagation();
         hideAutocomplete(700);
 
-        if (imeController.isComposing) {
-            return;
-        }
-
-        clearSelectionBeforeUndoRedo();
-        post({ type: 'shortcut', name });
+        undoRedo(name);
     }
 
     function clearKeyboardVerticalRepeatTimer() {

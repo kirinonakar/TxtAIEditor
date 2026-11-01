@@ -1844,6 +1844,42 @@ const {
     writeClipboardText
 });
 
+export function undoRedo(name) {
+    if (imeController.isComposing) return;
+
+    cancelImeBypassTextarea();
+
+    const selection = normalizeSelection();
+    const fallbackLine = selection ? selection.start.line : 1;
+    const fallbackColumn = selection ? selection.start.column : 0;
+    const caretLine = Math.min(
+        state.lineCount,
+        Math.max(1, Number(state.currentLine || fallbackLine)));
+    const lineText = state.cache.get(caretLine) || '';
+    const caretColumn = Math.max(
+        0,
+        Math.min(Number(state.currentColumn || fallbackColumn + 1) - 1, lineText.length));
+
+    selectionController.selection = null;
+    selectionController.anchor = { line: caretLine, column: caretColumn };
+    hexEditorMode.resetSelection();
+
+    try {
+        window.getSelection()?.removeAllRanges();
+    } catch (e) { }
+
+    clearCustomSelectionVisuals();
+    syncCustomSelectionClass();
+    queueRender(true);
+    setTimeout(() => {
+        if (!imeController.isComposing && !imeController.textareaBypassActive) {
+            focusLine(caretLine, caretColumn);
+        }
+    }, 0);
+    reportCursorAndSelection();
+    post({ type: 'shortcut', name });
+}
+
 export {
     applyMarkdownCommand,
     beginDeferredRangeComposition,

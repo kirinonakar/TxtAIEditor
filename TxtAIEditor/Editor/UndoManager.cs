@@ -48,6 +48,9 @@ namespace TxtAIEditor.Editor
         private long _nextStateId = 1;
         private bool _mergeBoundary;
 
+        public bool CanUndo => _undoStack.Count > 0 || _currentTransaction is { HasEdits: true };
+        public bool CanRedo => _redoStack.Count > 0;
+
         public bool IsAtSavedState =>
             _currentTransaction is not { HasEdits: true } &&
             _currentStateId == _savedStateId;

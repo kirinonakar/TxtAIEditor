@@ -501,7 +501,7 @@ function applyOptions(msg) {
 
     // Apply localized context menu text
     const actions = [
-        'cut', 'copy', 'paste', 'delete', 'selectAll', 'toggleComment', 'collapseAll', 'expandAll',
+        'cut', 'copy', 'paste', 'delete', 'selectAll', 'undo', 'redo', 'toggleComment', 'collapseAll', 'expandAll',
         'sortAsc', 'sortDesc', 'removeDuplicates', 'removeEmptyLines', 'collapseConsecutiveEmptyLines', 'trimSpaces',
         'toUpperCase', 'toLowerCase', 'toSentenceCase', 'toTitleCase', 'urlEncode', 'urlDecode',
         'base64Encode', 'base64Decode', 'hexToDec', 'decToHex', 'formatText'

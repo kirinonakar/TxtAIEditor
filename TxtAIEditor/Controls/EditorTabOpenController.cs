@@ -1576,6 +1576,12 @@ namespace TxtAIEditor.Controls
                 });
             };
 
+            bridge.UndoRedoStateRequested += () =>
+            {
+                var history = getSession().Document.UndoManager;
+                return (history.CanUndo, history.CanRedo);
+            };
+
             bridge.EditorReady += async () =>
             {
                 var currentSession = getSession();

@@ -126,6 +126,8 @@ namespace TxtAIEditor.Editor
                 ("menuPaste", "EditorContextMenuPaste", "붙여넣기"),
                 ("menuDelete", "EditorContextMenuDelete", "삭제"),
                 ("menuSelectAll", "EditorContextMenuSelectAll", "모두 선택"),
+                ("menuUndo", "ShortcutDescUndo", "실행 취소"),
+                ("menuRedo", "ShortcutDescRedo", "다시 실행"),
                 ("menuCollapseAll", "EditorContextMenuCollapseAll", "전체 접기"),
                 ("menuExpandAll", "EditorContextMenuExpandAll", "전체 펼치기"),
                 ("menuToggleComment", "EditorContextMenuToggleComment", "주석 토글"),

@@ -11,8 +11,24 @@ import {
     handleTextConversion,
     pasteFromClipboard,
     selectAll,
-    toggleComment
+    toggleComment,
+    undoRedo
 } from './editor-commands.js';
+import { hideAutocomplete } from './editor-autocomplete.js';
+
+let undoRedoStateRequestId = 0;
+
+export function updateUndoRedoState(msg) {
+    if (contextMenu.hidden || msg.requestId !== undoRedoStateRequestId) return;
+
+    for (const action of ['undo', 'redo']) {
+        const button = contextMenu.querySelector(`[data-action="${action}"]`);
+        if (!button) continue;
+        const available = action === 'undo' ? msg.canUndo : msg.canRedo;
+        button.disabled = !available || imeController.isComposing ||
+            state.textOperationLocked || (state.readOnly && !hexEditorMode.isEditable);
+    }
+}
 
 // Context Menu Operations
 export function showContextMenu(clientX, clientY) {
@@ -20,6 +36,9 @@ export function showContextMenu(clientX, clientY) {
     for (const button of contextMenu.querySelectorAll('.context-menu-button')) {
         const requiresEdit = button.dataset.requiresEdit === 'true';
         button.disabled = requiresEdit && state.readOnly && !hexEditorMode.isEditable;
+        if (['undo', 'redo'].includes(button.dataset.action)) {
+            button.disabled = true;
+        }
         if (['collapseAll', 'expandAll'].includes(button.dataset.action)) {
             button.disabled = imeController.isComposing || !!imeController.rangeComposition || !!imeController.columnComposition ||
                 !supportsFolding(state.language) || csvTableMode.isEnabled ||
@@ -33,6 +52,7 @@ export function showContextMenu(clientX, clientY) {
     }
 
     contextMenu.hidden = false;
+    post({ type: 'requestUndoRedoState', requestId: ++undoRedoStateRequestId });
     const menuRect = contextMenu.getBoundingClientRect();
     const left = Math.min(clientX, window.innerWidth - menuRect.width - 4);
     const top = Math.min(clientY, window.innerHeight - menuRect.height - 4);
@@ -97,6 +117,11 @@ export function bindContextMenu() {
             break;
         case 'selectAll':
             selectAll();
+            break;
+        case 'undo':
+        case 'redo':
+            hideAutocomplete(700);
+            undoRedo(action);
             break;
         case 'collapseAll':
         case 'expandAll':

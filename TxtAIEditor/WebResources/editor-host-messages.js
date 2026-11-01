@@ -44,6 +44,7 @@ import {
     updateCsvLocalization
 } from './editor-csv-table.js';
 import { isFullDocumentLivePreviewLanguage } from './editor-html-live-preview.js';
+import { updateUndoRedoState } from './editor-context-menu.js';
 
 const EDITOR_PROTOCOL_VERSION = 1;
 const VERSIONED_HOST_ACTIONS = new Set([
@@ -394,6 +395,9 @@ export function createHostMessageHandler({
                     queueRender(true);
                 }
             }
+            break;
+        case 'undoRedoState':
+            updateUndoRedoState(msg);
             break;
         case 'updateOptions':
             applyOptions(msg);
