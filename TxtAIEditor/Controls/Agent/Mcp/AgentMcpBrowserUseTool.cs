@@ -220,8 +220,11 @@ namespace TxtAIEditor.Controls
             }
 
             SelectControlledWindow(selected);
-            FocusBrowserWindow(selected.Handle);
-            await Task.Delay(180, cancellationToken);
+            if (!_settingsProvider().BrowserUseUiaDirectExecution)
+            {
+                FocusBrowserWindow(selected.Handle);
+                await Task.Delay(180, cancellationToken);
+            }
             return await BuildStatusResultAsync(
                 "MCP tool result: Computer Use selected an application window.",
                 selected.Handle,
@@ -301,7 +304,10 @@ namespace TxtAIEditor.Controls
                 {
                     try
                     {
-                        FocusBrowserWindow(handle);
+                        if (!_settingsProvider().BrowserUseUiaDirectExecution)
+                        {
+                            FocusBrowserWindow(handle);
+                        }
                     }
                     catch
                     {
@@ -514,6 +520,30 @@ namespace TxtAIEditor.Controls
             string elementRef = AgentToolHelpers.GetFirstStringArgument(arguments, "ref", "elementRef", "element_ref").Trim();
             bool hasX = TryGetFirstInt(arguments, out int x, "x");
             bool hasY = TryGetFirstInt(arguments, out int y, "y");
+            string button = AgentToolHelpers.GetFirstStringArgument(arguments, "button").Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(button))
+            {
+                button = "left";
+            }
+
+            if (button is not ("left" or "right" or "middle"))
+            {
+                throw new InvalidOperationException($"Unsupported mouse button: {button}");
+            }
+
+            int clickCount = Math.Clamp(AgentToolHelpers.GetIntArgument(arguments, "clickCount", 1), 1, 3);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_settingsProvider().BrowserUseUiaDirectExecution && elementRef.Length > 0 &&
+                button == "left" && clickCount == 1)
+            {
+                string? pattern = _accessibility.TryClickDirect(elementRef, browserWindow);
+                if (pattern != null)
+                {
+                    await Task.Delay(350, cancellationToken);
+                    return $"MCP tool result: Browser Use dispatched {pattern} for ref {elementRef}.\ninput_mode: uia_direct" +
+                        BuildPostActionContext(browserWindow);
+                }
+            }
 
             if (!GetWindowRect(browserWindow, out Rect rect))
             {
@@ -536,17 +566,17 @@ namespace TxtAIEditor.Controls
                 throw new InvalidOperationException("click requires a snapshot ref or integer x and y coordinates.");
             }
 
-            string button = AgentToolHelpers.GetFirstStringArgument(arguments, "button").Trim().ToLowerInvariant();
-            if (string.IsNullOrEmpty(button))
-            {
-                button = "left";
-            }
-
-            int clickCount = Math.Clamp(AgentToolHelpers.GetIntArgument(arguments, "clickCount", 1), 1, 3);
             FocusBrowserWindow(browserWindow);
             if (GetForegroundWindow() != browserWindow)
             {
                 throw new InvalidOperationException("Windows did not activate the target window, so the click was cancelled to avoid clicking another application.");
+            }
+
+            if (elementRef.Length > 0)
+            {
+                // Activating a window can move its controls; resolve again after activation.
+                TryResolvePoint(elementRef, false, 0, false, 0, coordinateSpace, browserWindow, rect,
+                    windowWidth, windowHeight, out screenX, out screenY, out targetDescription);
             }
 
             _inputService.SetCursorPosition(screenX, screenY);
@@ -562,7 +592,7 @@ namespace TxtAIEditor.Controls
             await Task.Delay(350, cancellationToken);
             string postActionContext = BuildPostActionContext(browserWindow);
 
-            return $"MCP tool result: Browser Use clicked {button} at {targetDescription}, mapped to screen ({screenX}, {screenY})." + postActionContext;
+            return $"MCP tool result: Browser Use clicked {button} at {targetDescription}, mapped to screen ({screenX}, {screenY}).\ninput_mode: foreground" + postActionContext;
         }
 
         private async Task<string> DragAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -756,20 +786,58 @@ namespace TxtAIEditor.Controls
             EnsureInteractionAllowed();
             string text = AgentToolHelpers.GetFirstStringArgument(arguments, "text", "value", "content");
             IntPtr browserWindow = await EnsureBrowserWindowAsync(cancellationToken);
+            string elementRef = AgentToolHelpers.GetFirstStringArgument(arguments, "ref", "elementRef", "element_ref").Trim();
+            bool replace = AgentToolHelpers.GetBoolArgument(arguments, "replace", false);
+            bool pressEnter = AgentToolHelpers.GetBoolArgument(arguments, "pressEnter", false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_settingsProvider().BrowserUseUiaDirectExecution && elementRef.Length > 0 && replace && !pressEnter &&
+                _accessibility.TrySetValueDirect(elementRef, browserWindow, text))
+            {
+                await Task.Delay(150, cancellationToken);
+                return $"MCP tool result: Browser Use set {text.Length:N0} characters with ValuePattern.SetValue; value verified.\ninput_mode: uia_direct" +
+                    BuildPostActionContext(browserWindow);
+            }
+
+            // An explicit ref must target that field even when ValuePattern is absent.
+            if (elementRef.Length > 0)
+            {
+                if (!_accessibility.TryResolveRef(elementRef, browserWindow, out _))
+                {
+                    throw new InvalidOperationException("The text target ref is stale or unavailable. Request a fresh snapshot.");
+                }
+
+                FocusBrowserWindow(browserWindow);
+                if (GetForegroundWindow() != browserWindow ||
+                    !_accessibility.TryResolveRef(elementRef, browserWindow, out var target))
+                {
+                    throw new InvalidOperationException("The text target could not be activated and revalidated. No text was sent.");
+                }
+
+                _inputService.SetCursorPosition(target.ScreenX, target.ScreenY);
+                _inputService.VerifyCursorPosition(target.ScreenX, target.ScreenY);
+                SendMouseClick("left");
+                await Task.Delay(80, cancellationToken);
+            }
+
             FocusBrowserWindow(browserWindow);
-            if (AgentToolHelpers.GetBoolArgument(arguments, "replace", false))
+            if (GetForegroundWindow() != browserWindow)
+            {
+                throw new InvalidOperationException("The text target window was not activated. No text was sent.");
+            }
+
+            if (replace)
             {
                 SendShortcut(0x11, 0x41); // Ctrl+A
             }
 
             SendUnicodeText(text);
-            if (AgentToolHelpers.GetBoolArgument(arguments, "pressEnter", false))
+            if (pressEnter)
             {
                 SendVirtualKey(0x0D);
             }
 
             await Task.Delay(150, cancellationToken);
-            return $"MCP tool result: Browser Use typed {text.Length:N0} characters." +
+            return $"MCP tool result: Browser Use typed {text.Length:N0} characters.\ninput_mode: foreground" +
                 BuildPostActionContext(browserWindow);
         }
 
@@ -1191,12 +1259,16 @@ namespace TxtAIEditor.Controls
                 builder.AppendLine("click_coordinates: relative to the controlled window top-left when coordinateSpace is window");
             }
 
-            if (includeUrl)
+            if (includeUrl && !_settingsProvider().BrowserUseUiaDirectExecution)
             {
                 FocusBrowserWindow(browserWindow);
                 string url = await CopyCurrentUrlAsync(cancellationToken);
                 SendVirtualKey(0x1B);
                 builder.AppendLine($"url: {url}");
+            }
+            else if (includeUrl)
+            {
+                builder.AppendLine("url: not copied while UIA direct execution is enabled (copying requires foreground keyboard input)");
             }
 
             return builder.ToString().TrimEnd();

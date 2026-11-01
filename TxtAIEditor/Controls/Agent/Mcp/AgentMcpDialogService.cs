@@ -51,6 +51,7 @@ namespace TxtAIEditor.Controls
         public bool AllowInteraction { get; set; } = true;
         public bool CaptureEnabled { get; set; } = true;
         public bool ComputerUseEnabled { get; set; }
+        public bool UiaDirectExecution { get; set; }
     }
 
     internal enum AgentPluginImportSourceKind
@@ -360,11 +361,22 @@ namespace TxtAIEditor.Controls
                 Header = _getString("AgentMcpBrowserUseComputerUseEnabledLabel", "Computer Use - 다른 프로그램 조작"),
                 IsOn = initial.ComputerUseEnabled
             };
+            var uiaDirectToggle = new ToggleSwitch
+            {
+                Header = _getString("AgentMcpBrowserUseUiaDirectLabel", "UIA 직접 실행"),
+                IsOn = initial.UiaDirectExecution,
+                IsEnabled = initial.AllowInteraction
+            };
+            interactionToggle.Toggled += (_, _) => uiaDirectToggle.IsEnabled = interactionToggle.IsOn;
 
             var stack = new StackPanel { Spacing = 12, Width = 460 };
             stack.Children.Add(captureToggle);
             stack.Children.Add(interactionToggle);
             stack.Children.Add(computerUseToggle);
+            stack.Children.Add(uiaDirectToggle);
+            stack.Children.Add(CreateInfoText(_getString(
+                "AgentMcpBrowserUseUiaDirectInfo",
+                "요소 참조 클릭과 값 바꾸기에 UIA 패턴을 우선 사용합니다. 직접 실행 시 마우스나 창 포커스를 이동하지 않습니다. 지원 패턴이 없거나 좌표·키 입력을 사용하면 기존 전경 입력으로 전환합니다. 오래되거나 모호한 참조는 거부합니다. 앱 자체가 포커스를 변경할 수 있습니다.")));
             stack.Children.Add(CreateInfoText(_getString(
                 "AgentMcpBrowserUseSettingsInfo",
                 "Browser Use는 Windows 기본 브라우저를 실행하고 키보드·마우스 입력으로 조작합니다. 읽기 전용 URL 열기, 상태 확인 및 페이지 텍스트 읽기는 이 옵션과 관계없이 사용할 수 있습니다.")));
@@ -393,7 +405,8 @@ namespace TxtAIEditor.Controls
             {
                 AllowInteraction = interactionToggle.IsOn,
                 CaptureEnabled = captureToggle.IsOn,
-                ComputerUseEnabled = computerUseToggle.IsOn
+                ComputerUseEnabled = computerUseToggle.IsOn,
+                UiaDirectExecution = uiaDirectToggle.IsOn
             };
         }
 

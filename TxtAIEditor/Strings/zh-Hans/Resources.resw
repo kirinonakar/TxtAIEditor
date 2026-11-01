@@ -3409,6 +3409,12 @@
   <data name="AgentMcpBrowserUseComputerUseEnabledLabel" xml:space="preserve">
     <value>Computer Use - 控制其他应用</value>
   </data>
+  <data name="AgentMcpBrowserUseUiaDirectLabel" xml:space="preserve">
+    <value>UIA 直接执行</value>
+  </data>
+  <data name="AgentMcpBrowserUseUiaDirectInfo" xml:space="preserve">
+    <value>优先使用 UIA 模式点击元素引用和替换值，不移动鼠标或激活窗口。不支持的模式、坐标和键盘操作使用前台输入。拒绝过期或不明确的引用。目标应用自身仍可能改变焦点。</value>
+  </data>
   <data name="AgentMcpBrowserUseComputerUseInfo" xml:space="preserve">
     <value>启用 Computer Use 后，Agent 可以选择其他已打开的应用程序窗口或启动程序，并使用相同的图像捕获、点击和键盘工具进行控制。</value>
   </data>

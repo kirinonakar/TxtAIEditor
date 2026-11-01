@@ -3409,6 +3409,12 @@
   <data name="AgentMcpBrowserUseComputerUseEnabledLabel" xml:space="preserve">
     <value>Computer Use - 他のアプリを操作</value>
   </data>
+  <data name="AgentMcpBrowserUseUiaDirectLabel" xml:space="preserve">
+    <value>UIA 直接実行</value>
+  </data>
+  <data name="AgentMcpBrowserUseUiaDirectInfo" xml:space="preserve">
+    <value>要素参照のクリックと値の置換に UIA パターンを優先し、マウスやウィンドウのフォーカスを移動しません。非対応パターン、座標、キー操作は前面入力を使用します。古い参照や曖昧な参照は拒否します。対象アプリ自体がフォーカスを変更する場合があります。</value>
+  </data>
   <data name="AgentMcpBrowserUseComputerUseInfo" xml:space="preserve">
     <value>Computer Use を有効にすると、Agent は開いている別のアプリケーションウィンドウを選択したり、プログラムを起動したりして、同じ画像キャプチャ、クリック、キー入力ツールで操作できます。</value>
   </data>

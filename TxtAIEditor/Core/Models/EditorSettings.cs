@@ -118,6 +118,7 @@ namespace TxtAIEditor.Core.Models
         public bool BrowserUseAllowInteraction { get; set; } = true;
         public bool BrowserUseCaptureEnabled { get; set; } = false;
         public bool BrowserUseComputerUseEnabled { get; set; } = true;
+        public bool BrowserUseUiaDirectExecution { get; set; } = false;
 
         // Git Config
         public bool AutoGitDetect { get; set; } = true;

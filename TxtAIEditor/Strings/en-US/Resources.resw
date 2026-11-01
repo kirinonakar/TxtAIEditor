@@ -3451,6 +3451,12 @@ Plan: {0}</value>
   <data name="AgentMcpBrowserUseComputerUseEnabledLabel" xml:space="preserve">
     <value>Computer Use - control other apps</value>
   </data>
+  <data name="AgentMcpBrowserUseUiaDirectLabel" xml:space="preserve">
+    <value>UIA direct execution</value>
+  </data>
+  <data name="AgentMcpBrowserUseUiaDirectInfo" xml:space="preserve">
+    <value>Prefer UIA patterns for element-ref clicks and value replacement without moving the mouse or activating the window. Unsupported patterns, coordinates, and keyboard actions use foreground input. Stale or ambiguous refs are rejected. The target app itself may change focus.</value>
+  </data>
   <data name="AgentMcpBrowserUseComputerUseInfo" xml:space="preserve">
     <value>When Computer Use is enabled, the Agent can select other open application windows or launch a program and control it with the same image capture, click, and keyboard tools.</value>
   </data>

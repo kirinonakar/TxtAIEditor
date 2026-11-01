@@ -7,7 +7,7 @@ using System.Text;
 
 namespace TxtAIEditor.Controls
 {
-    internal sealed class AgentBrowserAccessibilityService
+    internal sealed partial class AgentBrowserAccessibilityService
     {
         private const int MaxTextLength = 160;
         private const int RpcEChangedMode = unchecked((int)0x80010106);
@@ -46,27 +46,27 @@ namespace TxtAIEditor.Controls
 
         public bool TryResolveRef(string elementRef, IntPtr window, out AccessibilityTarget target)
         {
-            if (TryGetCurrentTarget(elementRef, window, requireCurrentGeneration: true, out target))
+            target = default;
+            try
             {
+                target = WithResolvedElement(elementRef, window, (element, data) =>
+                {
+                    if (data.IsOffscreen || data.Bounds.Right - data.Bounds.Left <= 1 ||
+                        data.Bounds.Bottom - data.Bounds.Top <= 1)
+                    {
+                        throw new InvalidOperationException("The referenced element has no visible clickable bounds.");
+                    }
+
+                    return new AccessibilityTarget(
+                        data.Bounds.Left + ((data.Bounds.Right - data.Bounds.Left) / 2),
+                        data.Bounds.Top + ((data.Bounds.Bottom - data.Bounds.Top) / 2), data.Name);
+                });
                 return true;
             }
-
-            if (!_elementsByRef.TryGetValue(elementRef, out AccessibilityRef? entry) ||
-                entry.Window != window)
+            catch (InvalidOperationException)
             {
                 return false;
             }
-
-            try
-            {
-                CaptureSnapshot(window, 500);
-            }
-            catch
-            {
-                // Fall back to the last known bounds so the ref does not expire.
-            }
-
-            return TryGetCurrentTarget(elementRef, window, requireCurrentGeneration: false, out target);
         }
 
         public bool TryCollapseTextSelection(IntPtr window)
@@ -215,31 +215,10 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private bool TryGetCurrentTarget(
-            string elementRef,
-            IntPtr window,
-            bool requireCurrentGeneration,
-            out AccessibilityTarget target)
-        {
-            target = default;
-            if (!_elementsByRef.TryGetValue(elementRef, out AccessibilityRef? entry) ||
-                (requireCurrentGeneration && entry.Generation != _generation) ||
-                entry.Window != window ||
-                entry.Bounds.Right - entry.Bounds.Left <= 1 ||
-                entry.Bounds.Bottom - entry.Bounds.Top <= 1)
-            {
-                return false;
-            }
-
-            target = new AccessibilityTarget(
-                entry.Bounds.Left + ((entry.Bounds.Right - entry.Bounds.Left) / 2),
-                entry.Bounds.Top + ((entry.Bounds.Bottom - entry.Bounds.Top) / 2),
-                entry.Name);
-            return true;
-        }
-
         private string CaptureSnapshotCore(IntPtr window, int requestedMaxNodes)
         {
+            // Even a failed snapshot invalidates earlier references.
+            _elementsByRef.Clear();
             int maxNodes = Math.Clamp(requestedMaxNodes, 20, 500);
             object automationObject = Activator.CreateInstance(Type.GetTypeFromCLSID(CUiAutomationClassId, throwOnError: true)!)
                 ?? throw new InvalidOperationException("Windows UI Automation could not be initialized.");
@@ -282,14 +261,8 @@ namespace TxtAIEditor.Controls
                                 continue;
                             }
 
-                            string identity = BuildIdentity(data, item.SemanticPath);
+                            string identity = BuildIdentity(window, data, item.SemanticPath);
                             string elementRef = GetOrCreateRef(identity);
-                            _elementsByRef[elementRef] = new AccessibilityRef(
-                                identity,
-                                window,
-                                data.Bounds,
-                                data.Name,
-                                _generation);
 
                             int childDepth = item.OutputDepth;
                             if (ShouldInclude(data))
@@ -300,6 +273,9 @@ namespace TxtAIEditor.Controls
                                     break;
                                 }
 
+                                bool ambiguous = _elementsByRef.ContainsKey(elementRef);
+                                _elementsByRef[elementRef] = new AccessibilityRef(
+                                    identity, window, data.RuntimeId, data.ProcessId, _generation, ambiguous);
                                 lines.Add(FormatLine(elementRef, data, item.OutputDepth));
                                 childDepth++;
                             }
@@ -331,7 +307,7 @@ namespace TxtAIEditor.Controls
 
                 var builder = new StringBuilder();
                 builder.AppendLine("MCP tool result: Browser Use accessibility snapshot.");
-                builder.AppendLine("Use ref with mcp_browser_use_click or mcp_browser_use_drag. Refs remain stable while the matching accessible element remains available.");
+                builder.AppendLine("Use ref with mcp_browser_use_click, mcp_browser_use_drag, or mcp_browser_use_type_text. Only refs from the latest snapshot are accepted; each action revalidates the live element. Stale, disabled, unverifiable, or ambiguous refs are rejected.");
                 builder.AppendLine("accessibility_tree:");
                 if (lines.Count == 0)
                 {
@@ -377,13 +353,19 @@ namespace TxtAIEditor.Controls
             data = default;
             try
             {
-                _ = element.GetCurrentControlType(out int controlType);
-                _ = element.GetCurrentName(out string name);
-                _ = element.GetCurrentAutomationId(out string automationId);
-                _ = element.GetCurrentIsEnabled(out int isEnabled);
-                _ = element.GetCurrentIsOffscreen(out int isOffscreen);
-                _ = element.GetCurrentIsKeyboardFocusable(out int isKeyboardFocusable);
-                _ = element.GetCurrentBoundingRectangle(out NativeRect bounds);
+                ThrowIfFailed(element.GetCurrentControlType(out int controlType));
+                ThrowIfFailed(element.GetCurrentName(out string name));
+                ThrowIfFailed(element.GetCurrentAutomationId(out string automationId));
+                name ??= string.Empty;
+                automationId ??= string.Empty;
+                ThrowIfFailed(element.GetCurrentIsEnabled(out int isEnabled));
+                ThrowIfFailed(element.GetCurrentIsOffscreen(out int isOffscreen));
+                ThrowIfFailed(element.GetCurrentIsKeyboardFocusable(out int isKeyboardFocusable));
+                ThrowIfFailed(element.GetCurrentBoundingRectangle(out NativeRect bounds));
+                ThrowIfFailed(element.GetCurrentProcessId(out int processId));
+                string runtimeId = element.GetCurrentPropertyValue(30000, out object runtimeValue) >= 0 &&
+                    runtimeValue is int[] { Length: > 0 } runtimeIds
+                    ? string.Join(",", runtimeIds) : string.Empty;
 
                 string value = string.Empty;
                 if (element.GetCurrentPropertyValue(UiaValueValuePropertyId, out object propertyValue) >= 0 &&
@@ -400,7 +382,11 @@ namespace TxtAIEditor.Controls
                     isEnabled != 0,
                     isOffscreen != 0,
                     isKeyboardFocusable != 0,
-                    bounds);
+                    bounds,
+                    runtimeId,
+                    processId,
+                    controlType.ToString(CultureInfo.InvariantCulture) + ":" + automationId.Length + ":" +
+                        automationId + ":" + name.Length + ":" + name);
                 return true;
             }
             catch (COMException)
@@ -449,14 +435,13 @@ namespace TxtAIEditor.Controls
             return builder.ToString();
         }
 
-        private static string BuildIdentity(ElementData data, string semanticPath)
+        private static string BuildIdentity(IntPtr window, ElementData data, string semanticPath)
         {
-            if (!string.IsNullOrWhiteSpace(data.AutomationId))
-            {
-                return "automation:" + data.Role + ":" + data.AutomationId + ":" + semanticPath;
-            }
-
-            return "semantic:" + semanticPath;
+            // Runtime IDs identify live UIA elements. Semantic paths alone can silently
+            // retarget a ref when a list or toolbar is rebuilt.
+            return window.ToInt64().ToString(CultureInfo.InvariantCulture) + ":" + data.ProcessId + ":" +
+                (data.RuntimeId.Length == 0 ? "unverified:" + semanticPath : data.RuntimeId) + ":" +
+                data.Signature;
         }
 
         private static string BuildSemanticSegment(IUIAutomationElement element, int siblingIndex)
@@ -471,12 +456,18 @@ namespace TxtAIEditor.Controls
             return data.Role + ":" + identityText + "[" + siblingIndex.ToString(CultureInfo.InvariantCulture) + "]";
         }
 
-        private static List<IUIAutomationElement> GetChildren(IUIAutomationTreeWalker walker, IUIAutomationElement parent)
+        private static List<IUIAutomationElement> GetChildren(IUIAutomationTreeWalker walker, IUIAutomationElement parent, bool strict = false)
         {
             var children = new List<IUIAutomationElement>();
             try
             {
-                if (walker.GetFirstChildElement(parent, out IUIAutomationElement? child) < 0 || child == null)
+                int firstResult = walker.GetFirstChildElement(parent, out IUIAutomationElement? child);
+                if (strict)
+                {
+                    ThrowIfFailed(firstResult);
+                }
+
+                if (firstResult < 0 || child == null)
                 {
                     return children;
                 }
@@ -484,7 +475,13 @@ namespace TxtAIEditor.Controls
                 while (child != null)
                 {
                     children.Add(child);
-                    if (walker.GetNextSiblingElement(child, out IUIAutomationElement? next) < 0)
+                    int nextResult = walker.GetNextSiblingElement(child, out IUIAutomationElement? next);
+                    if (strict)
+                    {
+                        ThrowIfFailed(nextResult);
+                    }
+
+                    if (nextResult < 0)
                     {
                         break;
                     }
@@ -494,6 +491,15 @@ namespace TxtAIEditor.Controls
             }
             catch (COMException)
             {
+                if (strict)
+                {
+                    foreach (IUIAutomationElement child in children)
+                    {
+                        ReleaseComObject(child);
+                    }
+
+                    throw;
+                }
             }
 
             return children;
@@ -563,9 +569,10 @@ namespace TxtAIEditor.Controls
         private sealed record AccessibilityRef(
             string Identity,
             IntPtr Window,
-            NativeRect Bounds,
-            string Name,
-            int Generation);
+            string RuntimeId,
+            int ProcessId,
+            int Generation,
+            bool IsAmbiguous);
 
         private readonly record struct SnapshotWorkItem(IUIAutomationElement Element, int OutputDepth, string SemanticPath);
 
@@ -577,7 +584,10 @@ namespace TxtAIEditor.Controls
             bool IsEnabled,
             bool IsOffscreen,
             bool IsKeyboardFocusable,
-            NativeRect Bounds);
+            NativeRect Bounds,
+            string RuntimeId,
+            int ProcessId,
+            string Signature);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct NativeRect

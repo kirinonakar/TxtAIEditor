@@ -3451,6 +3451,12 @@
   <data name="AgentMcpBrowserUseComputerUseEnabledLabel" xml:space="preserve">
     <value>Computer Use - 다른 프로그램 조작</value>
   </data>
+  <data name="AgentMcpBrowserUseUiaDirectLabel" xml:space="preserve">
+    <value>UIA 직접 실행</value>
+  </data>
+  <data name="AgentMcpBrowserUseUiaDirectInfo" xml:space="preserve">
+    <value>요소 참조 클릭과 값 바꾸기에 UIA 패턴을 우선 사용합니다. 직접 실행 시 마우스나 창 포커스를 이동하지 않습니다. 지원 패턴이 없거나 좌표·키 입력을 사용하면 기존 전경 입력으로 전환합니다. 오래되거나 모호한 참조는 거부합니다. 앱 자체가 포커스를 변경할 수 있습니다.</value>
+  </data>
   <data name="AgentMcpBrowserUseComputerUseInfo" xml:space="preserve">
     <value>Computer Use를 켜면 Agent가 실행 중인 다른 프로그램 창을 선택하거나 프로그램을 실행하고, 동일한 이미지 캡처·클릭·키 입력 도구로 조작할 수 있습니다.</value>
   </data>

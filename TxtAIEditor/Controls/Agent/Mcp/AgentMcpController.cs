@@ -543,7 +543,8 @@ namespace TxtAIEditor.Controls
                 {
                     AllowInteraction = browserSettings.BrowserUseAllowInteraction,
                     CaptureEnabled = browserSettings.BrowserUseCaptureEnabled,
-                    ComputerUseEnabled = browserSettings.BrowserUseComputerUseEnabled
+                    ComputerUseEnabled = browserSettings.BrowserUseComputerUseEnabled,
+                    UiaDirectExecution = browserSettings.BrowserUseUiaDirectExecution
                 });
                 if (browserInput == null)
                 {
@@ -553,6 +554,7 @@ namespace TxtAIEditor.Controls
                 browserSettings.BrowserUseAllowInteraction = browserInput.AllowInteraction;
                 browserSettings.BrowserUseCaptureEnabled = browserInput.CaptureEnabled;
                 browserSettings.BrowserUseComputerUseEnabled = browserInput.ComputerUseEnabled;
+                browserSettings.BrowserUseUiaDirectExecution = browserInput.UiaDirectExecution;
                 await _settingsService.SaveSettingsAsync(browserSettings);
                 RebuildAliases();
                 UpdateUI();
@@ -1109,6 +1111,10 @@ namespace TxtAIEditor.Controls
             {
                 AppendMcpAliasSection(builder, _browserUseTool.ServerName, _browserUseTool.ServerId);
                 builder.AppendLine("Browser Use & Computer Use controls the installed Windows default browser and other Windows applications through OS-level keyboard and mouse input.");
+                if (_settingsService.CurrentSettings.BrowserUseUiaDirectExecution)
+                {
+                    builder.AppendLine("UIA direct execution is enabled. focus_window selects without activating the window; status does not copy the URL. Single left clicks by ref prefer Invoke, Toggle, SelectionItem, ExpandCollapse, or LegacyIAccessible patterns. Use type_text with ref, replace=true, pressEnter=false for ValuePattern.SetValue without physical input. Unsupported patterns and coordinate clicks, other click types, typing without ref, keys, dragging, capture, and browser shortcuts use foreground input. UIA provider errors are not retried with physical input. Direct actions do not move the cursor or activate the window, but the target application itself may change focus. Always use the returned fresh snapshot; stale or ambiguous refs are rejected.");
+                }
                 if (_settingsService.CurrentSettings.BrowserUseCaptureEnabled)
                 {
                     builder.AppendLine("Accessibility snapshots provide stable refs, and interaction tools return a fresh snapshot.");

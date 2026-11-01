@@ -45,8 +45,8 @@ namespace TxtAIEditor.Controls
                 CreateAlias("mcp_browser_use_drag", "drag", "Drag mouse from a start element ref or coordinates to an end element ref or coordinates. Returns a fresh accessibility snapshot.", """
                 {"type":"object","properties":{"startRef":{"type":"string","description":"Start element ref returned by mcp_browser_use_snapshot."},"endRef":{"type":"string","description":"End element ref returned by mcp_browser_use_snapshot."},"startX":{"type":"integer","description":"Start X coordinate in explicit capture or window."},"startY":{"type":"integer","description":"Start Y coordinate in explicit capture or window."},"endX":{"type":"integer","description":"End X coordinate in explicit capture or window."},"endY":{"type":"integer","description":"End Y coordinate in explicit capture or window."},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Use screenshot only for coordinates from a prior mcp_browser_use_capture. Window coordinates are relative to the unscaled browser window."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"}}}
                 """),
-                CreateAlias("mcp_browser_use_type_text", "type_text", "Type Unicode text into the focused browser control. Can replace the current field selection and optionally press Enter.", """
-                {"type":"object","properties":{"text":{"type":"string"},"replace":{"type":"boolean","default":false},"pressEnter":{"type":"boolean","default":false}},"required":["text"]}
+                CreateAlias("mcp_browser_use_type_text", "type_text", "Type Unicode text into the focused control or an explicit ref. With UIA direct execution enabled, ref plus replace=true and pressEnter=false uses ValuePattern.SetValue when available; otherwise uses foreground input. Returns a fresh accessibility snapshot.", """
+                {"type":"object","properties":{"text":{"type":"string"},"ref":{"type":"string","description":"Current snapshot ref of the target field. Use replace=true and pressEnter=false for direct UIA value replacement."},"replace":{"type":"boolean","default":false},"pressEnter":{"type":"boolean","default":false}},"required":["text"]}
                 """),
                 CreateAlias("mcp_browser_use_key", "key", "Press a browser key or shortcut. Supported keys: enter, escape, tab, space, backspace, delete, home, end, pageup, pagedown, up, down, left, right, f5, f6, f11; modifiers are optional.", """
                 {"type":"object","properties":{"key":{"type":"string"},"ctrl":{"type":"boolean","default":false},"alt":{"type":"boolean","default":false},"shift":{"type":"boolean","default":false}},"required":["key"]}
@@ -95,7 +95,7 @@ namespace TxtAIEditor.Controls
                 aliases.Add(CreateAlias(
                     "mcp_browser_use_focus_window",
                     "focus_window",
-                    "Select and focus an open application window for capture, clicking, typing, keys, and scrolling. Use a windowId from list_windows when possible.",
+                    "Select an open application window for capture, clicking, typing, keys, and scrolling. Activates the window unless UIA direct execution is enabled. Use a windowId from list_windows when possible.",
                     """
                     {"type":"object","properties":{"windowId":{"type":"string","description":"Window id returned by list_windows."},"title":{"type":"string","description":"Case-insensitive title substring."},"process":{"type":"string","description":"Case-insensitive process name."}}}
                     """));
