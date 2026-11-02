@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Enumeration;
 using System.Text.RegularExpressions;
 using System.Threading;
 using TxtAIEditor.Core.Services;
@@ -29,16 +30,7 @@ namespace TxtAIEditor.Controls
             Action<ExplorerItem> publishResult,
             CancellationToken cancellationToken = default)
         {
-            foreach (string rootPath in rootPaths)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                SearchLocal(rootPath, query, hideUnwantedFolders, item =>
-                {
-                    // Include the drive so results from different roots are distinguishable.
-                    item.SubPath = Path.GetDirectoryName(item.Path) ?? rootPath;
-                    publishResult(item);
-                }, cancellationToken);
-            }
+            SearchLocalCore(rootPaths, query, hideUnwantedFolders, true, publishResult, cancellationToken);
         }
 
         public void SearchLocal(
@@ -48,91 +40,101 @@ namespace TxtAIEditor.Controls
             Action<ExplorerItem> publishResult,
             CancellationToken cancellationToken = default)
         {
-            var directories = new Stack<string>();
-            directories.Push(rootPath);
+            SearchLocalCore(new[] { rootPath }, query, hideUnwantedFolders, false, publishResult, cancellationToken);
+        }
 
+        private void SearchLocalCore(
+            IEnumerable<string> rootPaths,
+            string query,
+            bool hideUnwantedFolders,
+            bool includeRootInSubPath,
+            Action<ExplorerItem> publishResult,
+            CancellationToken cancellationToken)
+        {
+            var matcher = new NameMatcher(query);
+            // Scan all roots and nearby folders before descending into a large subtree.
+            var directories = new Queue<(string Path, string Root)>();
             var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            try
+            foreach (string rootPath in rootPaths)
             {
-                visited.Add(Path.GetFullPath(rootPath));
-            }
-            catch
-            {
-                visited.Add(rootPath);
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    string fullPath = Path.GetFullPath(rootPath);
+                    if (visited.Add(fullPath))
+                    {
+                        directories.Enqueue((fullPath, fullPath));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error resolving search root {rootPath}: {ex.Message}");
+                }
             }
 
+            var options = new EnumerationOptions
+            {
+                IgnoreInaccessible = true,
+                AttributesToSkip = FileAttributes.Hidden,
+                ReturnSpecialDirectories = false,
+                BufferSize = 16 * 1024
+            };
             while (directories.Count > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                string currentDirectory = directories.Pop();
+                (string currentDirectory, string rootPath) = directories.Dequeue();
                 try
                 {
-                    var directoryInfo = new DirectoryInfo(currentDirectory);
-                    if (currentDirectory != rootPath &&
-                        ShouldSkipDirectory(directoryInfo, hideUnwantedFolders))
-                    {
-                        continue;
-                    }
-
-                    foreach (FileInfo file in directoryInfo.EnumerateFiles())
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (file.Attributes.HasFlag(FileAttributes.Hidden) ||
-                            !MatchesPattern(file.Name, query))
+                    // Use the enumeration's metadata directly: one pass per folder, and no
+                    // FileInfo/DirectoryInfo or full-path allocation for nonmatching files.
+                    var entries = new FileSystemEnumerable<ExplorerItem?>(
+                        currentDirectory,
+                        (ref FileSystemEntry entry) =>
                         {
-                            continue;
-                        }
-
-                        string relativePath = Path.GetRelativePath(rootPath, file.FullName);
-                        publishResult(new ExplorerItem
-                        {
-                            Name = file.Name,
-                            Path = file.FullName,
-                            IsFolder = false,
-                            IsArchive = _archiveExplorerService.IsSupportedArchiveFile(file.FullName),
-                            ModifiedTime = file.LastWriteTime,
-                            FileSize = file.Length,
-                            SubPath = Path.GetDirectoryName(relativePath) ?? string.Empty
-                        });
-                    }
-
-                    foreach (DirectoryInfo subdirectory in directoryInfo.EnumerateDirectories())
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (ShouldSkipDirectory(subdirectory, hideUnwantedFolders))
-                        {
-                            continue;
-                        }
-
-                        string canonicalPath;
-                        try
-                        {
-                            canonicalPath = Path.GetFullPath(subdirectory.FullName);
-                        }
-                        catch
-                        {
-                            canonicalPath = subdirectory.FullName;
-                        }
-
-                        if (!visited.Add(canonicalPath))
-                        {
-                            continue;
-                        }
-
-                        if (MatchesPattern(subdirectory.Name, query))
-                        {
-                            string relativePath = Path.GetRelativePath(rootPath, subdirectory.FullName);
-                            publishResult(new ExplorerItem
+                            bool isFolder = entry.IsDirectory;
+                            string fullPath = entry.ToFullPath();
+                            if (isFolder && visited.Add(fullPath))
                             {
-                                Name = subdirectory.Name,
-                                Path = subdirectory.FullName,
-                                IsFolder = true,
-                                ModifiedTime = subdirectory.LastWriteTime,
-                                SubPath = Path.GetDirectoryName(relativePath) ?? string.Empty
-                            });
-                        }
+                                directories.Enqueue((fullPath, rootPath));
+                            }
 
-                        directories.Push(subdirectory.FullName);
+                            if (isFolder && !matcher.IsMatch(entry.FileName))
+                            {
+                                return null;
+                            }
+
+                            string displayPath = includeRootInSubPath
+                                ? fullPath
+                                : Path.GetRelativePath(rootPath, fullPath);
+                            return new ExplorerItem
+                            {
+                                Name = entry.FileName.ToString(),
+                                Path = fullPath,
+                                IsFolder = isFolder,
+                                IsArchive = !isFolder && _archiveExplorerService.IsSupportedArchiveFile(fullPath),
+                                ModifiedTime = entry.LastWriteTimeUtc.LocalDateTime,
+                                FileSize = isFolder ? null : entry.Length,
+                                SubPath = Path.GetDirectoryName(displayPath) ?? string.Empty
+                            };
+                        },
+                        options)
+                    {
+                        ShouldIncludePredicate = (ref FileSystemEntry entry) =>
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            return entry.IsDirectory
+                                ? !ShouldSkipDirectory(ref entry, hideUnwantedFolders)
+                                : matcher.IsMatch(entry.FileName);
+                        }
+                    };
+
+                    foreach (ExplorerItem? item in entries)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (item != null)
+                        {
+                            publishResult(item);
+                        }
                     }
                 }
                 catch (OperationCanceledException)
@@ -155,31 +157,44 @@ namespace TxtAIEditor.Controls
 
         public static bool MatchesPattern(string name, string pattern)
         {
-            if (string.IsNullOrEmpty(pattern))
-            {
-                return true;
-            }
-
-            if (pattern.Contains('*') || pattern.Contains('?'))
-            {
-                string regexPattern = "^" + Regex.Escape(pattern)
-                    .Replace("\\*", ".*")
-                    .Replace("\\?", ".") + "$";
-                return Regex.IsMatch(
-                    name,
-                    regexPattern,
-                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-            }
-
-            return name.Contains(pattern, StringComparison.OrdinalIgnoreCase);
+            return new NameMatcher(pattern).IsMatch(name.AsSpan());
         }
 
-        private static bool ShouldSkipDirectory(DirectoryInfo directory, bool hideUnwantedFolders)
+        public static Func<string, bool> CreateNameMatcher(string pattern)
         {
-            return directory.Attributes.HasFlag(FileAttributes.Hidden) ||
-                directory.Attributes.HasFlag(FileAttributes.ReparsePoint) ||
-                IgnoredFolderNames.Contains(directory.Name) ||
-                (hideUnwantedFolders && IsHiddenFolderName(directory.Name));
+            var matcher = new NameMatcher(pattern);
+            return name => matcher.IsMatch(name.AsSpan());
+        }
+
+        private sealed class NameMatcher
+        {
+            private readonly string _pattern;
+            private readonly Regex? _regex;
+
+            public NameMatcher(string pattern)
+            {
+                _pattern = pattern;
+                if (pattern.Contains('*') || pattern.Contains('?'))
+                {
+                    string regexPattern = "^" + Regex.Escape(pattern)
+                        .Replace("\\*", ".*")
+                        .Replace("\\?", ".") + "$";
+                    _regex = new Regex(regexPattern,
+                        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+                }
+            }
+
+            public bool IsMatch(ReadOnlySpan<char> name)
+            {
+                return _regex?.IsMatch(name) ?? name.Contains(_pattern.AsSpan(), StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private static bool ShouldSkipDirectory(ref FileSystemEntry directory, bool hideUnwantedFolders)
+        {
+            return (directory.Attributes & FileAttributes.ReparsePoint) != 0 ||
+                IgnoredFolderNames.Contains(directory.FileName.ToString()) ||
+                (hideUnwantedFolders && directory.FileName.StartsWith(".", StringComparison.Ordinal));
         }
     }
 }
