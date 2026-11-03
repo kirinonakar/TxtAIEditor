@@ -94,6 +94,7 @@ namespace TxtAIEditor.Controls
         public event KeyEventHandler? SearchQueryInputKeyDown { add => SearchView.QueryKeyDown += value; remove => SearchView.QueryKeyDown -= value; }
         public event RoutedEventHandler? SearchAllFilesClick { add => SearchView.SearchAllClick += value; remove => SearchView.SearchAllClick -= value; }
         public event RoutedEventHandler? ReplaceAllClick { add => SearchView.ReplaceAllClick += value; remove => SearchView.ReplaceAllClick -= value; }
+        public event RoutedEventHandler? SearchClearResultsClick { add => SearchView.ClearResultsClick += value; remove => SearchView.ClearResultsClick -= value; }
         public event RoutedEventHandler? ReplaceOneClick { add => SearchView.ReplaceOneClick += value; remove => SearchView.ReplaceOneClick -= value; }
         public event ItemClickEventHandler? SearchResultItemClick { add => SearchView.ResultItemClick += value; remove => SearchView.ResultItemClick -= value; }
         public event ItemClickEventHandler? RecentFileItemClick { add => RecentView.ItemClick += value; remove => RecentView.ItemClick -= value; }

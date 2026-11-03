@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -40,7 +42,9 @@ namespace TxtAIEditor.Controls
         private OpenedTab? _searchedTab;
         private string _lastSearchQuery = string.Empty;
         private CancellationTokenSource? _searchCancellationTokenSource;
+        private SearchResultDispatcher<SearchResultItem>? _resultDispatcher;
         private int _searchVersion;
+        private readonly Dictionary<string, SearchResultGroup> _resultGroups = new(StringComparer.OrdinalIgnoreCase);
         public event Func<string, Task>? FileModified;
 
         public SearchReplaceController(
@@ -130,11 +134,23 @@ namespace TxtAIEditor.Controls
             _viewModel.SearchResults.Clear();
             _viewModel.SearchResultsGrouped.Clear();
             _searchedTab = searchTab;
+            _resultGroups.Clear();
 
             var searchCancellationTokenSource = new CancellationTokenSource();
             _searchCancellationTokenSource = searchCancellationTokenSource;
             int searchVersion = unchecked(++_searchVersion);
             CancellationToken cancellationToken = searchCancellationTokenSource.Token;
+            var resultDispatcher = new SearchResultDispatcher<SearchResultItem>(
+                callback => _searchResultsList.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => callback()),
+                item =>
+                {
+                    if (!cancellationToken.IsCancellationRequested && searchVersion == _searchVersion)
+                    {
+                        AppendSearchResult(item);
+                    }
+                },
+                cancellationToken);
+            _resultDispatcher = resultDispatcher;
             SetSearchHeaderIsSearching(searchVersion, true);
 
             FileSearchSummary summary;
@@ -146,15 +162,16 @@ namespace TxtAIEditor.Controls
                         query,
                         GetSearchOptions(),
                         _fileSearchService,
-                        results => PublishSearchResults(results, searchVersion, cancellationToken),
+                        resultDispatcher.Publish,
                         cancellationToken)
                     : await _fileSearchService.SearchAsync(
                     searchRoot,
                     query,
                     _largeFileThresholdBytesProvider(),
                     GetSearchOptions(),
-                    results => PublishSearchResults(results, searchVersion, cancellationToken),
+                    resultDispatcher.Publish,
                     cancellationToken);
+                await resultDispatcher.CompleteAsync();
             }
             catch (OperationCanceledException)
             {
@@ -186,6 +203,8 @@ namespace TxtAIEditor.Controls
             }
             finally
             {
+                resultDispatcher.Cancel();
+                if (ReferenceEquals(_resultDispatcher, resultDispatcher)) _resultDispatcher = null;
                 if (ReferenceEquals(_searchCancellationTokenSource, searchCancellationTokenSource) || _searchCancellationTokenSource == null)
                 {
                     _searchCancellationTokenSource = null;
@@ -437,6 +456,8 @@ namespace TxtAIEditor.Controls
 
         public void CancelActiveSearch()
         {
+            _resultDispatcher?.Cancel();
+            _resultDispatcher = null;
             CancellationTokenSource? cancellationTokenSource = _searchCancellationTokenSource;
             cancellationTokenSource?.Cancel();
             if (cancellationTokenSource != null)
@@ -450,6 +471,18 @@ namespace TxtAIEditor.Controls
             }
 
             SetSearchHeaderText(isSearching: false);
+        }
+
+        public void ClearSearchResults()
+        {
+            CancelActiveSearch();
+            _searchResultsList.SelectedItem = null;
+            _viewModel.SearchResults.Clear();
+            _viewModel.SearchResultsGrouped.Clear();
+            _resultGroups.Clear();
+            _searchedTab = null;
+            _lastSearchQuery = string.Empty;
+            _searchQueryInput.Text = string.Empty;
         }
 
         private void SetSearchHeaderIsSearching(int searchVersion, bool isSearching)
@@ -491,62 +524,24 @@ namespace TxtAIEditor.Controls
             _searchProgressIndicator.Visibility = isSearching ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private void PublishSearchResults(System.Collections.Generic.IReadOnlyList<SearchResultItem> results, int searchVersion, CancellationToken cancellationToken)
+        private void AppendSearchResult(SearchResultItem item)
         {
-            if (cancellationToken.IsCancellationRequested || searchVersion != _searchVersion)
+            _viewModel.SearchResults.Add(item);
+            if (!_resultGroups.TryGetValue(item.Path, out SearchResultGroup? group))
             {
+                group = new SearchResultGroup(item.Path, new[] { item }, GetRelativeDirectory(item.Path));
+                _resultGroups.Add(item.Path, group);
+                _viewModel.SearchResultsGrouped.Add(group);
                 return;
             }
 
-            _searchResultsList.DispatcherQueue.TryEnqueue(() =>
-            {
-                if (cancellationToken.IsCancellationRequested || searchVersion != _searchVersion)
-                {
-                    return;
-                }
-
-                if (_viewModel.SearchResults is BulkObservableCollection<SearchResultItem> bulk)
-                {
-                    bulk.AddRange(results);
-                }
-                else
-                {
-                    foreach (var item in results)
-                    {
-                        _viewModel.SearchResults.Add(item);
-                    }
-                }
-
-                AppendGroupedResults(results);
-            });
+            // Incremental additions preserve the selected row while more results arrive.
+            group.Add(item);
         }
 
         private void UpdateGroupedResults()
         {
             SynchronizeGroupedResults();
-        }
-
-        private void AppendGroupedResults(System.Collections.Generic.IReadOnlyList<SearchResultItem> results)
-        {
-            foreach (var resultGroup in results.GroupBy(item => item.Path))
-            {
-                SearchResultGroup? existingGroup = _viewModel.SearchResultsGrouped.FirstOrDefault(
-                    group => string.Equals(group.Path, resultGroup.Key, StringComparison.OrdinalIgnoreCase));
-
-                if (existingGroup == null)
-                {
-                    _viewModel.SearchResultsGrouped.Add(new SearchResultGroup(
-                        resultGroup.Key,
-                        resultGroup,
-                        GetRelativeDirectory(resultGroup.Key)));
-                    continue;
-                }
-
-                foreach (SearchResultItem item in resultGroup)
-                {
-                    existingGroup.Add(item);
-                }
-            }
         }
 
         private void SynchronizeGroupedResults()
@@ -561,6 +556,7 @@ namespace TxtAIEditor.Controls
                 if (!currentItemsByPath.TryGetValue(group.Path, out var currentItems))
                 {
                     _viewModel.SearchResultsGrouped.RemoveAt(groupIndex);
+                    _resultGroups.Remove(group.Path);
                     continue;
                 }
 
@@ -585,10 +581,12 @@ namespace TxtAIEditor.Controls
 
             foreach (var remainingGroup in currentItemsByPath)
             {
-                _viewModel.SearchResultsGrouped.Add(new SearchResultGroup(
+                var group = new SearchResultGroup(
                     remainingGroup.Key,
                     remainingGroup.Value,
-                    GetRelativeDirectory(remainingGroup.Key)));
+                    GetRelativeDirectory(remainingGroup.Key));
+                _resultGroups[group.Path] = group;
+                _viewModel.SearchResultsGrouped.Add(group);
             }
         }
 

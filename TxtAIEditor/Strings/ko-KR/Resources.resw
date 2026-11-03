@@ -672,10 +672,16 @@
     <value>정규식 검색</value>
   </data>
   <data name="SearchAllFiles" xml:space="preserve">
-    <value>전체 검색</value>
+    <value>검색</value>
   </data>
   <data name="ReplaceAllFiles" xml:space="preserve">
     <value>모두 바꾸기</value>
+  </data>
+  <data name="SearchClearResults" xml:space="preserve">
+    <value>지우기</value>
+  </data>
+  <data name="SearchClearResultsTooltip" xml:space="preserve">
+    <value>검색을 중지하고 검색어와 결과 지우기</value>
   </data>
   <data name="RecentFilesHeader" xml:space="preserve">
     <value>최근 열린 파일</value>

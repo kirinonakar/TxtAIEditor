@@ -7,6 +7,9 @@
     xmlns:local="using:TxtAIEditor.Controls">
     <UserControl.Resources>
         <local:LocalizationBridge x:Key="LocBridge"/>
+        <DataTemplate x:Key="SearchActionContentTemplate">
+            <TextBlock Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center"/>
+        </DataTemplate>
     </UserControl.Resources>
     <Grid x:Name="RootGrid" Padding="0,10,0,10" Visibility="Collapsed">
                                 <Grid.RowDefinitions>
@@ -35,11 +38,13 @@
      
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="0.7*"/>
+                                            <ColumnDefinition Width="1.1*"/>
+                                            <ColumnDefinition Width="1.2*"/>
                                         </Grid.ColumnDefinitions>
-                                        <Button x:Name="SearchAllButton" Content="전체 검색" HorizontalAlignment="Stretch" Click="OnSearchAllFilesClick" Style="{StaticResource AccentButtonStyle}" FontSize="11"/>
-                                        <Button x:Name="ReplaceAllButton" Content="모두 바꾸기" Grid.Column="1" HorizontalAlignment="Stretch" Click="OnReplaceAllClick" FontSize="11"/>
+                                        <Button x:Name="SearchAllButton" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Click="OnSearchAllFilesClick" Style="{StaticResource AccentButtonStyle}" FontSize="11" MinWidth="0" Padding="4,5" ContentTemplate="{StaticResource SearchActionContentTemplate}"/>
+                                        <Button x:Name="ReplaceAllButton" Content="모두 바꾸기" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Click="OnReplaceAllClick" FontSize="11" MinWidth="0" Padding="4,5" ContentTemplate="{StaticResource SearchActionContentTemplate}"/>
+                                        <Button x:Name="ClearResultsButton" Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Click="OnClearResultsClick" FontSize="11" MinWidth="0" Padding="4,5" ContentTemplate="{StaticResource SearchActionContentTemplate}"/>
                                     </Grid>
                                 </StackPanel>
     

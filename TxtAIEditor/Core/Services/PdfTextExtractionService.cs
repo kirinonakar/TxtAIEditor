@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TxtAIEditor.Core.Services
@@ -15,7 +16,8 @@ namespace TxtAIEditor.Core.Services
         private const int MaxStreamsToInspect = 300;
         private const int MaxLooseFallbackChars = 256 * 1024;
 
-        public async Task<string> ExtractTextAsync(string filePath, int maxChars, IProgress<int>? progress = null)
+        public async Task<string> ExtractTextAsync(string filePath, int maxChars, IProgress<int>? progress = null,
+            CancellationToken cancellationToken = default, bool skipProtectedDocuments = false)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath) || maxChars <= 0)
             {
@@ -23,14 +25,19 @@ namespace TxtAIEditor.Core.Services
             }
 
             progress?.Report(1);
-            byte[] bytes = await File.ReadAllBytesAsync(filePath).ConfigureAwait(false);
+            byte[] bytes = await File.ReadAllBytesAsync(filePath, cancellationToken).ConfigureAwait(false);
             progress?.Report(5);
             string raw = Encoding.Latin1.GetString(bytes);
+            if (skipProtectedDocuments && ContainsEncryptionEntry(raw, cancellationToken))
+            {
+                throw new InvalidDataException("Encrypted PDF documents are skipped during folder search.");
+            }
             var parts = new List<string>();
             var streams = new List<PdfStreamInfo>();
 
             foreach (var stream in EnumeratePdfStreams(raw, progress))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 streams.Add(stream);
             }
 
@@ -40,6 +47,7 @@ namespace TxtAIEditor.Core.Services
 
             foreach (var page in pageContents)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string extracted = ExtractTextFromContentStream(page.Content, page.FontUnicodeMaps);
                 if (!string.IsNullOrWhiteSpace(extracted))
                 {
@@ -60,6 +68,7 @@ namespace TxtAIEditor.Core.Services
             {
                 foreach (var stream in streams)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (stream.ObjectNumber.HasValue && handledContentStreams.Contains(stream.ObjectNumber.Value))
                     {
                         continue;
@@ -97,6 +106,74 @@ namespace TxtAIEditor.Core.Services
             progress?.Report(100);
             return text.Length > maxChars ? text.Substring(0, maxChars) : text;
         }
+
+        internal static bool ContainsEncryptionEntry(string raw, CancellationToken cancellationToken = default)
+        {
+            // Inspect PDF names, excluding comments, strings, and stream contents. Looking for
+            // a raw substring would also reject ordinary text mentioning "/Encrypt".
+            for (int i = 0; i < raw.Length; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                char ch = raw[i];
+                if (ch == '%')
+                {
+                    while (i < raw.Length && raw[i] != '\r' && raw[i] != '\n') i++;
+                }
+                else if (ch == '(')
+                {
+                    int depth = 1;
+                    while (++i < raw.Length && depth > 0)
+                    {
+                        if (raw[i] == '\\') i++;
+                        else if (raw[i] == '(') depth++;
+                        else if (raw[i] == ')') depth--;
+                    }
+                    i--;
+                }
+                else if (ch == '<')
+                {
+                    if (i + 1 < raw.Length && raw[i + 1] == '<') i++;
+                    else while (++i < raw.Length && raw[i] != '>') { }
+                }
+                else if (ch == '/')
+                {
+                    int start = ++i;
+                    while (i < raw.Length && !IsPdfDelimiter(raw[i])) i++;
+                    ReadOnlySpan<char> name = raw.AsSpan(start, i - start);
+                    if (name.SequenceEqual("Encrypt")) return true;
+                    if (name.Contains('#') && name.Length <= 21)
+                    {
+                        var decoded = new StringBuilder();
+                        for (int n = 0; n < name.Length; n++)
+                        {
+                            if (name[n] == '#' && n + 2 < name.Length &&
+                                byte.TryParse(name.Slice(n + 1, 2), System.Globalization.NumberStyles.HexNumber,
+                                    System.Globalization.CultureInfo.InvariantCulture, out byte value))
+                            {
+                                decoded.Append((char)value);
+                                n += 2;
+                            }
+                            else decoded.Append(name[n]);
+                        }
+                        if (decoded.ToString() == "Encrypt") return true;
+                    }
+                    i--;
+                }
+                else if (ch == 's' && (i == 0 || IsPdfDelimiter(raw[i - 1])) &&
+                    raw.AsSpan(i).StartsWith("stream") &&
+                    i + 6 < raw.Length && (raw[i + 6] == '\r' || raw[i + 6] == '\n'))
+                {
+                    int end = raw.IndexOf("endstream", i + 6, StringComparison.Ordinal);
+                    if (end < 0) return false;
+                    i = end + 8;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsPdfDelimiter(char ch) =>
+            ch is '\0' or '\t' or '\n' or '\f' or '\r' or ' ' or '(' or ')' or '<' or '>' or '[' or ']' or '{' or '}' or '/' or '%';
 
         private sealed class PdfStreamInfo
         {

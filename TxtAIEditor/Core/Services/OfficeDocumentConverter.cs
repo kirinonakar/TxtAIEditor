@@ -7,7 +7,7 @@ namespace TxtAIEditor.Core.Services
 {
     public static class OfficeDocumentConverter
     {
-        public static async Task<string> ConvertToDocxAsync(string docPath)
+        public static async Task<string> ConvertToDocxAsync(string docPath, bool suppressPasswordPrompts = false)
         {
             var task = Task.Run(() =>
             {
@@ -35,7 +35,10 @@ namespace TxtAIEditor.Core.Services
                     wordApp.DisplayAlerts = 0; // wdAlertsNone = 0
 
                     dynamic documents = wordApp.Documents;
-                    document = documents.Open(docPath, ReadOnly: true, ConfirmConversions: false, AddToRecentFiles: false);
+                    document = suppressPasswordPrompts
+                        ? documents.Open(docPath, ReadOnly: true, ConfirmConversions: false, AddToRecentFiles: false,
+                            PasswordDocument: Guid.NewGuid().ToString("N"), WritePasswordDocument: Guid.NewGuid().ToString("N"))
+                        : documents.Open(docPath, ReadOnly: true, ConfirmConversions: false, AddToRecentFiles: false);
                     document.SaveAs2(destPath, 16); // 16 = wdFormatXMLDocument (docx)
                     document.Close(0); // 0 = wdDoNotSaveChanges
                     return destPath;
@@ -72,7 +75,7 @@ namespace TxtAIEditor.Core.Services
             return await task.ConfigureAwait(false);
         }
 
-        public static async Task<string> ConvertToXlsxAsync(string xlsPath)
+        public static async Task<string> ConvertToXlsxAsync(string xlsPath, bool suppressPasswordPrompts = false)
         {
             var task = Task.Run(() =>
             {
@@ -100,7 +103,10 @@ namespace TxtAIEditor.Core.Services
                     excelApp.DisplayAlerts = false;
 
                     dynamic workbooks = excelApp.Workbooks;
-                    workbook = workbooks.Open(xlsPath, ReadOnly: true, UpdateLinks: false);
+                    workbook = suppressPasswordPrompts
+                        ? workbooks.Open(xlsPath, ReadOnly: true, UpdateLinks: false,
+                            Password: Guid.NewGuid().ToString("N"), WriteResPassword: Guid.NewGuid().ToString("N"), IgnoreReadOnlyRecommended: true)
+                        : workbooks.Open(xlsPath, ReadOnly: true, UpdateLinks: false);
                     workbook.SaveAs(destPath, 51); // 51 = xlOpenXMLWorkbook (xlsx)
                     workbook.Close(false); // false = do not save changes
                     return destPath;

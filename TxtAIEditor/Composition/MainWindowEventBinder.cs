@@ -34,6 +34,7 @@ namespace TxtAIEditor.Composition
             };
             ui.LeftSidebar.SearchAllFilesClick += async (_, _) => await editor.SearchAllFilesAsync();
             ui.LeftSidebar.ReplaceAllClick += async (_, _) => await editor.ReplaceAllAsync();
+            ui.LeftSidebar.SearchClearResultsClick += (_, _) => editor.ClearSearchResults();
             ui.LeftSidebar.ReplaceOneClick += async (sender, _) =>
             {
                 if (sender is Button button && button.Tag is SearchResultItem item)

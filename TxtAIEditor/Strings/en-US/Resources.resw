@@ -672,10 +672,16 @@
     <value>Regex</value>
   </data>
   <data name="SearchAllFiles" xml:space="preserve">
-    <value>Search All</value>
+    <value>Search</value>
   </data>
   <data name="ReplaceAllFiles" xml:space="preserve">
     <value>Replace All</value>
+  </data>
+  <data name="SearchClearResults" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="SearchClearResultsTooltip" xml:space="preserve">
+    <value>Stop searching and clear the query and results</value>
   </data>
   <data name="RecentFilesHeader" xml:space="preserve">
     <value>Recent Files (Double-click to open)</value>

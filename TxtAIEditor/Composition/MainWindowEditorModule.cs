@@ -196,6 +196,9 @@ namespace TxtAIEditor.Composition
         public void CancelActiveSearch() =>
             Foundation.SearchReplace.CancelActiveSearch();
 
+        public void ClearSearchResults() =>
+            Foundation.SearchReplace.ClearSearchResults();
+
         public Task HandleSearchQueryEnterAsync() =>
             Foundation.SearchReplace.HandleSearchQueryEnterAsync();
 

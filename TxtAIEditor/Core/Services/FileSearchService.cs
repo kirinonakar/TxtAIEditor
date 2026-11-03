@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Enumeration;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -17,6 +18,10 @@ namespace TxtAIEditor.Core.Services
     {
         private const int DocumentSearchMaxChars = 50_000_000;
         private const int SearchResultBatchSize = 100;
+        private static readonly HashSet<string> SkippedDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".git", ".vs", "bin", "obj", "node_modules", "packages", ".venv"
+        };
 
         private static readonly HashSet<string> SkippedFileExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -73,13 +78,25 @@ namespace TxtAIEditor.Core.Services
             return new Regex(pattern, regexOptions, TimeSpan.FromSeconds(2));
         }
 
-        public async Task<FileSearchSummary> SearchAsync(
+        public Task<FileSearchSummary> SearchAsync(
             string searchRoot,
             string query,
             long largeFileThresholdBytes,
             FileSearchOptions options,
             Action<IReadOnlyList<SearchResultItem>> publishResults,
             CancellationToken cancellationToken = default)
+        {
+            // Preparing the enumerator reads ancestor .gitignore files. Regex compilation
+            // and all filesystem access must happen after leaving the caller's UI thread.
+            return Task.Run(() => SearchCoreAsync(searchRoot, query, options, publishResults, cancellationToken), cancellationToken);
+        }
+
+        private async Task<FileSearchSummary> SearchCoreAsync(
+            string searchRoot,
+            string query,
+            FileSearchOptions options,
+            Action<IReadOnlyList<SearchResultItem>> publishResults,
+            CancellationToken cancellationToken)
         {
             Regex? regex = options.IsRegex || options.WholeWord
                 ? BuildSearchRegex(query, options)
@@ -94,7 +111,7 @@ namespace TxtAIEditor.Core.Services
                 MaxDegreeOfParallelism = GetSearchDegreeOfParallelism()
             };
 
-            await Parallel.ForEachAsync(EnumerateSearchFiles(searchRoot), parallelOptions, async (file, token) =>
+            await Parallel.ForEachAsync(EnumerateSearchFiles(searchRoot, cancellationToken), parallelOptions, async (file, token) =>
             {
                 token.ThrowIfCancellationRequested();
 
@@ -135,7 +152,7 @@ namespace TxtAIEditor.Core.Services
         {
             int foundCount = 0;
             string extracted = await _documentTextExtractionService
-                .ExtractTextAsync(file, DocumentSearchMaxChars, normalize: false, cancellationToken: cancellationToken)
+                .ExtractTextAsync(file, DocumentSearchMaxChars, normalize: false, cancellationToken: cancellationToken, skipProtectedDocuments: true)
                 .ConfigureAwait(false);
 
             if (string.IsNullOrWhiteSpace(extracted))
@@ -186,7 +203,7 @@ namespace TxtAIEditor.Core.Services
                     detectedStream,
                     encoding,
                     detectEncodingFromByteOrderMarks: true,
-                    bufferSize: 64 * 1024);
+                    bufferSize: bytes.Length < 64 * 1024 ? 4096 : 64 * 1024);
 
                 return SearchTextReader(file, detectedReader, matcher, publishResults, cancellationToken);
             }
@@ -196,13 +213,13 @@ namespace TxtAIEditor.Core.Services
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.ReadWrite,
-                bufferSize: 64 * 1024,
+                bufferSize: 4096,
                 options: FileOptions.SequentialScan);
             using var reader = new StreamReader(
                 stream,
                 Encoding.UTF8,
                 detectEncodingFromByteOrderMarks: true,
-                bufferSize: 64 * 1024);
+                bufferSize: stream.Length < 64 * 1024 ? 4096 : 64 * 1024);
 
             return SearchTextReader(file, reader, matcher, publishResults, cancellationToken);
         }
@@ -296,7 +313,7 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static IEnumerable<string> EnumerateSearchFiles(string searchRoot)
+        private static IEnumerable<string> EnumerateSearchFiles(string searchRoot, CancellationToken cancellationToken)
         {
             var gitIgnoreStack = new List<GitIgnoreFile>();
 
@@ -333,13 +350,12 @@ namespace TxtAIEditor.Core.Services
             }
 
             var visitedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            return EnumerateDirectoryRecursive(searchRoot, searchRoot, gitIgnoreStack, visitedDirs);
+            return EnumerateDirectoryRecursive(searchRoot, searchRoot, gitIgnoreStack, visitedDirs, cancellationToken);
         }
 
         private static bool ShouldSkipDirectoryName(string dirName)
         {
-            string[] skippedNames = { ".git", ".vs", "bin", "obj", "node_modules", "packages", ".venv" };
-            return skippedNames.Any(name => dirName.Equals(name, StringComparison.OrdinalIgnoreCase));
+            return SkippedDirectoryNames.Contains(dirName);
         }
 
         private static bool ShouldSkipFileExtension(string filePath)
@@ -365,7 +381,7 @@ namespace TxtAIEditor.Core.Services
 
         private static IEnumerable<string> EnumerateNormalizedLines(string text)
         {
-            using var reader = new StringReader(text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n'));
+            using var reader = new StringReader(text);
             string? line;
             while ((line = reader.ReadLine()) != null)
             {
@@ -419,8 +435,10 @@ namespace TxtAIEditor.Core.Services
             string currentDir,
             string searchRoot,
             List<GitIgnoreFile> gitIgnoreStack,
-            HashSet<string> visitedDirs)
+            HashSet<string> visitedDirs,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string canonicalPath = Path.GetFullPath(currentDir);
             if (!visitedDirs.Add(canonicalPath))
             {
@@ -461,57 +479,26 @@ namespace TxtAIEditor.Core.Services
                 }
             }
 
-            string[] files = Array.Empty<string>();
-            try
+            var subDirs = new List<string>();
+            foreach (var entry in EnumerateDirectoryEntries(currentDir, cancellationToken))
             {
-                files = Directory.GetFiles(currentDir);
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.Security.SecurityException)
-            {
-                Debug.WriteLine($"Failed to list files in {currentDir}: {ex.Message}");
-            }
-
-            foreach (var file in files)
-            {
-                if (IsPathIgnored(file, gitIgnoreStack, isDir: false))
+                cancellationToken.ThrowIfCancellationRequested();
+                if (entry.IsDirectory)
                 {
+                    subDirs.Add(entry.Path);
                     continue;
                 }
-                if (ShouldSkipFileExtension(file))
+                if (IsPathIgnored(entry.Path, gitIgnoreStack, isDir: false))
                 {
                     continue;
                 }
 
-                yield return file;
-            }
-
-            string[] subDirs = Array.Empty<string>();
-            try
-            {
-                subDirs = Directory.GetDirectories(currentDir);
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.Security.SecurityException)
-            {
-                Debug.WriteLine($"Failed to list directories in {currentDir}: {ex.Message}");
+                yield return entry.Path;
             }
 
             foreach (var subDir in subDirs)
             {
-                try
-                {
-                    var attributes = File.GetAttributes(subDir);
-                    if (attributes.HasFlag(FileAttributes.ReparsePoint))
-                    {
-                        continue; // Skip symlinks and junctions to prevent infinite loops/duplicate results
-                    }
-                }
-                catch
-                {
-                    // Ignore attribute read failures and skip to be safe.
-                    continue;
-                }
-
-                foreach (var f in EnumerateDirectoryRecursive(subDir, searchRoot, gitIgnoreStack, visitedDirs))
+                foreach (var f in EnumerateDirectoryRecursive(subDir, searchRoot, gitIgnoreStack, visitedDirs, cancellationToken))
                 {
                     yield return f;
                 }
@@ -520,6 +507,48 @@ namespace TxtAIEditor.Core.Services
             if (pushed)
             {
                 gitIgnoreStack.RemoveAt(gitIgnoreStack.Count - 1);
+            }
+        }
+
+        private static IEnumerable<(string Path, bool IsDirectory)> EnumerateDirectoryEntries(string directory, CancellationToken cancellationToken)
+        {
+            IEnumerator<(string Path, bool IsDirectory)>? iterator = null;
+            try
+            {
+                var entries = new FileSystemEnumerable<(string Path, bool IsDirectory)>(directory,
+                    (ref FileSystemEntry entry) => (entry.ToFullPath(), entry.IsDirectory),
+                    new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = 0 })
+                {
+                    ShouldIncludePredicate = (ref FileSystemEntry entry) =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return entry.IsDirectory
+                            ? (entry.Attributes & FileAttributes.ReparsePoint) == 0 && !ShouldSkipDirectoryName(entry.FileName.ToString())
+                            : !ShouldSkipFileExtension(entry.FileName.ToString());
+                    }
+                };
+                iterator = entries.GetEnumerator();
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.Security.SecurityException)
+            {
+                Debug.WriteLine($"Failed to enumerate {directory}: {ex.Message}");
+            }
+
+            if (iterator == null) yield break;
+            using (iterator)
+            {
+                while (true)
+                {
+                    bool hasNext;
+                    try { hasNext = iterator.MoveNext(); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.Security.SecurityException)
+                    {
+                        Debug.WriteLine($"Failed to enumerate {directory}: {ex.Message}");
+                        yield break;
+                    }
+                    if (!hasNext) yield break;
+                    yield return iterator.Current;
+                }
             }
         }
 

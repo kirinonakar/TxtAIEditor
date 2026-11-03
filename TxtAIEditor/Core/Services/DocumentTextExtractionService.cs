@@ -37,7 +37,8 @@ namespace TxtAIEditor.Core.Services
             int maxChars,
             IProgress<int>? progress = null,
             bool normalize = true,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            bool skipProtectedDocuments = false)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath) || maxChars <= 0)
             {
@@ -47,6 +48,10 @@ namespace TxtAIEditor.Core.Services
             cancellationToken.ThrowIfCancellationRequested();
             progress?.Report(1);
             string extension = Path.GetExtension(filePath).ToLowerInvariant();
+            if (skipProtectedDocuments && extension != ".pdf" && OfficeSearchProtection.IsEncrypted(filePath, cancellationToken))
+            {
+                throw new InvalidDataException("Encrypted Office documents are skipped during folder search.");
+            }
             string tempFilePath = string.Empty;
             bool isTempFile = false;
 
@@ -54,14 +59,14 @@ namespace TxtAIEditor.Core.Services
             {
                 if (extension == ".doc")
                 {
-                    tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(filePath).ConfigureAwait(false);
+                    tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(filePath, skipProtectedDocuments).ConfigureAwait(false);
                     filePath = tempFilePath;
                     extension = ".docx";
                     isTempFile = true;
                 }
                 else if (extension == ".xls")
                 {
-                    tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(filePath).ConfigureAwait(false);
+                    tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(filePath, skipProtectedDocuments).ConfigureAwait(false);
                     filePath = tempFilePath;
                     extension = ".xlsx";
                     isTempFile = true;
@@ -76,7 +81,7 @@ namespace TxtAIEditor.Core.Services
 
                 string text = extension switch
                 {
-                    ".pdf" => await ExtractPdfTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                    ".pdf" => await ExtractPdfTextAsync(filePath, maxChars, progress, cancellationToken, skipProtectedDocuments).ConfigureAwait(false),
                     ".docx" => await ExtractDocxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
                     ".pptx" => await ExtractPptxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
                     ".xlsx" => await ExtractXlsxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
@@ -117,7 +122,7 @@ namespace TxtAIEditor.Core.Services
                 extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase);
         }
 
-        private async Task<string> ExtractPdfTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken)
+        private async Task<string> ExtractPdfTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken, bool skipProtectedDocuments)
         {
             string text = await TryExtractPdfWithPdftotextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(text))
@@ -127,7 +132,7 @@ namespace TxtAIEditor.Core.Services
 
             cancellationToken.ThrowIfCancellationRequested();
             return await new PdfTextExtractionService()
-                .ExtractTextAsync(filePath, maxChars, progress)
+                .ExtractTextAsync(filePath, maxChars, progress, cancellationToken, skipProtectedDocuments)
                 .ConfigureAwait(false);
         }
 
@@ -171,23 +176,32 @@ namespace TxtAIEditor.Core.Services
             try
             {
                 Task<string> stdoutTask = ReadTextPrefixAsync(process.StandardOutput, maxChars, cancellationToken);
-                Task<string> stderrTask = process.StandardError.ReadToEndAsync();
-                Task waitTask = process.WaitForExitAsync();
+                Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+                Task waitTask = process.WaitForExitAsync(cancellationToken);
 
                 int reported = 5;
                 while (!waitTask.IsCompleted)
                 {
-                    await Task.Delay(500, cancellationToken).ConfigureAwait(false);
+                    if (await Task.WhenAny(waitTask, Task.Delay(500, cancellationToken)).ConfigureAwait(false) == waitTask)
+                    {
+                        break;
+                    }
+                    cancellationToken.ThrowIfCancellationRequested();
                     reported = Math.Min(90, reported + 5);
                     progress?.Report(reported);
                 }
 
                 await waitTask.ConfigureAwait(false);
                 string stdout = await stdoutTask.ConfigureAwait(false);
-                _ = await stderrTask.ConfigureAwait(false);
+                string stderr = await stderrTask.ConfigureAwait(false);
 
                 if (process.ExitCode != 0)
                 {
+                    if (stderr.Contains("password", StringComparison.OrdinalIgnoreCase) ||
+                        stderr.Contains("encrypted", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidDataException("Encrypted PDF cannot be searched without a password.");
+                    }
                     return string.Empty;
                 }
 
@@ -212,7 +226,7 @@ namespace TxtAIEditor.Core.Services
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                int read = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+                int read = await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
                 if (read <= 0)
                 {
                     break;
@@ -583,7 +597,15 @@ namespace TxtAIEditor.Core.Services
         {
             var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, useAsync: true);
             await Task.CompletedTask.ConfigureAwait(false);
-            return new ZipArchive(stream, ZipArchiveMode.Read);
+            try
+            {
+                return new ZipArchive(stream, ZipArchiveMode.Read);
+            }
+            catch
+            {
+                stream.Dispose();
+                throw;
+            }
         }
 
         private static async Task<XDocument> LoadXmlEntryAsync(ZipArchiveEntry entry)

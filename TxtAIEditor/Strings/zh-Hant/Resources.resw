@@ -672,10 +672,16 @@
     <value>Regex</value>
   </data>
   <data name="SearchAllFiles" xml:space="preserve">
-    <value>搜尋全部</value>
+    <value>搜尋</value>
   </data>
   <data name="ReplaceAllFiles" xml:space="preserve">
     <value>全部替換</value>
+  </data>
+  <data name="SearchClearResults" xml:space="preserve">
+    <value>清除</value>
+  </data>
+  <data name="SearchClearResultsTooltip" xml:space="preserve">
+    <value>停止搜尋並清除搜尋詞和結果</value>
   </data>
   <data name="RecentFilesHeader" xml:space="preserve">
     <value>最近使用的檔案（雙擊開啟）</value>

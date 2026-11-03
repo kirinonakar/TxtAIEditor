@@ -447,8 +447,7 @@ namespace TxtAIEditor.Core.Services
             {
                 var decoder = Encoding.UTF8.GetDecoder();
                 decoder.Fallback = new DecoderExceptionFallback();
-                char[] chars = new char[decoder.GetCharCount(bytes, 0, bytes.Length)];
-                decoder.GetChars(bytes, 0, bytes.Length, chars, 0);
+                _ = decoder.GetCharCount(bytes, 0, bytes.Length);
                 return true;
             }
             catch

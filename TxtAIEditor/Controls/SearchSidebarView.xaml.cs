@@ -28,6 +28,7 @@ namespace TxtAIEditor.Controls
         public event KeyEventHandler? QueryKeyDown;
         public event RoutedEventHandler? SearchAllClick;
         public event RoutedEventHandler? ReplaceAllClick;
+        public event RoutedEventHandler? ClearResultsClick;
         public event RoutedEventHandler? ReplaceOneClick;
         public event ItemClickEventHandler? ResultItemClick;
 
@@ -39,8 +40,10 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(SearchMatchCaseToggle, getString("SearchMatchCaseTooltip", "대소문자 구분"));
             ToolTipService.SetToolTip(SearchWholeWordToggle, getString("SearchWholeWordTooltip", "단어 단위"));
             ToolTipService.SetToolTip(SearchRegexToggle, getString("SearchRegexTooltip", "정규식 검색"));
-            SearchAllButton.Content = getString("SearchAllFiles", "전체 검색");
+            SearchAllButton.Content = getString("SearchAllFiles", "검색");
             ReplaceAllButton.Content = getString("ReplaceAllFiles", "모두 바꾸기");
+            ClearResultsButton.Content = getString("SearchClearResults", "지우기");
+            ToolTipService.SetToolTip(ClearResultsButton, getString("SearchClearResultsTooltip", "검색을 중지하고 검색어와 결과 지우기"));
 
             if (Resources.TryGetValue("LocBridge", out var bridgeObject) &&
                 bridgeObject is LocalizationBridge bridge)
@@ -52,6 +55,7 @@ namespace TxtAIEditor.Controls
         private void OnSearchQueryInputKeyDown(object sender, KeyRoutedEventArgs e) => QueryKeyDown?.Invoke(sender, e);
         private void OnSearchAllFilesClick(object sender, RoutedEventArgs e) => SearchAllClick?.Invoke(sender, e);
         private void OnReplaceAllClick(object sender, RoutedEventArgs e) => ReplaceAllClick?.Invoke(sender, e);
+        private void OnClearResultsClick(object sender, RoutedEventArgs e) => ClearResultsClick?.Invoke(sender, e);
         private void OnReplaceOneClick(object sender, RoutedEventArgs e) => ReplaceOneClick?.Invoke(sender, e);
         private void OnSearchResultItemClick(object sender, ItemClickEventArgs e) => ResultItemClick?.Invoke(sender, e);
     }

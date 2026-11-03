@@ -672,10 +672,16 @@
     <value>正規表現</value>
   </data>
   <data name="SearchAllFiles" xml:space="preserve">
-    <value>すべて検索</value>
+    <value>検索</value>
   </data>
   <data name="ReplaceAllFiles" xml:space="preserve">
     <value>すべて置換</value>
+  </data>
+  <data name="SearchClearResults" xml:space="preserve">
+    <value>クリア</value>
+  </data>
+  <data name="SearchClearResultsTooltip" xml:space="preserve">
+    <value>検索を停止して検索語と結果をクリア</value>
   </data>
   <data name="RecentFilesHeader" xml:space="preserve">
     <value>最近のファイル (ダブルクリックで開く)</value>
