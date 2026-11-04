@@ -36,7 +36,7 @@ namespace TxtAIEditor.Controls
 
         public void Localize(Func<string, string, string> getString)
         {
-            SearchHeaderText.Text = getString("SearchHeader", "폴더 전체 검색 및 바꾸기");
+            SearchHeaderText.Text = getString("SearchHeader", "파일 내용 검색 및 바꾸기");
             SearchQueryInput.PlaceholderText = getString("SearchPlaceholder", "검색어 입력...");
             ReplaceQueryInput.PlaceholderText = getString("ReplacePlaceholder", "바꿀 단어 입력...");
             ToolTipService.SetToolTip(SearchMatchCaseToggle, getString("SearchMatchCaseTooltip", "대소문자 구분"));

@@ -648,7 +648,7 @@
     <value>선택 영역: {0} 글자 수 (약 {1} 토큰)</value>
   </data>
   <data name="SearchHeader" xml:space="preserve">
-    <value>폴더 전체 검색 및 바꾸기</value>
+    <value>파일 내용 검색 및 바꾸기</value>
   </data>
   <data name="SearchOpenedFileHeader" xml:space="preserve">
     <value>현재 파일 검색 및 바꾸기</value>

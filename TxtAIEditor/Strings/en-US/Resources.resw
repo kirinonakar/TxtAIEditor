@@ -648,7 +648,7 @@
     <value>Selection: {0} chars (approx {1} tokens)</value>
   </data>
   <data name="SearchHeader" xml:space="preserve">
-    <value>Search &amp; Replace in Folder</value>
+    <value>Search &amp; Replace File Contents</value>
   </data>
   <data name="SearchOpenedFileHeader" xml:space="preserve">
     <value>Search &amp; Replace in Current File</value>

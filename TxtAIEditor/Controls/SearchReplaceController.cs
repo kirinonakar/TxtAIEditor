@@ -540,7 +540,7 @@ namespace TxtAIEditor.Controls
             bool openedFileOnly = _searchOpenedFileOnlyProvider();
             string title = openedFileOnly
                 ? _getString("SearchOpenedFileHeader", "현재 파일 검색 및 바꾸기")
-                : _getString("SearchHeader", "폴더 전체 검색 및 바꾸기");
+                : _getString("SearchHeader", "파일 내용 검색 및 바꾸기");
             if (!openedFileOnly && _folderSearchCompleted)
             {
                 string count = _resultLimitReached

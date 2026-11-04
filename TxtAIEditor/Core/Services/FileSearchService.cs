@@ -23,7 +23,7 @@ namespace TxtAIEditor.Core.Services
         private const int EncodingSampleSize = 256 * 1024;
         private static readonly HashSet<string> SkippedDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".git", ".vs", "bin", "obj", "node_modules", "packages"
+            ".git", ".vs", "bin", "obj", "node_modules", "packages", ".venv"
         };
 
         private static readonly HashSet<string> SkippedFileExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -397,15 +397,9 @@ namespace TxtAIEditor.Core.Services
             return EnumerateDirectoryRecursive(searchRoot, searchRoot, gitIgnoreStack, includeHiddenFiles, cancellationToken);
         }
 
-        private static bool IsVirtualEnvironmentDirectory(string dirName)
-        {
-            return string.Equals(dirName, ".venv", StringComparison.OrdinalIgnoreCase);
-        }
-
         private static bool ShouldSkipDirectoryName(string dirName, bool includeHiddenFiles)
         {
-            return SkippedDirectoryNames.Contains(dirName) ||
-                (!includeHiddenFiles && IsVirtualEnvironmentDirectory(dirName));
+            return !includeHiddenFiles && SkippedDirectoryNames.Contains(dirName);
         }
 
         private static bool ShouldSkipFileExtension(string filePath)

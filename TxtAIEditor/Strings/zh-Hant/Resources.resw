@@ -648,7 +648,7 @@
     <value>選擇：{0} 個字元（大約 {1} 代幣）</value>
   </data>
   <data name="SearchHeader" xml:space="preserve">
-    <value>在資料夾中搜尋和替換</value>
+    <value>搜尋和取代檔案內容</value>
   </data>
   <data name="SearchOpenedFileHeader" xml:space="preserve">
     <value>在目前檔案中搜尋和替換</value>
