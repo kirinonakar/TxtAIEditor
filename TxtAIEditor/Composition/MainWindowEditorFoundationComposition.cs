@@ -162,6 +162,7 @@ namespace TxtAIEditor.Composition
                 ui.LeftSidebar.SearchMatchCase,
                 ui.LeftSidebar.SearchWholeWord,
                 ui.LeftSidebar.SearchRegex,
+                ui.LeftSidebar.SearchIncludeHidden,
                 ui.LeftSidebar.SearchResults,
                 ui.LeftSidebar.SearchHeaderLabel,
                 ui.LeftSidebar.SearchProgressIndicator,

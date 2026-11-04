@@ -668,6 +668,15 @@
   <data name="SearchWholeWordTooltip" xml:space="preserve">
     <value>整个词</value>
   </data>
+  <data name="SearchIncludeHiddenTooltip" xml:space="preserve">
+    <value>包含隐藏文件和文件夹</value>
+  </data>
+  <data name="SearchResultCountFormat" xml:space="preserve">
+    <value>({0} 项)</value>
+  </data>
+  <data name="SearchResultLimitLabel" xml:space="preserve">
+    <value>(超过 10000 项)</value>
+  </data>
   <data name="SearchRegexTooltip" xml:space="preserve">
     <value>Regex</value>
   </data>
@@ -3103,7 +3112,7 @@
     <value>按名称过滤（包括子文件夹）...</value>
   </data>
   <data name="ExplorerHideUnwantedTooltip" xml:space="preserve">
-    <value>显示以 . 开头的文件夹（如 .venv）以及 node_modules、obj</value>
+    <value>显示隐藏文件和文件夹</value>
   </data>
   <data name="ExplorerFilterClearTooltip" xml:space="preserve">
     <value>清除过滤器</value>

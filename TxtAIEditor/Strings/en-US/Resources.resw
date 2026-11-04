@@ -668,6 +668,15 @@
   <data name="SearchWholeWordTooltip" xml:space="preserve">
     <value>Whole Word</value>
   </data>
+  <data name="SearchIncludeHiddenTooltip" xml:space="preserve">
+    <value>Include hidden files and folders</value>
+  </data>
+  <data name="SearchResultCountFormat" xml:space="preserve">
+    <value>({0} items)</value>
+  </data>
+  <data name="SearchResultLimitLabel" xml:space="preserve">
+    <value>(over 10000)</value>
+  </data>
   <data name="SearchRegexTooltip" xml:space="preserve">
     <value>Regex</value>
   </data>
@@ -3103,7 +3112,7 @@ Plan: {0}</value>
     <value>Filter by name (includes subfolders)...</value>
   </data>
   <data name="ExplorerHideUnwantedTooltip" xml:space="preserve">
-    <value>Show dot-prefixed folders (e.g. .venv), node_modules, and obj</value>
+    <value>Show hidden files and folders</value>
   </data>
   <data name="ExplorerFilterClearTooltip" xml:space="preserve">
     <value>Clear filter</value>

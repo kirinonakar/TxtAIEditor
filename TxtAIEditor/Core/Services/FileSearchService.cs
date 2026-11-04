@@ -18,9 +18,12 @@ namespace TxtAIEditor.Core.Services
     {
         private const int DocumentSearchMaxChars = 50_000_000;
         private const int SearchResultBatchSize = 100;
+        private const int SearchResultLimit = 10_000;
+        private const int SearchPreviewLength = 512;
+        private const int EncodingSampleSize = 256 * 1024;
         private static readonly HashSet<string> SkippedDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".git", ".vs", "bin", "obj", "node_modules", "packages", ".venv"
+            ".git", ".vs", "bin", "obj", "node_modules", "packages"
         };
 
         private static readonly HashSet<string> SkippedFileExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -104,6 +107,22 @@ namespace TxtAIEditor.Core.Services
             var matcher = SearchMatcher.Create(query, options, regex);
             int foundCount = 0;
             int skippedFiles = 0;
+            int resultCount = 0;
+            using var documentSlot = new SemaphoreSlim(4);
+
+            void PublishLimitedResults(IReadOnlyList<SearchResultItem> results)
+            {
+                int start = Interlocked.Add(ref resultCount, results.Count) - results.Count;
+                int remaining = SearchResultLimit - start;
+                if (remaining >= results.Count)
+                {
+                    publishResults(results);
+                }
+                else if (remaining > 0)
+                {
+                    publishResults(results.Take(remaining).ToArray());
+                }
+            }
 
             var parallelOptions = new ParallelOptions
             {
@@ -111,15 +130,29 @@ namespace TxtAIEditor.Core.Services
                 MaxDegreeOfParallelism = GetSearchDegreeOfParallelism()
             };
 
-            await Parallel.ForEachAsync(EnumerateSearchFiles(searchRoot, cancellationToken), parallelOptions, async (file, token) =>
+            await Parallel.ForEachAsync(EnumerateSearchFiles(searchRoot, options.IncludeHiddenFiles, cancellationToken), parallelOptions, async (file, token) =>
             {
                 token.ThrowIfCancellationRequested();
 
                 try
                 {
-                    int fileFoundCount = DocumentTextExtractionService.IsSupportedExtension(file)
-                        ? await SearchExtractedDocumentAsync(file, matcher, publishResults, token).ConfigureAwait(false)
-                        : SearchTextFile(file, matcher, publishResults, token);
+                    int fileFoundCount;
+                    if (DocumentTextExtractionService.IsSupportedExtension(file))
+                    {
+                        await documentSlot.WaitAsync(token).ConfigureAwait(false);
+                        try
+                        {
+                            fileFoundCount = await SearchExtractedDocumentAsync(file, matcher, PublishLimitedResults, token).ConfigureAwait(false);
+                        }
+                        finally
+                        {
+                            documentSlot.Release();
+                        }
+                    }
+                    else
+                    {
+                        fileFoundCount = SearchTextFile(file, matcher, PublishLimitedResults, token);
+                    }
 
                     if (fileFoundCount > 0)
                     {
@@ -140,7 +173,8 @@ namespace TxtAIEditor.Core.Services
             return new FileSearchSummary
             {
                 FoundCount = foundCount,
-                SkippedFiles = skippedFiles
+                SkippedFiles = skippedFiles,
+                ResultLimitReached = resultCount > SearchResultLimit
             };
         }
 
@@ -172,7 +206,7 @@ namespace TxtAIEditor.Core.Services
                     {
                         Path = file,
                         LineNumber = lineNum,
-                        LineContent = line,
+                        LineContent = CreateSearchPreview(line, indexOfMatch),
                         IndexOfMatch = indexOfMatch,
                         MatchLength = matchLength,
                         CanReplace = false
@@ -194,20 +228,6 @@ namespace TxtAIEditor.Core.Services
             Action<IReadOnlyList<SearchResultItem>> publishResults,
             CancellationToken cancellationToken)
         {
-            if (ShouldAutoDetectSearchEncoding(file))
-            {
-                byte[] bytes = File.ReadAllBytes(file);
-                Encoding encoding = TextEncodingService.GetTextEncoding(bytes, "Auto");
-                using var detectedStream = new MemoryStream(bytes);
-                using var detectedReader = new StreamReader(
-                    detectedStream,
-                    encoding,
-                    detectEncodingFromByteOrderMarks: true,
-                    bufferSize: bytes.Length < 64 * 1024 ? 4096 : 64 * 1024);
-
-                return SearchTextReader(file, detectedReader, matcher, publishResults, cancellationToken);
-            }
-
             using var stream = new FileStream(
                 file,
                 FileMode.Open,
@@ -215,9 +235,18 @@ namespace TxtAIEditor.Core.Services
                 FileShare.ReadWrite,
                 bufferSize: 4096,
                 options: FileOptions.SequentialScan);
+            Encoding encoding = Encoding.UTF8;
+            if (ShouldAutoDetectSearchEncoding(file))
+            {
+                using var sampleReader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
+                byte[] sample = sampleReader.ReadBytes((int)Math.Min(stream.Length, EncodingSampleSize));
+                encoding = TextEncodingService.GetTextEncoding(sample, "Auto");
+                stream.Position = 0;
+            }
+
             using var reader = new StreamReader(
                 stream,
-                Encoding.UTF8,
+                encoding,
                 detectEncodingFromByteOrderMarks: true,
                 bufferSize: stream.Length < 64 * 1024 ? 4096 : 64 * 1024);
 
@@ -246,7 +275,7 @@ namespace TxtAIEditor.Core.Services
                     {
                         Path = file,
                         LineNumber = lineNum,
-                        LineContent = line,
+                        LineContent = CreateSearchPreview(line, indexOfMatch),
                         IndexOfMatch = indexOfMatch,
                         MatchLength = matchLength
                     });
@@ -259,6 +288,18 @@ namespace TxtAIEditor.Core.Services
 
             FlushSearchResults(tempResults, publishResults, cancellationToken);
             return foundCount;
+        }
+
+        private static string CreateSearchPreview(string line, int matchIndex)
+        {
+            if (line.Length <= SearchPreviewLength)
+            {
+                return line;
+            }
+
+            int start = Math.Clamp(matchIndex - SearchPreviewLength / 4, 0, line.Length - SearchPreviewLength);
+            return string.Concat(start > 0 ? "…" : "", line.AsSpan(start, SearchPreviewLength),
+                start + SearchPreviewLength < line.Length ? "…" : "");
         }
 
         public string ReplaceSearchMatches(string original, string query, string replace, FileSearchOptions options)
@@ -313,9 +354,13 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static IEnumerable<string> EnumerateSearchFiles(string searchRoot, CancellationToken cancellationToken)
+        private static IEnumerable<string> EnumerateSearchFiles(string searchRoot, bool includeHiddenFiles, CancellationToken cancellationToken)
         {
             var gitIgnoreStack = new List<GitIgnoreFile>();
+            if (includeHiddenFiles)
+            {
+                return EnumerateDirectoryRecursive(searchRoot, searchRoot, gitIgnoreStack, includeHiddenFiles, cancellationToken);
+            }
 
             try
             {
@@ -349,13 +394,18 @@ namespace TxtAIEditor.Core.Services
                 Debug.WriteLine($"Error resolving parent gitignores: {ex.Message}");
             }
 
-            var visitedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            return EnumerateDirectoryRecursive(searchRoot, searchRoot, gitIgnoreStack, visitedDirs, cancellationToken);
+            return EnumerateDirectoryRecursive(searchRoot, searchRoot, gitIgnoreStack, includeHiddenFiles, cancellationToken);
         }
 
-        private static bool ShouldSkipDirectoryName(string dirName)
+        private static bool IsVirtualEnvironmentDirectory(string dirName)
         {
-            return SkippedDirectoryNames.Contains(dirName);
+            return string.Equals(dirName, ".venv", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ShouldSkipDirectoryName(string dirName, bool includeHiddenFiles)
+        {
+            return SkippedDirectoryNames.Contains(dirName) ||
+                (!includeHiddenFiles && IsVirtualEnvironmentDirectory(dirName));
         }
 
         private static bool ShouldSkipFileExtension(string filePath)
@@ -400,6 +450,7 @@ namespace TxtAIEditor.Core.Services
                 ex is ArgumentException ||
                 ex is InvalidOperationException ||
                 ex is System.Runtime.InteropServices.ExternalException ||
+                ex is OutOfMemoryException ||
                 ex is TimeoutException;
         }
 
@@ -435,27 +486,17 @@ namespace TxtAIEditor.Core.Services
             string currentDir,
             string searchRoot,
             List<GitIgnoreFile> gitIgnoreStack,
-            HashSet<string> visitedDirs,
+            bool includeHiddenFiles,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string canonicalPath = Path.GetFullPath(currentDir);
-            if (!visitedDirs.Add(canonicalPath))
+            string dirName = Path.GetFileName(Path.TrimEndingDirectorySeparator(currentDir));
+            if (ShouldSkipDirectoryName(dirName, includeHiddenFiles))
             {
                 yield break;
             }
 
-            string dirName = Path.GetFileName(currentDir);
-            if (string.IsNullOrEmpty(dirName))
-            {
-                dirName = currentDir;
-            }
-            if (ShouldSkipDirectoryName(dirName))
-            {
-                yield break;
-            }
-
-            if (currentDir != searchRoot)
+            if (!includeHiddenFiles && currentDir != searchRoot)
             {
                 if (IsPathIgnored(currentDir, gitIgnoreStack, isDir: true))
                 {
@@ -465,7 +506,7 @@ namespace TxtAIEditor.Core.Services
 
             string gitignorePath = Path.Combine(currentDir, ".gitignore");
             bool pushed = false;
-            if (File.Exists(gitignorePath))
+            if (!includeHiddenFiles && File.Exists(gitignorePath))
             {
                 try
                 {
@@ -480,7 +521,7 @@ namespace TxtAIEditor.Core.Services
             }
 
             var subDirs = new List<string>();
-            foreach (var entry in EnumerateDirectoryEntries(currentDir, cancellationToken))
+            foreach (var entry in EnumerateDirectoryEntries(currentDir, includeHiddenFiles, cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (entry.IsDirectory)
@@ -488,7 +529,7 @@ namespace TxtAIEditor.Core.Services
                     subDirs.Add(entry.Path);
                     continue;
                 }
-                if (IsPathIgnored(entry.Path, gitIgnoreStack, isDir: false))
+                if (!includeHiddenFiles && IsPathIgnored(entry.Path, gitIgnoreStack, isDir: false))
                 {
                     continue;
                 }
@@ -498,7 +539,7 @@ namespace TxtAIEditor.Core.Services
 
             foreach (var subDir in subDirs)
             {
-                foreach (var f in EnumerateDirectoryRecursive(subDir, searchRoot, gitIgnoreStack, visitedDirs, cancellationToken))
+                foreach (var f in EnumerateDirectoryRecursive(subDir, searchRoot, gitIgnoreStack, includeHiddenFiles, cancellationToken))
                 {
                     yield return f;
                 }
@@ -510,20 +551,26 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static IEnumerable<(string Path, bool IsDirectory)> EnumerateDirectoryEntries(string directory, CancellationToken cancellationToken)
+        private static IEnumerable<(string Path, bool IsDirectory)> EnumerateDirectoryEntries(
+            string directory, bool includeHiddenFiles, CancellationToken cancellationToken)
         {
             IEnumerator<(string Path, bool IsDirectory)>? iterator = null;
             try
             {
                 var entries = new FileSystemEnumerable<(string Path, bool IsDirectory)>(directory,
                     (ref FileSystemEntry entry) => (entry.ToFullPath(), entry.IsDirectory),
-                    new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = 0 })
+                    new EnumerationOptions
+                    {
+                        IgnoreInaccessible = true,
+                        AttributesToSkip = includeHiddenFiles ? 0 : FileAttributes.Hidden
+                    })
                 {
                     ShouldIncludePredicate = (ref FileSystemEntry entry) =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         return entry.IsDirectory
-                            ? (entry.Attributes & FileAttributes.ReparsePoint) == 0 && !ShouldSkipDirectoryName(entry.FileName.ToString())
+                            ? (entry.Attributes & FileAttributes.ReparsePoint) == 0 &&
+                              !ShouldSkipDirectoryName(entry.FileName.ToString(), includeHiddenFiles)
                             : !ShouldSkipFileExtension(entry.FileName.ToString());
                     }
                 };

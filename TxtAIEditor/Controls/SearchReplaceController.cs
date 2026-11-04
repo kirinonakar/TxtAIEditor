@@ -24,6 +24,7 @@ namespace TxtAIEditor.Controls
         private readonly ToggleButton _matchCaseToggle;
         private readonly ToggleButton _wholeWordToggle;
         private readonly ToggleButton _regexToggle;
+        private readonly ToggleButton _includeHiddenToggle;
         private readonly ListView _searchResultsList;
         private readonly TextBlock _searchHeaderLabel;
         private readonly FrameworkElement _searchProgressIndicator;
@@ -44,6 +45,8 @@ namespace TxtAIEditor.Controls
         private CancellationTokenSource? _searchCancellationTokenSource;
         private SearchResultDispatcher<SearchResultItem>? _resultDispatcher;
         private int _searchVersion;
+        private bool _resultLimitReached;
+        private bool _folderSearchCompleted;
         private readonly Dictionary<string, SearchResultGroup> _resultGroups = new(StringComparer.OrdinalIgnoreCase);
         public event Func<string, Task>? FileModified;
 
@@ -55,6 +58,7 @@ namespace TxtAIEditor.Controls
             ToggleButton matchCaseToggle,
             ToggleButton wholeWordToggle,
             ToggleButton regexToggle,
+            ToggleButton includeHiddenToggle,
             ListView searchResultsList,
             TextBlock searchHeaderLabel,
             FrameworkElement searchProgressIndicator,
@@ -78,6 +82,7 @@ namespace TxtAIEditor.Controls
             _matchCaseToggle = matchCaseToggle;
             _wholeWordToggle = wholeWordToggle;
             _regexToggle = regexToggle;
+            _includeHiddenToggle = includeHiddenToggle;
             _searchResultsList = searchResultsList;
             _searchHeaderLabel = searchHeaderLabel;
             _searchProgressIndicator = searchProgressIndicator;
@@ -131,6 +136,8 @@ namespace TxtAIEditor.Controls
             CancelActiveSearch();
 
             _lastSearchQuery = query;
+            _resultLimitReached = false;
+            _folderSearchCompleted = false;
             _viewModel.SearchResults.Clear();
             _viewModel.SearchResultsGrouped.Clear();
             _searchedTab = searchTab;
@@ -219,6 +226,9 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            _resultLimitReached = summary.ResultLimitReached;
+            _folderSearchCompleted = searchTab == null;
+            SetSearchHeaderText(isSearching: false);
             if (summary.FoundCount == 0 && summary.SkippedFiles > 0)
             {
                 _showError(
@@ -229,6 +239,11 @@ namespace TxtAIEditor.Controls
 
         public async Task ReplaceAllAsync()
         {
+            if (_searchCancellationTokenSource != null || _resultLimitReached)
+            {
+                return;
+            }
+
             OpenedTab? searchedTab = _searchedTab;
             string query = _searchQueryInput.Text;
             string replace = _replaceQueryInput.Text;
@@ -450,7 +465,8 @@ namespace TxtAIEditor.Controls
             {
                 IsRegex = _regexToggle.IsChecked == true,
                 MatchCase = _matchCaseToggle.IsChecked == true,
-                WholeWord = _wholeWordToggle.IsChecked == true
+                WholeWord = _wholeWordToggle.IsChecked == true,
+                IncludeHiddenFiles = _includeHiddenToggle.IsChecked == true
             };
         }
 
@@ -482,7 +498,10 @@ namespace TxtAIEditor.Controls
             _resultGroups.Clear();
             _searchedTab = null;
             _lastSearchQuery = string.Empty;
+            _resultLimitReached = false;
+            _folderSearchCompleted = false;
             _searchQueryInput.Text = string.Empty;
+            SetSearchHeaderText(isSearching: false);
         }
 
         private void SetSearchHeaderIsSearching(int searchVersion, bool isSearching)
@@ -518,10 +537,20 @@ namespace TxtAIEditor.Controls
 
         private void ApplySearchHeaderText(bool isSearching)
         {
-            _searchHeaderLabel.Text = _searchOpenedFileOnlyProvider()
+            bool openedFileOnly = _searchOpenedFileOnlyProvider();
+            string title = openedFileOnly
                 ? _getString("SearchOpenedFileHeader", "현재 파일 검색 및 바꾸기")
                 : _getString("SearchHeader", "폴더 전체 검색 및 바꾸기");
+            if (!openedFileOnly && _folderSearchCompleted)
+            {
+                string count = _resultLimitReached
+                    ? _getString("SearchResultLimitLabel", "(10000개 초과)")
+                    : string.Format(_getString("SearchResultCountFormat", "({0} 항목)"), _viewModel.SearchResults.Count);
+                title = $"{title} {count}";
+            }
+            _searchHeaderLabel.Text = title;
             _searchProgressIndicator.Visibility = isSearching ? Visibility.Visible : Visibility.Collapsed;
+            _includeHiddenToggle.IsEnabled = !openedFileOnly;
         }
 
         private void AppendSearchResult(SearchResultItem item)
@@ -542,6 +571,7 @@ namespace TxtAIEditor.Controls
         private void UpdateGroupedResults()
         {
             SynchronizeGroupedResults();
+            SetSearchHeaderText(isSearching: _searchCancellationTokenSource != null);
         }
 
         private void SynchronizeGroupedResults()

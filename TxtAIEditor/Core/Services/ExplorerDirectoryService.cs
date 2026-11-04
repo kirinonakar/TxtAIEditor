@@ -9,7 +9,7 @@ namespace TxtAIEditor.Core.Services
     {
         public const string LocalRootPath = "txtaieditor://local-root";
 
-        public IEnumerable<ExplorerItem> CreateDirectoryItems(string parentPath)
+        public IEnumerable<ExplorerItem> CreateDirectoryItems(string parentPath, bool hideHiddenItems = true)
         {
             var items = new List<ExplorerItem>();
             try
@@ -33,26 +33,17 @@ namespace TxtAIEditor.Core.Services
                 var enumerationOptions = new EnumerationOptions
                 {
                     IgnoreInaccessible = true,
+                    AttributesToSkip = hideHiddenItems ? FileAttributes.Hidden | FileAttributes.System : 0,
                     ReturnSpecialDirectories = false
                 };
 
                 foreach (var dir in dirInfo.EnumerateDirectories("*", enumerationOptions))
                 {
-                    if (dir.Attributes.HasFlag(FileAttributes.Hidden))
-                    {
-                        continue;
-                    }
-
                     items.Add(new ExplorerItem { Name = dir.Name, Path = dir.FullName, IsFolder = true, ModifiedTime = dir.LastWriteTime });
                 }
 
                 foreach (var file in dirInfo.EnumerateFiles("*", enumerationOptions))
                 {
-                    if (file.Attributes.HasFlag(FileAttributes.Hidden))
-                    {
-                        continue;
-                    }
-
                     items.Add(new ExplorerItem { Name = file.Name, Path = file.FullName, IsFolder = false, ModifiedTime = file.LastWriteTime, FileSize = file.Length });
                 }
             }

@@ -181,6 +181,7 @@ namespace TxtAIEditor.Controls
         public ToggleButton SearchMatchCase => SearchView.MatchCase;
         public ToggleButton SearchWholeWord => SearchView.WholeWord;
         public ToggleButton SearchRegex => SearchView.Regex;
+        public ToggleButton SearchIncludeHidden => SearchView.IncludeHidden;
 
         public ToggleButton FavoritesFileTabButton => FavoritesView.FileTab;
         public ToggleButton FavoritesFolderTabButton => FavoritesView.FolderTab;

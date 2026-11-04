@@ -1,5 +1,6 @@
 using System;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
@@ -24,6 +25,7 @@ namespace TxtAIEditor.Controls
         public ToggleButton MatchCase => SearchMatchCaseToggle;
         public ToggleButton WholeWord => SearchWholeWordToggle;
         public ToggleButton Regex => SearchRegexToggle;
+        public ToggleButton IncludeHidden => SearchIncludeHiddenToggle;
 
         public event KeyEventHandler? QueryKeyDown;
         public event RoutedEventHandler? SearchAllClick;
@@ -40,6 +42,9 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(SearchMatchCaseToggle, getString("SearchMatchCaseTooltip", "대소문자 구분"));
             ToolTipService.SetToolTip(SearchWholeWordToggle, getString("SearchWholeWordTooltip", "단어 단위"));
             ToolTipService.SetToolTip(SearchRegexToggle, getString("SearchRegexTooltip", "정규식 검색"));
+            string includeHidden = getString("SearchIncludeHiddenTooltip", "숨김 파일 및 폴더 포함");
+            ToolTipService.SetToolTip(SearchIncludeHiddenToggle, includeHidden);
+            AutomationProperties.SetName(SearchIncludeHiddenToggle, includeHidden);
             SearchAllButton.Content = getString("SearchAllFiles", "검색");
             ReplaceAllButton.Content = getString("ReplaceAllFiles", "모두 바꾸기");
             ClearResultsButton.Content = getString("SearchClearResults", "지우기");

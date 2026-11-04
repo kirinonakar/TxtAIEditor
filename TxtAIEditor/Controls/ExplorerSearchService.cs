@@ -75,7 +75,7 @@ namespace TxtAIEditor.Controls
             var options = new EnumerationOptions
             {
                 IgnoreInaccessible = true,
-                AttributesToSkip = FileAttributes.Hidden,
+                AttributesToSkip = hideUnwantedFolders ? FileAttributes.Hidden : 0,
                 ReturnSpecialDirectories = false,
                 BufferSize = 16 * 1024
             };
@@ -193,8 +193,9 @@ namespace TxtAIEditor.Controls
         private static bool ShouldSkipDirectory(ref FileSystemEntry directory, bool hideUnwantedFolders)
         {
             return (directory.Attributes & FileAttributes.ReparsePoint) != 0 ||
-                IgnoredFolderNames.Contains(directory.FileName.ToString()) ||
-                (hideUnwantedFolders && directory.FileName.StartsWith(".", StringComparison.Ordinal));
+                (hideUnwantedFolders &&
+                    (IgnoredFolderNames.Contains(directory.FileName.ToString()) ||
+                     directory.FileName.StartsWith(".", StringComparison.Ordinal)));
         }
     }
 }

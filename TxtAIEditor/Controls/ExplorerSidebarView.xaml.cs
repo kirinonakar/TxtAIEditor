@@ -194,7 +194,7 @@ namespace TxtAIEditor.Controls
 
             ExplorerFilterBox.PlaceholderText = getString("ExplorerFilterPlaceholder", "파일명 필터 (하위 폴더 포함)...");
 
-            var hideUnwantedText = getString("ExplorerHideUnwantedTooltip", ".venv 등 .으로 시작하는 폴더와 node_modules, obj 보이기");
+            var hideUnwantedText = getString("ExplorerHideUnwantedTooltip", "숨김 파일 및 폴더 보이기");
             ToolTipService.SetToolTip(ExplorerHideUnwantedButton, hideUnwantedText);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExplorerHideUnwantedButton, hideUnwantedText);
 

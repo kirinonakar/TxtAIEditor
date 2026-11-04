@@ -12,12 +12,14 @@ namespace TxtAIEditor.Core.Interfaces
         public bool IsRegex { get; set; }
         public bool MatchCase { get; set; }
         public bool WholeWord { get; set; }
+        public bool IncludeHiddenFiles { get; set; }
     }
 
     public sealed class FileSearchSummary
     {
         public int FoundCount { get; set; }
         public int SkippedFiles { get; set; }
+        public bool ResultLimitReached { get; set; }
     }
 
     public interface IFileSearchService

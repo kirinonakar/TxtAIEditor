@@ -251,7 +251,7 @@ namespace TxtAIEditor.Controls
                 List<ExplorerItem> items = await Task.Run(() =>
                 {
                     var loadedItems = new List<ExplorerItem>();
-                    foreach (ExplorerItem item in _directoryService.CreateDirectoryItems(folderPath))
+                    foreach (ExplorerItem item in _directoryService.CreateDirectoryItems(folderPath, _hideUnwantedFolders))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         if (_hideUnwantedFolders &&
@@ -997,6 +997,7 @@ namespace TxtAIEditor.Controls
             _flatDirectoryLoadCancellation = cancellation;
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
             ExplorerItemSorter.SortMode sortMode = _itemSorter.Mode;
+            bool hideUnwantedFolders = _hideUnwantedFolders;
             try
             {
                 var loaded = await Task.Run(() =>
@@ -1012,7 +1013,7 @@ namespace TxtAIEditor.Controls
                         ModifiedTime = directoryInfo.LastWriteTime,
                         IsDark = isDark
                     };
-                    var children = _itemSorter.Sort(_directoryService.CreateDirectoryItems(rootPath), sortMode).ToList();
+                    var children = _itemSorter.Sort(_directoryService.CreateDirectoryItems(rootPath, hideUnwantedFolders), sortMode).ToList();
                     cancellationToken.ThrowIfCancellationRequested();
                     foreach (var child in children)
                     {
@@ -1149,7 +1150,7 @@ namespace TxtAIEditor.Controls
             }
             else if (item.IsFolder)
             {
-                childItems = _directoryService.CreateDirectoryItems(item.Path);
+                childItems = _directoryService.CreateDirectoryItems(item.Path, _hideUnwantedFolders);
             }
             else
             {
