@@ -219,7 +219,7 @@ To build and run TxtAIEditor locally, make sure you have:
 2.  **Open the Solution:**
     Open the `TxtAIEditor.slnx` (or `TxtAIEditor.csproj`) inside Visual Studio.
 3.  **Restore & Build:**
-    Visual Studio will automatically restore NuGet packages (such as `Microsoft.WindowsAppSDK`).
+    Visual Studio will automatically restore NuGet packages (such as `Microsoft.WindowsAppSDK.WinUI`).
 4.  **Run:**
     Set the startup project to `TxtAIEditor` and press `F5` to build and run in unpackaged mode.
 
