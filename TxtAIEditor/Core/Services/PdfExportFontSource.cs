@@ -145,6 +145,10 @@ namespace TxtAIEditor.Core.Services
                 // shared tables. Read each selected-face table by tag instead.
                 uint tableTag = BinaryPrimitives.ReadUInt32LittleEndian(directory.AsSpan(i, 4));
                 byte[] table = ReadData(dc, tableTag, 0, checked((int)length));
+                if (Encoding.ASCII.GetString(directory, i, 4) == "GSUB")
+                {
+                    NormalizeLegacyGsubVersion(table);
+                }
                 int tableOffset = checked((int)result.Position);
                 if (Encoding.ASCII.GetString(directory, i, 4) == "head")
                 {
@@ -173,6 +177,24 @@ namespace TxtAIEditor.Core.Services
                 BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(headOffset + 8), unchecked(0xb1b0afbAu - sum));
             }
             return bytes;
+        }
+
+        private static void NormalizeLegacyGsubVersion(byte[] table)
+        {
+            // Older Windows CJK fonts (including Gulim/GulimChe) use 0x00001000
+            // for an otherwise v1.0 GSUB table. HarfBuzz rejects that version.
+            // Repair only this known legacy spelling and only a v1.0-shaped
+            // header; retain all substitution rules, glyphs and font names.
+            if (table.Length < 10 || U32(table, 0) != 0x00001000) return;
+            for (int at = 4; at <= 8; at += 2)
+            {
+                int offset = U16(table, at);
+                if (offset < 10 || offset > table.Length - 2) return;
+                int count = U16(table, offset);
+                int recordSize = at == 8 ? 2 : 6;
+                if (offset + 2L + count * (long)recordSize > table.Length) return;
+            }
+            BinaryPrimitives.WriteUInt32BigEndian(table.AsSpan(0, 4), 0x00010000);
         }
 
         private static byte[] ReadData(IntPtr dc, uint table, uint offset, int count)
