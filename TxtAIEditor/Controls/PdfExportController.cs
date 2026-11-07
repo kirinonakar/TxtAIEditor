@@ -89,7 +89,7 @@ namespace TxtAIEditor.Controls
                     byte[] bytes = Encoding.UTF8.GetBytes(html);
                     await htmlStream.WriteAsync(bytes);
                     htmlStream.Position = 0;
-                    string htmlUrl = $"http://{PreviewWebResourceService.ResourceHostName}/pdf-export-{requestId}.html";
+                    string htmlUrl = $"http://pdf-document.{PreviewWebResourceService.ResourceHostName}/pdf-export-{requestId}.html";
                     core.AddWebResourceRequestedFilter(htmlUrl, CoreWebView2WebResourceContext.Document);
                     core.WebResourceRequested += (_, e) =>
                     {
@@ -115,6 +115,8 @@ namespace TxtAIEditor.Controls
                     await core.ExecuteScriptAsync($"window.preparePdfExport({payload}, {JsonSerializer.Serialize(requestId)})");
                     await prepared.Task.WaitAsync(PreparationTimeout);
                 }
+
+                await PdfExportFontEmbedding.EmbedAsync(core, fullHtml);
 
                 var printSettings = environment.CreatePrintSettings();
                 printSettings.ShouldPrintBackgrounds = true;
