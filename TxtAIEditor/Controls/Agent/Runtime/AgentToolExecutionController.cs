@@ -295,7 +295,8 @@ namespace TxtAIEditor.Controls
         private async Task<string> ReadImageToolAsync(JsonElement arguments)
         {
             AgentReadImageResult imageResult = await _fileTools.ReadImageAsync(
-                GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path"));
+                GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path"),
+                GetBoolArgument(arguments, "original", false));
 
             if (imageResult.Attachment != null)
             {

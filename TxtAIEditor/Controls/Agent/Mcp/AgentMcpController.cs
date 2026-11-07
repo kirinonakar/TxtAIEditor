@@ -34,6 +34,7 @@ namespace TxtAIEditor.Controls
         private readonly Action? _afterDialog;
         private readonly AgentMcpComfyUiTool _comfyUiTool;
         private readonly AgentMcpBrowserUseTool _browserUseTool;
+        private readonly Action<TxtAIEditor.Core.Services.LLM.LlmMessageAttachment>? _addImageAttachment;
         private readonly AgentSkillController _skillController;
         private readonly AgentMcpPluginManagerTool _pluginManagerTool;
         private readonly AgentMcpRuntime _runtime;
@@ -88,6 +89,7 @@ namespace TxtAIEditor.Controls
             _dialogService = new AgentMcpDialogService(_agentPane, _initializePickerWindow, _getString, _beforeDialog, _afterDialog);
             _comfyUiTool = new AgentMcpComfyUiTool(workspaceRootProvider, () => _settingsService.CurrentSettings, fileModifiedAsync);
             _browserUseTool = new AgentMcpBrowserUseTool(() => _settingsService.CurrentSettings, addImageAttachment);
+            _addImageAttachment = addImageAttachment;
             _skillController = skillController;
             _pluginManagerTool = new AgentMcpPluginManagerTool(GetPluginManagerEntriesAsync, SetPluginActive);
 
@@ -1309,7 +1311,8 @@ namespace TxtAIEditor.Controls
                 return "MCP tool returned no result.";
             }
 
-            return _credentialStore.RedactServerSecrets(server, FormatToolCallResult(alias, result));
+            string formattedResult = await AgentMcpToolResultFormatter.FormatAsync(alias.Alias, result, _addImageAttachment);
+            return _credentialStore.RedactServerSecrets(server, formattedResult);
         }
 
         private async Task<string> ExecuteBuiltInToolAsync(
@@ -1937,46 +1940,6 @@ namespace TxtAIEditor.Controls
             return _servers
                 .Where(server => _selectedServerIds.Contains(server.Id))
                 .ToList();
-        }
-
-        private static string FormatToolCallResult(AgentMcpToolAlias alias, JsonElement result)
-        {
-            bool isError = result.TryGetProperty("isError", out var isErrorProp) && isErrorProp.ValueKind == JsonValueKind.True;
-            var builder = new StringBuilder();
-            builder.AppendLine(isError
-                ? $"MCP tool returned an error: {alias.Alias}"
-                : $"MCP tool result: {alias.Alias}");
-
-            if (result.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in content.EnumerateArray())
-                {
-                    string type = TryGetStringProperty(item, "type");
-                    if (type.Equals("text", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string text = TryGetStringProperty(item, "text");
-                        if (!string.IsNullOrWhiteSpace(text))
-                        {
-                            builder.AppendLine(text);
-                        }
-                    }
-                    else if (!string.IsNullOrWhiteSpace(type))
-                    {
-                        builder.AppendLine($"[{type} content omitted]");
-                    }
-                }
-            }
-
-            if (result.TryGetProperty("structuredContent", out var structuredContent))
-            {
-                builder.AppendLine("[structuredContent]");
-                builder.AppendLine(structuredContent.GetRawText());
-            }
-
-            string textResult = builder.ToString().TrimEnd();
-            return string.IsNullOrWhiteSpace(textResult)
-                ? result.GetRawText()
-                : textResult;
         }
 
         private static string TryGetStringProperty(JsonElement element, string propertyName)

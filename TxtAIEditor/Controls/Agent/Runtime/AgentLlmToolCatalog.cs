@@ -131,13 +131,14 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "read_image",
-                    Description = "Read an image file.",
+                    Description = "Read an image file. By default, images whose longest side exceeds 2048 pixels are resized proportionally to a maximum dimension of 2048 pixels. Set original to true to attach the original file without resizing or re-encoding.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the image" }
+                            path = new { type = "string", description = "Relative path to the image" },
+                            original = new { type = "boolean", description = "Attach the original image bytes, dimensions, and format without resizing or re-encoding (default: false). The 25 MiB file limit still applies." }
                         },
                         required = new[] { "path" }
                     }

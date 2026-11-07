@@ -216,9 +216,9 @@ namespace TxtAIEditor.Controls
             return RunInBackgroundAsync(() => _workspaceFiles.ReadFileAsync(path, startLine, lineCount));
         }
 
-        public Task<AgentReadImageResult> ReadImageAsync(string path)
+        public Task<AgentReadImageResult> ReadImageAsync(string path, bool original = false)
         {
-            return RunInBackgroundAsync(() => _images.ReadImageAsync(path));
+            return RunInBackgroundAsync(() => _images.ReadImageAsync(path, original));
         }
 
         public Task<string> ExtractDocumentAsync(string path, string outputPath, int maxChars)

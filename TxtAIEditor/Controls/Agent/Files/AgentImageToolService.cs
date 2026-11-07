@@ -10,7 +10,7 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentImageToolService
     {
-        private const int MaxReadImageDimension = 1024;
+        private const int MaxReadImageDimension = 2048;
         private const long MaxReadImageFileBytes = 25L * 1024L * 1024L;
 
         private readonly AgentWorkspaceFileResolver _workspace;
@@ -20,7 +20,7 @@ namespace TxtAIEditor.Controls
             _workspace = workspace;
         }
 
-        public async Task<AgentReadImageResult> ReadImageAsync(string path)
+        public async Task<AgentReadImageResult> ReadImageAsync(string path, bool original = false)
         {
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -71,11 +71,13 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                LlmMessageAttachment attachment = await CreateImageAttachmentAsync(fullPath, mimeType);
+                LlmMessageAttachment attachment = await CreateImageAttachmentAsync(fullPath, mimeType, original);
                 string relativePath = _workspace.RelativePath(fullPath);
-                string resizedNote = string.Equals(attachment.MimeType, mimeType, StringComparison.OrdinalIgnoreCase)
-                    ? string.Empty
-                    : " The image was resized and converted to JPEG for model input.";
+                string resizedNote = original
+                    ? " The original image is attached without resizing or re-encoding."
+                    : string.Equals(attachment.MimeType, mimeType, StringComparison.OrdinalIgnoreCase)
+                        ? string.Empty
+                        : " The image was resized and converted to JPEG for model input.";
 
                 return new AgentReadImageResult
                 {
@@ -97,7 +99,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static async Task<LlmMessageAttachment> CreateImageAttachmentAsync(string fullPath, string mimeType)
+        private static async Task<LlmMessageAttachment> CreateImageAttachmentAsync(string fullPath, string mimeType, bool original)
         {
             using var fileStream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             using IRandomAccessStream input = fileStream.AsRandomAccessStream();
@@ -109,10 +111,10 @@ namespace TxtAIEditor.Controls
             string outputMimeType = string.IsNullOrWhiteSpace(mimeType) ? "image/png" : mimeType;
             byte[] bytes;
 
-            bool shouldTranscode =
+            bool shouldTranscode = !original && (
                 Math.Max(originalWidth, originalHeight) > MaxReadImageDimension ||
                 outputMimeType.Equals("image/bmp", StringComparison.OrdinalIgnoreCase) ||
-                outputMimeType.Equals("image/tiff", StringComparison.OrdinalIgnoreCase);
+                outputMimeType.Equals("image/tiff", StringComparison.OrdinalIgnoreCase));
 
             if (shouldTranscode)
             {
