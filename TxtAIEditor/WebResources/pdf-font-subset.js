@@ -125,6 +125,10 @@ export async function subsetFont(bytes, spec) {
         if (!data || !length) throw new Error('The generated font subset is empty.');
         let output = new Uint8Array(hb.memory.buffer, data, length).slice();
         const outputTables = tables(output);
+        // An emoji-only run can have no glyphs in an earlier CSS fallback face.
+        // Its subset contains only .notdef and an empty cmap, which FontFace
+        // rejects as invalid. Keep that candidate in the normal fallback chain.
+        if (u16(outputTables.get('maxp'), 4) <= 1) return null;
         if (outputTables.has('fvar')) throw new Error('The PDF font still contains variable axes.');
         if (outputTables.has('CFF ') || outputTables.has('CFF2')) output = await cffToTrueType(output);
         return output;

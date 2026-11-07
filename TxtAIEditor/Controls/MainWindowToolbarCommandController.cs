@@ -271,9 +271,10 @@ namespace TxtAIEditor.Controls
             _savingPdf = true;
             try
             {
-                if ((tab.IsReadOnlyViewer && !tab.IsReadOnlyTextFile) ||
-                    !_editorSessions.TryGetValue(tab.Id, out var session) ||
-                    _ownerWindow.Content is not Panel host)
+                bool officeDocument = tab.IsOfficeDocumentViewer;
+                _editorSessions.TryGetValue(tab.Id, out var session);
+                if (_ownerWindow.Content is not Panel host ||
+                    (!officeDocument && ((tab.IsReadOnlyViewer && !tab.IsReadOnlyTextFile) || session == null)))
                 {
                     throw new InvalidOperationException(_getLocalizedString("SavePdfUnsupported", "이 탭은 PDF로 저장할 수 없습니다. 텍스트 문서를 열고 다시 시도해 주세요."));
                 }
@@ -290,11 +291,20 @@ namespace TxtAIEditor.Controls
                 var file = await picker.PickSaveFileAsync();
                 if (file == null) return;
 
+                if (officeDocument)
+                {
+                    string html = await _officeDocumentViewerController.BuildPdfHtmlAsync(tab);
+                    await PdfExportController.ExportAsync(host, file.Path,
+                        new { mode = "html", text = html, baseHref = string.Empty },
+                        fullHtml: true, _ => { }, officeDocument: true);
+                    return;
+                }
+
                 var settings = _settingsService.CurrentSettings;
                 await PdfExportController.ExportAsync(host, file.Path, new
                 {
                     mode,
-                    text = session.GetText(),
+                    text = session!.GetText(),
                     baseHref = _getPreviewBaseHref(tab),
                     tabSize = settings.TabSize,
                     fontFamily = mode == "text" ? settings.FontFamily :

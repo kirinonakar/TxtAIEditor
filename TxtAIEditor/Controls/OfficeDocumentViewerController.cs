@@ -46,6 +46,11 @@ namespace TxtAIEditor.Controls
             return _activeTabProvider()?.IsOfficeDocumentViewer == true;
         }
 
+        public Task<string> BuildPdfHtmlAsync(OpenedTab tab)
+        {
+            return _viewerService.BuildPdfHtmlAsync(tab.FilePath!);
+        }
+
         public async Task<bool> FocusFindInActiveViewerAsync()
         {
             if (!TryGetActiveViewer(out var webView))

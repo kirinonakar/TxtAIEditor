@@ -17,7 +17,7 @@ namespace TxtAIEditor.Controls
 
         public static async Task ExportAsync(
             Panel host, string path, object document, bool fullHtml,
-            Action<CoreWebView2> registerDocumentResources)
+            Action<CoreWebView2> registerDocumentResources, bool officeDocument = false)
         {
             // A separate, noninteractive document avoids changing the editor DOM,
             // IME composition, selection, scroll position, or dirty state.
@@ -116,6 +116,13 @@ namespace TxtAIEditor.Controls
                     await prepared.Task.WaitAsync(PreparationTimeout);
                 }
 
+                JsonElement? officeLayout = null;
+                if (officeDocument)
+                {
+                    officeLayout = await PrepareOfficeDocumentAsync(core);
+                    // Workbook export creates the other sheets and their images.
+                    await WaitForHtmlAssetsAsync(core);
+                }
                 await PdfExportFontEmbedding.EmbedAsync(core, fullHtml);
 
                 var printSettings = environment.CreatePrintSettings();
@@ -125,6 +132,15 @@ namespace TxtAIEditor.Controls
                 printSettings.PageHeight = 297.0 / 25.4;
                 printSettings.MarginTop = printSettings.MarginBottom = 0.5;
                 printSettings.MarginLeft = printSettings.MarginRight = 0.5;
+                if (officeLayout is JsonElement layout)
+                {
+                    printSettings.PageWidth = layout.GetProperty("width").GetDouble();
+                    printSettings.PageHeight = layout.GetProperty("height").GetDouble();
+                    printSettings.MarginTop = layout.GetProperty("top").GetDouble();
+                    printSettings.MarginRight = layout.GetProperty("right").GetDouble();
+                    printSettings.MarginBottom = layout.GetProperty("bottom").GetDouble();
+                    printSettings.MarginLeft = layout.GetProperty("left").GetDouble();
+                }
                 if (!await core.PrintToPdfAsync(temporaryPath, printSettings))
                     throw new InvalidOperationException("WebView2 PDF export failed.");
 
@@ -137,6 +153,24 @@ namespace TxtAIEditor.Controls
                 host.Children.Remove(webView);
                 if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
             }
+        }
+
+        private static async Task<JsonElement> PrepareOfficeDocumentAsync(CoreWebView2 core)
+        {
+            string url = $"http://{PreviewWebResourceService.ResourceHostName}/office-pdf-export.js?v={PreviewWebResourceService.GetWebResourceVersion("office-pdf-export.js")}";
+            string json = await core.CallDevToolsProtocolMethodAsync("Runtime.evaluate", JsonSerializer.Serialize(new
+            {
+                expression = $"(async () => {{ const module = await import({JsonSerializer.Serialize(url)}); return module.prepareOfficePdf(); }})()",
+                awaitPromise = true, returnByValue = true
+            }));
+            using var result = JsonDocument.Parse(json);
+            if (result.RootElement.TryGetProperty("exceptionDetails", out var error))
+            {
+                string message = error.TryGetProperty("exception", out var exception) && exception.TryGetProperty("description", out var description)
+                    ? description.GetString() ?? "Office PDF preparation failed." : "Office PDF preparation failed.";
+                throw new InvalidOperationException(message);
+            }
+            return result.RootElement.GetProperty("result").GetProperty("value").Clone();
         }
 
         private static async Task WaitForHtmlAssetsAsync(CoreWebView2 core)

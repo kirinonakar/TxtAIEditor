@@ -50,26 +50,31 @@ namespace TxtAIEditor.Core.Services
 
             string? pageWidth = null;
             string? pagePadding = null;
-            if (TryReadWordPageLayout(document, out string documentPageWidth, out string documentPagePadding))
+            string? pageHeight = null;
+            if (TryReadWordPageLayout(document, out string documentPageWidth, out string documentPagePadding, out string documentPageHeight))
             {
                 pageWidth = documentPageWidth;
                 pagePadding = documentPagePadding;
+                pageHeight = documentPageHeight;
             }
 
             return BuildDocumentHtml(
                 Path.GetFileName(filePath),
                 content.ToString(),
                 pageWidth,
-                pagePadding);
+                pagePadding,
+                pageHeight);
         }
 
         private static bool TryReadWordPageLayout(
             XDocument document,
             out string pageWidth,
-            out string pagePadding)
+            out string pagePadding,
+            out string pageHeight)
         {
             pageWidth = string.Empty;
             pagePadding = string.Empty;
+            pageHeight = string.Empty;
 
             XElement? sectionProperties = document.Descendants()
                 .FirstOrDefault(element => element.Name.LocalName == "sectPr");
@@ -90,6 +95,7 @@ namespace TxtAIEditor.Core.Services
             }
 
             pageWidth = WordTwipsToCssPoints(widthTwips);
+            pageHeight = WordTwipsToCssPoints(heightTwips);
 
             XElement? pageMargins = GetDirectProperty(sectionProperties, "pgMar");
             if (TryReadWordTwips(pageMargins, "top", out int topTwips) &&

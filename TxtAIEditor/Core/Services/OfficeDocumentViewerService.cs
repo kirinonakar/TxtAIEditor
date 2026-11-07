@@ -15,7 +15,11 @@ namespace TxtAIEditor.Core.Services
             _getString = getString;
         }
 
-        public async Task<string> BuildHtmlAsync(string filePath)
+        public Task<string> BuildHtmlAsync(string filePath) => BuildHtmlCoreAsync(filePath, forPdf: false);
+
+        public Task<string> BuildPdfHtmlAsync(string filePath) => BuildHtmlCoreAsync(filePath, forPdf: true);
+
+        private async Task<string> BuildHtmlCoreAsync(string filePath, bool forPdf)
         {
             string extension = Path.GetExtension(filePath);
             string tempFilePath = string.Empty;
@@ -49,33 +53,35 @@ namespace TxtAIEditor.Core.Services
                 }
                 catch (Exception ex)
                 {
+                    if (forPdf) throw;
                     return AddFindPanel(BuildErrorHtml(ex.Message));
                 }
 
                 if (extension.Equals(".docx", StringComparison.OrdinalIgnoreCase))
                 {
                     string html = await OfficeTextDocumentHtmlRenderer.BuildWordAsync(filePath, _getString).ConfigureAwait(false);
-                    return AddFindPanel(html);
+                    return forPdf ? html : AddFindPanel(html);
                 }
 
                 if (extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase))
                 {
                     string html = await OfficeTextDocumentHtmlRenderer.BuildHwpxAsync(filePath, _getString).ConfigureAwait(false);
-                    return AddFindPanel(html);
+                    return forPdf ? html : AddFindPanel(html);
                 }
 
                 if (extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase))
                 {
                     string html = await OfficePresentationDocumentHtmlRenderer.BuildAsync(filePath, _getString).ConfigureAwait(false);
-                    return AddFindPanel(html);
+                    return forPdf ? html : AddFindPanel(html);
                 }
 
                 if (extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
                 {
                     string html = await OfficeWorkbookDocumentHtmlRenderer.BuildAsync(filePath, _getString).ConfigureAwait(false);
-                    return AddFindPanel(html);
+                    return forPdf ? html : AddFindPanel(html);
                 }
 
+                if (forPdf) throw new NotSupportedException(_getString("OfficeViewerUnsupportedDocument", "Unsupported Office document."));
                 return AddFindPanel(BuildErrorHtml(_getString("OfficeViewerUnsupportedDocument", "Unsupported Office document.")));
             }
             finally

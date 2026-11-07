@@ -20,7 +20,8 @@ namespace TxtAIEditor.Core.Services
             string title,
             string content,
             string? pageWidth = null,
-            string? pagePadding = null)
+            string? pagePadding = null,
+            string? pageHeight = null)
         {
             string documentPageWidth = string.IsNullOrWhiteSpace(pageWidth) ? "920px" : pageWidth;
             string responsivePageWidth = string.IsNullOrWhiteSpace(pageWidth)
@@ -49,6 +50,7 @@ namespace TxtAIEditor.Core.Services
     --document-page-width: {{documentPageWidth}};
     --document-page-responsive-width: {{responsivePageWidth}};
     --document-page-padding: {{documentPagePadding}};
+    --document-page-height: {{pageHeight ?? "297mm"}};
 }
 @media (prefers-color-scheme: dark) {
     :root {

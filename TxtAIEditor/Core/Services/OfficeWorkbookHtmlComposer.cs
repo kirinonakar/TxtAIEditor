@@ -820,11 +820,11 @@ function renderSheetObjects(sheet) {
     wrap.appendChild(section);
 }
 
-function renderSheet(index) {
+function renderSheet(index, rowLimit = maxRows) {
     const sheet = sheets[index];
     const rows = sheet.rows || [];
-    const visibleRows = rows.slice(0, maxRows);
-    columnCount = Math.max(1, ...visibleRows.map(row => row.length));
+    const visibleRows = rows.slice(0, rowLimit);
+    columnCount = visibleRows.reduce((maximum, row) => Math.max(maximum, row.length), 1);
     wrap.textContent = '';
     sheetLayout();
 
@@ -878,6 +878,26 @@ function renderSheet(index) {
     applySelectionClasses();
     updateResizedStyles();
 }
+
+// Called only in the separate PDF export document. Include every sheet and row;
+// the interactive viewer continues to use its normal display limit.
+window.__txtAiEditorPrepareWorkbookPdf = () => {
+    const exportDocument = document.createElement('main');
+    exportDocument.className = 'office-pdf-workbook';
+    sheets.forEach((sheet, index) => {
+        activeSheetIndex = index;
+        selectionState = null;
+        renderSheet(index, Number.MAX_SAFE_INTEGER);
+        const section = document.createElement('section');
+        section.className = 'office-pdf-sheet';
+        const heading = document.createElement('h2');
+        heading.textContent = sheet.name;
+        section.appendChild(heading);
+        section.append(...wrap.childNodes);
+        exportDocument.appendChild(section);
+    });
+    document.body.replaceChildren(exportDocument);
+};
 
 sheets.forEach((sheet, index) => {
     const option = document.createElement('option');
