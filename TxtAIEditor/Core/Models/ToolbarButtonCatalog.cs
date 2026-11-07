@@ -13,6 +13,7 @@ namespace TxtAIEditor.Core.Models
             new ToolbarButtonOption("openFile", "OpenFile"),
             new ToolbarButtonOption("saveFile", "SaveFile"),
             new ToolbarButtonOption("saveAsFile", "SaveAsFile"),
+            new ToolbarButtonOption("savePdf", "SavePdf"),
             new ToolbarButtonOption("print", "Print"),
             new ToolbarButtonOption("search", "Search"),
             new ToolbarButtonOption("compare", "Compare"),
@@ -38,13 +39,14 @@ namespace TxtAIEditor.Core.Models
             "openFile",
             "saveFile",
             "saveAsFile",
+            "savePdf",
             "print",
             "search"
         };
 
         public static IReadOnlyList<IReadOnlyList<string>> DefaultGroups { get; } = new[]
         {
-            new[] { "openFile", "saveFile", "saveAsFile", "print" },
+            new[] { "openFile", "saveFile", "saveAsFile", "savePdf", "print" },
             new[] { "search" },
             new[] { "compare", "terminal", "topMost", "stickyNote" },
             new[] { "wordWrap" },
@@ -61,6 +63,7 @@ namespace TxtAIEditor.Core.Models
                 "파일 열기" or "Open File" or "ファイルを開く" or "OpenFileButton" => "openFile",
                 "저장" or "Save" or "保存" or "SaveFileButton" => "saveFile",
                 "다른 이름으로 저장" or "Save As" or "名前を付けて保存" or "SaveAsFileButton" => "saveAsFile",
+                "PDF로 저장" or "Save as PDF" or "SavePdfButton" => "savePdf",
                 "비교" or "Compare" or "比較" or "CompareButton" => "compare",
                 "터미널" or "Terminal" or "ターミナル" or "TerminalToggleButton" => "terminal",
                 "인쇄" or "Print" or "印刷" or "PrintButton" => "print",
@@ -76,6 +79,17 @@ namespace TxtAIEditor.Core.Models
                 "설정" or "Settings" or "設定" or "SettingsButton" => "settings",
                 _ => value
             };
+        }
+
+        // Older toolbar settings do not know the new button. Place it beside Save As
+        // once, while retaining an explicitly saved position/alignment afterwards.
+        public static void IncludePdfSaveButton(List<string> orderedIds)
+        {
+            if (!orderedIds.Contains("savePdf", StringComparer.OrdinalIgnoreCase))
+            {
+                int anchor = orderedIds.FindIndex(id => id.Equals("saveAsFile", StringComparison.OrdinalIgnoreCase));
+                if (anchor >= 0) orderedIds.Insert(anchor + 1, "savePdf");
+            }
         }
     }
 }

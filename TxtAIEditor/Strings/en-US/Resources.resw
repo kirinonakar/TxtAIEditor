@@ -62,6 +62,15 @@
   <data name="SaveAsFile" xml:space="preserve">
     <value>Save As</value>
   </data>
+  <data name="SavePdf" xml:space="preserve">
+    <value>Save as PDF</value>
+  </data>
+  <data name="SavePdfErrorTitle" xml:space="preserve">
+    <value>Save PDF failed</value>
+  </data>
+  <data name="SavePdfUnsupported" xml:space="preserve">
+    <value>This tab cannot be saved as PDF. Open a text document and try again.</value>
+  </data>
   <data name="Compare" xml:space="preserve">
     <value>Compare</value>
   </data>

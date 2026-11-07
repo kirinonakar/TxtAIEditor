@@ -227,7 +227,8 @@ namespace TxtAIEditor.Composition
                 () => ui.EditorWorkspace.IsTerminalVisible,
                 () => ui.TerminalPane.SuspendNativeWindows(),
                 () => ui.TerminalPane.ResumeNativeWindows(),
-                () => livePreview.PrintActivePreview());
+                () => livePreview.PrintActivePreview(),
+                livePreview);
 
             return new MainWindowStartupControllers(
                 lifecycle,

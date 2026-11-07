@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -9,6 +10,7 @@ using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
 using TxtAIEditor.Editor;
 using TxtAIEditor.ViewModels;
+using Windows.Storage.Pickers;
 
 namespace TxtAIEditor.Controls
 {
@@ -43,6 +45,8 @@ namespace TxtAIEditor.Controls
         private readonly Action _suspendTerminal;
         private readonly Action _resumeTerminal;
         private readonly Func<bool>? _printLivePreview;
+        private readonly LivePreviewController? _pdfPreview;
+        private bool _savingPdf;
 
         public MainWindowToolbarCommandController(
             Window ownerWindow,
@@ -73,7 +77,8 @@ namespace TxtAIEditor.Controls
             Func<bool> isTerminalVisible,
             Action suspendTerminal,
             Action resumeTerminal,
-            Func<bool>? printLivePreview = null)
+            Func<bool>? printLivePreview = null,
+            LivePreviewController? pdfPreview = null)
         {
             _ownerWindow = ownerWindow;
             _topToolbar = topToolbar;
@@ -104,6 +109,7 @@ namespace TxtAIEditor.Controls
             _suspendTerminal = suspendTerminal;
             _resumeTerminal = resumeTerminal;
             _printLivePreview = printLivePreview;
+            _pdfPreview = pdfPreview;
 
             WireEvents();
         }
@@ -194,6 +200,7 @@ namespace TxtAIEditor.Controls
             _topToolbar.OpenFileClick += OnOpenFileClick;
             _topToolbar.SaveFileClick += OnSaveFileClick;
             _topToolbar.SaveAsFileClick += OnSaveAsFileClick;
+            _topToolbar.SavePdfClick += OnSavePdfClick;
             _topToolbar.CompareFilesClick += OnCompareFilesClick;
             _topToolbar.OpenTerminalClick += OnOpenTerminalClick;
             _topToolbar.PrintClick += OnPrintClick;
@@ -212,6 +219,8 @@ namespace TxtAIEditor.Controls
         private void OnSaveFileClick(object sender, RoutedEventArgs e) => SaveActive();
 
         private void OnSaveAsFileClick(object sender, RoutedEventArgs e) => SaveActiveAs();
+
+        private async void OnSavePdfClick(object sender, RoutedEventArgs e) => await SavePdfAsync();
 
         private async void OnCompareFilesClick(object sender, RoutedEventArgs e) => await CompareFilesAsync();
 
@@ -250,6 +259,60 @@ namespace TxtAIEditor.Controls
             if (tab != null)
             {
                 await _tabSaveCommands.SaveAsAsync(tab);
+            }
+        }
+
+        private async Task SavePdfAsync()
+        {
+            if (_savingPdf) return;
+            var tab = _tabNavigationController.GetActiveTab();
+            if (tab == null) return;
+
+            _savingPdf = true;
+            try
+            {
+                if ((tab.IsReadOnlyViewer && !tab.IsReadOnlyTextFile) ||
+                    !_editorSessions.TryGetValue(tab.Id, out var session) ||
+                    _ownerWindow.Content is not Panel host)
+                {
+                    throw new InvalidOperationException(_getLocalizedString("SavePdfUnsupported", "이 탭은 PDF로 저장할 수 없습니다. 텍스트 문서를 열고 다시 시도해 주세요."));
+                }
+
+                string mode = _pdfPreview?.GetPdfExportMode(tab) ?? "text";
+                var picker = new FileSavePicker
+                {
+                    SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                    SuggestedFileName = Path.GetFileNameWithoutExtension(tab.Title),
+                    DefaultFileExtension = ".pdf"
+                };
+                WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(_ownerWindow));
+                picker.FileTypeChoices.Add("PDF", new List<string> { ".pdf" });
+                var file = await picker.PickSaveFileAsync();
+                if (file == null) return;
+
+                var settings = _settingsService.CurrentSettings;
+                await PdfExportController.ExportAsync(host, file.Path, new
+                {
+                    mode,
+                    text = session.GetText(),
+                    baseHref = _getPreviewBaseHref(tab),
+                    tabSize = settings.TabSize,
+                    fontFamily = mode == "text" ? settings.FontFamily :
+                        mode == "aozora" ? settings.AozoraPreviewFontFamily : settings.PreviewFontFamily,
+                    fontSize = mode == "text" ? settings.FontSize :
+                        mode == "aozora" ? settings.AozoraPreviewFontSize : settings.PreviewFontSize,
+                    usePele = settings.UsePele,
+                    csvEmptyMessage = _getLocalizedString("PreviewCsvEmpty", "빈 CSV 파일입니다.")
+                }, mode == "html", core => _pdfPreview?.RegisterDocumentResourceAccess(core));
+            }
+            catch (Exception ex)
+            {
+                _dialogController.ShowErrorMessage(
+                    _getLocalizedString("SavePdfErrorTitle", "PDF 저장 오류"), ex.Message);
+            }
+            finally
+            {
+                _savingPdf = false;
             }
         }
 

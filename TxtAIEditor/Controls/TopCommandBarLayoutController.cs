@@ -36,7 +36,7 @@ namespace TxtAIEditor.Controls
                 (settings.ToolbarHiddenButtons ?? new List<string>()).Select(ToolbarButtonCatalog.NormalizeId),
                 StringComparer.OrdinalIgnoreCase);
             var leftAlignedSet = new HashSet<string>(
-                NormalizeToolbarLeftAlignedButtons(settings.ToolbarLeftAlignedButtons),
+                NormalizeToolbarLeftAlignedButtons(settings.ToolbarLeftAlignedButtons, settings.ToolbarButtonOrder),
                 StringComparer.OrdinalIgnoreCase);
             var orderedIds = NormalizeToolbarOrder(settings.ToolbarButtonOrder);
 
@@ -187,6 +187,7 @@ namespace TxtAIEditor.Controls
                 }
             }
 
+            ToolbarButtonCatalog.IncludePdfSaveButton(orderedIds);
             foreach (string id in ToolbarButtonCatalog.DefaultOrder)
             {
                 if (!orderedIds.Contains(id, StringComparer.OrdinalIgnoreCase))
@@ -198,7 +199,7 @@ namespace TxtAIEditor.Controls
             return orderedIds;
         }
 
-        private static List<string> NormalizeToolbarLeftAlignedButtons(IReadOnlyList<string>? savedLeftAlignedButtons)
+        private static List<string> NormalizeToolbarLeftAlignedButtons(IReadOnlyList<string>? savedLeftAlignedButtons, IReadOnlyList<string>? savedOrder)
         {
             var validIds = new HashSet<string>(
                 ToolbarButtonCatalog.DefaultOrder,
@@ -214,6 +215,10 @@ namespace TxtAIEditor.Controls
                 }
             }
 
+            if (savedOrder?.Any(id => ToolbarButtonCatalog.NormalizeId(id).Equals("savePdf", StringComparison.OrdinalIgnoreCase)) != true)
+            {
+                ToolbarButtonCatalog.IncludePdfSaveButton(leftAlignedIds);
+            }
             return leftAlignedIds;
         }
     }

@@ -62,6 +62,15 @@
   <data name="SaveAsFile" xml:space="preserve">
     <value>另存新檔</value>
   </data>
+  <data name="SavePdf" xml:space="preserve">
+    <value>另存為 PDF</value>
+  </data>
+  <data name="SavePdfErrorTitle" xml:space="preserve">
+    <value>PDF 儲存失敗</value>
+  </data>
+  <data name="SavePdfUnsupported" xml:space="preserve">
+    <value>此分頁無法另存為 PDF。請開啟文字文件後重試。</value>
+  </data>
   <data name="Compare" xml:space="preserve">
     <value>比較</value>
   </data>

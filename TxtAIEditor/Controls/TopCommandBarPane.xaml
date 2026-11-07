@@ -18,6 +18,11 @@
                             <FontIcon Glyph="&#xE792;"/>
                         </AppBarButton.Icon>
                     </AppBarButton>
+                    <AppBarButton x:Name="SavePdfButton" Click="OnSavePdfClick">
+                        <AppBarButton.Icon>
+                            <FontIcon Glyph="&#xEA90;"/>
+                        </AppBarButton.Icon>
+                    </AppBarButton>
                     <AppBarButton x:Name="PrintButton" Label="인쇄" Click="OnPrintClick" ToolTipService.ToolTip="인쇄 (Ctrl+P)">
                         <AppBarButton.Icon>
                             <FontIcon Glyph="&#xE749;"/>

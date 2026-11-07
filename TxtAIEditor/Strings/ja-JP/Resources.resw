@@ -62,6 +62,15 @@
   <data name="SaveAsFile" xml:space="preserve">
     <value>名前を付けて保存</value>
   </data>
+  <data name="SavePdf" xml:space="preserve">
+    <value>PDFとして保存</value>
+  </data>
+  <data name="SavePdfErrorTitle" xml:space="preserve">
+    <value>PDF保存エラー</value>
+  </data>
+  <data name="SavePdfUnsupported" xml:space="preserve">
+    <value>このタブはPDFとして保存できません。テキスト文書を開いて再試行してください。</value>
+  </data>
   <data name="Compare" xml:space="preserve">
     <value>比較</value>
   </data>

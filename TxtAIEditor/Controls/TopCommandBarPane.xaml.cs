@@ -22,6 +22,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? OpenFileClick;
         public event RoutedEventHandler? SaveFileClick;
         public event RoutedEventHandler? SaveAsFileClick;
+        public event RoutedEventHandler? SavePdfClick;
         public event RoutedEventHandler? CompareFilesClick;
         public event RoutedEventHandler? OpenTerminalClick;
         public event RoutedEventHandler? PrintClick;
@@ -85,6 +86,9 @@ namespace TxtAIEditor.Controls
             SaveAsFileButton.Label = getString("SaveAsFile", "다른 이름으로 저장");
             ToolTipService.SetToolTip(SaveAsFileButton, getString("SaveAsFile", "다른 이름으로 저장") + " (Ctrl+Shift+S)");
 
+            SavePdfButton.Label = getString("SavePdf", "PDF로 저장");
+            ToolTipService.SetToolTip(SavePdfButton, getString("SavePdf", "PDF로 저장"));
+
             CompareButton.Label = getString("Compare", "비교");
             ToolTipService.SetToolTip(CompareButton, getString("Compare", "비교") + " (Diff)");
 
@@ -139,6 +143,7 @@ namespace TxtAIEditor.Controls
                 ["openFile"] = (OpenFileButton, "OpenFile"),
                 ["saveFile"] = (SaveFileButton, "SaveFile"),
                 ["saveAsFile"] = (SaveAsFileButton, "SaveAsFile"),
+                ["savePdf"] = (SavePdfButton, "SavePdf"),
                 ["compare"] = (CompareButton, "Compare"),
                 ["terminal"] = (TerminalToggleButton, "Terminal"),
                 ["print"] = (PrintButton, "Print"),
@@ -158,6 +163,7 @@ namespace TxtAIEditor.Controls
         private void OnOpenFileClick(object sender, RoutedEventArgs e) => OpenFileClick?.Invoke(sender, e);
         private void OnSaveFileClick(object sender, RoutedEventArgs e) => SaveFileClick?.Invoke(sender, e);
         private void OnSaveAsFileClick(object sender, RoutedEventArgs e) => SaveAsFileClick?.Invoke(sender, e);
+        private void OnSavePdfClick(object sender, RoutedEventArgs e) => SavePdfClick?.Invoke(sender, e);
         private void OnCompareFilesClick(object sender, RoutedEventArgs e) => CompareFilesClick?.Invoke(sender, e);
         private void OnOpenTerminalClick(object sender, RoutedEventArgs e) => OpenTerminalClick?.Invoke(sender, e);
         private void OnPrintClick(object sender, RoutedEventArgs e) => PrintClick?.Invoke(sender, e);

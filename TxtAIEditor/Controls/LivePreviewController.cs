@@ -459,6 +459,20 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public string GetPdfExportMode(OpenedTab tab)
+        {
+            if (tab.InlineLivePreviewEnabled)
+            {
+                return tab.Language.Equals("html", StringComparison.OrdinalIgnoreCase) ||
+                       tab.Language.Equals("svg", StringComparison.OrdinalIgnoreCase)
+                    ? "html" : "markdown";
+            }
+
+            return IsLivePreviewVisible && PreviewTargetTab?.Id == tab.Id && !IsReadOnlyViewerTab(tab)
+                ? ResolvePreviewModeName(tab)
+                : "text";
+        }
+
         private string ResolvePreviewModeName(OpenedTab tab)
         {
             int selectedMode;

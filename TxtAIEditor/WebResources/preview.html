@@ -468,6 +468,20 @@
                 background: #e6e6e6;
             }
 
+            #print-container pre,
+            #print-container .math.display,
+            #print-container .mermaid-block,
+            #print-container .csv-table-wrap {
+                overflow: visible;
+                white-space: pre-wrap;
+                overflow-wrap: anywhere;
+            }
+
+            #print-container table {
+                max-width: 100%;
+                overflow-wrap: anywhere;
+            }
+
             body:not(.wrap-enabled) .preview-row {
                 width: auto !important;
                 white-space: normal !important;
@@ -1322,6 +1336,52 @@
                 html += `<div class="preview-row${extraClass ? ` ${extraClass}` : ''}">${rendered.html ?? ''}</div>`;
             }
             return html;
+        }
+
+        // Used only by the isolated PDF export WebView. Keep text and SVG as DOM
+        // content for Chromium's native PDF writer, without canvas screenshots.
+        if (new URLSearchParams(location.search).get('pdfExport') === '1') {
+            window.buildPdfExportHtml = message => buildHtmlPreviewDocument(message.text, message.baseHref);
+            window.preparePdfExport = async (message, requestId) => {
+                try {
+                    setPreviewBaseHref(message.baseHref || '');
+                    configureDiagramRenderer(!!message.usePele, 'Light', message.fontFamily, message.fontSize);
+                    document.documentElement.style.setProperty('--font', message.fontFamily);
+                    document.documentElement.style.setProperty('--font-size', `${message.fontSize}px`);
+                    document.documentElement.style.setProperty('--aozora-font', message.fontFamily);
+                    document.body.classList.add('wrap-enabled');
+                    const container = document.createElement('div');
+                    container.id = 'print-container';
+                    container.style.tabSize = String(message.tabSize || 4);
+                    document.body.appendChild(container);
+                    container.style.display = 'block';
+                    if (message.mode === 'text') {
+                        container.textContent = message.text;
+                        container.style.whiteSpace = 'pre-wrap';
+                        container.style.overflowWrap = 'anywhere';
+                    } else {
+                        container.innerHTML = buildPrintDocumentHtml(message.mode, message.text,
+                            message.baseHref, message.tabSize, message.csvEmptyMessage);
+                        await renderSharedMermaidBlocks(container);
+                    }
+                    // Lay out the actual print document before waiting for fonts.
+                    container.style.color = '#000';
+                    container.style.setProperty('--fg', '#1a1a1a');
+                    container.style.setProperty('--bg', '#fff');
+                    await Promise.all([...container.querySelectorAll('img')].map(image => {
+                        image.loading = 'eager';
+                        if (image.complete) return;
+                        return new Promise(resolve => {
+                            image.addEventListener('load', resolve, { once: true });
+                            image.addEventListener('error', resolve, { once: true });
+                        });
+                    }));
+                    await document.fonts.ready;
+                    post({ type: 'pdfExportPrepared', requestId });
+                } catch (error) {
+                    post({ type: 'pdfExportPrepared', requestId, error: String(error) });
+                }
+            };
         }
 
         function printPreviewDocument(message) {
