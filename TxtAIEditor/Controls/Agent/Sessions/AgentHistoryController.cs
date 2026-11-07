@@ -525,6 +525,18 @@ namespace TxtAIEditor.Controls
                     pendingToolResultToolName = toolName;
                     continue;
                 }
+                else if (line.StartsWith("[assistant: response]", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("[assistant: error]", StringComparison.OrdinalIgnoreCase))
+                {
+                    EnsureAgentRunHeader();
+                    inToolCall = false;
+                    toolCallSyntaxReached = false;
+                    inToolResult = false;
+                    inUserPromptInstructionMetadata = false;
+                    suppressInstructionMetadataSection = false;
+                    afterUserRequest = false;
+                    inPlanningModeTaskDetails = false;
+                }
                 else if (line.StartsWith("[Agent Response]:", StringComparison.OrdinalIgnoreCase) ||
                     line.StartsWith("[assistant: final answer]", StringComparison.OrdinalIgnoreCase))
                 {

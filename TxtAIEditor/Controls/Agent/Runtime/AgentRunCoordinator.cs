@@ -292,6 +292,7 @@ namespace TxtAIEditor.Controls
             string approvedPlanWorkspaceRoot = activeOpenSession.WorkspaceRoot;
 
             bool historyReady = false;
+            bool responseStreamInProgress = false;
             void FinishRun(string? responseLine, AgentRunStatus status = AgentRunStatus.Completed)
             {
                 AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
@@ -443,6 +444,7 @@ namespace TxtAIEditor.Controls
                         await _uiDispatcher.RunAsync(() => _updateContextStatsImmediate(true));
                     }
 
+                    responseStreamInProgress = true;
                     AgentResponseStreamResult streamResult = await _responseStreamService.RunAsync(
                         runContext,
                         fixedPromptContext,
@@ -453,6 +455,7 @@ namespace TxtAIEditor.Controls
                         agentTools,
                         imageAttachments,
                         cancellationToken);
+                    responseStreamInProgress = false;
 
                     if (!string.IsNullOrWhiteSpace(runContext.PendingVisionFallbackContext))
                     {
@@ -1032,7 +1035,10 @@ namespace TxtAIEditor.Controls
                     ex.Message);
                 await _runOutputController.AppendRunActivityAsync(runContext, failureMessage);
                 await _runOutputController.AppendRunOutputLineAsync(runContext, failureMessage);
-                // Errors and partial responses must not become next-turn assistant answers.
+                AgentRunTranscriptRecorder.AppendFailedRun(
+                    runContext, conversationTurn, transcript, initialTranscript,
+                    modelTranscript, responseStreamInProgress, failureMessage);
+                historyReady = true;
             }
             finally
             {

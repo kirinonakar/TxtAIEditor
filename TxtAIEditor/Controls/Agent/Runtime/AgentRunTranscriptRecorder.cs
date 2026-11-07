@@ -32,6 +32,50 @@ namespace TxtAIEditor.Controls
                 modelTranscript);
         }
 
+        public static void AppendFailedRun(
+            AgentRunContext context,
+            string instruction,
+            string transcript,
+            string initialTranscript,
+            string modelTranscript,
+            bool responseStreamInProgress,
+            string failureMessage)
+        {
+            // Context collection can fail before the current user turn is added.
+            if (string.IsNullOrEmpty(transcript))
+            {
+                transcript = instruction.Trim() + Environment.NewLine;
+                initialTranscript = string.Empty;
+                modelTranscript = context.ModelSessionHistory.ToString().TrimEnd() +
+                    Environment.NewLine + transcript;
+            }
+
+            AppendPromptTranscript(context, instruction, transcript, initialTranscript, modelTranscript);
+
+            // Preserve the unfinished stream for history only. It is neither a final
+            // answer nor a valid tool call to send back to the model on the next turn.
+            if (responseStreamInProgress)
+            {
+                string partialResponse = AgentThinkingTranscriptFormatter.BuildResponsePayload(
+                    AgentThinkingTranscriptFormatter.RemoveInlineThinking(context.StreamingResponseText),
+                    context.LlmSettings.LlmRetainThinking
+                        ? AgentThinkingTranscriptFormatter.CollectThinking(
+                            context.StreamingReasoningText, context.StreamingResponseText)
+                        : string.Empty);
+                if (!string.IsNullOrWhiteSpace(partialResponse))
+                {
+                    AppendLine(context, "[assistant: response]");
+                    AppendLine(context, partialResponse);
+                    AppendLine(context);
+                    context.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(partialResponse);
+                }
+            }
+
+            AppendLine(context, "[assistant: error]");
+            AppendLine(context, failureMessage);
+            AppendLine(context);
+        }
+
         public static void AppendPromptTranscriptAndResponse(
             AgentRunContext context,
             string instruction,
