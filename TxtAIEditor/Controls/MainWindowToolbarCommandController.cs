@@ -116,26 +116,29 @@ namespace TxtAIEditor.Controls
 
         public bool LivePreviewEnabled { get; private set; }
 
-        public async void OpenFile() => await _fileOpenDropController.OpenFileAsync();
+        public void OpenFile() => RunCommand(_fileOpenDropController.OpenFileAsync);
 
-        public async void SaveActive() => await SaveActiveAsync();
+        public void SaveActive() => RunCommand(SaveActiveAsync);
 
-        public async void SaveActiveAs() => await SaveActiveAsAsync();
+        public void SaveActiveAs() => RunCommand(SaveActiveAsAsync);
 
-        public async void Find() => await FindAsync();
+        public void Find() => RunCommand(FindAsync);
 
-        public async void ToggleTheme() => await _settingsController.ToggleThemeAsync();
+        public void ToggleTheme() => RunCommand(_settingsController.ToggleThemeAsync);
 
-        public async void ShowSettings() => await _settingsController.ShowSettingsAsync();
+        public void ShowSettings() => RunCommand(() => _settingsController.ShowSettingsAsync());
 
-        public async void ShowModelSettings() => await _settingsController.ShowSettingsAsync("LLM");
+        public void ShowModelSettings() => RunCommand(() => _settingsController.ShowSettingsAsync("LLM"));
+
+        private void RunCommand(Func<Task> command) => _ = AppErrorHandler.RunAsync(command, ex =>
+            _dialogController.ShowErrorMessage(_getLocalizedString("UnexpectedErrorTitle", "Unexpected error"), ex.Message));
 
         public void ToggleTerminal() => _terminalPanelController.Toggle();
 
         public void ToggleLivePreview()
         {
             _topToolbar.LivePreviewIsChecked = !_topToolbar.LivePreviewIsChecked;
-            _ = ApplyLivePreviewToggleAsync();
+            RunCommand(ApplyLivePreviewToggleAsync);
         }
 
         public void EnableLivePreview()
@@ -146,14 +149,14 @@ namespace TxtAIEditor.Controls
             }
 
             _topToolbar.LivePreviewIsChecked = true;
-            _ = ApplyLivePreviewToggleAsync();
+            RunCommand(ApplyLivePreviewToggleAsync);
         }
 
 
         public void ToggleWordWrap()
         {
             _topToolbar.WordWrapIsChecked = !_topToolbar.WordWrapIsChecked;
-            _ = ToggleWordWrapAsync();
+            RunCommand(ToggleWordWrapAsync);
         }
 
         public void ToggleCsvTableMode()
@@ -170,7 +173,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            _ = SetCsvTableModeAsync(tab, !tab.IsCsvTableModeEnabled);
+            RunCommand(() => SetCsvTableModeAsync(tab, !tab.IsCsvTableModeEnabled));
         }
 
         public void SyncCsvTableMode(OpenedTab tab)
@@ -193,7 +196,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public async void Print() => await PrintAsync();
+        public void Print() => RunCommand(PrintAsync);
 
         private void WireEvents()
         {
@@ -220,9 +223,9 @@ namespace TxtAIEditor.Controls
 
         private void OnSaveAsFileClick(object sender, RoutedEventArgs e) => SaveActiveAs();
 
-        private async void OnSavePdfClick(object sender, RoutedEventArgs e) => await SavePdfAsync();
+        private void OnSavePdfClick(object sender, RoutedEventArgs e) => RunCommand(SavePdfAsync);
 
-        private async void OnCompareFilesClick(object sender, RoutedEventArgs e) => await CompareFilesAsync();
+        private void OnCompareFilesClick(object sender, RoutedEventArgs e) => RunCommand(CompareFilesAsync);
 
         private void OnOpenTerminalClick(object sender, RoutedEventArgs e) => ToggleTerminal();
 
@@ -232,19 +235,19 @@ namespace TxtAIEditor.Controls
 
         private void OnStickyNoteClick(object sender, RoutedEventArgs e) => _stickyNoteModeController.ToggleMode();
 
-        private async void OnWordWrapToggleClick(object sender, RoutedEventArgs e) => await ToggleWordWrapAsync();
+        private void OnWordWrapToggleClick(object sender, RoutedEventArgs e) => RunCommand(ToggleWordWrapAsync);
 
         private void OnFindClick(object sender, RoutedEventArgs e) => Find();
 
-        private async void OnToggleLivePreviewClick(object sender, RoutedEventArgs e) => await ApplyLivePreviewToggleAsync();
+        private void OnToggleLivePreviewClick(object sender, RoutedEventArgs e) => RunCommand(ApplyLivePreviewToggleAsync);
 
-        private async void OnToggleCsvTableClick(object sender, RoutedEventArgs e) => await ApplyCsvTableModeAsync();
+        private void OnToggleCsvTableClick(object sender, RoutedEventArgs e) => RunCommand(ApplyCsvTableModeAsync);
 
         private void OnToggleThemeClick(object sender, RoutedEventArgs e) => ToggleTheme();
 
         private void OnSettingsClick(object sender, RoutedEventArgs e) => ShowSettings();
 
-        private async Task SaveActiveAsync()
+        public async Task SaveActiveAsync()
         {
             var tab = _tabNavigationController.GetActiveTab();
             if (tab != null)
@@ -253,7 +256,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async Task SaveActiveAsAsync()
+        public async Task SaveActiveAsAsync()
         {
             var tab = _tabNavigationController.GetActiveTab();
             if (tab != null)

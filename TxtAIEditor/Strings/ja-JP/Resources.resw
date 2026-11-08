@@ -4136,4 +4136,37 @@
   <data name="ExplorerImageDimensionsLabel" xml:space="preserve"><value>画像サイズ</value></data>
   <data name="AgentTruncatedRetryLimit" xml:space="preserve"><value>応答の途切れが繰り返されたため、エージェントを停止しました。もう一度実行してください。</value></data>
   <data name="AgentMcpPluginManagerDetail" xml:space="preserve"><value>内蔵プラグイン - MCP・Skill の一覧、検索、有効化の管理</value></data>
+  <data name="FileNotFoundMessage" xml:space="preserve"><value>ファイルが見つかりません。</value></data>
+  <data name="FileSaveErrorFormat" xml:space="preserve"><value>ファイルの保存に失敗しました: {0}</value></data>
+  <data name="LargeReplaceErrorFormat" xml:space="preserve"><value>大容量ファイルの置換に失敗しました: {0}</value></data>
+  <data name="ModelListRequestErrorFormat" xml:space="preserve"><value>モデル一覧の取得に失敗しました ({0}): {1}</value></data>
+  <data name="CredentialWriteErrorFormat" xml:space="preserve"><value>資格情報の保存に失敗しました (エラー: {0})。</value></data>
+  <data name="TerminalExecutableMissingFormat" xml:space="preserve"><value>{0} の実行ファイルが見つかりません。</value></data>
+  <data name="SecureNotePasswordRequired" xml:space="preserve"><value>パスワードを入力してください。</value></data>
+  <data name="SecureNoteUnsupportedFormat" xml:space="preserve"><value>暗号化ファイルの形式に対応していません。</value></data>
+  <data name="SecureNoteCorruptFile" xml:space="preserve"><value>暗号化ファイルが破損しているか、対応していない形式です。</value></data>
+  <data name="SecureNoteDecryptFailed" xml:space="preserve"><value>パスワードが正しくないか、ファイルを復号できません。</value></data>
+  <data name="SecureNoteSaveErrorFormat" xml:space="preserve"><value>暗号化ファイルの保存に失敗しました: {0}</value></data>
+  <data name="SecureNoteInvalidKdf" xml:space="preserve"><value>暗号化ファイルの KDF 反復回数が無効です。</value></data>
+  <data name="TextSearchTimedOut" xml:space="preserve"><value>テキスト検索がタイムアウトしました。</value></data>
+  <data name="ReplaceDocumentChanged" xml:space="preserve"><value>文書が変更されたため、すべて置換の結果を破棄しました。</value></data>
+  <data name="EditorWebViewNotReady" xml:space="preserve"><value>エディターの WebView の準備ができていません。</value></data>
+  <data name="UnexpectedErrorTitle" xml:space="preserve"><value>予期しないエラー</value></data>
+  <data name="UnexpectedErrorMessage" xml:space="preserve"><value>操作に失敗しました。作業を保存し、問題が続く場合はアプリを再起動してください。詳細: {0}</value></data>
+  <data name="CsvBreadcrumbRoot" xml:space="preserve"><value>ルート</value></data>
+  <data name="JupyterNotebookInvalid" xml:space="preserve"><value>Jupyter ノートブックの形式が無効です。</value></data>
+  <data name="JupyterNotebookLoadError" xml:space="preserve"><value>ノートブックを読み込めません。</value></data>
+  <data name="AgentActivityReadImageFormat" xml:space="preserve"><value>画像を読み込み中: {0}</value></data>
+  <data name="AgentActivitySearchReplaceFormat" xml:space="preserve"><value>検索・置換中: {0}</value></data>
+  <data name="AgentActivityOpenFileFormat" xml:space="preserve"><value>ファイルを開いています: {0}</value></data>
+  <data name="UnslothErrorNoModelSelected" xml:space="preserve"><value>先に Unsloth Desktop のモデルを選択してください。</value></data>
+  <data name="UnslothErrorApiCallFailed" xml:space="preserve"><value>Unsloth Desktop API の呼び出しに失敗しました ({0}): {1}</value></data>
+  <data name="UnslothErrorEmptyResponse" xml:space="preserve"><value>Unsloth Desktop から空の応答を受信しました。</value></data>
+  <data name="UnslothErrorStreamCallFailed" xml:space="preserve"><value>Unsloth Desktop API のストリーミング呼び出しに失敗しました ({0}): {1}</value></data>
+  <data name="AgentTabHeader" xml:space="preserve"><value>Agent</value></data>
+  <data name="AgentActivityEmptyResponseRetry" xml:space="preserve"><value>空の応答を受信したため、再試行します。</value></data>
+  <data name="AgentToolStepLimitReached" xml:space="preserve"><value>ツール呼び出しの上限に達したため停止しました。結果を確認して再実行してください。</value></data>
+  <data name="AgentExaMcpRateLimitHistoryFormat" xml:space="preserve"><value>ツール失敗: Exa MCP を利用できません。
+Exa の無料 MCP 上限に達しました。
+次のリセットまで約 {0} 時間です。</value></data>
 </root>

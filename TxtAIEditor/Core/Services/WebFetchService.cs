@@ -16,6 +16,15 @@ namespace TxtAIEditor.Core.Services
         private const int MaxRedirects = 5;
         private const long MaxContentSize = 2 * 1024 * 1024; // 2MB
         private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(15);
+        private static readonly HttpClient Client = new HttpClient(PublicWebConnection.CreateHandler())
+        {
+            Timeout = Timeout.InfiniteTimeSpan
+        };
+        private readonly HttpClient _client;
+
+        public WebFetchService() : this(Client) { }
+
+        internal WebFetchService(HttpClient client) => _client = client;
 
         public async Task<string> FetchUrlAsMarkdownAsync(string url, CancellationToken cancellationToken = default)
         {
@@ -38,12 +47,6 @@ namespace TxtAIEditor.Core.Services
 
         private async Task<string> FetchHtmlAsync(string startUrl, CancellationToken cancellationToken)
         {
-            var handler = new HttpClientHandler
-            {
-                AllowAutoRedirect = false
-            };
-
-            using var client = new HttpClient(handler);
             string currentUrl = startUrl;
             int redirectCount = 0;
 
@@ -51,10 +54,10 @@ namespace TxtAIEditor.Core.Services
             {
                 var uri = new Uri(currentUrl);
 
-                // SSRF Protection: Check internal network block
-                if (await IsInternalOrPrivateUriAsync(uri, cancellationToken))
+                if (!uri.IsAbsoluteUri || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+                    !string.IsNullOrEmpty(uri.UserInfo))
                 {
-                    throw new InvalidOperationException($"Access to internal or private URL is blocked: {currentUrl}");
+                    throw new InvalidOperationException("Only HTTP and HTTPS URLs without credentials are supported.");
                 }
 
                 using var request = new HttpRequestMessage(HttpMethod.Get, uri);
@@ -65,7 +68,7 @@ namespace TxtAIEditor.Core.Services
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(DefaultTimeout);
 
-                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                using var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
 
                 // Redirect detection
                 if (response.StatusCode is HttpStatusCode.MovedPermanently or HttpStatusCode.Found or HttpStatusCode.SeeOther or HttpStatusCode.TemporaryRedirect or (HttpStatusCode)308)
@@ -133,73 +136,6 @@ namespace TxtAIEditor.Core.Services
             throw new InvalidOperationException($"Too many redirects (max redirects: {MaxRedirects} exceeded)");
         }
 
-        private async Task<bool> IsInternalOrPrivateUriAsync(Uri uri, CancellationToken cancellationToken)
-        {
-            string host = uri.Host;
-
-            if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(host, "loopback", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            try
-            {
-                IPAddress[] addresses = await Dns.GetHostAddressesAsync(host, cancellationToken);
-                foreach (var ip in addresses)
-                {
-                    if (IsPrivateOrLoopbackIp(ip))
-                    {
-                        return true;
-                    }
-                }
-            }
-            catch
-            {
-                // DNS resolution failed. To be safe, block access if it resolves to nothing or fails.
-                return true;
-            }
-
-            return false;
-        }
-
-        private bool IsPrivateOrLoopbackIp(IPAddress ip)
-        {
-            if (IPAddress.IsLoopback(ip))
-            {
-                return true;
-            }
-
-            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-            {
-                byte[] bytes = ip.GetAddressBytes();
-                // 10.0.0.0/8
-                if (bytes[0] == 10) return true;
-                // 172.16.0.0/12 (172.16.x.x - 172.31.x.x)
-                if (bytes[0] == 172 && (bytes[1] >= 16 && bytes[1] <= 31)) return true;
-                // 192.168.0.0/16
-                if (bytes[0] == 192 && bytes[1] == 168) return true;
-                // 169.254.0.0/16 (Link-local)
-                if (bytes[0] == 169 && bytes[1] == 254) return true;
-                // 0.0.0.0 (unspecified)
-                if (bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0) return true;
-            }
-            else if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
-            {
-                byte[] bytes = ip.GetAddressBytes();
-
-                // fc00::/7 (Unique Local Address)
-                if ((bytes[0] & 0xFE) == 0xFC) return true;
-
-                // fe80::/10 (Link-Local Address)
-                if (bytes[0] == 0xFE && (bytes[1] & 0xC0) == 0x80) return true;
-
-                // unspecified ::
-                if (bytes.All(b => b == 0)) return true;
-            }
-
-            return false;
-        }
 
         private string ExtractMainContentAsMarkdown(string html)
         {

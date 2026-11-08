@@ -29,7 +29,7 @@ namespace TxtAIEditor.Core.Services
             // Try standard /v1/models first (OpenAI compatible endpoint supported by modern Ollama)
             try
             {
-                using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) })
+                using (var client = AppHttpClients.CreateClient(HttpClientProfile.ModelDiscovery))
                 {
                     if (!string.IsNullOrEmpty(apiKey))
                     {
@@ -89,7 +89,7 @@ namespace TxtAIEditor.Core.Services
 
             try
             {
-                using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) })
+                using (var client = AppHttpClients.CreateClient(HttpClientProfile.ModelDiscovery))
                 {
                     if (!string.IsNullOrEmpty(apiKey))
                     {
@@ -129,7 +129,7 @@ namespace TxtAIEditor.Core.Services
             if (models.Count == 0)
             {
                 // Trigger original request error details so caller receives detailed HTTP exception
-                using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) })
+                using (var client = AppHttpClients.CreateClient(HttpClientProfile.ModelDiscovery))
                 {
                     if (!string.IsNullOrEmpty(apiKey))
                     {
@@ -140,7 +140,7 @@ namespace TxtAIEditor.Core.Services
                         string responseBody = await response.Content.ReadAsStringAsync();
                         if (!response.IsSuccessStatusCode)
                         {
-                            throw new HttpRequestException($"모델 목록 요청 실패 ({response.StatusCode}): {responseBody}");
+                            throw new HttpRequestException(string.Format(LocalizedServiceMessages.Get("ModelListRequestErrorFormat", "Model list request failed ({0}): {1}"), response.StatusCode, responseBody));
                         }
                     }
                 }
@@ -171,7 +171,7 @@ namespace TxtAIEditor.Core.Services
             var models = new List<string>();
             string? pageToken = null;
 
-            using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
+            using (var client = AppHttpClients.CreateClient(HttpClientProfile.GoogleModelDiscovery))
             {
                 if (!string.IsNullOrEmpty(apiKey))
                 {
@@ -191,7 +191,7 @@ namespace TxtAIEditor.Core.Services
                         string responseBody = await response.Content.ReadAsStringAsync();
                         if (!response.IsSuccessStatusCode)
                         {
-                            throw new HttpRequestException($"모델 목록 요청 실패 ({response.StatusCode}): {responseBody}");
+                            throw new HttpRequestException(string.Format(LocalizedServiceMessages.Get("ModelListRequestErrorFormat", "Model list request failed ({0}): {1}"), response.StatusCode, responseBody));
                         }
 
                         using (var doc = JsonDocument.Parse(responseBody))

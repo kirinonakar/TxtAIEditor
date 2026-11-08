@@ -11,11 +11,10 @@ using TxtAIEditor.Core.Interfaces;
 
 namespace TxtAIEditor.Core.Services.LLM
 {
-    public class GoProvider : ILLMProvider
+    public class GoProvider : OpenAICompatibleProviderBase
     {
         private readonly ILocalizationService _localizationService;
 
-        private static readonly HttpClient _httpClient = new HttpClient();
         private const string ClientUserAgent = "TxtAIEditor/1.0.0";
         private readonly string _thinkingLevel;
         private readonly string _providerName;
@@ -111,8 +110,19 @@ namespace TxtAIEditor.Core.Services.LLM
 
         private static bool IsAnthropicModel(string model) => _anthropicModels.Contains(model);
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
+        public override async Task<string> GenerateCompletionAsync(LlmCompletionRequest completion)
         {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var systemPrompt = completion.SystemPrompt;
+            var userContent = completion.UserContent;
+            var cancellationToken = completion.CancellationToken;
+            var attachments = completion.Attachments;
+            var tools = completion.Tools;
+            var onUsage = completion.OnUsage;
+            var onNativeToolCall = completion.OnNativeToolCall;
+            var onApiType = completion.OnApiType;
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
@@ -137,22 +147,14 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 return await LlmResponsesApiClient.GenerateCompletionAsync(
-                    _httpClient,
-                    endpoint,
-                    apiKey,
-                    model,
-                    systemPrompt,
-                    userContent,
-                    outputLimit,
-                    GetResponsesReasoningEffort(model),
-                    attachments,
-                    tools,
-                    cancellationToken,
-                    onUsage,
-                    onNativeToolCall,
-                    _localizationService.GetString("GoErrorApiCallFailed", "OpenCode Go API 호출 실패 ({0}): {1}"),
-                    _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."),
-                    request => ConfigureOpenCodeRequest(request));
+                    _httpClient, completion, new LlmResponsesOptions
+                    {
+                        OutputLimit = outputLimit,
+                        ReasoningEffort = GetResponsesReasoningEffort(model),
+                        ErrorMessageTemplate = _localizationService.GetString("GoErrorApiCallFailed", "OpenCode Go API 호출 실패 ({0}): {1}"),
+                        EmptyResponseMessage = _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."),
+                        ConfigureRequest = request => ConfigureOpenCodeRequest(request),
+                    });
             }
 
             await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
@@ -293,8 +295,21 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
+        public override async Task GenerateCompletionStreamAsync(LlmCompletionRequest completion)
         {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var systemPrompt = completion.SystemPrompt;
+            var userContent = completion.UserContent;
+            var cancellationToken = completion.CancellationToken;
+            var attachments = completion.Attachments;
+            var tools = completion.Tools;
+            var onUsage = completion.OnUsage;
+            var onNativeToolCall = completion.OnNativeToolCall;
+            var onApiType = completion.OnApiType;
+            var onReasoning = completion.OnReasoning;
+            var onChunk = completion.OnChunk ?? throw new ArgumentException("A streaming callback is required.", nameof(completion));
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
@@ -320,23 +335,13 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 await LlmResponsesApiClient.GenerateCompletionStreamAsync(
-                    _httpClient,
-                    endpoint,
-                    apiKey,
-                    model,
-                    systemPrompt,
-                    userContent,
-                    outputLimit,
-                    GetResponsesReasoningEffort(model),
-                    attachments,
-                    tools,
-                    onChunk,
-                    cancellationToken,
-                    onReasoning,
-                    onUsage,
-                    onNativeToolCall,
-                    _localizationService.GetString("GoErrorStreamCallFailed", "OpenCode Go API 스트리밍 호출 실패 ({0}): {1}"),
-                    request => ConfigureOpenCodeRequest(request));
+                    _httpClient, completion, new LlmResponsesOptions
+                    {
+                        OutputLimit = outputLimit,
+                        ReasoningEffort = GetResponsesReasoningEffort(model),
+                        ErrorMessageTemplate = _localizationService.GetString("GoErrorStreamCallFailed", "OpenCode Go API 스트리밍 호출 실패 ({0}): {1}"),
+                        ConfigureRequest = request => ConfigureOpenCodeRequest(request),
+                    });
                 return;
             }
 
@@ -976,32 +981,5 @@ namespace TxtAIEditor.Core.Services.LLM
             };
         }
 
-        private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)
-        {
-            var images = attachments?.Where(a => a.IsImage && !string.IsNullOrWhiteSpace(a.Base64Data)).ToList();
-            if (images == null || images.Count == 0)
-            {
-                return userContent;
-            }
-
-            var parts = new List<object>
-            {
-                new { type = "text", text = userContent }
-            };
-
-            foreach (var image in images)
-            {
-                parts.Add(new
-                {
-                    type = "image_url",
-                    image_url = new
-                    {
-                        url = $"data:{image.MimeType};base64,{image.Base64Data}"
-                    }
-                });
-            }
-
-            return parts;
-        }
     }
 }

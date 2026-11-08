@@ -42,7 +42,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 }
             }
 
-            using (var sseClient = new HttpClient { Timeout = TimeSpan.FromMinutes(2) })
+            using (var sseClient = AppHttpClients.CreateClient(HttpClientProfile.Mcp))
             {
                 using (var sseRequest = new HttpRequestMessage(HttpMethod.Get, endpointUrl))
                 {
@@ -120,7 +120,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                 postUrl = resolvedUri.ToString();
                             }
 
-                            using (var postClient = new HttpClient())
+                            using (var postClient = AppHttpClients.CreateClient(HttpClientProfile.Mcp))
                             {
                                 // Step 2: Send initialize request
                                 string initId = "init_" + Guid.NewGuid().ToString("N");
@@ -336,7 +336,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 throw new InvalidOperationException("MCP endpoint must use HTTPS.");
             }
 
-            using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) })
+            using (var client = AppHttpClients.CreateClient(HttpClientProfile.Mcp))
             {
                 string initId = "init_" + Guid.NewGuid().ToString("N");
                 var initPayload = new

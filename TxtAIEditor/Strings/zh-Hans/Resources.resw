@@ -4136,4 +4136,37 @@
   <data name="ExplorerImageDimensionsLabel" xml:space="preserve"><value>图像尺寸</value></data>
   <data name="AgentTruncatedRetryLimit" xml:space="preserve"><value>响应多次被截断，Agent 已停止。请重试。</value></data>
   <data name="AgentMcpPluginManagerDetail" xml:space="preserve"><value>内置插件 - 列出、搜索、启用和停用 MCP 与 Skill</value></data>
+  <data name="FileNotFoundMessage" xml:space="preserve"><value>找不到文件。</value></data>
+  <data name="FileSaveErrorFormat" xml:space="preserve"><value>保存文件失败：{0}</value></data>
+  <data name="LargeReplaceErrorFormat" xml:space="preserve"><value>大文件替换失败：{0}</value></data>
+  <data name="ModelListRequestErrorFormat" xml:space="preserve"><value>模型列表请求失败（{0}）：{1}</value></data>
+  <data name="CredentialWriteErrorFormat" xml:space="preserve"><value>保存凭据失败（错误：{0}）。</value></data>
+  <data name="TerminalExecutableMissingFormat" xml:space="preserve"><value>找不到 {0} 可执行文件。</value></data>
+  <data name="SecureNotePasswordRequired" xml:space="preserve"><value>请输入密码。</value></data>
+  <data name="SecureNoteUnsupportedFormat" xml:space="preserve"><value>不支持的加密文件格式。</value></data>
+  <data name="SecureNoteCorruptFile" xml:space="preserve"><value>加密文件已损坏或格式不受支持。</value></data>
+  <data name="SecureNoteDecryptFailed" xml:space="preserve"><value>密码不正确或无法解密文件。</value></data>
+  <data name="SecureNoteSaveErrorFormat" xml:space="preserve"><value>保存加密文件失败：{0}</value></data>
+  <data name="SecureNoteInvalidKdf" xml:space="preserve"><value>加密文件的 KDF 迭代次数无效。</value></data>
+  <data name="TextSearchTimedOut" xml:space="preserve"><value>文本搜索超时。</value></data>
+  <data name="ReplaceDocumentChanged" xml:space="preserve"><value>文档已更改，已丢弃全部替换结果。</value></data>
+  <data name="EditorWebViewNotReady" xml:space="preserve"><value>编辑器 WebView 尚未就绪。</value></data>
+  <data name="UnexpectedErrorTitle" xml:space="preserve"><value>意外错误</value></data>
+  <data name="UnexpectedErrorMessage" xml:space="preserve"><value>操作失败。请保存工作；如果问题持续，请重启应用。详细信息：{0}</value></data>
+  <data name="CsvBreadcrumbRoot" xml:space="preserve"><value>根</value></data>
+  <data name="JupyterNotebookInvalid" xml:space="preserve"><value>Jupyter 笔记本格式无效。</value></data>
+  <data name="JupyterNotebookLoadError" xml:space="preserve"><value>无法加载笔记本。</value></data>
+  <data name="AgentActivityReadImageFormat" xml:space="preserve"><value>正在读取图像：{0}</value></data>
+  <data name="AgentActivitySearchReplaceFormat" xml:space="preserve"><value>正在搜索/替换：{0}</value></data>
+  <data name="AgentActivityOpenFileFormat" xml:space="preserve"><value>正在打开文件：{0}</value></data>
+  <data name="UnslothErrorNoModelSelected" xml:space="preserve"><value>请先选择 Unsloth Desktop 模型。</value></data>
+  <data name="UnslothErrorApiCallFailed" xml:space="preserve"><value>Unsloth Desktop API 调用失败（{0}）：{1}</value></data>
+  <data name="UnslothErrorEmptyResponse" xml:space="preserve"><value>收到 Unsloth Desktop 的空响应。</value></data>
+  <data name="UnslothErrorStreamCallFailed" xml:space="preserve"><value>Unsloth Desktop API 流式调用失败（{0}）：{1}</value></data>
+  <data name="AgentTabHeader" xml:space="preserve"><value>Agent</value></data>
+  <data name="AgentActivityEmptyResponseRetry" xml:space="preserve"><value>收到空响应，正在重试。</value></data>
+  <data name="AgentToolStepLimitReached" xml:space="preserve"><value>已达到工具调用上限，任务已停止。请检查结果后重新运行。</value></data>
+  <data name="AgentExaMcpRateLimitHistoryFormat" xml:space="preserve"><value>工具失败：Exa MCP 请求不可用。
+已达到 Exa 免费 MCP 请求上限。
+距离下次重置约 {0} 小时。</value></data>
 </root>

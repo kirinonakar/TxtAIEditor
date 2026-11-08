@@ -57,7 +57,7 @@ namespace TxtAIEditor.Core.Services
                 catch (Exception ex)
                 {
                     TryDelete(temp);
-                    throw new IOException($"파일 저장 실패 (안전 복구 완료): {ex.Message}", ex);
+                    throw new IOException(string.Format(LocalizedServiceMessages.Get("FileSaveErrorFormat", "Failed to save the file: {0}"), ex.Message), ex);
                 }
             }, cancellationToken);
 

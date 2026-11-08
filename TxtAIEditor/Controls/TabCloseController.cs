@@ -150,7 +150,10 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public async void WarnUnsavedAndClose(OpenedTab tab, TabViewItem tabItem)
+        public void WarnUnsavedAndClose(OpenedTab tab, TabViewItem tabItem) =>
+            _ = AppErrorHandler.RunAsync(() => WarnUnsavedAndCloseAsync(tab, tabItem));
+
+        public async Task WarnUnsavedAndCloseAsync(OpenedTab tab, TabViewItem tabItem)
         {
             bool terminalWasVisible = _isTerminalVisible();
             try

@@ -11,13 +11,12 @@ using TxtAIEditor.Core.Interfaces;
 
 namespace TxtAIEditor.Core.Services.LLM
 {
-    public class UpstageProvider : ILLMProvider
+    public class UpstageProvider : OpenAICompatibleProviderBase
     {
         private readonly ILocalizationService _localizationService;
         private readonly string _thinkingLevel;
         private readonly string _providerName;
 
-        private static readonly HttpClient _httpClient = new HttpClient();
 
         public UpstageProvider(ILocalizationService localizationService, string thinkingLevel = "", string providerName = "Upstage")
         {
@@ -26,25 +25,22 @@ namespace TxtAIEditor.Core.Services.LLM
             _providerName = providerName ?? "Upstage";
         }
 
-        private async Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken)
-        {
-            var (context, output) = await ModelsDevCatalog.GetLimitsAsync(_providerName, model, cancellationToken);
-            return (context, output > 0 ? output : 0);
-        }
+        private Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken) =>
+            GetCatalogTokenLimitsAsync(_providerName, model, cancellationToken);
 
-        public async Task<string> GenerateCompletionAsync(
-            string endpoint,
-            string apiKey,
-            string model,
-            string systemPrompt,
-            string userContent,
-            CancellationToken cancellationToken = default,
-            IReadOnlyList<LlmMessageAttachment>? attachments = null,
-            IReadOnlyList<LlmTool>? tools = null,
-            Func<LlmTokenUsage, Task>? onUsage = null,
-            Func<Task>? onNativeToolCall = null,
-            Func<string, Task>? onApiType = null)
+        public override async Task<string> GenerateCompletionAsync(LlmCompletionRequest completion)
         {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var systemPrompt = completion.SystemPrompt;
+            var userContent = completion.UserContent;
+            var cancellationToken = completion.CancellationToken;
+            var attachments = completion.Attachments;
+            var tools = completion.Tools;
+            var onUsage = completion.OnUsage;
+            var onNativeToolCall = completion.OnNativeToolCall;
+            var onApiType = completion.OnApiType;
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
             {
@@ -69,21 +65,13 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 return await LlmResponsesApiClient.GenerateCompletionAsync(
-                    _httpClient,
-                    endpoint,
-                    apiKey,
-                    model,
-                    systemPrompt,
-                    userContent,
-                    outputLimit,
-                    GetReasoningEffort(model, _thinkingLevel),
-                    attachments,
-                    tools,
-                    cancellationToken,
-                    onUsage,
-                    onNativeToolCall,
-                    _localizationService.GetString("UpstageErrorApiCallFailed", "Upstage API 호출 실패 ({0}): {1}"),
-                    _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."));
+                    _httpClient, completion, new LlmResponsesOptions
+                    {
+                        OutputLimit = outputLimit,
+                        ReasoningEffort = GetReasoningEffort(model, _thinkingLevel),
+                        ErrorMessageTemplate = _localizationService.GetString("UpstageErrorApiCallFailed", "Upstage API 호출 실패 ({0}): {1}"),
+                        EmptyResponseMessage = _localizationService.GetString("LlmErrorEmptyResponse", "AI로부터 빈 응답을 수신했습니다."),
+                    });
             }
 
             await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
@@ -162,36 +150,14 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(
-            string endpoint,
-            string apiKey,
-            string model,
-            string systemPrompt,
-            string userContent,
-            Func<string, Task> onChunk,
-            CancellationToken cancellationToken = default,
-            IReadOnlyList<LlmMessageAttachment>? attachments = null,
-            Func<string, Task>? onReasoning = null,
-            IReadOnlyList<LlmTool>? tools = null,
-            Func<LlmTokenUsage, Task>? onUsage = null,
-            Func<Task>? onNativeToolCall = null,
-            Func<string, Task>? onApiType = null)
+        public override async Task GenerateCompletionStreamAsync(LlmCompletionRequest completion)
         {
+            var cancellationToken = completion.CancellationToken;
+            var onChunk = completion.OnChunk ?? throw new ArgumentException("A streaming callback is required.", nameof(completion));
             // Upstage does not support the streaming response path used by the editor.
             // Keep the provider interface contract by delivering the complete response
             // as one chunk after a normal, non-streaming request.
-            string response = await GenerateCompletionAsync(
-                endpoint,
-                apiKey,
-                model,
-                systemPrompt,
-                userContent,
-                cancellationToken,
-                attachments,
-                tools,
-                onUsage,
-                onNativeToolCall,
-                onApiType);
+            string response = await GenerateCompletionAsync(completion);
 
             cancellationToken.ThrowIfCancellationRequested();
             if (!string.IsNullOrEmpty(response))
@@ -292,44 +258,6 @@ namespace TxtAIEditor.Core.Services.LLM
             };
         }
 
-        private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)
-        {
-            var images = attachments?.Where(a => a.IsImage && !string.IsNullOrWhiteSpace(a.Base64Data)).ToList();
-            if (images == null || images.Count == 0)
-            {
-                return userContent;
-            }
 
-            var parts = new List<object>
-            {
-                new { type = "text", text = userContent }
-            };
-
-            foreach (var image in images)
-            {
-                parts.Add(new
-                {
-                    type = "image_url",
-                    image_url = new
-                    {
-                        url = $"data:{image.MimeType};base64,{image.Base64Data}"
-                    }
-                });
-            }
-
-            return parts;
-        }
-
-        private static string NormalizeBearerCredential(string credential)
-        {
-            string value = (credential ?? string.Empty).Trim();
-            const string bearerPrefix = "Bearer ";
-            if (value.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                return value.Substring(bearerPrefix.Length).Trim();
-            }
-
-            return value;
-        }
     }
 }

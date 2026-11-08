@@ -305,7 +305,10 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async void QueueDelayedEmbeddedTerminalResize()
+        private void QueueDelayedEmbeddedTerminalResize() =>
+            _ = AppErrorHandler.RunAsync(ResizeEmbeddedTerminalAfterDelayAsync);
+
+        private async Task ResizeEmbeddedTerminalAfterDelayAsync()
         {
             await Task.Delay(80);
             ResizeEmbeddedTerminal();

@@ -123,24 +123,24 @@ namespace TxtAIEditor.Core.Services.LLM
         }
 
         public static async Task<string> GenerateCompletionAsync(
-            HttpClient httpClient,
-            string endpoint,
-            string apiKey,
-            string model,
-            string systemPrompt,
-            string userContent,
-            int outputLimit,
-            string? reasoningEffort,
-            IReadOnlyList<LlmMessageAttachment>? attachments,
-            IReadOnlyList<LlmTool>? tools,
-            CancellationToken cancellationToken,
-            Func<LlmTokenUsage, Task>? onUsage,
-            Func<Task>? onNativeToolCall,
-            string errorMessageTemplate,
-            string emptyResponseMessage,
-            Action<HttpRequestMessage>? configureRequest = null,
-            bool allowExplicitPromptCaching = true)
+            HttpClient httpClient, LlmCompletionRequest completion, LlmResponsesOptions options)
         {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var systemPrompt = completion.SystemPrompt;
+            var userContent = completion.UserContent;
+            var cancellationToken = completion.CancellationToken;
+            var attachments = completion.Attachments;
+            var tools = completion.Tools;
+            var onUsage = completion.OnUsage;
+            var onNativeToolCall = completion.OnNativeToolCall;
+            var outputLimit = options.OutputLimit;
+            var reasoningEffort = options.ReasoningEffort;
+            var errorMessageTemplate = options.ErrorMessageTemplate;
+            var emptyResponseMessage = options.EmptyResponseMessage;
+            var configureRequest = options.ConfigureRequest;
+            var allowExplicitPromptCaching = options.AllowExplicitPromptCaching;
             cancellationToken.ThrowIfCancellationRequested();
 
             string requestUrl = BuildRequestUrl(endpoint);
@@ -259,25 +259,26 @@ namespace TxtAIEditor.Core.Services.LLM
         }
 
         public static async Task GenerateCompletionStreamAsync(
-            HttpClient httpClient,
-            string endpoint,
-            string apiKey,
-            string model,
-            string systemPrompt,
-            string userContent,
-            int outputLimit,
-            string? reasoningEffort,
-            IReadOnlyList<LlmMessageAttachment>? attachments,
-            IReadOnlyList<LlmTool>? tools,
-            Func<string, Task> onChunk,
-            CancellationToken cancellationToken,
-            Func<string, Task>? onReasoning,
-            Func<LlmTokenUsage, Task>? onUsage,
-            Func<Task>? onNativeToolCall,
-            string errorMessageTemplate,
-            Action<HttpRequestMessage>? configureRequest = null,
-            bool allowExplicitPromptCaching = true)
+            HttpClient httpClient, LlmCompletionRequest completion, LlmResponsesOptions options)
         {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var systemPrompt = completion.SystemPrompt;
+            var userContent = completion.UserContent;
+            var cancellationToken = completion.CancellationToken;
+            var attachments = completion.Attachments;
+            var tools = completion.Tools;
+            var onUsage = completion.OnUsage;
+            var onNativeToolCall = completion.OnNativeToolCall;
+            var onReasoning = completion.OnReasoning;
+            var outputLimit = options.OutputLimit;
+            var reasoningEffort = options.ReasoningEffort;
+            var errorMessageTemplate = options.ErrorMessageTemplate;
+            var emptyResponseMessage = options.EmptyResponseMessage;
+            var configureRequest = options.ConfigureRequest;
+            var allowExplicitPromptCaching = options.AllowExplicitPromptCaching;
+            var onChunk = completion.OnChunk ?? throw new ArgumentException("A streaming callback is required.", nameof(completion));
             cancellationToken.ThrowIfCancellationRequested();
 
             string requestUrl = BuildRequestUrl(endpoint);

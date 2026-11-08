@@ -15,7 +15,7 @@ namespace TxtAIEditor.Core.Services.LLM
     {
         private readonly ILocalizationService _localizationService;
 
-        private static readonly HttpClient _httpClient = new HttpClient();
+        private static readonly HttpClient _httpClient = AppHttpClients.Llm;
 
         private readonly bool _verbose;
         private readonly string _thinkingLevel;
@@ -296,8 +296,19 @@ namespace TxtAIEditor.Core.Services.LLM
             return url;
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
+        public async Task<string> GenerateCompletionAsync(LlmCompletionRequest completion)
         {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var systemPrompt = completion.SystemPrompt;
+            var userContent = completion.UserContent;
+            var cancellationToken = completion.CancellationToken;
+            var attachments = completion.Attachments;
+            var tools = completion.Tools;
+            var onUsage = completion.OnUsage;
+            var onNativeToolCall = completion.OnNativeToolCall;
+            var onApiType = completion.OnApiType;
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
@@ -439,8 +450,21 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
+        public async Task GenerateCompletionStreamAsync(LlmCompletionRequest completion)
         {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var systemPrompt = completion.SystemPrompt;
+            var userContent = completion.UserContent;
+            var cancellationToken = completion.CancellationToken;
+            var attachments = completion.Attachments;
+            var tools = completion.Tools;
+            var onUsage = completion.OnUsage;
+            var onNativeToolCall = completion.OnNativeToolCall;
+            var onApiType = completion.OnApiType;
+            var onReasoning = completion.OnReasoning;
+            var onChunk = completion.OnChunk ?? throw new ArgumentException("A streaming callback is required.", nameof(completion));
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));

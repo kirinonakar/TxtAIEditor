@@ -11,13 +11,12 @@ using TxtAIEditor.Core.Interfaces;
 
 namespace TxtAIEditor.Core.Services.LLM
 {
-    public class OpenRouterProvider : ILLMProvider
+    public class OpenRouterProvider : OpenAICompatibleProviderBase
     {
         private readonly ILocalizationService _localizationService;
         private readonly string _thinkingLevel;
         private readonly string _providerName;
 
-        private static readonly HttpClient _httpClient = new HttpClient();
 
         public OpenRouterProvider(ILocalizationService localizationService, string thinkingLevel = "", string providerName = "OpenRouter")
         {
@@ -31,25 +30,25 @@ namespace TxtAIEditor.Core.Services.LLM
                                     !_thinkingLevel.Equals("default", StringComparison.OrdinalIgnoreCase) &&
                                     !_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase);
 
-        private async Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken)
-        {
-            var (context, output) = await ModelsDevCatalog.GetBestLimitsAsync(_providerName, model, cancellationToken);
-            return (context, output > 0 ? output : 0);
-        }
+        private Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken) =>
+            GetCatalogTokenLimitsAsync(_providerName, model, cancellationToken, bestLimits: true);
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
-        {
-            var sb = new StringBuilder();
-            await GenerateCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, chunk =>
-            {
-                sb.Append(chunk);
-                return Task.CompletedTask;
-            }, cancellationToken, attachments, null, tools, onUsage, onNativeToolCall, onApiType);
-            return sb.ToString();
-        }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
+        public override async Task GenerateCompletionStreamAsync(LlmCompletionRequest completion)
         {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var systemPrompt = completion.SystemPrompt;
+            var userContent = completion.UserContent;
+            var cancellationToken = completion.CancellationToken;
+            var attachments = completion.Attachments;
+            var tools = completion.Tools;
+            var onUsage = completion.OnUsage;
+            var onNativeToolCall = completion.OnNativeToolCall;
+            var onApiType = completion.OnApiType;
+            var onReasoning = completion.OnReasoning;
+            var onChunk = completion.OnChunk ?? throw new ArgumentException("A streaming callback is required.", nameof(completion));
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(apiKey))
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
@@ -77,23 +76,13 @@ namespace TxtAIEditor.Core.Services.LLM
             {
                 await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.Responses);
                 await LlmResponsesApiClient.GenerateCompletionStreamAsync(
-                    _httpClient,
-                    endpoint,
-                    apiKey,
-                    model,
-                    systemPrompt,
-                    userContent,
-                    outputLimit,
-                    GetResponsesReasoningEffort(model),
-                    attachments,
-                    tools,
-                    onChunk,
-                    cancellationToken,
-                    onReasoning,
-                    onUsage,
-                    onNativeToolCall,
-                    _localizationService.GetString("OpenRouterErrorStreamCallFailed", "OpenRouter API 스트리밍 호출 실패 ({0}): {1}"),
-                    request => ConfigureOpenRouterRequest(request, sessionId));
+                    _httpClient, completion, new LlmResponsesOptions
+                    {
+                        OutputLimit = outputLimit,
+                        ReasoningEffort = GetResponsesReasoningEffort(model),
+                        ErrorMessageTemplate = _localizationService.GetString("OpenRouterErrorStreamCallFailed", "OpenRouter API 스트리밍 호출 실패 ({0}): {1}"),
+                        ConfigureRequest = request => ConfigureOpenRouterRequest(request, sessionId),
+                    });
                 return;
             }
 
@@ -331,32 +320,5 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)
-        {
-            var images = attachments?.Where(a => a.IsImage && !string.IsNullOrWhiteSpace(a.Base64Data)).ToList();
-            if (images == null || images.Count == 0)
-            {
-                return userContent;
-            }
-
-            var parts = new List<object>
-            {
-                new { type = "text", text = userContent }
-            };
-
-            foreach (var image in images)
-            {
-                parts.Add(new
-                {
-                    type = "image_url",
-                    image_url = new
-                    {
-                        url = $"data:{image.MimeType};base64,{image.Base64Data}"
-                    }
-                });
-            }
-
-            return parts;
-        }
     }
 }

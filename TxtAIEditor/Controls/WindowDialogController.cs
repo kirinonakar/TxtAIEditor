@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Controls
 {
@@ -47,7 +48,10 @@ namespace TxtAIEditor.Controls
             return _xamlRootProvider();
         }
 
-        public async void ShowErrorMessage(string title, string message)
+        public void ShowErrorMessage(string title, string message) =>
+            _ = AppErrorHandler.RunAsync(() => ShowErrorMessageAsync(title, message));
+
+        public async Task ShowErrorMessageAsync(string title, string message)
         {
             bool terminalWasSuspended = false;
             try

@@ -11,14 +11,13 @@ using TxtAIEditor.Core.Interfaces;
 
 namespace TxtAIEditor.Core.Services.LLM
 {
-    public class OllamaProvider : ILLMProvider
+    public class OllamaProvider : OpenAICompatibleProviderBase
     {
         private readonly ILocalizationService _localizationService;
         private readonly bool _isCloud;
         private readonly string _thinkingLevel;
         private readonly string _providerName;
 
-        private static readonly HttpClient _httpClient = new HttpClient();
 
         public OllamaProvider(ILocalizationService localizationService, bool isCloud, string thinkingLevel = "", string providerName = "")
         {
@@ -47,19 +46,22 @@ namespace TxtAIEditor.Core.Services.LLM
             return (context, output > 0 ? output : 0);
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
-        {
-            var sb = new StringBuilder();
-            await GenerateCompletionStreamAsync(endpoint, apiKey, model, systemPrompt, userContent, chunk =>
-            {
-                sb.Append(chunk);
-                return Task.CompletedTask;
-            }, cancellationToken, attachments, null, tools, onUsage, onNativeToolCall, onApiType);
-            return sb.ToString();
-        }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
+        public override async Task GenerateCompletionStreamAsync(LlmCompletionRequest completion)
         {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var systemPrompt = completion.SystemPrompt;
+            var userContent = completion.UserContent;
+            var cancellationToken = completion.CancellationToken;
+            var attachments = completion.Attachments;
+            var tools = completion.Tools;
+            var onUsage = completion.OnUsage;
+            var onNativeToolCall = completion.OnNativeToolCall;
+            var onApiType = completion.OnApiType;
+            var onReasoning = completion.OnReasoning;
+            var onChunk = completion.OnChunk ?? throw new ArgumentException("A streaming callback is required.", nameof(completion));
             cancellationToken.ThrowIfCancellationRequested();
 
             string defaultNoModelError = _isCloud
@@ -686,32 +688,5 @@ namespace TxtAIEditor.Core.Services.LLM
             };
         }
 
-        private static object BuildUserContent(string userContent, IReadOnlyList<LlmMessageAttachment>? attachments)
-        {
-            var images = attachments?.Where(a => a.IsImage && !string.IsNullOrWhiteSpace(a.Base64Data)).ToList();
-            if (images == null || images.Count == 0)
-            {
-                return userContent;
-            }
-
-            var parts = new List<object>
-            {
-                new { type = "text", text = userContent }
-            };
-
-            foreach (var image in images)
-            {
-                parts.Add(new
-                {
-                    type = "image_url",
-                    image_url = new
-                    {
-                        url = $"data:{image.MimeType};base64,{image.Base64Data}"
-                    }
-                });
-            }
-
-            return parts;
-        }
     }
 }

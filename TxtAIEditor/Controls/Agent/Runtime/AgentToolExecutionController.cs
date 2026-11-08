@@ -92,7 +92,9 @@ namespace TxtAIEditor.Controls
                         "run_rga" => await _fileTools.RunRgaAsync(
                             GetStringArgument(arguments, "arguments"),
                             GetIntArgument(arguments, "timeoutMs", 10000),
-                            cancellationToken),
+                            cancellationToken,
+                            GetBoolArgument(arguments, "includeNotebooks", false),
+                            GetBoolArgument(arguments, "includeArchives", false)),
                         "run_powershell" => await _fileTools.RunPowerShellAsync(
                             GetStringArgument(arguments, "command"),
                             GetIntArgument(arguments, "timeoutMs", AgentProcessToolService.DefaultPowerShellTimeoutMs),

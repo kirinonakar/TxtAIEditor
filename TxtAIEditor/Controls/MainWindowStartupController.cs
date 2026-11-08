@@ -173,7 +173,7 @@ namespace TxtAIEditor.Controls
 
         private void QueueDeferredUserContentIndexes()
         {
-            async void LoadDeferredIndexes()
+            async Task LoadDeferredIndexes()
             {
                 try
                 {
@@ -186,9 +186,9 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (!_window.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, LoadDeferredIndexes))
+            if (!_window.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _ = AppErrorHandler.RunAsync(LoadDeferredIndexes)))
             {
-                LoadDeferredIndexes();
+                _ = AppErrorHandler.RunAsync(LoadDeferredIndexes);
             }
         }
 
@@ -286,7 +286,7 @@ namespace TxtAIEditor.Controls
         {
             bool revealInLeftPanel = _settingsService.CurrentSettings.LeftSidebarVisible;
 
-            async void NavigateAsync()
+            async Task NavigateAsync()
             {
                 try
                 {
@@ -298,15 +298,15 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (!_window.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, NavigateAsync))
+            if (!_window.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _ = AppErrorHandler.RunAsync(NavigateAsync)))
             {
-                NavigateAsync();
+                _ = AppErrorHandler.RunAsync(NavigateAsync);
             }
         }
 
         private void QueuePreviewInitialization()
         {
-            async void InitializePreview()
+            async Task InitializePreview()
             {
                 try
                 {
@@ -319,9 +319,9 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (!_window.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, InitializePreview))
+            if (!_window.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _ = AppErrorHandler.RunAsync(InitializePreview)))
             {
-                InitializePreview();
+                _ = AppErrorHandler.RunAsync(InitializePreview);
             }
         }
 

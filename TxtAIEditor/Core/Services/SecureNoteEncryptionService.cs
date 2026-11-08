@@ -51,13 +51,13 @@ namespace TxtAIEditor.Core.Services
         {
             if (string.IsNullOrWhiteSpace(password))
             {
-                throw new InvalidOperationException("암호를 입력해 주세요.");
+                throw new InvalidOperationException(LocalizedServiceMessages.Get("SecureNotePasswordRequired", "Enter a password."));
             }
 
             var lines = encryptedText.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n', 3);
             if (lines.Length < 2 || !string.Equals(lines[0], Version, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("지원하지 않는 암호화 파일 형식입니다.");
+                throw new InvalidOperationException(LocalizedServiceMessages.Get("SecureNoteUnsupportedFormat", "Unsupported encrypted file format."));
             }
 
             SecureNotePayload? payload = JsonSerializer.Deserialize<SecureNotePayload>(lines[1]);
@@ -66,7 +66,7 @@ namespace TxtAIEditor.Core.Services
                 !string.Equals(payload.Kdf, Kdf, StringComparison.Ordinal) ||
                 !string.Equals(payload.Cipher, Cipher, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("지원하지 않는 암호화 파일 형식입니다.");
+                throw new InvalidOperationException(LocalizedServiceMessages.Get("SecureNoteUnsupportedFormat", "Unsupported encrypted file format."));
             }
 
             byte[] salt = Convert.FromBase64String(payload.Salt);
@@ -74,7 +74,7 @@ namespace TxtAIEditor.Core.Services
             byte[] encrypted = Convert.FromBase64String(payload.Ciphertext);
             if (salt.Length != SaltSizeBytes || iv.Length != IvSizeBytes || encrypted.Length < TagSizeBytes)
             {
-                throw new InvalidOperationException("암호화 파일이 손상되었거나 지원하지 않는 형식입니다.");
+                throw new InvalidOperationException(LocalizedServiceMessages.Get("SecureNoteCorruptFile", "The encrypted file is damaged or unsupported."));
             }
 
             byte[] key = DeriveKey(password, salt, payload.Iterations);
@@ -90,7 +90,7 @@ namespace TxtAIEditor.Core.Services
             }
             catch (CryptographicException ex)
             {
-                throw new InvalidOperationException("암호가 올바르지 않거나 파일을 복호화할 수 없습니다.", ex);
+                throw new InvalidOperationException(LocalizedServiceMessages.Get("SecureNoteDecryptFailed", "The password is incorrect or the file cannot be decrypted."), ex);
             }
         }
 
@@ -104,7 +104,7 @@ namespace TxtAIEditor.Core.Services
             }
             catch (Exception ex)
             {
-                throw new IOException($"암호화 파일 저장 실패 (안전 복구 완료): {ex.Message}", ex);
+                throw new IOException(string.Format(LocalizedServiceMessages.Get("SecureNoteSaveErrorFormat", "Failed to save the encrypted file: {0}"), ex.Message), ex);
             }
         }
 
@@ -112,7 +112,7 @@ namespace TxtAIEditor.Core.Services
         {
             if (string.IsNullOrWhiteSpace(password))
             {
-                throw new InvalidOperationException("암호를 입력해 주세요.");
+                throw new InvalidOperationException(LocalizedServiceMessages.Get("SecureNotePasswordRequired", "Enter a password."));
             }
 
             byte[] salt = RandomNumberGenerator.GetBytes(SaltSizeBytes);
@@ -150,7 +150,7 @@ namespace TxtAIEditor.Core.Services
         {
             if (iterations <= 0)
             {
-                throw new InvalidOperationException("암호화 파일의 KDF 반복 횟수가 올바르지 않습니다.");
+                throw new InvalidOperationException(LocalizedServiceMessages.Get("SecureNoteInvalidKdf", "The encrypted file has an invalid KDF iteration count."));
             }
 
             return Rfc2898DeriveBytes.Pbkdf2(

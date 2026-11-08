@@ -55,7 +55,7 @@ namespace TxtAIEditor.Core.Services
         {
             if (!profile.IsAvailable)
             {
-                throw new FileNotFoundException($"{profile.DisplayName} 실행 파일을 찾을 수 없습니다.", profile.ExecutablePath);
+                throw new FileNotFoundException(string.Format(LocalizedServiceMessages.Get("TerminalExecutableMissingFormat", "The {0} executable was not found."), profile.DisplayName), profile.ExecutablePath);
             }
 
             if (!CreatePipe(out SafeFileHandle ptyInputRead, out SafeFileHandle inputWrite, IntPtr.Zero, 0))

@@ -14,6 +14,13 @@
 .codex
 AGENTS.md
 tests/
+!/Tests/
+/Tests/*
+!/Tests/RuntimeSafety/
+/Tests/RuntimeSafety/*
+!/Tests/RuntimeSafety/*.cs
+!/Tests/RuntimeSafety/*.csproj
+!/Tests/RuntimeSafety/*.md
 tmp/
 
 # User-specific files (MonoDevelop/Xamarin Studio)

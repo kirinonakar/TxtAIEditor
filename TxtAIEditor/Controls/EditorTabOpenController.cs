@@ -1518,10 +1518,8 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async void InitializeEditorWebView(WebView2 webView, CustomEditorBridge bridge)
-        {
-            await _editorWebViewInitializationController.InitializeAsync(webView, bridge);
-        }
+        private void InitializeEditorWebView(WebView2 webView, CustomEditorBridge bridge) =>
+            _ = AppErrorHandler.RunAsync(() => _editorWebViewInitializationController.InitializeAsync(webView, bridge));
 
         private void WireEditorBridge(
             CustomEditorBridge bridge,

@@ -38,6 +38,7 @@ namespace TxtAIEditor
         private static int _comServerLockCount;
         private static int _comInvokeCompleted;
         private int _appCleanupStarted;
+        private bool _showingUnexpectedError;
         private static TxtAIEditorExplorerCommandFactory? _commandFactory;
         private const int ComIdleExitTimeoutMs = 15000;
         private const int ComMaxLifetimeMs = 60000;
@@ -61,6 +62,16 @@ namespace TxtAIEditor
 
         public App()
         {
+            UnhandledException += OnUnhandledException;
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                AppErrorHandler.Report(e.Exception);
+                e.SetObserved();
+            };
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                if (e.ExceptionObject is Exception exception) AppErrorHandler.Report(exception);
+            };
             AppDomain.CurrentDomain.SetData(
                 "REGEX_DEFAULT_MATCH_TIMEOUT",
                 TimeSpan.FromSeconds(2));
@@ -73,6 +84,35 @@ namespace TxtAIEditor
             {
                 StartExplorerCommandServer();
             }
+        }
+
+        private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+        {
+            AppErrorHandler.Report(e.Exception);
+            if (!AppErrorHandler.IsRecoverable(e.Exception)) return;
+            e.Handled = true;
+            _dispatcherQueue?.TryEnqueue(() => _ = AppErrorHandler.RunAsync(ShowUnexpectedErrorAsync));
+        }
+
+        private async Task ShowUnexpectedErrorAsync()
+        {
+            if (_showingUnexpectedError || _window is not MainWindow owner ||
+                owner.Content is not FrameworkElement root || root.XamlRoot == null) return;
+            _showingUnexpectedError = true;
+            try
+            {
+                var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
+                {
+                    XamlRoot = root.XamlRoot,
+                    RequestedTheme = root.ActualTheme,
+                    Title = owner.GetLocalizedString("UnexpectedErrorTitle", "Unexpected error"),
+                    Content = string.Format(owner.GetLocalizedString("UnexpectedErrorMessage",
+                        "The operation failed. Save your work and restart the app if problems continue. Details: {0}"), AppErrorHandler.LogPath),
+                    CloseButtonText = owner.GetLocalizedString("Ok", "OK")
+                };
+                await dialog.ShowAsync();
+            }
+            finally { _showingUnexpectedError = false; }
         }
 
         protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)

@@ -143,7 +143,7 @@ namespace TxtAIEditor.Editor
         {
             if (!File.Exists(filePath))
             {
-                throw new FileNotFoundException("파일을 찾을 수 없습니다.", filePath);
+                throw new FileNotFoundException(LocalizedServiceMessages.Get("FileNotFoundMessage", "The file was not found."), filePath);
             }
 
             byte[] sample = await ReadSampleBytesAsync(filePath, cancellationToken).ConfigureAwait(false);
@@ -554,7 +554,7 @@ namespace TxtAIEditor.Editor
                 cancellationToken.ThrowIfCancellationRequested();
                 if (maxElapsed != Timeout.InfiniteTimeSpan && stopwatch.Elapsed > maxElapsed)
                 {
-                    throw new OperationCanceledException("텍스트 검색 제한 시간을 초과했습니다.", cancellationToken);
+                    throw new OperationCanceledException(LocalizedServiceMessages.Get("TextSearchTimedOut", "Text search timed out."), cancellationToken);
                 }
 
                 processedLines++;
@@ -1630,7 +1630,7 @@ namespace TxtAIEditor.Editor
             cancellationToken.ThrowIfCancellationRequested();
             if (DocumentVersion != baseVersion)
             {
-                throw new OperationCanceledException("문서가 변경되어 모두 바꾸기 결과를 폐기했습니다.", cancellationToken);
+                throw new OperationCanceledException(LocalizedServiceMessages.Get("ReplaceDocumentChanged", "The document changed; replace-all results were discarded."), cancellationToken);
             }
 
             if (plan.Replacements.Count == 0)

@@ -11,12 +11,11 @@ using TxtAIEditor.Core.Interfaces;
 
 namespace TxtAIEditor.Core.Services.LLM
 {
-    public class LMStudioProvider : ILLMProvider
+    public class LMStudioProvider : OpenAICompatibleProviderBase
     {
         private readonly ILocalizationService _localizationService;
         private readonly string _thinkingLevel;
 
-        private static readonly HttpClient _httpClient = new HttpClient();
 
         public LMStudioProvider(ILocalizationService localizationService, string thinkingLevel = "")
         {
@@ -55,8 +54,19 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task<string> GenerateCompletionAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
+        public override async Task<string> GenerateCompletionAsync(LlmCompletionRequest completion)
         {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var systemPrompt = completion.SystemPrompt;
+            var userContent = completion.UserContent;
+            var cancellationToken = completion.CancellationToken;
+            var attachments = completion.Attachments;
+            var tools = completion.Tools;
+            var onUsage = completion.OnUsage;
+            var onNativeToolCall = completion.OnNativeToolCall;
+            var onApiType = completion.OnApiType;
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
                 throw new ArgumentException(_localizationService.GetString("LmStudioErrorNoModelSelected", "LM Studio 모델을 먼저 선택해 주십시오."));
@@ -176,8 +186,21 @@ namespace TxtAIEditor.Core.Services.LLM
             }
         }
 
-        public async Task GenerateCompletionStreamAsync(string endpoint, string apiKey, string model, string systemPrompt, string userContent, Func<string, Task> onChunk, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null)
+        public override async Task GenerateCompletionStreamAsync(LlmCompletionRequest completion)
         {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var systemPrompt = completion.SystemPrompt;
+            var userContent = completion.UserContent;
+            var cancellationToken = completion.CancellationToken;
+            var attachments = completion.Attachments;
+            var tools = completion.Tools;
+            var onUsage = completion.OnUsage;
+            var onNativeToolCall = completion.OnNativeToolCall;
+            var onApiType = completion.OnApiType;
+            var onReasoning = completion.OnReasoning;
+            var onChunk = completion.OnChunk ?? throw new ArgumentException("A streaming callback is required.", nameof(completion));
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(model))
                 throw new ArgumentException(_localizationService.GetString("LmStudioErrorNoModelSelected", "LM Studio 모델을 먼저 선택해 주십시오."));

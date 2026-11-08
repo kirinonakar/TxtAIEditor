@@ -218,7 +218,7 @@ namespace TxtAIEditor.Controls
 
             _initializeAndRenderQueued = true;
 
-            async void InitializeAndRender()
+            async Task InitializeAndRender()
             {
                 try
                 {
@@ -242,9 +242,9 @@ namespace TxtAIEditor.Controls
             }
 
             var dispatcher = _previewPane.DispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
-            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, InitializeAndRender) != true)
+            if (dispatcher?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, () => _ = AppErrorHandler.RunAsync(InitializeAndRender)) != true)
             {
-                InitializeAndRender();
+                _ = AppErrorHandler.RunAsync(InitializeAndRender);
             }
         }
 

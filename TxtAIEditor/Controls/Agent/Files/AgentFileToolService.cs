@@ -231,9 +231,11 @@ namespace TxtAIEditor.Controls
             return RunInBackgroundAsync(() => _processes.RunRgAsync(arguments, timeoutMs, cancellationToken), cancellationToken);
         }
 
-        public Task<string> RunRgaAsync(string arguments, int timeoutMs, CancellationToken cancellationToken = default)
+        public Task<string> RunRgaAsync(string arguments, int timeoutMs, CancellationToken cancellationToken = default,
+            bool includeNotebooks = false, bool includeArchives = false)
         {
-            return RunInBackgroundAsync(() => _processes.RunRgaAsync(arguments, timeoutMs, cancellationToken), cancellationToken);
+            return RunInBackgroundAsync(() => _processes.RunRgaAsync(arguments, timeoutMs, cancellationToken,
+                includeNotebooks, includeArchives), cancellationToken);
         }
 
         public Task<string> RunPowerShellAsync(string command, int timeoutMs, CancellationToken cancellationToken = default)

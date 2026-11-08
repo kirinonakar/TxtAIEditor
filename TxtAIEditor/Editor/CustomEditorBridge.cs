@@ -687,7 +687,7 @@ namespace TxtAIEditor.Editor
         {
             if (!_messageRouter.IsReady || _webView.CoreWebView2 == null)
             {
-                throw new InvalidOperationException("편집기 WebView가 준비되지 않았습니다.");
+                throw new InvalidOperationException(Core.Services.LocalizedServiceMessages.Get("EditorWebViewNotReady", "The editor WebView is not ready."));
             }
 
             string json = JsonSerializer.Serialize(obj);

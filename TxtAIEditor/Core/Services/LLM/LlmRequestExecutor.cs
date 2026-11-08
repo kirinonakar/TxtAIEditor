@@ -109,21 +109,22 @@ namespace TxtAIEditor.Core.Services.LLM
                 {
                     var fullResponse = new StringBuilder();
                     var reasoningResponse = new StringBuilder();
-                    await provider.GenerateCompletionStreamAsync(
-                        settings.LlmEndpoint ?? string.Empty,
-                        apiKey,
-                        settings.LlmModel,
-                        systemPrompt,
-                        userContent,
-                        async chunk =>
+                    await provider.GenerateCompletionStreamAsync(new LlmCompletionRequest
+                    {
+                        Endpoint = settings.LlmEndpoint ?? string.Empty,
+                        ApiKey = apiKey,
+                        Model = settings.LlmModel,
+                        SystemPrompt = systemPrompt,
+                        UserContent = userContent,
+                        OnChunk = async chunk =>
                         {
                             emittedOutput |= !string.IsNullOrEmpty(chunk);
                             fullResponse.Append(chunk);
                             await onChunk(chunk);
                         },
-                        cancellationToken,
-                        attachments,
-                        async reasoningChunk =>
+                        CancellationToken = cancellationToken,
+                        Attachments = attachments,
+                        OnReasoning = async reasoningChunk =>
                         {
                             emittedOutput |= !string.IsNullOrEmpty(reasoningChunk);
                             reasoningResponse.Append(reasoningChunk);
@@ -138,15 +139,15 @@ namespace TxtAIEditor.Core.Services.LLM
                                 await onChunk(reasoningChunk);
                             }
                         },
-                        tools,
-                        onProviderUsage,
-                        async () =>
+                        Tools = tools,
+                        OnUsage = onProviderUsage,
+                        OnNativeToolCall = async () =>
                         {
                             emittedOutput = true;
                             if (onNativeToolCall != null) await onNativeToolCall();
                         },
-                        onApiType
-                    );
+                        OnApiType = onApiType
+                    });
                     if (observedUsage != null)
                     {
                         _tokenUsageTracker.Record(observedUsage);
@@ -155,23 +156,24 @@ namespace TxtAIEditor.Core.Services.LLM
                 }
                 else
                 {
-                    string result = await provider.GenerateCompletionAsync(
-                        settings.LlmEndpoint ?? string.Empty,
-                        apiKey,
-                        settings.LlmModel,
-                        systemPrompt,
-                        userContent,
-                        cancellationToken,
-                        attachments,
-                        tools,
-                        onProviderUsage,
-                        async () =>
+                    string result = await provider.GenerateCompletionAsync(new LlmCompletionRequest
+                    {
+                        Endpoint = settings.LlmEndpoint ?? string.Empty,
+                        ApiKey = apiKey,
+                        Model = settings.LlmModel,
+                        SystemPrompt = systemPrompt,
+                        UserContent = userContent,
+                        CancellationToken = cancellationToken,
+                        Attachments = attachments,
+                        Tools = tools,
+                        OnUsage = onProviderUsage,
+                        OnNativeToolCall = async () =>
                         {
                             emittedOutput = true;
                             if (onNativeToolCall != null) await onNativeToolCall();
                         },
-                        onApiType
-                    );
+                        OnApiType = onApiType
+                    });
                     if (observedUsage != null)
                     {
                         _tokenUsageTracker.Record(observedUsage);

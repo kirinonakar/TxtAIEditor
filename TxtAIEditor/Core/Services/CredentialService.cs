@@ -74,7 +74,7 @@ namespace TxtAIEditor.Core.Services
                 if (!success)
                 {
                     int lastError = Marshal.GetLastWin32Error();
-                    throw new System.ComponentModel.Win32Exception(lastError, $"자격 증명 쓰기 실패 (Error: {lastError})");
+                    throw new System.ComponentModel.Win32Exception(lastError, string.Format(LocalizedServiceMessages.Get("CredentialWriteErrorFormat", "Failed to save credentials (error: {0})."), lastError));
                 }
             }
             finally

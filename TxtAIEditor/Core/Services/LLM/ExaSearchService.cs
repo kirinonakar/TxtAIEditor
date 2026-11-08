@@ -617,32 +617,10 @@ namespace TxtAIEditor.Core.Services.LLM
 
                 try
                 {
-                    using (var request = new HttpRequestMessage(HttpMethod.Get, url))
-                    {
-                        AddNoKeyWebHeaders(request);
-
-                        using (var response = await _exaHttpClient.SendAsync(request, cancellationToken))
-                        {
-                            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                            if (!response.IsSuccessStatusCode)
-                            {
-                                sb.AppendLine($"Fetch failed ({response.StatusCode}): {LimitText(StripHtmlToText(responseBody), 1000)}");
-                                sb.AppendLine();
-                                index++;
-                                continue;
-                            }
-
-                            string title = ExtractHtmlTitle(responseBody);
-                            if (!string.IsNullOrWhiteSpace(title))
-                            {
-                                sb.AppendLine($"Title: {title}");
-                            }
-
-                            sb.AppendLine("Content:");
-                            sb.AppendLine(LimitText(StripHtmlToText(responseBody), NoKeyFetchMaxCharacters));
-                            sb.AppendLine();
-                        }
-                    }
+                    string markdown = await new WebFetchService().FetchUrlAsMarkdownAsync(url, cancellationToken);
+                    sb.AppendLine("Content:");
+                    sb.AppendLine(LimitText(markdown, NoKeyFetchMaxCharacters));
+                    sb.AppendLine();
                 }
                 catch (Exception ex)
                 {

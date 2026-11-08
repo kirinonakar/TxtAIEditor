@@ -47,7 +47,7 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "run_rg",
-                    Description = "Run ripgrep search with raw arguments. Supports simple read-only pipelines after '|' (e.g. | head -80, | tail -20, | sort, | Select-String \"needle\").",
+                    Description = "Run ripgrep with validated literal arguments and no shell. Quote regexes/globs. Optional filters: head/tail N or -n N, sort, wc -l, Select-Object -First/-Last N. Executable/configuration options are blocked; use run_powershell for other pipelines.",
                     Parameters = new
                     {
                         type = "object",
@@ -68,13 +68,15 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "run_rga",
-                    Description = "Run ripgrep-all search for text inside PDFs/documents with raw arguments. Supports simple read-only pipelines after '|' (e.g. | head -80).",
+                    Description = "Search PDFs/documents, text and source files with ripgrep-all. Normal .py files are included. Notebooks (.ipynb) and archives are excluded by default; opt in with includeNotebooks/includeArchives. Long lines default to a 300-byte preview; -M/--max-columns and --max-columns-preview/--no-max-columns-preview are supported. Uses run_rg filters and no shell; user --rga-* and executable options remain blocked.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            arguments = new { type = "string", description = "Ripgrep-all arguments" },
+                            arguments = new { type = "string", description = "Ripgrep-all arguments, e.g. -n -i --max-columns 300 --max-columns-preview \"cpu\" .; use -g to narrow file types" },
+                            includeNotebooks = new { type = "boolean", description = "Include .ipynb files (default: false). Searches raw notebook JSON without pandoc or executing Python; source and stored outputs can match." },
+                            includeArchives = new { type = "boolean", description = "Include ZIP/compressed files (default: false). Native archive adapters may report unsupported encodings; scope results identify whether archives were included." },
                             timeoutMs = new
                             {
                                 type = "integer",

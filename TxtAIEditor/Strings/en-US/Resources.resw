@@ -4178,4 +4178,37 @@ Plan: {0}</value>
   <data name="ExplorerImageDimensionsLabel" xml:space="preserve"><value>Dimensions</value></data>
   <data name="AgentTruncatedRetryLimit" xml:space="preserve"><value>Repeated response truncation stopped the agent. Please try again.</value></data>
   <data name="AgentMcpPluginManagerDetail" xml:space="preserve"><value>Built-in plugin - list, search, activate and deactivate MCPs and skills</value></data>
+  <data name="FileNotFoundMessage" xml:space="preserve"><value>The file was not found.</value></data>
+  <data name="FileSaveErrorFormat" xml:space="preserve"><value>Failed to save the file: {0}</value></data>
+  <data name="LargeReplaceErrorFormat" xml:space="preserve"><value>Replace in large file failed: {0}</value></data>
+  <data name="ModelListRequestErrorFormat" xml:space="preserve"><value>Model list request failed ({0}): {1}</value></data>
+  <data name="CredentialWriteErrorFormat" xml:space="preserve"><value>Failed to save credentials (error: {0}).</value></data>
+  <data name="TerminalExecutableMissingFormat" xml:space="preserve"><value>The {0} executable was not found.</value></data>
+  <data name="SecureNotePasswordRequired" xml:space="preserve"><value>Enter a password.</value></data>
+  <data name="SecureNoteUnsupportedFormat" xml:space="preserve"><value>Unsupported encrypted file format.</value></data>
+  <data name="SecureNoteCorruptFile" xml:space="preserve"><value>The encrypted file is damaged or unsupported.</value></data>
+  <data name="SecureNoteDecryptFailed" xml:space="preserve"><value>The password is incorrect or the file cannot be decrypted.</value></data>
+  <data name="SecureNoteSaveErrorFormat" xml:space="preserve"><value>Failed to save the encrypted file: {0}</value></data>
+  <data name="SecureNoteInvalidKdf" xml:space="preserve"><value>The encrypted file has an invalid KDF iteration count.</value></data>
+  <data name="TextSearchTimedOut" xml:space="preserve"><value>Text search timed out.</value></data>
+  <data name="ReplaceDocumentChanged" xml:space="preserve"><value>The document changed; replace-all results were discarded.</value></data>
+  <data name="EditorWebViewNotReady" xml:space="preserve"><value>The editor WebView is not ready.</value></data>
+  <data name="UnexpectedErrorTitle" xml:space="preserve"><value>Unexpected error</value></data>
+  <data name="UnexpectedErrorMessage" xml:space="preserve"><value>The operation failed. Save your work and restart the app if problems continue. Details: {0}</value></data>
+  <data name="CsvBreadcrumbRoot" xml:space="preserve"><value>root</value></data>
+  <data name="JupyterNotebookInvalid" xml:space="preserve"><value>Invalid Jupyter notebook format.</value></data>
+  <data name="JupyterNotebookLoadError" xml:space="preserve"><value>Unable to load the notebook.</value></data>
+  <data name="AgentActivityReadImageFormat" xml:space="preserve"><value>Reading image: {0}</value></data>
+  <data name="AgentActivitySearchReplaceFormat" xml:space="preserve"><value>Searching/replacing: {0}</value></data>
+  <data name="AgentActivityOpenFileFormat" xml:space="preserve"><value>Opening file: {0}</value></data>
+  <data name="UnslothErrorNoModelSelected" xml:space="preserve"><value>Select an Unsloth Desktop model first.</value></data>
+  <data name="UnslothErrorApiCallFailed" xml:space="preserve"><value>Unsloth Desktop API call failed ({0}): {1}</value></data>
+  <data name="UnslothErrorEmptyResponse" xml:space="preserve"><value>Received an empty response from Unsloth Desktop.</value></data>
+  <data name="UnslothErrorStreamCallFailed" xml:space="preserve"><value>Unsloth Desktop API streaming call failed ({0}): {1}</value></data>
+  <data name="AgentTabHeader" xml:space="preserve"><value>Agent</value></data>
+  <data name="AgentActivityEmptyResponseRetry" xml:space="preserve"><value>Received an empty response; retrying.</value></data>
+  <data name="AgentToolStepLimitReached" xml:space="preserve"><value>Stopped after reaching the tool call limit. Review the results and run again.</value></data>
+  <data name="AgentExaMcpRateLimitHistoryFormat" xml:space="preserve"><value>Tool failed: Exa MCP request unavailable.
+You've hit Exa's free MCP rate limit.
+Approximately {0} hours until the next reset.</value></data>
 </root>
