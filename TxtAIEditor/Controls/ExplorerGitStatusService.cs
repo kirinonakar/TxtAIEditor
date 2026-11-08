@@ -15,10 +15,10 @@ namespace TxtAIEditor.Controls
             _gitService = gitService;
         }
 
-        public Task<Dictionary<string, string>?> GetStatusesAsync(string folderPath) =>
+        public Task<StatusSnapshot?> GetStatusesAsync(string folderPath) =>
             Task.Run(() => GetStatusesCoreAsync(folderPath));
 
-        private async Task<Dictionary<string, string>?> GetStatusesCoreAsync(string folderPath)
+        private async Task<StatusSnapshot?> GetStatusesCoreAsync(string folderPath)
         {
             string repoPath = _gitService.FindRepositoryRoot(folderPath) ?? string.Empty;
             if (string.IsNullOrEmpty(repoPath))
@@ -26,125 +26,79 @@ namespace TxtAIEditor.Controls
                 return null;
             }
 
-            return await _gitService.GetFileStatusesAsync(
+            var statuses = await _gitService.GetFileStatusesAsync(
                 repoPath,
                 includeAllUntrackedFiles: true,
                 matchIgnoredDirectories: true);
+            return new StatusSnapshot(statuses);
         }
 
-        public void ApplyStatuses(
-            IEnumerable<ExplorerItem> items,
-            Dictionary<string, string>? statuses,
+        public void ApplyStatus(
+            ExplorerItem item,
+            StatusSnapshot? statuses,
             bool isDark)
         {
-            foreach (ExplorerItem item in items)
-            {
-                item.IsDark = isDark;
-                item.GitStatus = statuses == null
-                    ? ExplorerItem.GitStatusType.Clean
-                    : ResolveStatus(item, statuses);
-            }
+            item.IsDark = isDark;
+            item.GitStatus = statuses?.ResolveStatus(item.Path, item.IsFolder)
+                ?? ExplorerItem.GitStatusType.Clean;
         }
 
-        private static ExplorerItem.GitStatusType ResolveStatus(
-            ExplorerItem item,
-            Dictionary<string, string> statuses)
+        // Build once on the worker thread. UI lookups only visit path ancestors,
+        // rather than scanning every changed/ignored path for every visible item.
+        internal sealed class StatusSnapshot
         {
-            if (!item.IsFolder)
+            private readonly Dictionary<string, ExplorerItem.GitStatusType> _files =
+                new(StringComparer.OrdinalIgnoreCase);
+            private readonly Dictionary<string, ExplorerItem.GitStatusType> _folders =
+                new(StringComparer.OrdinalIgnoreCase);
+            private readonly HashSet<string> _ignoredPaths = new(StringComparer.OrdinalIgnoreCase);
+
+            public StatusSnapshot(Dictionary<string, string> statuses)
             {
-                if (statuses.TryGetValue(item.Path, out string? fileStatus))
+                foreach (var entry in statuses)
                 {
-                    string status = fileStatus.Trim();
-                    if (status == "??")
+                    string path = Path.TrimEndingDirectorySeparator(entry.Key);
+                    string status = entry.Value.Trim();
+                    var resolved = status == "??" ? ExplorerItem.GitStatusType.Added
+                        : status == "!!" ? ExplorerItem.GitStatusType.Ignored
+                        : ExplorerItem.GitStatusType.Modified;
+                    _files[path] = resolved;
+                    if (resolved == ExplorerItem.GitStatusType.Ignored)
                     {
-                        return ExplorerItem.GitStatusType.Added;
+                        _ignoredPaths.Add(path);
+                        continue;
                     }
 
-                    return status == "!!"
-                        ? ExplorerItem.GitStatusType.Ignored
-                        : ExplorerItem.GitStatusType.Modified;
+                    for (string? parent = path; !string.IsNullOrEmpty(parent); parent = Path.GetDirectoryName(parent))
+                    {
+                        if (!_folders.TryGetValue(parent, out var existing) ||
+                            existing != ExplorerItem.GitStatusType.Modified)
+                        {
+                            _folders[parent] = resolved;
+                        }
+                    }
                 }
-
-                return IsPathIgnored(item.Path, statuses)
-                    ? ExplorerItem.GitStatusType.Ignored
-                    : ExplorerItem.GitStatusType.Clean;
             }
 
-            bool hasModified = false;
-            bool hasAdded = false;
-            if (statuses.TryGetValue(item.Path, out string? folderStatus))
+            public ExplorerItem.GitStatusType ResolveStatus(string path, bool isFolder)
             {
-                string status = folderStatus.Trim();
-                if (status == "??")
+                path = Path.TrimEndingDirectorySeparator(path);
+                var index = isFolder ? _folders : _files;
+                if (index.TryGetValue(path, out var status))
                 {
-                    hasAdded = true;
+                    return status;
                 }
-                else if (status != "!!")
+
+                for (string? parent = path; !string.IsNullOrEmpty(parent); parent = Path.GetDirectoryName(parent))
                 {
-                    hasModified = true;
+                    if (_ignoredPaths.Contains(parent))
+                    {
+                        return ExplorerItem.GitStatusType.Ignored;
+                    }
                 }
+
+                return ExplorerItem.GitStatusType.Clean;
             }
-
-            string folderPathWithSlash = item.Path.EndsWith(Path.DirectorySeparatorChar)
-                ? item.Path
-                : item.Path + Path.DirectorySeparatorChar;
-            foreach (KeyValuePair<string, string> statusEntry in statuses)
-            {
-                if (!statusEntry.Key.StartsWith(folderPathWithSlash, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                string status = statusEntry.Value.Trim();
-                if (status == "??")
-                {
-                    hasAdded = true;
-                }
-                else if (status != "!!")
-                {
-                    hasModified = true;
-                }
-            }
-
-            if (hasModified)
-            {
-                return ExplorerItem.GitStatusType.Modified;
-            }
-
-            if (hasAdded)
-            {
-                return ExplorerItem.GitStatusType.Added;
-            }
-
-            return IsPathIgnored(item.Path, statuses)
-                ? ExplorerItem.GitStatusType.Ignored
-                : ExplorerItem.GitStatusType.Clean;
-        }
-
-        private static bool IsPathIgnored(string path, Dictionary<string, string> statuses)
-        {
-            if (statuses.TryGetValue(path, out string? status) && status.Trim() == "!!")
-            {
-                return true;
-            }
-
-            foreach (KeyValuePair<string, string> statusEntry in statuses)
-            {
-                if (statusEntry.Value.Trim() != "!!")
-                {
-                    continue;
-                }
-
-                string ignoredPathWithSlash = statusEntry.Key.EndsWith(Path.DirectorySeparatorChar)
-                    ? statusEntry.Key
-                    : statusEntry.Key + Path.DirectorySeparatorChar;
-                if (path.StartsWith(ignoredPathWithSlash, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 }

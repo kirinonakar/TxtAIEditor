@@ -40,6 +40,10 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<string> GetCurrentBranchAsync(string repoPath)
         {
+            // Yield to the thread pool without capturing the caller's UI context.
+            // Process startup, filesystem checks and result parsing can all block.
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || !Directory.Exists(repoPath))
                 return string.Empty;
 
@@ -81,6 +85,8 @@ namespace TxtAIEditor.Core.Services
             bool includeAllUntrackedFiles = false,
             bool matchIgnoredDirectories = false)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             var statuses = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(repoPath) || !Directory.Exists(repoPath))
                 return statuses;
@@ -238,6 +244,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<string> RunGitCommandAsync(string workingDir, string arguments)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             var startInfo = new ProcessStartInfo
             {
                 FileName = GitExecutablePath.Value,
@@ -285,6 +293,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<string> GetFileDiffAsync(string repoPath, string filePath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(filePath))
                 return string.Empty;
 
@@ -345,6 +355,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<string> GetGitFileContentAsync(string repoPath, string filePath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(filePath))
                 return string.Empty;
 
@@ -375,6 +387,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> StageFileAsync(string repoPath, string filePath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(filePath))
                 return false;
 
@@ -385,6 +399,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> StageAllAsync(string repoPath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
@@ -398,6 +414,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> UnstageFileAsync(string repoPath, string filePath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(filePath))
                 return false;
 
@@ -408,6 +426,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> RestoreFileAsync(string repoPath, string filePath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(filePath))
                 return false;
 
@@ -440,6 +460,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> RestoreAllAsync(string repoPath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
@@ -465,6 +487,8 @@ namespace TxtAIEditor.Core.Services
             string message,
             bool stripJupyterOutputs = false)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(message))
                 return false;
 
@@ -692,6 +716,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> PushAsync(string repoPath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
@@ -717,6 +743,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> PullAsync(string repoPath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
@@ -726,6 +754,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> RebaseAsync(string repoPath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
@@ -735,6 +765,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> GitGcAsync(string repoPath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
@@ -744,6 +776,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> HardResetAsync(string repoPath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
@@ -753,6 +787,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> PushForceAsync(string repoPath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath))
                 return false;
 
@@ -762,6 +798,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> CheckoutBranchAsync(string repoPath, string branchName)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrWhiteSpace(branchName))
                 return false;
 
@@ -771,6 +809,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<string> GetRemoteUrlAsync(string repoPath, string remoteName = "origin")
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(remoteName))
                 return string.Empty;
 
@@ -785,6 +825,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> SetRemoteUrlAsync(string repoPath, string remoteUrl, string remoteName = "origin")
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrWhiteSpace(remoteUrl) || string.IsNullOrEmpty(remoteName))
                 return false;
 
@@ -806,6 +848,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> LinkCurrentBranchToRemoteAsync(string repoPath, string remoteName = "origin")
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(remoteName))
                 return false;
 
@@ -864,6 +908,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<int> GetUnpushedCommitCountAsync(string repoPath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (!await HasRemoteAsync(repoPath))
             {
                 return 0;
@@ -875,6 +921,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<IReadOnlyList<GitHistoryItem>> GetRecentHistoryAsync(string repoPath, int maxCount = 50, int skipCount = 0)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath))
                 return Array.Empty<GitHistoryItem>();
 
@@ -1186,6 +1234,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<bool> InitRepositoryAsync(string repoPath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || !Directory.Exists(repoPath))
                 return false;
 
@@ -1195,6 +1245,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<IReadOnlyList<string>> GetBranchesAsync(string repoPath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath))
                 return Array.Empty<string>();
 
@@ -1228,6 +1280,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<IReadOnlyList<(string Status, string Path)>> GetCommitChangedFilesAsync(string repoPath, string commitHash)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             var list = new List<(string, string)>();
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(commitHash))
                 return list;
@@ -1272,6 +1326,8 @@ namespace TxtAIEditor.Core.Services
 
         public async Task<string> GetCommitFileContentAsync(string repoPath, string commitHash, string filePath)
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
             if (string.IsNullOrEmpty(repoPath) || string.IsNullOrEmpty(commitHash) || string.IsNullOrEmpty(filePath))
                 return string.Empty;
 

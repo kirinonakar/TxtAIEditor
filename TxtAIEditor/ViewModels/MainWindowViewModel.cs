@@ -9,7 +9,7 @@ namespace TxtAIEditor.ViewModels
         public ObservableCollection<FavoriteItem> Favorites { get; } = new ObservableCollection<FavoriteItem>();
         public ObservableCollection<RecentFileItem> RecentFiles { get; } = new ObservableCollection<RecentFileItem>();
         public ObservableCollection<SnippetItem> Snippets { get; } = new ObservableCollection<SnippetItem>();
-        public ObservableCollection<GitFileItem> GitFiles { get; } = new ObservableCollection<GitFileItem>();
+        public BulkObservableCollection<GitFileItem> GitFiles { get; } = new BulkObservableCollection<GitFileItem>();
         public BulkObservableCollection<SearchResultItem> SearchResults { get; } = new BulkObservableCollection<SearchResultItem>();
         public ObservableCollection<SearchResultGroup> SearchResultsGrouped { get; } = new ObservableCollection<SearchResultGroup>();
         public BulkObservableCollection<ExplorerItem> ExplorerItems { get; } = new BulkObservableCollection<ExplorerItem>();

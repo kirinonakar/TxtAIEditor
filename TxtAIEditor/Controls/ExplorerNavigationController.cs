@@ -38,6 +38,7 @@ namespace TxtAIEditor.Controls
         private readonly ExplorerItemSorter _itemSorter = new();
         private readonly ExplorerSearchService _searchService;
         private readonly ExplorerGitStatusService _gitStatusService;
+        private int _gitStatusVersion;
         private readonly ExplorerBreadcrumbBuilder _breadcrumbBuilder;
         private System.Threading.CancellationTokenSource? _remoteCancellation;
         private CancellationTokenSource? _filterCancellation;
@@ -1784,16 +1785,53 @@ namespace TxtAIEditor.Controls
 
         public async Task UpdateGitStatusesAsync()
         {
+            int version = ++_gitStatusVersion;
             string folderPath = CurrentFolderPath;
-            bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-            Dictionary<string, string>? statuses = IsViewingArchive || CurrentFolderPath == ExplorerDirectoryService.LocalRootPath
+            var statuses = IsViewingArchive || IsViewingRemote || folderPath == ExplorerDirectoryService.LocalRootPath
                 ? null
                 : await _gitStatusService.GetStatusesAsync(folderPath);
-            _leftSidebar.DispatcherQueue.TryEnqueue(() =>
+
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            ExplorerItem[]? items = null;
+            int offset = 0;
+
+            void ApplyNextBatch()
             {
-                if (!string.Equals(folderPath, CurrentFolderPath, StringComparison.OrdinalIgnoreCase)) return;
-                _gitStatusService.ApplyStatuses(GetVisibleExplorerItems(), statuses, isDark);
-            });
+                try
+                {
+                    if (version != _gitStatusVersion ||
+                        !string.Equals(folderPath, CurrentFolderPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        completion.TrySetResult();
+                        return;
+                    }
+
+                    items ??= GetVisibleExplorerItems().ToArray();
+                    bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
+                    var elapsed = Stopwatch.StartNew();
+                    int batchEnd = Math.Min(offset + 128, items.Length);
+                    while (offset < batchEnd)
+                    {
+                        _gitStatusService.ApplyStatus(items[offset++], statuses, isDark);
+                        if (elapsed.ElapsedMilliseconds >= 4) break;
+                    }
+
+                    if (offset >= items.Length ||
+                        !_leftSidebar.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, ApplyNextBatch))
+                    {
+                        completion.TrySetResult();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    completion.TrySetException(ex);
+                }
+            }
+
+            if (_leftSidebar.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, ApplyNextBatch))
+            {
+                await completion.Task;
+            }
         }
 
         private void OnExplorerSortClick(object sender, RoutedEventArgs e)

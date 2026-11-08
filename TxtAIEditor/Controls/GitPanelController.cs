@@ -41,6 +41,7 @@ namespace TxtAIEditor.Controls
         private readonly Action? _beforeDialog;
         private readonly Action? _afterDialog;
         private readonly Func<Task>? _refreshExplorerGitStatus;
+        private readonly BulkObservableCollection<GitHistoryItem> _gitHistory = new();
         private bool _isRefreshingBranchList;
         private bool _isCheckingOutBranch;
         private bool _isLoadingMoreGitHistory;
@@ -85,6 +86,7 @@ namespace TxtAIEditor.Controls
             _refreshExplorerGitStatus = refreshExplorerGitStatus;
 
             _leftSidebar.GitChangedFiles.ItemsSource = _viewModel.GitFiles;
+            _leftSidebar.GitHistory.ItemsSource = _gitHistory;
             WireEvents();
         }
 
@@ -116,7 +118,7 @@ namespace TxtAIEditor.Controls
                 {
                     if (_leftSidebar.GitBranches.Items.Count > 0)
                     {
-                        _leftSidebar.GitBranches.Items.Clear();
+                        _leftSidebar.GitBranches.ItemsSource = Array.Empty<string>();
                     }
                 }
                 finally
@@ -125,7 +127,7 @@ namespace TxtAIEditor.Controls
                 }
                 if (_leftSidebar.GitHistory.Items.Count > 0)
                 {
-                    _leftSidebar.GitHistory.Items.Clear();
+                    _gitHistory.Clear();
                 }
                 ResetGitHistoryPaging();
                 if (_refreshExplorerGitStatus != null)
@@ -189,11 +191,10 @@ namespace TxtAIEditor.Controls
                 _isRefreshingBranchList = true;
                 try
                 {
-                    _leftSidebar.GitBranches.Items.Clear();
+                    _leftSidebar.GitBranches.ItemsSource = branchNames;
                     int selectedIndex = -1;
                     for (int i = 0; i < branchNames.Length; i++)
                     {
-                        _leftSidebar.GitBranches.Items.Add(branchNames[i]);
                         if (branchNames[i].StartsWith("*", StringComparison.Ordinal))
                         {
                             selectedIndex = i;
@@ -223,20 +224,16 @@ namespace TxtAIEditor.Controls
                     pair.First.IsRemoteOnly != pair.Second.IsRemoteOnly);
             if (historyChanged)
             {
-                _leftSidebar.GitHistory.Items.Clear();
-                foreach (var history in historyList)
-                {
-                    _leftSidebar.GitHistory.Items.Add(history);
-                }
+                _gitHistory.ReplaceAll(historyList);
                 _gitHistoryRepoPath = repoPath;
                 _loadedGitHistoryCount = historyList.Count;
                 _hasMoreGitHistory = historyList.Count >= historyCount;
             }
 
-            var gitFiles = fileStatuses
+            var gitFiles = await Task.Run(() => fileStatuses
                 .Where(kvp => kvp.Value.Trim() != "!!")
                 .Select(kvp => CreateGitFileItem(kvp.Key, kvp.Value))
-                .ToArray();
+                .ToArray());
             bool filesChanged = _viewModel.GitFiles.Count != gitFiles.Length ||
                 _viewModel.GitFiles.Zip(gitFiles).Any(pair =>
                     pair.First.Name != pair.Second.Name ||
@@ -246,11 +243,7 @@ namespace TxtAIEditor.Controls
                     pair.First.IsStaged != pair.Second.IsStaged);
             if (filesChanged)
             {
-                _viewModel.GitFiles.Clear();
-                foreach (var item in gitFiles)
-                {
-                    _viewModel.GitFiles.Add(item);
-                }
+                _viewModel.GitFiles.ReplaceAll(gitFiles);
             }
             
             if (_refreshExplorerGitStatus != null)
@@ -283,10 +276,7 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                foreach (var history in moreHistory)
-                {
-                    _leftSidebar.GitHistory.Items.Add(history);
-                }
+                _gitHistory.AddRange(moreHistory);
 
                 _loadedGitHistoryCount += moreHistory.Count;
                 _hasMoreGitHistory = moreHistory.Count >= GitHistoryBatchSize;
