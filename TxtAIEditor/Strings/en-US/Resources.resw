@@ -3845,6 +3845,9 @@ Plan: {0}</value>
   <data name="RemoteServerRequiredFields" xml:space="preserve"><value>Enter the server name, address, ID, and password.</value></data>
   <data name="RemoteServerInvalidPort" xml:space="preserve"><value>The port must be a number from 1 to 65535.</value></data>
   <data name="RemoteWebDavHttpsRequired" xml:space="preserve"><value>The WebDAV address must start with https://.</value></data>
+  <data name="RemoteWebDavCertificateWarningTitle" xml:space="preserve"><value>WebDAV certificate error</value></data>
+  <data name="RemoteWebDavCertificateWarningFormat" xml:space="preserve"><value>The HTTPS certificate for {0} could not be verified. Connect despite the certificate error?</value></data>
+  <data name="RemoteWebDavConnect" xml:space="preserve"><value>Connect</value></data>
   <data name="RemoteDeleteConfirmMessage" xml:space="preserve"><value>Permanently delete '{0}' from the remote server?</value></data>
   <data name="RemoteOperationFailedTitle" xml:space="preserve"><value>Remote operation failed</value></data>
   <data name="ExplorerCreateItemTooltip" xml:space="preserve"><value>New item</value></data>

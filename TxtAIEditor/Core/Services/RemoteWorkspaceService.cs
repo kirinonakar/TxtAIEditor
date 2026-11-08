@@ -31,6 +31,11 @@ namespace TxtAIEditor.Core.Services
         public bool IsActive => ActiveConnection != null;
         public event EventHandler<string>? FileUploaded;
         public event EventHandler<string>? DirectoryOpened;
+        public Func<Uri, CancellationToken, Task<bool>>? ConfirmWebDavCertificateAsync
+        {
+            get => _explorerService.ConfirmWebDavCertificateAsync;
+            set => _explorerService.ConfirmWebDavCertificateAsync = value;
+        }
         public string ActiveDirectoryVirtualPath => ActiveConnection == null
             ? string.Empty
             : RemotePath.Create(

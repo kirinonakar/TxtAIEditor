@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
@@ -52,6 +53,7 @@ namespace TxtAIEditor.Controls
         private bool _isForwardNavigation;
         private string _explorerStatusBaseText = string.Empty;
         private int _treeSelectionCount;
+        private readonly SemaphoreSlim _certificateDialogGate = new(1, 1);
 
         private sealed class ExplorerHistoryEntry
         {
@@ -109,12 +111,68 @@ namespace TxtAIEditor.Controls
             WireEvents();
             _remoteWorkspaceService.FileUploaded += (_, _) =>
                 _leftSidebar.DispatcherQueue.TryEnqueue(() => _ = RefreshRemoteDirectoryAsync());
+            _remoteWorkspaceService.ConfirmWebDavCertificateAsync = ConfirmWebDavCertificateAsync;
             UpdateSortButtonVisuals();
             _leftSidebar.ActualThemeChanged += (sender, args) =>
             {
                 RefreshExplorerItemThemeColors();
                 _ = UpdateGitStatusesAsync();
             };
+        }
+
+        private async Task<bool> ConfirmWebDavCertificateAsync(Uri uri, CancellationToken cancellationToken)
+        {
+            var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!_leftSidebar.DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    completion.TrySetResult(await ShowWebDavCertificateDialogAsync(uri, cancellationToken));
+                }
+                catch (OperationCanceledException)
+                {
+                    completion.TrySetCanceled(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    completion.TrySetException(ex);
+                }
+            }))
+            {
+                return false;
+            }
+
+            return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        private async Task<bool> ShowWebDavCertificateDialogAsync(Uri uri, CancellationToken cancellationToken)
+        {
+            await _certificateDialogGate.WaitAsync(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = _leftSidebar.XamlRoot,
+                    RequestedTheme = _leftSidebar.ActualTheme,
+                    Title = _localizationService.GetString("RemoteWebDavCertificateWarningTitle", string.Empty),
+                    Content = string.Format(
+                        _localizationService.GetString("RemoteWebDavCertificateWarningFormat", string.Empty),
+                        uri.GetLeftPart(UriPartial.Authority)),
+                    PrimaryButtonText = _localizationService.GetString("RemoteWebDavConnect", string.Empty),
+                    CloseButtonText = _localizationService.GetString("CommonCancel", string.Empty),
+                    DefaultButton = ContentDialogButton.Close
+                };
+                using var registration = cancellationToken.Register(() =>
+                    _leftSidebar.DispatcherQueue.TryEnqueue(() => dialog.Hide()));
+                ContentDialogResult result = await dialog.ShowAsync();
+                cancellationToken.ThrowIfCancellationRequested();
+                return result == ContentDialogResult.Primary;
+            }
+            finally
+            {
+                _certificateDialogGate.Release();
+            }
         }
 
         public string CurrentFolderPath { get; private set; } = string.Empty;

@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Security;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -22,6 +25,12 @@ namespace TxtAIEditor.Core.Services
         private readonly SemaphoreSlim _fileTransferSemaphore = new(
             MaxConcurrentFileTransfers,
             MaxConcurrentFileTransfers);
+        private readonly ConditionalWeakTable<RemoteConnectionSettings, ConcurrentDictionary<string, Lazy<Task<bool>>>>
+            _certificateDecisions = new();
+        private static readonly HttpRequestOptionsKey<WebDavCertificateChallenge?> CertificateChallengeKey =
+            new("TxtAIEditor.WebDavCertificateChallenge");
+
+        public Func<Uri, CancellationToken, Task<bool>>? ConfirmWebDavCertificateAsync { get; set; }
 
         public async Task<IReadOnlyList<RemoteDirectoryEntry>> ListDirectoryAsync(
             RemoteConnectionSettings connection,
@@ -989,7 +998,7 @@ namespace TxtAIEditor.Core.Services
             }, cancellationToken);
         }
 
-        private static async Task<IReadOnlyList<RemoteDirectoryEntry>> ListWebDavAsync(
+        private async Task<IReadOnlyList<RemoteDirectoryEntry>> ListWebDavAsync(
             RemoteConnectionSettings connection,
             string path,
             CancellationToken cancellationToken)
@@ -1073,7 +1082,7 @@ namespace TxtAIEditor.Core.Services
             };
         }
 
-        private static async Task DownloadWebDavAsync(
+        private async Task DownloadWebDavAsync(
             RemoteConnectionSettings connection,
             string remotePath,
             string localPath,
@@ -1169,7 +1178,7 @@ namespace TxtAIEditor.Core.Services
             }, cancellationToken);
         }
 
-        private static async Task DownloadWebDavWithProgressAsync(
+        private async Task DownloadWebDavWithProgressAsync(
             RemoteConnectionSettings connection,
             string remotePath,
             string localPath,
@@ -1265,14 +1274,102 @@ namespace TxtAIEditor.Core.Services
             }, cancellationToken);
         }
 
-        private static HttpClient CreateWebDavClient(RemoteConnectionSettings connection)
+        private HttpClient CreateWebDavClient(RemoteConnectionSettings connection)
         {
             HttpClientHandler handler = new()
             {
                 Credentials = new NetworkCredential(connection.Profile.UserName, connection.Password),
-                PreAuthenticate = true
+                PreAuthenticate = true,
+                ServerCertificateCustomValidationCallback = (request, certificate, _, errors) =>
+                {
+                    if (errors == SslPolicyErrors.None)
+                    {
+                        return true;
+                    }
+
+                    if (request.RequestUri is not Uri uri)
+                    {
+                        return false;
+                    }
+
+                    string key = $"{uri.GetLeftPart(UriPartial.Authority)}|{certificate?.Thumbprint}|{errors}";
+                    if (_certificateDecisions.GetOrCreateValue(connection).TryGetValue(key, out var decision) &&
+                        decision.IsValueCreated && decision.Value.IsCompletedSuccessfully && decision.Value.Result)
+                    {
+                        return true;
+                    }
+
+                    // Stop before sending credentials or content, then ask asynchronously
+                    // outside the TLS callback so the UI thread remains responsive.
+                    request.Options.Set(CertificateChallengeKey, new WebDavCertificateChallenge(uri, key));
+                    return false;
+                }
             };
-            return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(45) };
+            return new HttpClient(new WebDavCertificateHandler(this, connection, handler))
+            {
+                Timeout = TimeSpan.FromSeconds(45)
+            };
+        }
+
+        private sealed record WebDavCertificateChallenge(Uri Uri, string Key);
+
+        private sealed class WebDavCertificateHandler : DelegatingHandler
+        {
+            private readonly RemoteExplorerService _owner;
+            private readonly RemoteConnectionSettings _connection;
+
+            public WebDavCertificateHandler(
+                RemoteExplorerService owner,
+                RemoteConnectionSettings connection,
+                HttpClientHandler handler) : base(handler)
+            {
+                _owner = owner;
+                _connection = connection;
+            }
+
+            protected override async Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken)
+            {
+                while (true)
+                {
+                    request.Options.Set(CertificateChallengeKey, null);
+                    try
+                    {
+                        return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (HttpRequestException ex) when (ex.HttpRequestError == HttpRequestError.SecureConnectionError)
+                    {
+                        if (!request.Options.TryGetValue(CertificateChallengeKey, out var challenge) ||
+                            challenge == null || _owner.ConfirmWebDavCertificateAsync is not { } confirm)
+                        {
+                            throw;
+                        }
+
+                        var decisions = _owner._certificateDecisions.GetOrCreateValue(_connection);
+                        var decision = decisions.GetOrAdd(challenge.Key, _ => new Lazy<Task<bool>>(
+                            () => confirm(challenge.Uri, cancellationToken)));
+                        bool accepted;
+                        try
+                        {
+                            accepted = await decision.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
+                        }
+                        catch
+                        {
+                            decisions.TryRemove(new KeyValuePair<string, Lazy<Task<bool>>>(challenge.Key, decision));
+                            throw;
+                        }
+
+                        if (!accepted)
+                        {
+                            throw new OperationCanceledException("WebDAV certificate connection canceled.", cancellationToken);
+                        }
+
+                        // TLS validation failed before HTTP content was sent, so the
+                        // same request can be retried after this certificate is approved.
+                    }
+                }
+            }
         }
 
         private static Uri BuildWebDavUri(RemoteConnectionSettings connection, string path)
