@@ -18,10 +18,10 @@ namespace TxtAIEditor.Controls
             {"type":"object","properties":{"type":{"type":"string","enum":["all","mcp","skill"],"default":"all"}},"additionalProperties":false}
             """;
         private const string ChangeSchema = """
-            {"type":"object","properties":{"name":{"type":"string","description":"Exact installed name or id returned by list_plugin or search_plugin."},"type":{"type":"string","enum":["mcp","skill"],"description":"Optional type to disambiguate identical MCP and skill names."}},"required":["name"],"additionalProperties":false}
+            {"type":"object","properties":{"name":{"type":"string","description":"Exact installed name or ID from list_plugin or search_plugin."},"type":{"type":"string","enum":["mcp","skill"],"description":"Disambiguates shared names."}},"required":["name"],"additionalProperties":false}
             """;
         private const string SearchSchema = """
-            {"type":"object","properties":{"keywords":{"type":"array","items":{"type":"string"},"minItems":1,"description":"Keywords or regular expressions to search in installed MCP/skill names, ids, and descriptions, including disabled skills."},"regex":{"type":"boolean","default":false},"match":{"type":"string","enum":["any","all"],"default":"any","description":"Match any keyword (OR) or all keywords (AND)."},"ignoreCase":{"type":"boolean","default":true},"type":{"type":"string","enum":["all","mcp","skill"],"default":"all"}},"required":["keywords"],"additionalProperties":false}
+            {"type":"object","properties":{"keywords":{"type":"array","items":{"type":"string"},"minItems":1,"description":"Literal terms or patterns when regex=true."},"regex":{"type":"boolean","default":false},"match":{"type":"string","enum":["any","all"],"default":"any"},"ignoreCase":{"type":"boolean","default":true},"type":{"type":"string","enum":["all","mcp","skill"],"default":"all"}},"required":["keywords"],"additionalProperties":false}
             """;
         private readonly Func<Task<IReadOnlyList<AgentPluginEntry>>> _getEntriesAsync;
         private readonly Action<AgentPluginEntry, bool> _setActive;
@@ -42,10 +42,10 @@ namespace TxtAIEditor.Controls
         {
             return new[]
             {
-                CreateAlias("list_plugin", "List all installed MCPs and skills, including inactive entries, their descriptions and activation state.", ListSchema),
-                CreateAlias("activate_plugin", "Activate an installed MCP or skill. The change, tool catalog, skill context, AgentPanel selection and chips apply before the next model turn.", ChangeSchema),
-                CreateAlias("deactivate_plugin", "Deactivate an installed MCP or skill. The change, tool catalog, skill context, AgentPanel selection and chips apply before the next model turn.", ChangeSchema),
-                CreateAlias("search_plugin", "Search installed MCPs and skills, including inactive entries and skill descriptions. Supports multiple keywords, AND/OR matching and regular expressions.", SearchSchema)
+                CreateAlias("list_plugin", "List installed MCPs and skills with activation state, including inactive entries.", ListSchema),
+                CreateAlias("activate_plugin", "Enable an installed MCP or skill.", ChangeSchema),
+                CreateAlias("deactivate_plugin", "Disable an installed MCP or skill.", ChangeSchema),
+                CreateAlias("search_plugin", "Search names, IDs, and descriptions of installed MCPs and skills, including inactive entries.", SearchSchema)
             };
         }
 

@@ -171,7 +171,6 @@ namespace TxtAIEditor.Controls
                 builder.AppendLine($"  bounds: x={window.Bounds.Left}, y={window.Bounds.Top}, width={window.Bounds.Right - window.Bounds.Left}, height={window.Bounds.Bottom - window.Bounds.Top}");
             }
 
-            builder.Append("Use mcp_browser_use_focus_window with a windowId, then choose accessibility refs or capture based on the task.");
             return builder.ToString();
         }
 
@@ -341,9 +340,7 @@ namespace TxtAIEditor.Controls
                             continue;
                         }
 
-                        return status +
-                            $"\n(Warning: Initial accessibility snapshot failed: {ex.Message})\n" +
-                            "next_action: mcp_browser_use_capture remains available if screenshot context would help.";
+                        return status + $"\n(Warning: Initial accessibility snapshot failed: {ex.Message})";
                     }
                 }
 
@@ -401,7 +398,7 @@ namespace TxtAIEditor.Controls
                 $"window_title: {SanitizeWindowTitle(GetWindowTitle(browserWindow))}\n" +
                 $"image_dimensions: {_lastCapture.ImageWidth}x{_lastCapture.ImageHeight}\n" +
                 $"controlled_window_dimensions: {_lastCapture.WindowWidth}x{_lastCapture.WindowHeight}\n" +
-                "next_action: The captured image is automatically attached. You can use coordinates from this image or accessibility refs, and interaction tools will return a fresh accessibility snapshot.";
+                "next_action: Verify screenshot clicks with mcp_browser_use_capture_target.";
         }
 
         private async Task<string> SnapshotAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -452,7 +449,7 @@ namespace TxtAIEditor.Controls
                 $"target_screenshot_coordinates: ({x}, {y})\n" +
                 $"image_dimensions: {capture.ImageWidth}x{capture.ImageHeight}\n" +
                 "interaction_performed: false\n" +
-                "next_action: Inspect the attached image and verify that the red plus is centered on the intended button or input field, not merely inside its bounds. If it is off-center, move x left or right and y up or down as needed, then call mcp_browser_use_capture_target again. Repeat until centered; only then call mcp_browser_use_click with the same verified x and y in screenshot coordinateSpace.";
+                "next_action: Adjust and recheck until the red plus is centered on the intended control. Click the same verified x/y with coordinateSpace=screenshot.";
         }
 
         private async Task<string> ReadPageAsync(JsonElement arguments, CancellationToken cancellationToken)
@@ -975,8 +972,7 @@ namespace TxtAIEditor.Controls
             }
             catch (Exception ex)
             {
-                context = $"\n(Warning: Accessibility snapshot after interaction failed: {ex.Message})\n" +
-                    "next_action: mcp_browser_use_capture remains available if screenshot context would help.";
+                context = $"\n(Warning: Accessibility snapshot after interaction failed: {ex.Message})";
             }
 
             return context;

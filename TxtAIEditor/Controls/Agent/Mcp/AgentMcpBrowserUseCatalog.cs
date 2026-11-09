@@ -27,40 +27,40 @@ namespace TxtAIEditor.Controls
         {
             var aliases = new List<AgentMcpToolAlias>
             {
-                CreateAlias("mcp_browser_use_open_url", "open_url", "Open an http, https, file, or about:blank URL in the Windows default browser.", """
-                {"type":"object","properties":{"url":{"type":"string","description":"Absolute URL to open."},"newWindow":{"type":"boolean","default":false}},"required":["url"]}
+                CreateAlias("mcp_browser_use_open_url", "open_url", "Open an absolute http, https, file, or about:blank URL in the Windows default browser.", """
+                {"type":"object","properties":{"url":{"type":"string"},"newWindow":{"type":"boolean","default":false}},"required":["url"]}
                 """),
-                CreateAlias("mcp_browser_use_status", "status", "Get the controlled default browser window title, process, bounds, and current URL.", """
+                CreateAlias("mcp_browser_use_status", "status", "Report the controlled window's title, process, bounds, and browser URL when available.", """
                 {"type":"object","properties":{}}
                 """),
-                CreateAlias("mcp_browser_use_snapshot", "snapshot", "Return a concise accessibility tree for the currently controlled browser or Computer Use application window. Every emitted element has a stable ref that can be passed to mcp_browser_use_click. Set includeScreenshot only when visual context is needed.", """
+                CreateAlias("mcp_browser_use_snapshot", "snapshot", "Get the current accessibility tree and element refs. Request a screenshot only for visual context.", """
                 {"type":"object","properties":{"maxNodes":{"type":"integer","minimum":20,"maximum":500,"default":180},"includeScreenshot":{"type":"boolean","default":false}}}
                 """),
-                CreateAlias("mcp_browser_use_read_page", "read_page", "Copy and return selectable text from the current page, together with the current URL and window title. This is browser-agnostic and may not expose canvas or protected page content.", """
+                CreateAlias("mcp_browser_use_read_page", "read_page", "Copy selectable page text with its URL and title. Canvas or protected text may be unavailable.", """
                 {"type":"object","properties":{"maxCharacters":{"type":"integer","minimum":1000,"maximum":60000,"default":30000}}}
                 """),
-                CreateAlias("mcp_browser_use_click", "click", "Click an element by stable ref from mcp_browser_use_snapshot (preferred), or by coordinates from an existing explicit capture. Returns a fresh accessibility snapshot.", """
-                {"type":"object","properties":{"ref":{"type":"string","description":"Stable element ref returned by mcp_browser_use_snapshot."},"x":{"type":"integer","description":"X coordinate in the latest explicit capture image."},"y":{"type":"integer","description":"Y coordinate in the latest explicit capture image."},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Use screenshot only for coordinates from a prior mcp_browser_use_capture. Window coordinates are relative to the unscaled browser window."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"},"clickCount":{"type":"integer","minimum":1,"maximum":3,"default":1}},"anyOf":[{"required":["ref"]},{"required":["x","y"]}]}
+                CreateAlias("mcp_browser_use_click", "click", "Click by latest ref (preferred) or by x/y. Verify screenshot clicks with mcp_browser_use_capture_target first.", """
+                {"type":"object","properties":{"ref":{"type":"string"},"x":{"type":"integer"},"y":{"type":"integer"},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Pixels from the latest capture or from the unscaled window's top left."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"},"clickCount":{"type":"integer","minimum":1,"maximum":3,"default":1}},"anyOf":[{"required":["ref"]},{"required":["x","y"]}]}
                 """),
-                CreateAlias("mcp_browser_use_drag", "drag", "Drag mouse from a start element ref or coordinates to an end element ref or coordinates. Returns a fresh accessibility snapshot.", """
-                {"type":"object","properties":{"startRef":{"type":"string","description":"Start element ref returned by mcp_browser_use_snapshot."},"endRef":{"type":"string","description":"End element ref returned by mcp_browser_use_snapshot."},"startX":{"type":"integer","description":"Start X coordinate in explicit capture or window."},"startY":{"type":"integer","description":"Start Y coordinate in explicit capture or window."},"endX":{"type":"integer","description":"End X coordinate in explicit capture or window."},"endY":{"type":"integer","description":"End Y coordinate in explicit capture or window."},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Use screenshot only for coordinates from a prior mcp_browser_use_capture. Window coordinates are relative to the unscaled browser window."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"}}}
+                CreateAlias("mcp_browser_use_drag", "drag", "Drag between two endpoints. Give a current ref or an x/y pair for each.", """
+                {"type":"object","properties":{"startRef":{"type":"string"},"endRef":{"type":"string"},"startX":{"type":"integer"},"startY":{"type":"integer"},"endX":{"type":"integer"},"endY":{"type":"integer"},"coordinateSpace":{"type":"string","enum":["screenshot","window"],"default":"screenshot","description":"Pixels from the latest capture or from the unscaled window's top left."},"button":{"type":"string","enum":["left","right","middle"],"default":"left"}}}
                 """),
-                CreateAlias("mcp_browser_use_type_text", "type_text", "Type Unicode text into the focused control or an explicit ref. With UIA direct execution enabled, ref plus replace=true and pressEnter=false uses ValuePattern.SetValue when available; otherwise uses foreground input. Returns a fresh accessibility snapshot.", """
-                {"type":"object","properties":{"text":{"type":"string"},"ref":{"type":"string","description":"Current snapshot ref of the target field. Use replace=true and pressEnter=false for direct UIA value replacement."},"replace":{"type":"boolean","default":false},"pressEnter":{"type":"boolean","default":false}},"required":["text"]}
+                CreateAlias("mcp_browser_use_type_text", "type_text", "Type Unicode into the control identified by ref, or into the focused control when ref is omitted.", """
+                {"type":"object","properties":{"text":{"type":"string"},"ref":{"type":"string"},"replace":{"type":"boolean","default":false},"pressEnter":{"type":"boolean","default":false}},"required":["text"]}
                 """),
-                CreateAlias("mcp_browser_use_key", "key", "Press a browser key or shortcut. Supported keys: enter, escape, tab, space, backspace, delete, home, end, pageup, pagedown, up, down, left, right, f5, f6, f11; modifiers are optional.", """
+                CreateAlias("mcp_browser_use_key", "key", "Send a key or shortcut. Keys include enter, escape, tab, space, backspace, delete, home, end, pageup, pagedown, up, down, left, right, f5, f6, and f11.", """
                 {"type":"object","properties":{"key":{"type":"string"},"ctrl":{"type":"boolean","default":false},"alt":{"type":"boolean","default":false},"shift":{"type":"boolean","default":false}},"required":["key"]}
                 """),
-                CreateAlias("mcp_browser_use_scroll", "scroll", "Scroll the current browser page vertically or horizontally.", """
-                {"type":"object","properties":{"deltaY":{"type":"integer","description":"Vertical wheel delta; negative scrolls down, positive scrolls up.","default":-720},"deltaX":{"type":"integer","description":"Horizontal wheel delta; implemented with Shift+wheel.","default":0}}}
+                CreateAlias("mcp_browser_use_scroll", "scroll", "Scroll the controlled window.", """
+                {"type":"object","properties":{"deltaY":{"type":"integer","description":"Negative scrolls down, positive scrolls up.","default":-720},"deltaX":{"type":"integer","description":"Horizontal via Shift+wheel.","default":0}}}
                 """),
-                CreateAlias("mcp_browser_use_navigate", "navigate", "Run a browser navigation command.", """
+                CreateAlias("mcp_browser_use_navigate", "navigate", "Navigate the current browser tab.", """
                 {"type":"object","properties":{"action":{"type":"string","enum":["back","forward","refresh","stop","home"]}},"required":["action"]}
                 """),
-                CreateAlias("mcp_browser_use_tab", "tab", "Manage default browser tabs.", """
+                CreateAlias("mcp_browser_use_tab", "tab", "Manage browser tabs.", """
                 {"type":"object","properties":{"action":{"type":"string","enum":["new","close","next","previous","reopen"]}},"required":["action"]}
                 """),
-                CreateAlias("mcp_browser_use_find", "find", "Open the browser find box and search for text on the current page.", """
+                CreateAlias("mcp_browser_use_find", "find", "Search the current page using the browser's find box.", """
                 {"type":"object","properties":{"text":{"type":"string"},"next":{"type":"boolean","default":false}},"required":["text"]}
                 """)
             };
@@ -70,16 +70,16 @@ namespace TxtAIEditor.Controls
                 aliases.Insert(2, CreateAlias(
                     "mcp_browser_use_capture",
                     "capture",
-                    "Capture the controlled browser or Computer Use window as a PNG for visual inspection. The captured image is automatically attached to the model context. Before a coordinate click, call mcp_browser_use_capture_target to verify the chosen point. Do NOT call read_image.",
+                    "Capture the controlled window and attach its screenshot directly.",
                     """
                     {"type":"object","properties":{}}
                     """));
                 aliases.Insert(3, CreateAlias(
                     "mcp_browser_use_capture_target",
                     "capture_target",
-                    "Mark a proposed point on the latest explicit capture with a red plus and attach the marked image for visual verification. This does not interact with the controlled window. Check that the plus is centered on the intended button or input field. If it is off-center, move x left or right and y up or down as needed and call this tool again until centered. Then pass the same verified coordinates to mcp_browser_use_click with coordinateSpace=screenshot.",
+                    "Preview a red plus on the latest capture without clicking. Adjust and recheck until it is centered on the intended control. Then click the same x/y with coordinateSpace=screenshot.",
                     """
-                    {"type":"object","properties":{"x":{"type":"integer","description":"X coordinate in the latest explicit capture image."},"y":{"type":"integer","description":"Y coordinate in the latest explicit capture image."}},"required":["x","y"]}
+                    {"type":"object","properties":{"x":{"type":"integer"},"y":{"type":"integer"}},"required":["x","y"]}
                     """));
             }
 
@@ -88,23 +88,23 @@ namespace TxtAIEditor.Controls
                 aliases.Add(CreateAlias(
                     "mcp_browser_use_list_windows",
                     "list_windows",
-                    "List visible application windows that can be selected for Computer Use. The TxtAIEditor host window is excluded.",
+                    "List controllable windows and their IDs, excluding TxtAIEditor.",
                     """
                     {"type":"object","properties":{"maxResults":{"type":"integer","minimum":1,"maximum":100,"default":40}}}
                     """));
                 aliases.Add(CreateAlias(
                     "mcp_browser_use_focus_window",
                     "focus_window",
-                    "Select an open application window for capture, clicking, typing, keys, and scrolling. Activates the window unless UIA direct execution is enabled. Use a windowId from list_windows when possible.",
+                    "Select by window ID (preferred), title, or process. Activates the window unless UIA direct mode is on.",
                     """
-                    {"type":"object","properties":{"windowId":{"type":"string","description":"Window id returned by list_windows."},"title":{"type":"string","description":"Case-insensitive title substring."},"process":{"type":"string","description":"Case-insensitive process name."}}}
+                    {"type":"object","properties":{"windowId":{"type":"string","description":"ID from list_windows."},"title":{"type":"string","description":"Case-insensitive substring."},"process":{"type":"string","description":"Case-insensitive substring."}}}
                     """));
                 aliases.Add(CreateAlias(
                     "mcp_browser_use_open_app",
                     "open_app",
-                    "Launch a Windows program, friendly application name, document, or registered URI and select its visible window for Computer Use. Common names such as excel, word, powerpoint, outlook, calculator, and their Korean names are resolved automatically.",
+                    "Launch a Windows app, select its visible window, and return an initial accessibility snapshot.",
                     """
-                    {"type":"object","properties":{"target":{"type":"string","description":"Friendly app name, executable name/path, document path, or registered URI. Examples: excel, 엑셀, word, powerpoint, calculator."},"arguments":{"type":"string","description":"Optional program arguments."}},"required":["target"]}
+                    {"type":"object","properties":{"target":{"type":"string","description":"App name (e.g. excel or 엑셀), executable, document path, or registered URI."},"arguments":{"type":"string"}},"required":["target"]}
                     """));
             }
 

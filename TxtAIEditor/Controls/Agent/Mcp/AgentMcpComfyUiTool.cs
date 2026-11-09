@@ -41,32 +41,32 @@ namespace TxtAIEditor.Controls
           "properties": {
             "apiJson": {
               "type": "string",
-              "description": "ComfyUI workflow API JSON. Pass either apiJson or workflowFile. IMPORTANT: DO NOT write local file paths (e.g. D:\\path\\img.png) inside LoadImage nodes in apiJson. Instead, pass local paths to 'inputImagePath' or 'inputImages', and set the target 'image' values inside apiJson to empty string (\"\"). The system uploads files and automatically maps them to empty LoadImage nodes in order."
+              "description": "Workflow exported in ComfyUI API format."
             },
             "workflowFile": {
               "type": "string",
-              "description": "Optional ComfyUI API workflow JSON file. Relative paths resolve under the configured ComfyUI API workflow folder shown in the MCP context. Use this when choosing from the provided workflow list."
+              "description": "API JSON path relative to the configured workflow folder."
             },
             "parameters": {
               "type": "object",
-              "description": "Optional replacements. Keys replace {{key}} placeholders and dot paths such as 6.inputs.text. You can set 6.inputs.image to \"\" to clear default workflow image names so that uploaded input images can be mapped. All seed and noise_seed inputs are always replaced with fresh random seeds after these replacements; fixed seeds are not preserved."
+              "description": "Replace {{key}} placeholders or dot paths such as 6.inputs.text. Use 6.inputs.image=\"\" to clear a default image. seed and noise_seed are randomized after overrides."
             },
             "prompt": {
               "type": "string",
-              "description": "Positive image prompt. TxtAIEditor follows positive conditioning connections and replaces the text or prompt input of text encoders (including CLIPTextEncode and TextEncodeQwenImage21), even when it contains default text. Linked empty StringConcatenate slots are also supported. Negative prompts are preserved and explicit parameters take precedence."
+              "description": "Replace positive conditioning text, including linked empty StringConcatenate slots. Keep negative prompts. Explicit parameters take precedence."
             },
             "inputImagePath": {
               "type": "string",
-              "description": "Optional local image path to upload to the ComfyUI input folder before running the workflow. TxtAIEditor uploads the file and automatically populates the first LoadImage node's image parameter that has an empty string value (\"\") in the workflow. DO NOT put local file paths inside the apiJson."
+              "description": "Local image path for one upload."
             },
             "inputImages": {
               "type": "array",
               "items": { "type": "string" },
-              "description": "Optional local image paths to upload to the ComfyUI input folder. Empty LoadImage inputs (those with \"\" as the value in apiJson) are filled with the uploaded filenames in workflow order. DO NOT put local file paths inside the apiJson."
+              "description": "Local image paths in mapping order."
             },
             "outputFileName": {
               "type": "string",
-              "description": "File name or path for the generated image. Relative paths are saved under the current workspace. Paths outside the workspace are saved under the current workspace as well."
+              "description": "Destination filename or path. Relative paths and disallowed destinations resolve inside the workspace."
             },
             "endpoint": {
               "type": "string",
@@ -78,7 +78,7 @@ namespace TxtAIEditor.Controls
             },
             "outputNodeId": {
               "type": "string",
-              "description": "Optional ComfyUI output node id to prefer when several image outputs exist."
+              "description": "Restrict the image output to this node ID."
             }
           },
           "required": ["outputFileName"]
@@ -90,7 +90,7 @@ namespace TxtAIEditor.Controls
           "properties": {
             "workflowFile": {
               "type": "string",
-              "description": "ComfyUI API workflow JSON file to read. Relative paths resolve under the configured ComfyUI API workflow folder."
+              "description": "API JSON path relative to the configured workflow folder."
             }
           },
           "required": ["workflowFile"]
@@ -153,7 +153,7 @@ namespace TxtAIEditor.Controls
                 ServerId = BuiltInComfyUiId,
                 ServerName = BuiltInComfyUiName,
                 ToolName = BuiltInComfyUiGenerateToolName,
-                Description = "Generate an image through a local or remote ComfyUI HTTP API workflow, then download and save the produced image file. Pass either apiJson or workflowFile. IMPORTANT for image inputs: if input images are used, do NOT modify apiJson directly to include local absolute paths. Instead, set the target image properties inside apiJson (or via parameters replacement) to \"\" and pass local image paths through inputImagePath or inputImages so the tool can upload and map them automatically.",
+                Description = "Generate and save an image using apiJson or workflowFile. For uploads, pass local paths in inputImagePath or inputImages and set target image inputs to \"\" in the workflow or parameters. Uploads fill empty LoadImage inputs first, in workflow order.",
                 InputSchemaJson = BuiltInComfyUiInputSchemaJson,
                 IsBuiltIn = true
             };
@@ -167,7 +167,7 @@ namespace TxtAIEditor.Controls
                 ServerId = BuiltInComfyUiId,
                 ServerName = BuiltInComfyUiName,
                 ToolName = BuiltInComfyUiReadWorkflowToolName,
-                Description = "Read a configured ComfyUI API workflow JSON file so you can inspect node ids, inputs, placeholders, and parameter paths before calling mcp_comfyui_generate_image.",
+                Description = "Inspect workflow node IDs, inputs, and placeholders before generating.",
                 InputSchemaJson = BuiltInComfyUiReadWorkflowInputSchemaJson,
                 IsBuiltIn = true
             };
@@ -365,9 +365,8 @@ namespace TxtAIEditor.Controls
             }
 
             builder.AppendLine($"ComfyUI API workflow folder: {workflowDirectory}");
-            builder.AppendLine("Use mcp_comfyui_read_workflow with workflowFile to inspect a listed JSON file, then call mcp_comfyui_generate_image with either workflowFile or apiJson.");
 
-            IReadOnlyList<ComfyWorkflowFile> workflows = GetWorkflowFiles(workflowDirectory, out bool hasMore, out string error);
+            IReadOnlyList<string> workflows = GetWorkflowFiles(workflowDirectory, out bool hasMore, out string error);
             if (!string.IsNullOrWhiteSpace(error))
             {
                 builder.AppendLine($"Workflow list unavailable: {error}");
@@ -377,20 +376,20 @@ namespace TxtAIEditor.Controls
 
             if (workflows.Count == 0)
             {
-                builder.AppendLine("Available workflow API JSON files: none found.");
+                builder.AppendLine("No workflow JSON files found.");
                 builder.AppendLine();
                 return;
             }
 
-            builder.AppendLine("Available workflow API JSON files:");
-            foreach (var workflow in workflows)
+            builder.AppendLine("Workflow files for workflowFile");
+            foreach (string path in workflows)
             {
-                builder.AppendLine($"- {workflow.RelativePath} ({FormatByteSize(workflow.SizeBytes)}, modified {workflow.ModifiedAt:yyyy-MM-dd HH:mm})");
+                builder.AppendLine($"- {path}");
             }
 
             if (hasMore)
             {
-                builder.AppendLine($"- ... more than {WorkflowContextLimit:N0} workflow files; ask the user to narrow the folder or use a specific relative path.");
+                builder.AppendLine($"Showing the first {WorkflowContextLimit:N0} files. Use an exact relative path for unlisted workflows.");
             }
 
             builder.AppendLine();
@@ -587,7 +586,7 @@ namespace TxtAIEditor.Controls
                 : workflowPath;
         }
 
-        private static IReadOnlyList<ComfyWorkflowFile> GetWorkflowFiles(
+        private static IReadOnlyList<string> GetWorkflowFiles(
             string workflowDirectory,
             out bool hasMore,
             out string error)
@@ -598,12 +597,13 @@ namespace TxtAIEditor.Controls
             {
                 if (!Directory.Exists(workflowDirectory))
                 {
-                    return Array.Empty<ComfyWorkflowFile>();
+                    return Array.Empty<string>();
                 }
 
                 var files = Directory
                     .EnumerateFiles(workflowDirectory, "*.json", SearchOption.AllDirectories)
-                    .OrderBy(path => Path.GetRelativePath(workflowDirectory, path), StringComparer.OrdinalIgnoreCase)
+                    .Select(path => Path.GetRelativePath(workflowDirectory, path))
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                     .Take(WorkflowContextLimit + 1)
                     .ToList();
                 hasMore = files.Count > WorkflowContextLimit;
@@ -612,39 +612,13 @@ namespace TxtAIEditor.Controls
                     files.RemoveAt(files.Count - 1);
                 }
 
-                return files.Select(path =>
-                {
-                    var info = new FileInfo(path);
-                    return new ComfyWorkflowFile
-                    {
-                        RelativePath = Path.GetRelativePath(workflowDirectory, path),
-                        SizeBytes = info.Length,
-                        ModifiedAt = info.LastWriteTime
-                    };
-                }).ToList();
+                return files;
             }
             catch (Exception ex)
             {
                 error = ex.Message;
-                return Array.Empty<ComfyWorkflowFile>();
+                return Array.Empty<string>();
             }
-        }
-
-        private static string FormatByteSize(long bytes)
-        {
-            if (bytes < 1024)
-            {
-                return bytes.ToString(System.Globalization.CultureInfo.InvariantCulture) + " B";
-            }
-
-            double value = bytes / 1024.0;
-            if (value < 1024)
-            {
-                return value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " KB";
-            }
-
-            value /= 1024.0;
-            return value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " MB";
         }
 
         private static string GetJsonArgument(JsonElement arguments, params string[] names)
@@ -1752,13 +1726,6 @@ namespace TxtAIEditor.Controls
             public string LocalPath { get; set; } = string.Empty;
             public string Subfolder { get; set; } = string.Empty;
             public string Type { get; set; } = "input";
-        }
-
-        private sealed class ComfyWorkflowFile
-        {
-            public string RelativePath { get; set; } = string.Empty;
-            public long SizeBytes { get; set; }
-            public DateTime ModifiedAt { get; set; }
         }
     }
 }

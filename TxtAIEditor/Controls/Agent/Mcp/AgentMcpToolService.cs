@@ -60,15 +60,12 @@ namespace TxtAIEditor.Controls
             RebuildAliases();
             var builder = new StringBuilder();
             builder.AppendLine("[Enabled MCP servers]");
-            builder.AppendLine("These tools are provided by enabled MCP servers or built-in MCP-compatible plugins. Use their exact alias names in tool_call.");
-            builder.AppendLine("MCP tool aliases use the form mcp_server_tool and are executed through MCP tools/call or the matching built-in plugin.");
-            builder.AppendLine("Never emit a tool_call with an empty or invented name. If a tool action is intended, copy one exact enabled alias and provide all required arguments.");
             builder.AppendLine();
 
             if (hasPluginManager)
             {
                 AppendMcpAliasSection(builder, AgentMcpPluginManagerTool.ServerName, AgentMcpPluginManagerTool.ServerId);
-                builder.AppendLine("Plugin manager lists and searches installed MCPs and skills, including inactive ones. Activation changes apply before the next model request, including its tool catalog and current skill metadata. Use exact returned ids to disambiguate names.");
+                builder.AppendLine("Activation changes take effect on the next model turn. Wait for its updated catalog before using newly enabled tools or skills.");
                 builder.AppendLine();
             }
 
@@ -81,26 +78,14 @@ namespace TxtAIEditor.Controls
             if (hasBrowserUse)
             {
                 AppendMcpAliasSection(builder, _browserUseTool.ServerName, _browserUseTool.ServerId);
-                builder.AppendLine("Browser Use & Computer Use controls the installed Windows default browser and other Windows applications through OS-level keyboard and mouse input.");
+                builder.AppendLine("Use refs from the latest snapshot or interaction result. Use returned IDs and observed coordinates.");
                 if (_settingsService.CurrentSettings.BrowserUseUiaDirectExecution)
                 {
-                    builder.AppendLine("UIA direct execution is enabled. focus_window selects without activating the window; status does not copy the URL. Single left clicks by ref prefer Invoke, Toggle, SelectionItem, ExpandCollapse, or LegacyIAccessible patterns. Use type_text with ref, replace=true, pressEnter=false for ValuePattern.SetValue without physical input. Unsupported patterns and coordinate clicks, other click types, typing without ref, keys, dragging, capture, and browser shortcuts use foreground input. UIA provider errors are not retried with physical input. Direct actions do not move the cursor or activate the window, but the target application itself may change focus. Always use the returned fresh snapshot; stale or ambiguous refs are rejected.");
+                    builder.AppendLine("UIA direct mode avoids foreground input for supported single left clicks by ref and type_text with ref, replace=true, pressEnter=false. Other actions use foreground input. UIA provider errors do not trigger foreground retries. status skips URL copying.");
                 }
-                if (_settingsService.CurrentSettings.BrowserUseCaptureEnabled)
+                if (!_settingsService.CurrentSettings.BrowserUseCaptureEnabled)
                 {
-                    builder.AppendLine("Accessibility snapshots provide stable refs, and interaction tools return a fresh snapshot.");
-                    builder.AppendLine("mcp_browser_use_capture is available whenever you determine that screenshot context would help with the task.");
-                    builder.AppendLine("Before clicking screenshot coordinates, call mcp_browser_use_capture_target and inspect the attached marked image. Verify that the red plus is centered on the intended button or input field, not merely somewhere inside it. If it is off-center, adjust x left or right and y up or down as needed, call mcp_browser_use_capture_target again, and repeat until the marker is centered. Only then click using the same verified screenshot coordinates.");
-                }
-                else
-                {
-                    builder.AppendLine("Browser image capture is disabled in plugin settings. Use accessibility snapshots and stable refs for interactions.");
-                }
-
-                builder.AppendLine("Use read_page after navigation when selectable page text is needed.");
-                if (_settingsService.CurrentSettings.BrowserUseComputerUseEnabled)
-                {
-                    builder.AppendLine("Computer Use is enabled. open_app returns an initial accessibility tree with stable refs. After list_windows or open_app, use focus_window when needed and choose between accessibility refs and capture based on the current task. Never guess a window id, ref, or visual coordinate.");
+                    builder.AppendLine("Capture is disabled. Use accessibility refs.");
                 }
                 builder.AppendLine();
             }
@@ -130,7 +115,10 @@ namespace TxtAIEditor.Controls
             foreach (var alias in aliases)
             {
                 builder.AppendLine($"- {alias.Alias}: {alias.Description}");
-                builder.AppendLine($"  Original MCP tool: {alias.ToolName}");
+                if (!alias.IsBuiltIn)
+                {
+                    builder.AppendLine($"  Original MCP tool: {alias.ToolName}");
+                }
                 builder.AppendLine($"  Arguments JSON schema: {alias.InputSchemaJson}");
             }
 
