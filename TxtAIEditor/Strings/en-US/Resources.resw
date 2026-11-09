@@ -440,6 +440,9 @@
   <data name="SettingsLlmUpstageInfo" xml:space="preserve">
     <value>Upstage loads the list of models from https://api.upstage.ai/v1/models.</value>
   </data>
+  <data name="SettingsLlmExaoneInfo" xml:space="preserve">
+    <value>K-EXAONE 2.5 accepts text and always uses reasoning. The Disable setting uses Low.</value>
+  </data>
   <data name="SettingsLlmLoadGoogleModels" xml:space="preserve">
     <value>Load Google Models</value>
   </data>
@@ -2219,6 +2222,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityThinking" xml:space="preserve">
     <value>Thinking</value>
   </data>
+  <data name="AgentActivityThinkingMetricsFormat" xml:space="preserve">
+    <value>{0} ({1}, {2:0.0}s, {3} TPS)</value>
+  </data>
   <data name="AgentOutputPreparingTool" xml:space="preserve">
     <value>Preparing tool call</value>
   </data>
@@ -3012,6 +3018,12 @@ Plan: {0}</value>
    <data name="CerebrasErrorStreamCallFailed" xml:space="preserve">
      <value>Cerebras API streaming call failed ({0}): {1}</value>
    </data>
+  <data name="ExaoneErrorImageUnsupported" xml:space="preserve">
+    <value>K-EXAONE 2.5 accepts text input only.</value>
+  </data>
+  <data name="ExaoneErrorApiCallFailed" xml:space="preserve">
+    <value>EXAONE API call failed ({0}): {1}</value>
+  </data>
   <data name="UpstageErrorApiCallFailed" xml:space="preserve">
     <value>Upstage API call failed ({0}): {1}</value>
   </data>

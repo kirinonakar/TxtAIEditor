@@ -106,6 +106,21 @@ namespace TxtAIEditor.Controls
                 FormatInlineTokenCount(tokenCount));
         }
 
+        public string FormatThinkingLabel(double estimatedTokens, TimeSpan elapsed)
+        {
+            int tokenCount = (int)Math.Round(estimatedTokens);
+            double seconds = elapsed.TotalSeconds;
+            string rate = tokenCount > 0 && seconds > 0
+                ? (estimatedTokens / seconds).ToString("0.0")
+                : "—";
+            return string.Format(
+                GetString("AgentActivityThinkingMetricsFormat", "{0} ({1}, {2:0.0}s, {3} TPS)"),
+                GetString("AgentActivityThinking", "생각중"),
+                FormatInlineTokenCount(tokenCount),
+                seconds,
+                rate);
+        }
+
         public string FormatLlmTokenUsage(LlmTokenUsage usage)
         {
             string prompt = FormatTokenValue(usage.PromptTokens);

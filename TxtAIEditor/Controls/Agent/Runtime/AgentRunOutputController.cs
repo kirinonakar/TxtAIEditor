@@ -65,9 +65,9 @@ namespace TxtAIEditor.Controls
             _openSessionController.EnqueueRunUi(context, activeAction, backgroundAction);
         }
 
-        public Task BeginRunThinkingActivityAsync(AgentRunContext context, string label)
+        public Task BeginRunThinkingActivityAsync(AgentRunContext context, string label, Func<string>? liveLabel = null)
         {
-            return _openSessionController.BeginRunThinkingActivityAsync(context, label);
+            return _openSessionController.BeginRunThinkingActivityAsync(context, label, liveLabel);
         }
 
         public Task StopRunThinkingActivityAsync(AgentRunContext context)

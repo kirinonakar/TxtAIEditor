@@ -195,8 +195,15 @@ namespace TxtAIEditor.Core.Services.LLM
 
         private static (int context, int output) Resolve(string appProvider, string model)
         {
-            (int context, int output) limits = ResolveModelLimits(appProvider, model);
             int maxContextTokens = LlmRequestTuning.MaxContextTokens;
+            if (SettingsLlmModelCatalog.IsExaoneProvider(appProvider) &&
+                string.Equals(model, SettingsLlmModelCatalog.ExaoneDefaultModel, StringComparison.OrdinalIgnoreCase))
+            {
+                const int exaoneContextLimit = 524288;
+                return (maxContextTokens > 0 ? Math.Min(maxContextTokens, exaoneContextLimit) : exaoneContextLimit, exaoneContextLimit);
+            }
+
+            (int context, int output) limits = ResolveModelLimits(appProvider, model);
             if (maxContextTokens > 0)
             {
                 limits.context = maxContextTokens;

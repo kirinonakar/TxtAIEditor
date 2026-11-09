@@ -6,6 +6,10 @@ namespace TxtAIEditor.Core.Services
 {
     internal static class SettingsLlmModelCatalog
     {
+        internal const string ExaoneProviderName = "EXAONE";
+        internal const string ExaoneEndpoint = "https://api.exaone.ai/v1";
+        internal const string ExaoneDefaultModel = "k-exaone_v2.5";
+
         public static IReadOnlyList<string> ProviderNames { get; } = new[]
         {
             "Google",
@@ -14,6 +18,7 @@ namespace TxtAIEditor.Core.Services
             "Cerebras",
             "OpenRouter",
             "Upstage",
+            ExaoneProviderName,
             "LM Studio",
             "OpenCode Go",
             "OpenCode Zen",
@@ -49,7 +54,8 @@ namespace TxtAIEditor.Core.Services
 
         public static bool SupportsThinkingLevel(string provider)
         {
-            return provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase) ||
+            return IsExaoneProvider(provider) ||
+                provider.Equals("OpenCode Go", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenCode Zen", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) ||
@@ -83,6 +89,7 @@ namespace TxtAIEditor.Core.Services
                 endpoint.Equals("http://127.0.0.1:10531/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("https://api.cerebras.ai/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("https://api.upstage.ai/v1", StringComparison.OrdinalIgnoreCase) ||
+                endpoint.TrimEnd('/').Equals(ExaoneEndpoint, StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("https://openrouter.ai/api/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("http://localhost:1234/v1", StringComparison.OrdinalIgnoreCase) ||
                 endpoint.Equals("https://generativelanguage.googleapis.com", StringComparison.OrdinalIgnoreCase) ||
@@ -97,6 +104,11 @@ namespace TxtAIEditor.Core.Services
 
         public static string GetDefaultEndpoint(string provider, string fallback)
         {
+            if (IsExaoneProvider(provider))
+            {
+                return ExaoneEndpoint;
+            }
+
             return provider switch
             {
                 "LM Studio" => "http://localhost:1234/v1",
@@ -117,6 +129,11 @@ namespace TxtAIEditor.Core.Services
 
         public static IReadOnlyList<string> GetStaticModels(string provider)
         {
+            if (IsExaoneProvider(provider))
+            {
+                return new[] { ExaoneDefaultModel };
+            }
+
             if (IsGoogleProvider(provider))
             {
                 return new[]
@@ -291,6 +308,11 @@ namespace TxtAIEditor.Core.Services
 
         public static string GetInitialModel(EditorSettings settings, string provider, string selectedModel)
         {
+            if (IsExaoneProvider(provider))
+            {
+                return string.IsNullOrWhiteSpace(settings.LlmModelExaone) ? ExaoneDefaultModel : settings.LlmModelExaone;
+            }
+
             if (IsGoogleProvider(provider))
             {
                 return EnsureKnownModel(settings.LlmModelGemini, selectedModel, GetStaticModels(provider), "gemini-flash-lite-latest");
@@ -358,6 +380,11 @@ namespace TxtAIEditor.Core.Services
 
         public static string GetModelForProviderChange(EditorSettings settings, string provider)
         {
+            if (IsExaoneProvider(provider))
+            {
+                return GetInitialModel(settings, provider, string.Empty);
+            }
+
             if (IsGoogleProvider(provider))
             {
                 return !string.IsNullOrEmpty(settings.LlmModelGemini) ? settings.LlmModelGemini : "gemini-flash-lite-latest";
@@ -503,6 +530,10 @@ namespace TxtAIEditor.Core.Services
             {
                 settings.LlmModelUpstage = settings.LlmModel;
             }
+            else if (IsExaoneProvider(settings.LlmProvider))
+            {
+                settings.LlmModelExaone = settings.LlmModel;
+            }
             else if (settings.LlmProvider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase))
             {
                 settings.LlmModelLmStudio = settings.LlmModel;
@@ -557,6 +588,9 @@ namespace TxtAIEditor.Core.Services
             return provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase) ||
                 provider.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase);
         }
+
+        internal static bool IsExaoneProvider(string provider) =>
+            string.Equals(provider, ExaoneProviderName, StringComparison.OrdinalIgnoreCase);
 
         internal static bool IsGoogleProvider(string provider)
         {

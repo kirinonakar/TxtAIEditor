@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -57,7 +58,8 @@ namespace TxtAIEditor.Controls
             CancellationToken cancellationToken)
         {
             string thinkingLabel = _getString("AgentActivityThinking", "생각중");
-            await _runOutputController.BeginRunThinkingActivityAsync(runContext, thinkingLabel);
+            var requestThinking = new ThinkingProgress(_displayText);
+            await _runOutputController.BeginRunThinkingActivityAsync(runContext, thinkingLabel, requestThinking.FormatLabel);
 
             var responseBuilder = new StringBuilder();
             runContext.StreamingResponseText = string.Empty;
@@ -92,6 +94,7 @@ namespace TxtAIEditor.Controls
 
             bool inThoughtBlock = false;
             var thoughtTextBuilder = new StringBuilder();
+            ThinkingProgress inlineThinking = requestThinking;
             var cleanStreamTextBuilder = new StringBuilder();
             int rawProcessedLength = 0;
 
@@ -103,6 +106,7 @@ namespace TxtAIEditor.Controls
                 // Keep the in-flight reasoning estimate in the run context so the panel
                 // token count keeps growing while the model is thinking.
                 runContext.InFlightReasoningTokens += AgentTokenEstimator.Estimate(chunk);
+                requestThinking.SetTokenCount(runContext.InFlightReasoningTokens);
             }
 
             async Task RefreshContextStatsAsync(bool force = false)
@@ -144,16 +148,6 @@ namespace TxtAIEditor.Controls
                     stepReasoningBuilder.Append(reasoningChunk);
                     runContext.StreamingReasoningText = stepReasoningBuilder.ToString();
                     UpdateInFlightReasoningTokens(reasoningChunk);
-                    int tokenCount = (int)Math.Round(runContext.InFlightReasoningTokens);
-                    string label = string.Format(
-                        _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
-                        _getString("AgentActivityThinking", "생각중"),
-                        _displayText.FormatInlineTokenCount(tokenCount)
-                    );
-                    _runOutputController.EnqueueRunUi(
-                        runContext,
-                        () => _agentPane.UpdateThinkingActivity(label),
-                        session => _openSessionController.UpdateThinkingInSession(session, label));
                     await RefreshContextStatsAsync();
                 };
             }
@@ -254,12 +248,14 @@ namespace TxtAIEditor.Controls
                                         thoughtTextBuilder.Clear();
                                         currentPos = earliestStartIdx + matchedStartTag.Length;
 
-                                        string label = string.Format(
-                                            _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
-                                            _getString("AgentActivityThinking", "생각중"),
-                                            _displayText.FormatInlineTokenCount(0)
-                                        );
-                                        await _runOutputController.BeginRunThinkingActivityAsync(runContext, label);
+                                        if (visibleTextFlushed ||
+                                            !rawStreamedText.AsSpan(0, earliestStartIdx).IsWhiteSpace() ||
+                                            runContext.InFlightReasoningTokens > 0)
+                                        {
+                                            inlineThinking = new ThinkingProgress(_displayText);
+                                            await _runOutputController.BeginRunThinkingActivityAsync(
+                                                runContext, thinkingLabel, inlineThinking.FormatLabel);
+                                        }
                                     }
                                     else
                                     {
@@ -293,32 +289,14 @@ namespace TxtAIEditor.Controls
                                         inThoughtBlock = false;
                                         currentPos = earliestEndIdx + matchedEndTag.Length;
 
-                                        int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
-                                        string label = string.Format(
-                                            _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
-                                            _getString("AgentActivityThinking", "생각중"),
-                                            _displayText.FormatInlineTokenCount(tokenCount)
-                                        );
-                                        _runOutputController.EnqueueRunUi(
-                                            runContext,
-                                            () => _agentPane.UpdateThinkingActivity(label),
-                                            session => _openSessionController.UpdateThinkingInSession(session, label));
+                                        inlineThinking.SetTokenCount(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
                                     }
                                     else
                                     {
                                         thoughtTextBuilder.Append(rawStreamedText.Substring(currentPos, rawSafeLength - currentPos));
                                         currentPos = rawSafeLength;
 
-                                        int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
-                                        string label = string.Format(
-                                            _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
-                                            _getString("AgentActivityThinking", "생각중"),
-                                            _displayText.FormatInlineTokenCount(tokenCount)
-                                        );
-                                        _runOutputController.EnqueueRunUi(
-                                            runContext,
-                                            () => _agentPane.UpdateThinkingActivity(label),
-                                            session => _openSessionController.UpdateThinkingInSession(session, label));
+                                        inlineThinking.SetTokenCount(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
                                     }
                                 }
                             }
@@ -367,11 +345,7 @@ namespace TxtAIEditor.Controls
                                 string label;
                                 if (toolCallClosed)
                                 {
-                                    label = string.Format(
-                                        _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
-                                        _getString("AgentActivityThinking", "생각중"),
-                                        _displayText.FormatInlineTokenCount(tokenCount)
-                                    );
+                                    label = _displayText.FormatThinkingLabel(tokenCount, requestThinking.Elapsed);
                                 }
                                 else
                                 {
@@ -406,11 +380,7 @@ namespace TxtAIEditor.Controls
                                 if (toolCallClosed)
                                 {
                                     int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
-                                    label = string.Format(
-                                        _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
-                                        _getString("AgentActivityThinking", "생각중"),
-                                        _displayText.FormatInlineTokenCount(tokenCount)
-                                    );
+                                    label = _displayText.FormatThinkingLabel(tokenCount, requestThinking.Elapsed);
                                 }
                                 else
                                 {
@@ -637,32 +607,14 @@ namespace TxtAIEditor.Controls
                             inThoughtBlock = false;
                             currentPos = earliestEndIdx + matchedEndTag.Length;
 
-                            int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
-                            string label = string.Format(
-                                _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
-                                _getString("AgentActivityThinking", "생각중"),
-                                _displayText.FormatInlineTokenCount(tokenCount)
-                            );
-                            _runOutputController.EnqueueRunUi(
-                                runContext,
-                                () => _agentPane.UpdateThinkingActivity(label),
-                                session => _openSessionController.UpdateThinkingInSession(session, label));
+                            inlineThinking.SetTokenCount(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
                         }
                         else
                         {
                             thoughtTextBuilder.Append(finalRawText.Substring(currentPos, finalSafeLength - currentPos));
                             currentPos = finalSafeLength;
 
-                            int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
-                            string label = string.Format(
-                                _displayText.GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
-                                _getString("AgentActivityThinking", "생각중"),
-                                _displayText.FormatInlineTokenCount(tokenCount)
-                            );
-                            _runOutputController.EnqueueRunUi(
-                                runContext,
-                                () => _agentPane.UpdateThinkingActivity(label),
-                                session => _openSessionController.UpdateThinkingInSession(session, label));
+                            inlineThinking.SetTokenCount(AgentTokenEstimator.Estimate(thoughtTextBuilder.ToString()));
                         }
                     }
                 }
@@ -687,6 +639,18 @@ namespace TxtAIEditor.Controls
                 VisibleTextFlushed = visibleTextFlushed,
                 UsedNativeFunctionToolCall = nativeFunctionToolCallDetected
             };
+        }
+
+        private sealed class ThinkingProgress(AgentDisplayLocalizer displayText)
+        {
+            private readonly long _startedAt = Stopwatch.GetTimestamp();
+            private double _estimatedTokens;
+
+            public TimeSpan Elapsed => Stopwatch.GetElapsedTime(_startedAt);
+
+            public void SetTokenCount(double estimatedTokens) => Volatile.Write(ref _estimatedTokens, estimatedTokens);
+
+            public string FormatLabel() => displayText.FormatThinkingLabel(Volatile.Read(ref _estimatedTokens), Elapsed);
         }
     }
 

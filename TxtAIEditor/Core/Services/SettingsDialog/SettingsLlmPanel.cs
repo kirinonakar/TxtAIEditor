@@ -62,13 +62,17 @@ namespace TxtAIEditor.Core.Services
             string initialLlmEndpoint = settings.LlmProvider.Equals("Custom", StringComparison.OrdinalIgnoreCase)
                 ? (settings.LlmEndpointCustom ?? string.Empty)
                 : settings.LlmEndpoint;
+            if (SettingsLlmModelCatalog.IsExaoneProvider(_lastSelectedProviderName))
+            {
+                initialLlmEndpoint = SettingsLlmModelCatalog.ExaoneEndpoint;
+            }
             _llmEndpointBox = new TextBox { PlaceholderText = getString("SettingsLlmEndpointPlaceholder", "예: http://localhost:1234/v1"), Text = initialLlmEndpoint, HorizontalAlignment = HorizontalAlignment.Stretch };
             _llmModelCombo = new ComboBox { PlaceholderText = getString("SettingsLlmSelectModel", "모델 선택"), HorizontalAlignment = HorizontalAlignment.Stretch, IsEditable = true, Tag = "LlmModelCombo" };
             _llmModelCombo.Loaded += (_, __) => SettingsDialogStyler.ApplyEditableComboBoxVisualStyles(_llmModelCombo);
             string visionFallbackProvider = string.IsNullOrWhiteSpace(settings.LlmVisionFallbackProvider)
                 ? settings.LlmProvider
                 : settings.LlmVisionFallbackProvider;
-            _visionFallbackProviderCombo = CreateProviderCombo(visionFallbackProvider);
+            _visionFallbackProviderCombo = CreateProviderCombo(visionFallbackProvider, visionFallback: true);
             _visionFallbackModelCombo = new ComboBox { PlaceholderText = getString("SettingsLlmSelectModel", "모델 선택"), HorizontalAlignment = HorizontalAlignment.Stretch, IsEditable = true, Tag = "LlmVisionFallbackModelCombo" };
             _visionFallbackModelCombo.Loaded += (_, __) => SettingsDialogStyler.ApplyEditableComboBoxVisualStyles(_visionFallbackModelCombo);
             _llmApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsLlmCredentialPlaceholder", "API Key 입력 (비워두면 저장된 자격 증명 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -796,6 +800,12 @@ namespace TxtAIEditor.Core.Services
 
         private void ApplyProviderDefaults(string provider, string previousProvider)
         {
+            if (SettingsLlmModelCatalog.IsExaoneProvider(provider))
+            {
+                _llmEndpointBox.Text = SettingsLlmModelCatalog.ExaoneEndpoint;
+                return;
+            }
+
             if (provider.Equals("Custom", StringComparison.OrdinalIgnoreCase))
             {
                 _llmEndpointBox.Text = _settings.LlmEndpointCustom ?? string.Empty;
@@ -912,9 +922,17 @@ namespace TxtAIEditor.Core.Services
         private void UpdateModelRefreshButtonVisibility()
         {
             string provider = GetSelectedProviderName();
+            bool isExaone = SettingsLlmModelCatalog.IsExaoneProvider(provider);
+            _llmEndpointBox.IsReadOnly = isExaone;
             _llmThinkingLevelCombo.Visibility = SettingsLlmModelCatalog.SupportsThinkingLevel(provider) ? Visibility.Visible : Visibility.Collapsed;
 
-            if (provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase))
+            if (isExaone)
+            {
+                _refreshModelsButton.Visibility = Visibility.Collapsed;
+                _modelStatusText.Text = _getString("SettingsLlmExaoneInfo", "K-EXAONE 2.5는 텍스트 전용 모델이며 항상 추론합니다. 추론 강도를 비활성화로 설정하면 낮음(Low)을 사용합니다.");
+                _modelStatusText.Visibility = Visibility.Visible;
+            }
+            else if (provider.Equals("LM Studio", StringComparison.OrdinalIgnoreCase))
             {
                 ToolTipService.SetToolTip(_refreshModelsButton, _getString("SettingsLlmLoadModels", "LM Studio 모델 불러오기"));
                 _refreshModelsButton.Visibility = Visibility.Visible;
@@ -1072,15 +1090,19 @@ namespace TxtAIEditor.Core.Services
             return CreateProviderCombo(settings.LlmProvider);
         }
 
-        private ComboBox CreateProviderCombo(string provider)
+        private ComboBox CreateProviderCombo(string provider, bool visionFallback = false)
         {
             var comboBox = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
             foreach (var providerName in SettingsLlmModelCatalog.ProviderNames)
             {
-                comboBox.Items.Add(providerName);
+                if (!visionFallback || !SettingsLlmModelCatalog.IsExaoneProvider(providerName))
+                {
+                    comboBox.Items.Add(providerName);
+                }
             }
 
-            comboBox.SelectedIndex = SettingsLlmModelCatalog.GetProviderIndex(provider);
+            string selectedProvider = SettingsLlmModelCatalog.ProviderNames[SettingsLlmModelCatalog.GetProviderIndex(provider)];
+            comboBox.SelectedItem = comboBox.Items.Contains(selectedProvider) ? selectedProvider : "OpenAI";
             return comboBox;
         }
 

@@ -440,6 +440,9 @@
   <data name="SettingsLlmUpstageInfo" xml:space="preserve">
     <value>Upstageは https://api.upstage.ai/v1/models からモデルリストを取得します。</value>
   </data>
+  <data name="SettingsLlmExaoneInfo" xml:space="preserve">
+    <value>K-EXAONE 2.5 はテキスト入力専用で、常に推論を行います。推論レベルで「無効」を選ぶと「低」が使われます。</value>
+  </data>
   <data name="SettingsLlmLoadGoogleModels" xml:space="preserve">
     <value>Googleモデルを取得</value>
   </data>
@@ -2216,6 +2219,9 @@
   <data name="AgentActivityCollectingContext" xml:space="preserve">
     <value>コンテキスト収集中</value>
   </data>
+  <data name="AgentActivityThinkingMetricsFormat" xml:space="preserve">
+    <value>{0} ({1}, {2:0.0}秒, {3} TPS)</value>
+  </data>
   <data name="AgentActivityThinking" xml:space="preserve">
     <value>思考中</value>
   </data>
@@ -3012,6 +3018,12 @@
    <data name="CerebrasErrorStreamCallFailed" xml:space="preserve">
      <value>Cerebras API ストリーミング呼び出し失敗 ({0}): {1}</value>
    </data>
+  <data name="ExaoneErrorImageUnsupported" xml:space="preserve">
+    <value>K-EXAONE 2.5 はテキスト入力のみ対応しています。</value>
+  </data>
+  <data name="ExaoneErrorApiCallFailed" xml:space="preserve">
+    <value>EXAONE API 呼び出し失敗 ({0}): {1}</value>
+  </data>
   <data name="UpstageErrorApiCallFailed" xml:space="preserve">
     <value>Upstage API 呼び出し失敗 ({0}): {1}</value>
   </data>

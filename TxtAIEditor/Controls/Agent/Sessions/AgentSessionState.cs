@@ -33,6 +33,7 @@ namespace TxtAIEditor.Controls
         public int ThinkingLineStart { get; set; }
         public string ThinkingLineTimestamp { get; set; } = string.Empty;
         public string ThinkingLinePrefix { get; set; } = string.Empty;
+        public Func<string>? LiveThinkingLabel { get; set; }
         public EditorSettings? LlmSettings { get; set; }
     }
 

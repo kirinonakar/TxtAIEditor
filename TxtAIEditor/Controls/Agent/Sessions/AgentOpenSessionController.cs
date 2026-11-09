@@ -266,7 +266,7 @@ namespace TxtAIEditor.Controls
                     : session.OutputText);
                 if (session.ThinkingLineActive && session.IsRunning)
                 {
-                    _agentPane.ResumeThinkingActivityFromOutput();
+                    _agentPane.ResumeThinkingActivityFromOutput(session.ThinkingLineTimestamp, session.LiveThinkingLabel);
                 }
 
                 _agentPane.ClearActivity(string.IsNullOrWhiteSpace(session.ActivityText)
@@ -649,12 +649,7 @@ namespace TxtAIEditor.Controls
                 });
         }
 
-        public Task BeginRunThinkingActivityAsync(AgentRunContext context, string label)
-        {
-            return BeginRunThinkingActivityCoreAsync(context, label);
-        }
-
-        private async Task BeginRunThinkingActivityCoreAsync(AgentRunContext context, string label)
+        public async Task BeginRunThinkingActivityAsync(AgentRunContext context, string label, Func<string>? liveLabel)
         {
             await FlushQueuedRunOutputTextAsync(context);
             await RunOnUIThreadAsync(() =>
@@ -662,13 +657,13 @@ namespace TxtAIEditor.Controls
                 var session = EnsureSession(context.SessionId);
                 if (IsSessionVisible(context.SessionId))
                 {
-                    _agentPane.BeginThinkingActivity(label);
+                    _agentPane.BeginThinkingActivity(label, liveLabel);
                     session.OutputText = _agentPane.GetRawOutputText();
                     SyncVisibleThinkingStateToSession(session);
                 }
                 else
                 {
-                    BeginThinkingInSession(session, label);
+                    BeginThinkingInSession(session, label, liveLabel);
                 }
             });
         }
@@ -723,8 +718,9 @@ namespace TxtAIEditor.Controls
             });
         }
 
-        public void BeginThinkingInSession(AgentOpenSessionState session, string label)
+        private void BeginThinkingInSession(AgentOpenSessionState session, string label, Func<string>? liveLabel = null)
         {
+            CompleteThinkingInSession(session);
             string text = NormalizePlaceholderOutput(session.OutputText);
             if (!string.IsNullOrEmpty(text) && !EndsWithLineBreak(text))
             {
@@ -732,12 +728,13 @@ namespace TxtAIEditor.Controls
             }
 
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
-            string prefix = $"{timestamp}  {label}";
+            string prefix = $"{timestamp}  {liveLabel?.Invoke() ?? label}";
             session.OutputText = text + prefix;
             session.ThinkingLineActive = true;
             session.ThinkingLineStart = text.Length;
             session.ThinkingLineTimestamp = timestamp;
             session.ThinkingLinePrefix = prefix;
+            session.LiveThinkingLabel = liveLabel;
             session.UpdatedAt = DateTime.Now;
         }
 
@@ -763,6 +760,7 @@ namespace TxtAIEditor.Controls
             session.OutputText = text.Substring(0, session.ThinkingLineStart) + prefix;
             session.ThinkingLinePrefix = prefix;
             session.ThinkingLineTimestamp = timestamp;
+            session.LiveThinkingLabel = null;
             session.UpdatedAt = DateTime.Now;
         }
 
@@ -771,6 +769,12 @@ namespace TxtAIEditor.Controls
             if (!session.ThinkingLineActive)
             {
                 return;
+            }
+
+            if (session.LiveThinkingLabel is { } liveLabel &&
+                session.ThinkingLineStart >= 0 && session.ThinkingLineStart <= (session.OutputText?.Length ?? 0))
+            {
+                UpdateThinkingInSession(session, liveLabel());
             }
 
             if (!EndsWithLineBreak(session.OutputText ?? string.Empty))
@@ -788,6 +792,7 @@ namespace TxtAIEditor.Controls
             session.ThinkingLineStart = 0;
             session.ThinkingLineTimestamp = string.Empty;
             session.ThinkingLinePrefix = string.Empty;
+            session.LiveThinkingLabel = null;
         }
 
         public void SyncVisibleThinkingStateToSession(AgentOpenSessionState session)
@@ -971,6 +976,7 @@ namespace TxtAIEditor.Controls
             session.ThinkingLineStart = lineStart;
             session.ThinkingLineTimestamp = ExtractThinkingTimestamp(line);
             session.ThinkingLinePrefix = StripTrailingThinkingDots(line);
+            session.LiveThinkingLabel = _agentPane.LiveThinkingLabel;
         }
 
         private string NormalizePlaceholderOutput(string text)
@@ -1130,6 +1136,7 @@ namespace TxtAIEditor.Controls
                 LlmModelGemini = settings.LlmModelGemini,
                 LlmModelOpenAI = settings.LlmModelOpenAI,
                 LlmModelOpenRouter = settings.LlmModelOpenRouter,
+                LlmModelExaone = settings.LlmModelExaone,
                 LlmModelLmStudio = settings.LlmModelLmStudio,
                 LlmModelOpenCodeGo = settings.LlmModelOpenCodeGo,
                 LlmModelOpenCodeZen = settings.LlmModelOpenCodeZen,

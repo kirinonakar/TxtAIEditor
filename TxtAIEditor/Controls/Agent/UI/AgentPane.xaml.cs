@@ -229,6 +229,7 @@ namespace TxtAIEditor.Controls
             set => _outputController.HideHtmlCodeBlocks = value;
         }
         public bool IsThinkingActivityActive => _outputController.IsThinkingActivityActive;
+        internal Func<string>? LiveThinkingLabel => _outputController.LiveThinkingLabel;
 
         private bool _isBusy;
         private bool _canRewindSession;
@@ -428,9 +429,9 @@ private Style? _accentRunButtonStyle;
             _outputController.BeginOutputBlock(title);
         }
 
-        public void BeginThinkingActivity(string label)
+        public void BeginThinkingActivity(string label, Func<string>? liveLabel = null)
         {
-            _outputController.BeginThinkingActivity(label);
+            _outputController.BeginThinkingActivity(label, liveLabel);
         }
 
         public void UpdateThinkingActivity(string label)
@@ -443,9 +444,9 @@ private Style? _accentRunButtonStyle;
             _outputController.StopThinkingActivity();
         }
 
-        public void ResumeThinkingActivityFromOutput()
+        public void ResumeThinkingActivityFromOutput(string timestamp = "", Func<string>? liveLabel = null)
         {
-            _outputController.ResumeThinkingActivityFromOutput();
+            _outputController.ResumeThinkingActivityFromOutput(timestamp, liveLabel);
         }
 
         public void ResetOutput(string text)

@@ -440,6 +440,9 @@
   <data name="SettingsLlmUpstageInfo" xml:space="preserve">
     <value>Upstage 從 https://api.upstage.ai/v1/models. 載入模型列表</value>
   </data>
+  <data name="SettingsLlmExaoneInfo" xml:space="preserve">
+    <value>K-EXAONE 2.5 僅接受文字輸入，且一律進行推理。選擇「停用」時會使用低推理強度。</value>
+  </data>
   <data name="SettingsLlmLoadGoogleModels" xml:space="preserve">
     <value>載入 Google 模型</value>
   </data>
@@ -2216,6 +2219,9 @@
   <data name="AgentActivityCollectingContext" xml:space="preserve">
     <value>收集上下文</value>
   </data>
+  <data name="AgentActivityThinkingMetricsFormat" xml:space="preserve">
+    <value>{0} ({1}, {2:0.0}秒, {3} TPS)</value>
+  </data>
   <data name="AgentActivityThinking" xml:space="preserve">
     <value>思考</value>
   </data>
@@ -3012,6 +3018,12 @@
    <data name="CerebrasErrorStreamCallFailed" xml:space="preserve">
      <value>Cerebras API 串流呼叫失敗 ({0})：{1}</value>
    </data>
+  <data name="ExaoneErrorImageUnsupported" xml:space="preserve">
+    <value>K-EXAONE 2.5 僅支援文字輸入。</value>
+  </data>
+  <data name="ExaoneErrorApiCallFailed" xml:space="preserve">
+    <value>EXAONE API 呼叫失敗 ({0})：{1}</value>
+  </data>
   <data name="UpstageErrorApiCallFailed" xml:space="preserve">
     <value>Upstage API 呼叫失敗 ({0}): {1}</value>
   </data>

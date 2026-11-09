@@ -40,6 +40,7 @@ namespace TxtAIEditor.Controls
         private int _thinkingDotCount;
         private string _thinkingLinePrefix = string.Empty;
         private string _thinkingLineTimestamp = string.Empty;
+        private Func<string>? _liveThinkingLabel;
         private string? _pendingThinkingLabel;
         private DateTimeOffset _lastThinkingLabelRender = DateTimeOffset.MinValue;
         private bool _outputRenderDeferred;
@@ -122,6 +123,7 @@ namespace TxtAIEditor.Controls
         }
 
         public bool IsThinkingActivityActive => _thinkingLineActive;
+        public Func<string>? LiveThinkingLabel => _liveThinkingLabel;
 
         public void Localize(Func<string, string, string> getString)
         {
@@ -177,7 +179,7 @@ namespace TxtAIEditor.Controls
             ScrollOutputToEnd(true);
         }
 
-        public void BeginThinkingActivity(string label)
+        public void BeginThinkingActivity(string label, Func<string>? liveLabel)
         {
             FlushAllPendingOutputText();
             CompleteThinkingLine();
@@ -193,12 +195,13 @@ namespace TxtAIEditor.Controls
 
             _thinkingLineTimestamp = DateTime.Now.ToString("HH:mm:ss");
             _thinkingLinePrefix = $"{_thinkingLineTimestamp}  {label}";
+            _liveThinkingLabel = liveLabel;
             _pendingThinkingLabel = null;
             _lastThinkingLabelRender = DateTimeOffset.Now;
             _thinkingLineStart = currentText.Length + lineBreakLength;
             _thinkingDotCount = 0;
             _thinkingLineActive = true;
-            AppendText(_thinkingLinePrefix);
+            AppendText(BuildThinkingLine());
             ScrollOutputToEnd(true);
 
             _thinkingTimer ??= CreateThinkingTimer();
@@ -232,7 +235,7 @@ namespace TxtAIEditor.Controls
             CompleteThinkingLine();
         }
 
-        public void ResumeThinkingActivityFromOutput()
+        public void ResumeThinkingActivityFromOutput(string timestamp, Func<string>? liveLabel)
         {
             FlushAllPendingOutputText();
             ResetThinkingState();
@@ -254,8 +257,10 @@ namespace TxtAIEditor.Controls
             _thinkingLinePrefix = trailingDotCount > 0
                 ? line.Substring(0, line.Length - trailingDotCount)
                 : line;
-            _thinkingLineTimestamp = string.Empty;
+            _thinkingLineTimestamp = timestamp;
+            _liveThinkingLabel = liveLabel;
             _thinkingLineActive = true;
+            ReplaceThinkingLine(BuildThinkingLine());
 
             _thinkingTimer ??= CreateThinkingTimer();
             _thinkingTimer.Start();
@@ -601,7 +606,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 _thinkingDotCount = (_thinkingDotCount + 1) % 4;
-                ReplaceThinkingLine(_thinkingLinePrefix + new string('.', _thinkingDotCount));
+                ReplaceThinkingLine(BuildThinkingLine());
             };
             return timer;
         }
@@ -634,9 +639,10 @@ namespace TxtAIEditor.Controls
             }
 
             _thinkingLinePrefix = $"{_thinkingLineTimestamp}  {_pendingThinkingLabel}";
+            _liveThinkingLabel = null;
             _pendingThinkingLabel = null;
             _lastThinkingLabelRender = now;
-            ReplaceThinkingLine(_thinkingLinePrefix + new string('.', _thinkingDotCount));
+            ReplaceThinkingLine(BuildThinkingLine());
         }
 
         private void CompleteThinkingLine()
@@ -649,18 +655,20 @@ namespace TxtAIEditor.Controls
             if (!string.IsNullOrEmpty(_pendingThinkingLabel))
             {
                 _thinkingLinePrefix = $"{_thinkingLineTimestamp}  {_pendingThinkingLabel}";
+                _liveThinkingLabel = null;
                 _pendingThinkingLabel = null;
             }
 
             _thinkingTimer?.Stop();
             _thinkingLabelFlushTimer?.Stop();
-            ReplaceThinkingLine(_thinkingLinePrefix + new string('.', _thinkingDotCount));
+            ReplaceThinkingLine(BuildThinkingLine());
             if (!EndsWithLineBreak(_rawOutputText))
             {
                 AppendText(OutputLineBreak);
             }
 
             _thinkingLineActive = false;
+            _liveThinkingLabel = null;
             ScrollOutputToEnd();
         }
 
@@ -673,8 +681,17 @@ namespace TxtAIEditor.Controls
             _thinkingDotCount = 0;
             _thinkingLinePrefix = string.Empty;
             _thinkingLineTimestamp = string.Empty;
+            _liveThinkingLabel = null;
             _pendingThinkingLabel = null;
             _lastThinkingLabelRender = DateTimeOffset.MinValue;
+        }
+
+        private string BuildThinkingLine()
+        {
+            string prefix = _liveThinkingLabel is { } liveLabel
+                ? $"{_thinkingLineTimestamp}  {liveLabel()}"
+                : _thinkingLinePrefix;
+            return prefix + new string('.', _thinkingDotCount);
         }
 
         private void ReplaceThinkingLine(string text)

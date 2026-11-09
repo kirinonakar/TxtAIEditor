@@ -44,17 +44,19 @@ namespace TxtAIEditor.Core.Services.LLM
             _providerName.Equals("OpenAI OAuth", StringComparison.OrdinalIgnoreCase) ||
             _providerName.Equals("OpenAIOAuth", StringComparison.OrdinalIgnoreCase);
 
-        // The Custom provider targets arbitrary OpenAI-compatible endpoints that may
-        // expose a non-standard /responses route, so it always uses Chat Completions.
+        private bool IsExaone => SettingsLlmModelCatalog.IsExaoneProvider(_providerName);
+
         private bool ForcesChatCompletions =>
-            _providerName.Equals("Custom", StringComparison.OrdinalIgnoreCase);
+            IsExaone || _providerName.Equals("Custom", StringComparison.OrdinalIgnoreCase);
 
         private Task<(int context, int output)> GetTokenLimitsAsync(string model, CancellationToken cancellationToken) =>
-            GetCatalogTokenLimitsAsync(_providerName, model, cancellationToken);
+            IsExaone
+                ? Task.FromResult(ModelsDevCatalog.GetCachedLimits(_providerName, model))
+                : GetCatalogTokenLimitsAsync(_providerName, model, cancellationToken);
 
         public override async Task<string> GenerateCompletionAsync(LlmCompletionRequest completion)
         {
-            var endpoint = completion.Endpoint;
+            var endpoint = IsExaone ? SettingsLlmModelCatalog.ExaoneEndpoint : completion.Endpoint;
             var apiKey = completion.ApiKey;
             var model = completion.Model;
             var systemPrompt = completion.SystemPrompt;
@@ -70,6 +72,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                    endpoint.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(apiKey) && !isLocalEndpoint)
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
+            ValidateAttachments(attachments);
 
             var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
             outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
@@ -102,8 +105,6 @@ namespace TxtAIEditor.Core.Services.LLM
 
             await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
-            bool reasoning = IsReasoningModel(model);
-            string tokenField = reasoning ? "max_completion_tokens" : "max_tokens";
 
             var payloadDict = new Dictionary<string, object>
             {
@@ -142,29 +143,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 payloadDict["tools"] = toolsList;
             }
 
-            if (!_isOAuth)
-            {
-                LlmRequestTuning.SetTemperature(payloadDict, IsKimiModel(model) ? 1.0 : 0.5);
-            }
-            if (outputLimit > 0)
-            {
-                payloadDict[tokenField] = outputLimit;
-            }
-            if (HasThinking)
-            {
-                payloadDict["reasoning"] = new Dictionary<string, object>
-                {
-                    ["effort"] = LlmThinkingLevelMapper.MapEffort(model, _thinkingLevel)
-                };
-            }
-            else if (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
-                     _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase))
-            {
-                payloadDict["reasoning"] = new Dictionary<string, object>
-                {
-                    ["effort"] = "none"
-                };
-            }
+            ApplyChatTuning(payloadDict, model, outputLimit);
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
@@ -180,7 +159,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
                     if (!response.IsSuccessStatusCode)
                     {
-                        throw new LlmHttpException(response, string.Format(_localizationService.GetString("OpenAIErrorApiCallFailed", "OpenAI API 호출 실패 ({0}): {1}"), response.StatusCode, responseBody));
+                        throw new LlmHttpException(response, string.Format(GetChatErrorTemplate(stream: false), response.StatusCode, responseBody));
                     }
 
                     using (var doc = JsonDocument.Parse(responseBody))
@@ -190,6 +169,10 @@ namespace TxtAIEditor.Core.Services.LLM
                         if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
                         {
                             var firstChoice = choices[0];
+                            if (IsExaone && HasReachedTokenLimit(firstChoice))
+                            {
+                                throw new ResponseTruncatedException();
+                            }
                             if (firstChoice.TryGetProperty("message", out var message))
                             {
                                 string? contentText = null;
@@ -223,7 +206,7 @@ namespace TxtAIEditor.Core.Services.LLM
 
         public override async Task GenerateCompletionStreamAsync(LlmCompletionRequest completion)
         {
-            var endpoint = completion.Endpoint;
+            var endpoint = IsExaone ? SettingsLlmModelCatalog.ExaoneEndpoint : completion.Endpoint;
             var apiKey = completion.ApiKey;
             var model = completion.Model;
             var systemPrompt = completion.SystemPrompt;
@@ -241,6 +224,7 @@ namespace TxtAIEditor.Core.Services.LLM
                                    endpoint.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(apiKey) && !isLocalEndpoint)
                 throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiCredential", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
+            ValidateAttachments(attachments);
 
             var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
             outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
@@ -273,8 +257,6 @@ namespace TxtAIEditor.Core.Services.LLM
 
             await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.ChatCompletions);
             string requestUrl = endpoint.TrimEnd('/') + "/chat/completions";
-            bool reasoning = IsReasoningModel(model);
-            string tokenField = reasoning ? "max_completion_tokens" : "max_tokens";
 
             var payloadDict = new Dictionary<string, object>
             {
@@ -322,29 +304,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 payloadDict["tools"] = toolsList;
             }
 
-            if (!_isOAuth)
-            {
-                LlmRequestTuning.SetTemperature(payloadDict, IsKimiModel(model) ? 1.0 : 0.5);
-            }
-            if (outputLimit > 0)
-            {
-                payloadDict[tokenField] = outputLimit;
-            }
-            if (HasThinking)
-            {
-                payloadDict["reasoning"] = new Dictionary<string, object>
-                {
-                    ["effort"] = LlmThinkingLevelMapper.MapEffort(model, _thinkingLevel)
-                };
-            }
-            else if (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
-                     _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase))
-            {
-                payloadDict["reasoning"] = new Dictionary<string, object>
-                {
-                    ["effort"] = "none"
-                };
-            }
+            ApplyChatTuning(payloadDict, model, outputLimit);
 
             string jsonPayload = JsonSerializer.Serialize(payloadDict);
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
@@ -360,7 +320,7 @@ namespace TxtAIEditor.Core.Services.LLM
                     if (!response.IsSuccessStatusCode)
                     {
                         string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                        throw new LlmHttpException(response, string.Format(_localizationService.GetString("OpenAIErrorStreamCallFailed", "OpenAI API 스트리밍 호출 실패 ({0}): {1}"), response.StatusCode, errorBody));
+                        throw new LlmHttpException(response, string.Format(GetChatErrorTemplate(stream: true), response.StatusCode, errorBody));
                     }
 
                     var toolAccumulator = new StreamToolCallAccumulator();
@@ -482,6 +442,83 @@ namespace TxtAIEditor.Core.Services.LLM
                         }
                     }
                 }
+            }
+        }
+
+        private void ValidateAttachments(IReadOnlyList<LlmMessageAttachment>? attachments)
+        {
+            if (IsExaone && attachments?.Any(a => a.IsImage && !string.IsNullOrWhiteSpace(a.Base64Data)) == true)
+            {
+                throw new LlmRequestException(_localizationService.GetString(
+                    "ExaoneErrorImageUnsupported", "K-EXAONE 2.5는 텍스트 입력만 지원합니다."));
+            }
+        }
+
+        private static bool HasReachedTokenLimit(JsonElement choice) =>
+            choice.TryGetProperty("finish_reason", out var reason) &&
+            reason.ValueKind == JsonValueKind.String &&
+            reason.ValueEquals("length");
+
+        private string GetChatErrorTemplate(bool stream)
+        {
+            if (IsExaone)
+            {
+                return _localizationService.GetString("ExaoneErrorApiCallFailed", "EXAONE API 호출 실패 ({0}): {1}");
+            }
+
+            return stream
+                ? _localizationService.GetString("OpenAIErrorStreamCallFailed", "OpenAI API 스트리밍 호출 실패 ({0}): {1}")
+                : _localizationService.GetString("OpenAIErrorApiCallFailed", "OpenAI API 호출 실패 ({0}): {1}");
+        }
+
+        private void ApplyChatTuning(Dictionary<string, object> payload, string model, int outputLimit)
+        {
+            if (IsExaone)
+            {
+                LlmRequestTuning.SetTemperature(payload, 1.0);
+                payload["top_p"] = 0.95;
+                if (outputLimit > 0)
+                {
+                    payload["max_tokens"] = outputLimit;
+                }
+
+                string? effort = _thinkingLevel.Trim().ToLowerInvariant() switch
+                {
+                    "none" or "disabled" or "low" => "low",
+                    "medium" or "high" => "high",
+                    "xhigh" or "max" => "max",
+                    _ => null
+                };
+                if (effort != null)
+                {
+                    payload["reasoning_effort"] = effort;
+                }
+                return;
+            }
+
+            if (!_isOAuth)
+            {
+                LlmRequestTuning.SetTemperature(payload, IsKimiModel(model) ? 1.0 : 0.5);
+            }
+            if (outputLimit > 0)
+            {
+                string tokenField = IsReasoningModel(model) ? "max_completion_tokens" : "max_tokens";
+                payload[tokenField] = outputLimit;
+            }
+            if (HasThinking)
+            {
+                payload["reasoning"] = new Dictionary<string, object>
+                {
+                    ["effort"] = LlmThinkingLevelMapper.MapEffort(model, _thinkingLevel)
+                };
+            }
+            else if (_thinkingLevel.Equals("disabled", StringComparison.OrdinalIgnoreCase) ||
+                     _thinkingLevel.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                payload["reasoning"] = new Dictionary<string, object>
+                {
+                    ["effort"] = "none"
+                };
             }
         }
 
