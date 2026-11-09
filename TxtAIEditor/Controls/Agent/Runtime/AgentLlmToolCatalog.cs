@@ -47,7 +47,7 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "run_rg",
-                    Description = "Run ripgrep with validated literal arguments and no shell. Quote regexes/globs. Optional filters: head/tail N or -n N, sort, wc -l, Select-Object -First/-Last N. Executable/configuration options are blocked; use run_powershell for other pipelines.",
+                    Description = "Run ripgrep with validated literal arguments and no shell. Quote regexes/globs. Filters include head/tail N or -n N, sort [-t CHAR] [-k N] [-n] [-r], wc -l, and Select-Object -First/-Last N. Use sort -t: -k2 -nr to rank rg -c results by count. Executable/configuration options are blocked.",
                     Parameters = new
                     {
                         type = "object",

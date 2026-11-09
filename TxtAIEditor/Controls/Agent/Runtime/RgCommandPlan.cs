@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace TxtAIEditor.Controls
 {
@@ -35,7 +36,7 @@ namespace TxtAIEditor.Controls
         };
         private const string ShortSwitches = "nNiIsSFwxcClLqovHh0aUbupP.";
         private const string ShortValues = "egtfmABCjMTr";
-        private readonly List<(string Kind, int Count)> _filters = new();
+        private readonly List<Func<IEnumerable<string>, IEnumerable<string>>> _filters = new();
         internal bool HasFilters => _filters.Count > 0;
         internal List<string> Arguments { get; } = new() { "--no-config" };
         internal string? ScopeNote { get; private set; }
@@ -153,10 +154,12 @@ namespace TxtAIEditor.Controls
             foreach (List<string> stage in stages.Skip(1))
             {
                 string kind = stage[0].ToLowerInvariant();
-                if ((kind == "sort" || kind == "sort-object") && stage.Count == 1)
-                    plan._filters.Add(("sort", 0));
+                if (kind == "sort")
+                    plan._filters.Add(ParseSort(stage));
+                else if (kind == "sort-object" && stage.Count == 1)
+                    plan._filters.Add(lines => lines.Order(StringComparer.Ordinal));
                 else if (kind == "wc" && stage.Count == 2 && stage[1] == "-l")
-                    plan._filters.Add(("count", 0));
+                    plan._filters.Add(lines => new[] { lines.Count().ToString(CultureInfo.InvariantCulture) });
                 else
                 {
                     string? count = null;
@@ -174,8 +177,8 @@ namespace TxtAIEditor.Controls
                     }
                     if (count == null || !int.TryParse(count, NumberStyles.None, CultureInfo.InvariantCulture, out int size) ||
                         size < 0 || size > 100000 || kind is not ("head" or "tail"))
-                        throw new ArgumentException("Unsupported pipeline. Use head/tail [N or -n N], sort, wc -l, or Select-Object -First/-Last N. Use run_powershell for other commands.");
-                    plan._filters.Add((kind, size));
+                        throw new ArgumentException("Unsupported pipeline. Use head/tail [N or -n N], sort [-t CHAR] [-k N] [-n] [-r], wc -l, or Select-Object -First/-Last N. Use run_powershell for other commands.");
+                    plan._filters.Add(kind == "head" ? lines => lines.Take(size) : lines => lines.TakeLast(size));
                 }
             }
             return plan;
@@ -188,17 +191,93 @@ namespace TxtAIEditor.Controls
             using (var reader = new StringReader(stdout))
                 while (reader.ReadLine() is string line) lines.Add(line);
             foreach (var filter in _filters)
-            {
-                lines = filter.Kind switch
-                {
-                    "head" => lines.Take(filter.Count).ToList(),
-                    "tail" => lines.TakeLast(filter.Count).ToList(),
-                    "sort" => lines.OrderBy(line => line, StringComparer.Ordinal).ToList(),
-                    "count" => new List<string> { lines.Count.ToString(CultureInfo.InvariantCulture) },
-                    _ => throw new InvalidOperationException()
-                };
-            }
+                lines = filter(lines).ToList();
             return string.Join(Environment.NewLine, lines);
+        }
+
+        private static Func<IEnumerable<string>, IEnumerable<string>> ParseSort(IReadOnlyList<string> stage)
+        {
+            const string syntax = "Use sort [-t CHAR] [-k N] [-n] [-r], for example sort -t: -k2 -nr.";
+            char? separator = null;
+            int? field = null;
+            bool numeric = false;
+            bool reverse = false;
+
+            for (int i = 1; i < stage.Count; i++)
+            {
+                string option = stage[i];
+                switch (option)
+                {
+                    case "-n":
+                        numeric = true;
+                        continue;
+                    case "-r":
+                        reverse = true;
+                        continue;
+                    case "-nr":
+                    case "-rn":
+                        numeric = reverse = true;
+                        continue;
+                }
+
+                if (option.StartsWith("-t", StringComparison.Ordinal) || option.StartsWith("-k", StringComparison.Ordinal))
+                {
+                    string value = option.Length > 2 ? option[2..] : ++i < stage.Count ? stage[i] : string.Empty;
+                    if (option[1] == 't' && separator == null && value.Length == 1)
+                    {
+                        separator = value[0];
+                        continue;
+                    }
+                    if (option[1] == 'k' && field == null &&
+                        int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int number) && number > 0)
+                    {
+                        field = number;
+                        continue;
+                    }
+                }
+
+                throw new ArgumentException($"Unsupported sort option: {option}. {syntax}");
+            }
+
+            string Key(string line) => GetSortKey(line, separator, field ?? 1);
+            return lines =>
+            {
+                var ordered = numeric
+                    ? lines.OrderBy(line => GetNumericSortKey(Key(line)))
+                    : lines.OrderBy(Key, StringComparer.Ordinal);
+                var withTieBreak = ordered.ThenBy(line => line, StringComparer.Ordinal);
+                return reverse ? withTieBreak.Reverse() : withTieBreak;
+            };
+        }
+
+        private static string GetSortKey(string line, char? separator, int field)
+        {
+            int start = 0;
+            for (int i = 1; i < field; i++)
+            {
+                if (separator is char delimiter)
+                {
+                    int next = line.IndexOf(delimiter, start);
+                    if (next < 0) return string.Empty;
+                    start = next + 1;
+                }
+                else
+                {
+                    while (start < line.Length && char.IsWhiteSpace(line[start])) start++;
+                    while (start < line.Length && !char.IsWhiteSpace(line[start])) start++;
+                    if (start == line.Length) return string.Empty;
+                }
+            }
+            return line[start..];
+        }
+
+        private static double GetNumericSortKey(string key)
+        {
+            // A key can include later fields. Read only its leading number.
+            var match = Regex.Match(key.TrimStart(), @"^-?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)");
+            double.TryParse(match.ValueSpan, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out double number);
+            return number;
         }
 
         private static List<List<string>> Tokenize(string input)
