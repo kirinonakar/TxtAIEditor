@@ -17,29 +17,29 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "list_files",
-                    Description = "List files and folders in the workspace matching a glob pattern. A leading slash anchors the pattern at the workspace root; /* lists only top-level entries.",
+                    Description = "List workspace files and folders.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            glob = new { type = "string", description = "Glob pattern to match files and folders, e.g. /* for workspace-root entries, **/* for all entries, or **/*.cs" },
-                            maxResults = new { type = "integer", description = "Maximum number of files or folders to return (default: 80)" }
+                            glob = new { type = "string", description = "Leading / anchors at the root. /* lists top-level entries, **/*.cs matches recursively." },
+                            maxResults = new { type = "integer", description = "Default 80." }
                         }
                     }
                 },
                 new LlmTool
                 {
                     Name = "search_text",
-                    Description = "Search for text within files in the workspace matching a glob pattern.",
+                    Description = "Search workspace paths and file contents.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            query = new { type = "string", description = "The text query to search for" },
-                            glob = new { type = "string", description = "Glob pattern to filter files, e.g. **/*" },
-                            maxResults = new { type = "integer", description = "Maximum number of search results to return (default: 80)" }
+                            query = new { type = "string", description = "Case-insensitive regex. Invalid patterns fall back to literal text." },
+                            glob = new { type = "string", description = "Workspace file filter, e.g. **/*.cs." },
+                            maxResults = new { type = "integer", description = "Default 80." }
                         },
                         required = new[] { "query" }
                     }
@@ -47,19 +47,19 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "run_rg",
-                    Description = "Run ripgrep with validated literal arguments and no shell. Quote regexes/globs. Filters include head/tail N or -n N, sort [-t CHAR] [-k N] [-n] [-r], wc -l, and Select-Object -First/-Last N. Use sort -t: -k2 -nr to rank rg -c results by count. Executable/configuration options are blocked.",
+                    Description = "Search with ripgrep without a shell. Executable and config options are blocked.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            arguments = new { type = "string", description = "Ripgrep arguments, e.g. -n \"pattern\" FolderName | head -50" },
+                            arguments = new { type = "string", description = "Quote regexes and globs. Supports head/tail [N or -n N], sort [-t CHAR] [-k N] [-n] [-r], wc -l, and Select-Object -First/-Last N. Rank rg -c counts with | sort -t: -k2 -nr." },
                             timeoutMs = new
                             {
                                 type = "integer",
                                 minimum = AgentProcessToolService.MinimumProcessTimeoutMs,
                                 maximum = AgentProcessToolService.MaximumProcessTimeoutMs,
-                                description = "Execution timeout in milliseconds (default: 10000, maximum: 300000)"
+                                description = "Default 10000."
                             }
                         },
                         required = new[] { "arguments" }
@@ -68,21 +68,21 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "run_rga",
-                    Description = "Search PDFs/documents, text and source files with ripgrep-all. Normal .py files are included. Notebooks (.ipynb) and archives are excluded by default; opt in with includeNotebooks/includeArchives. Long lines default to a 300-byte preview; -M/--max-columns and --max-columns-preview/--no-max-columns-preview are supported. Uses run_rg filters and no shell; user --rga-* and executable options remain blocked.",
+                    Description = "Search documents, text, and source with ripgrep-all. Uses run_rg filters without a shell. Blocks --rga-* and executable options.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            arguments = new { type = "string", description = "Ripgrep-all arguments, e.g. -n -i --max-columns 300 --max-columns-preview \"cpu\" .; use -g to narrow file types" },
-                            includeNotebooks = new { type = "boolean", description = "Include .ipynb files (default: false). Searches raw notebook JSON without pandoc or executing Python; source and stored outputs can match." },
-                            includeArchives = new { type = "boolean", description = "Include ZIP/compressed files (default: false). Native archive adapters may report unsupported encodings; scope results identify whether archives were included." },
+                            arguments = new { type = "string", description = "Quote regexes and globs. Use -g to filter files. Long lines default to 300-byte previews. Override with -M and --[no-]max-columns-preview." },
+                            includeNotebooks = new { type = "boolean", description = "Search raw .ipynb JSON, including saved outputs. Default false." },
+                            includeArchives = new { type = "boolean", description = "Search archives such as ZIP. Default false." },
                             timeoutMs = new
                             {
                                 type = "integer",
                                 minimum = AgentProcessToolService.MinimumProcessTimeoutMs,
                                 maximum = AgentProcessToolService.MaximumProcessTimeoutMs,
-                                description = "Timeout in milliseconds (default: 10000, maximum: 300000)"
+                                description = "Default 10000."
                             }
                         },
                         required = new[] { "arguments" }
@@ -91,24 +91,19 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "run_powershell",
-                    Description = "Run a PowerShell script body on the system. Pass complete cmdlet names and omit any powershell.exe -Command wrapper. Examples: Get-ChildItem -LiteralPath 'D:/workspace/test' -Recurse | Select-Object FullName, Length, LastWriteTime; Get-Command -Name '*doc*','*docx*' -ErrorAction SilentlyContinue; git status --short.",
+                    Description = "Run a PowerShell script from the workspace root.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            command = new
-                            {
-                                type = "string",
-                                description = "PowerShell script body only, not a powershell.exe -Command wrapper. Use full Verb-Noun cmdlets such as Get-ChildItem and Get-Command; do not pass bare fragments such as -ChildItem or -Command. Example: Get-ChildItem -LiteralPath 'D:/workspace/test' -Recurse | Select-Object FullName, Length, LastWriteTime"
-                            },
+                            command = new { type = "string", description = "Script body with full cmdlets such as Get-ChildItem. Omit the powershell.exe -Command wrapper." },
                             timeoutMs = new
                             {
                                 type = "integer",
                                 minimum = AgentProcessToolService.MinimumProcessTimeoutMs,
                                 maximum = AgentProcessToolService.MaximumProcessTimeoutMs,
-                                @default = AgentProcessToolService.DefaultPowerShellTimeoutMs,
-                                description = "Timeout in milliseconds (default: 120000, maximum: 300000)"
+                                @default = AgentProcessToolService.DefaultPowerShellTimeoutMs
                             }
                         },
                         required = new[] { "command" }
@@ -117,15 +112,15 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "read_file",
-                    Description = "Read a specific line range from a file (lines longer than 1000 characters are truncated).",
+                    Description = "Read file lines. Truncates lines at 1000 characters.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the file in the workspace" },
-                            startLine = new { type = "integer", description = "Start line number, 1-indexed (default: 1)" },
-                            lineCount = new { type = "integer", description = "Number of lines to read (default: 160)" }
+                            path = new { type = "string", description = "Workspace-relative path." },
+                            startLine = new { type = "integer", description = "1-based. Default 1." },
+                            lineCount = new { type = "integer", description = "Default 160." }
                         },
                         required = new[] { "path" }
                     }
@@ -133,14 +128,14 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "read_image",
-                    Description = "Read an image file. By default, images whose longest side exceeds 2048 pixels are resized proportionally to a maximum dimension of 2048 pixels. Set original to true to attach the original file without resizing or re-encoding.",
+                    Description = "Attach an image up to 25 MiB. By default, downscale proportionally if either side exceeds 2048 px.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the image" },
-                            original = new { type = "boolean", description = "Attach the original image bytes, dimensions, and format without resizing or re-encoding (default: false). The 25 MiB file limit still applies." }
+                            path = new { type = "string", description = "Workspace-relative path." },
+                            original = new { type = "boolean", description = "Keep original bytes. Default false." }
                         },
                         required = new[] { "path" }
                     }
@@ -148,15 +143,15 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "extract_document",
-                    Description = "Extract text from documents (PDF, DOCX, HWPX, etc.).",
+                    Description = "Extract PDF, Word, PowerPoint, Excel, or HWPX content to TXT or CSV.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Path to the document file" },
-                            outputPath = new { type = "string", description = "Optional output text file path" },
-                            maxChars = new { type = "integer", description = "Maximum number of characters to extract" }
+                            path = new { type = "string" },
+                            outputPath = new { type = "string", description = "Workspace destination. Omit for automatic naming." },
+                            maxChars = new { type = "integer", description = "Default 5000000." }
                         },
                         required = new[] { "path" }
                     }
@@ -164,15 +159,15 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "create_file",
-                    Description = "Create a new file with specified content.",
+                    Description = "Create a new file.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the new file" },
-                            content = new { type = "string", description = "Content of the file" },
-                            openAfterCreate = new { type = "boolean", description = "Whether to open the file in the editor after creation" }
+                            path = new { type = "string", description = "Workspace-relative path." },
+                            content = new { type = "string" },
+                            openAfterCreate = new { type = "boolean" }
                         },
                         required = new[] { "path", "content" }
                     }
@@ -180,14 +175,14 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "overwrite_file",
-                    Description = "Overwrite an existing file completely with new content.",
+                    Description = "Replace the entire contents of an existing file.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the file" },
-                            content = new { type = "string", description = "New content of the file" }
+                            path = new { type = "string", description = "Workspace-relative path." },
+                            content = new { type = "string" }
                         },
                         required = new[] { "path", "content" }
                     }
@@ -195,14 +190,14 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "append_to_file",
-                    Description = "Append content to the end of a file.",
+                    Description = "Append text to a file.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the file" },
-                            content = new { type = "string", description = "Content to append" }
+                            path = new { type = "string", description = "Workspace-relative path." },
+                            content = new { type = "string" }
                         },
                         required = new[] { "path", "content" }
                     }
@@ -210,14 +205,14 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "merge_files",
-                    Description = "Merge multiple source files into one target file.",
+                    Description = "Merge files in input order.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            targetPath = new { type = "string", description = "Relative output path for the merged file" },
-                            paths = new { type = "array", items = new { type = "string" }, description = "Relative source file paths to merge in order" }
+                            targetPath = new { type = "string", description = "Workspace-relative destination." },
+                            paths = new { type = "array", items = new { type = "string" }, description = "Workspace-relative inputs." }
                         },
                         required = new[] { "targetPath", "paths" }
                     }
@@ -225,27 +220,27 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "split_file",
-                    Description = "Split a file into generated chunks or explicit line ranges.",
+                    Description = "Split a file using linesPerFile or explicit ranges.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the source file" },
-                            linesPerFile = new { type = "integer", description = "Number of lines per generated split file" },
+                            path = new { type = "string", description = "Workspace-relative input." },
+                            linesPerFile = new { type = "integer" },
                             ranges = new
                             {
                                 type = "array",
-                                description = "Explicit target ranges to write",
+                                description = "Use endLine or lineCount per range. Omit both to read through EOF.",
                                 items = new
                                 {
                                     type = "object",
                                     properties = new
                                     {
-                                        path = new { type = "string", description = "Relative output path for this split range" },
-                                        startLine = new { type = "integer", description = "Start line number, 1-indexed" },
-                                        endLine = new { type = "integer", description = "End line number, inclusive" },
-                                        lineCount = new { type = "integer", description = "Optional number of lines to include from startLine" }
+                                        path = new { type = "string", description = "Workspace-relative output." },
+                                        startLine = new { type = "integer", description = "1-based." },
+                                        endLine = new { type = "integer", description = "Inclusive." },
+                                        lineCount = new { type = "integer" }
                                     },
                                     required = new[] { "path", "startLine" }
                                 }
@@ -257,21 +252,21 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "search_replace",
-                    Description = "Search for text in a file and replace matching occurrences. maxReplacements=0 replaces all matches; use apply_patch for structured or multi-hunk changes.",
+                    Description = "Replace literal or regex matches in a file.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the file" },
-                            search = new { type = "string", description = "Text or regular expression to find" },
-                            replacement = new { type = "string", description = "Replacement text" },
-                            useRegex = new { type = "boolean", @default = false, description = "Treat search as a regular expression" },
-                            matchCase = new { type = "boolean", @default = true, description = "Match letter case" },
-                            wholeWord = new { type = "boolean", @default = false, description = "Match only complete words" },
-                            maxReplacements = new { type = "integer", minimum = 0, @default = 0, description = "Maximum replacements; 0 means replace all matches" },
-                            startLine = new { type = "integer", minimum = 0, description = "Optional first line to search; 0 means the whole file" },
-                            endLine = new { type = "integer", minimum = 0, description = "Optional last line to search; 0 means the whole file" }
+                            path = new { type = "string", description = "Workspace-relative path." },
+                            search = new { type = "string" },
+                            replacement = new { type = "string" },
+                            useRegex = new { type = "boolean", @default = false },
+                            matchCase = new { type = "boolean", @default = true },
+                            wholeWord = new { type = "boolean", @default = false },
+                            maxReplacements = new { type = "integer", minimum = 0, @default = 0, description = "0 replaces all matches." },
+                            startLine = new { type = "integer", minimum = 0, description = "1-based. 0 leaves the start unset." },
+                            endLine = new { type = "integer", minimum = 0, description = "Inclusive. 0 leaves the end unset." }
                         },
                         required = new[] { "path", "search", "replacement" }
                     }
@@ -279,18 +274,18 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "replace_range",
-                    Description = "Replace a range of lines in a file.",
+                    Description = "Replace an inclusive line range using original boundary text.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the file" },
-                            startLine = new { type = "integer", description = "Start line number to replace" },
-                            endLine = new { type = "integer", description = "End line number to replace" },
-                            newText = new { type = "string", description = "New text to insert" },
-                            expectedStartLine = new { type = "string", description = "Required boundary text at the start of the original range. Provide at least one line; include newline characters when the boundary spans multiple lines." },
-                            expectedEndLine = new { type = "string", description = "Required boundary text at the end of the original range. Provide at least one line; include newline characters when the boundary spans multiple lines." }
+                            path = new { type = "string", description = "Workspace-relative path." },
+                            startLine = new { type = "integer", description = "1-based." },
+                            endLine = new { type = "integer" },
+                            newText = new { type = "string" },
+                            expectedStartLine = new { type = "string", description = "One or more original lines at the start, joined with \\n." },
+                            expectedEndLine = new { type = "string", description = "One or more original lines at the end, joined with \\n." }
                         },
                         required = new[] { "path", "startLine", "endLine", "newText", "expectedStartLine", "expectedEndLine" }
                     }
@@ -298,14 +293,14 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "apply_patch",
-                    Description = "Apply a unified diff patch to one file, or a multi-file patch containing *** Update File: relative/path sections. For a multi-file patch, path may be omitted. Every hunk must include an explicit line range in the form @@ -oldStart,oldCount +newStart,newCount @@; bare @@ hunks are not allowed.",
+                    Description = "Apply a unified diff to existing files.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the file for a single-file patch; omit it when patch contains *** Update File: sections" },
-                            patch = new { type = "string", description = "Unified diff patch content. Every hunk must include an explicit line range such as @@ -10,2 +10,2 @@; do not use bare @@. Multi-file format: *** Begin Patch, one or more *** Update File: relative/path sections, then *** End Patch. The patch must end exactly at *** End Patch with no characters or text after the marker." }
+                            path = new { type = "string", description = "Workspace-relative path for one file. Omit for multi-file patches." },
+                            patch = new { type = "string", description = "Each hunk needs @@ -oldStart,oldCount +newStart,newCount @@. For multiple files, wrap *** Update File: relative/path sections between *** Begin Patch and *** End Patch. End at the closing marker." }
                         },
                         required = new[] { "patch" }
                     }
@@ -313,16 +308,16 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "insert_to_file",
-                    Description = "Insert text relative to unique context lines.",
+                    Description = "Insert text between two anchors.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the file" },
-                            content = new { type = "string", description = "Content to insert" },
-                            insert_after = new { type = "string", description = "2+ unique context lines to insert after" },
-                            insert_before = new { type = "string", description = "2+ unique context lines to insert before" }
+                            path = new { type = "string", description = "Workspace-relative path." },
+                            content = new { type = "string" },
+                            insert_after = new { type = "string", description = "2+ unique lines before the insertion." },
+                            insert_before = new { type = "string", description = "2+ unique lines after the insertion." }
                         },
                         required = new[] { "path", "content", "insert_after", "insert_before" }
                     }
@@ -330,13 +325,13 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "insert_text",
-                    Description = "Insert text at the current cursor position in the active editor tab.",
+                    Description = "Insert text at the active tab's cursor.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            content = new { type = "string", description = "The text to insert" }
+                            content = new { type = "string" }
                         },
                         required = new[] { "content" }
                     }
@@ -344,14 +339,14 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "create_tab",
-                    Description = "Create a new editor tab with content.",
+                    Description = "Create an unsaved editor tab.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            title = new { type = "string", description = "Title of the tab" },
-                            content = new { type = "string", description = "Content of the tab" }
+                            title = new { type = "string" },
+                            content = new { type = "string" }
                         },
                         required = new[] { "title", "content" }
                     }
@@ -359,14 +354,14 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "edit_tab",
-                    Description = "Modify the content of an editor tab.",
+                    Description = "Replace an editor tab's contents.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
                             title = new { type = "string", description = "Tab title or ID" },
-                            content = new { type = "string", description = "New content of the tab" }
+                            content = new { type = "string" }
                         },
                         required = new[] { "title", "content" }
                     }
@@ -380,8 +375,8 @@ namespace TxtAIEditor.Controls
                         type = "object",
                         properties = new
                         {
-                            title = new { type = "string", description = "Optional tab title/ID" },
-                            path = new { type = "string", description = "Optional workspace path to save to" }
+                            title = new { type = "string", description = "Tab title or ID. Defaults to the active tab." },
+                            path = new { type = "string", description = "Workspace destination. Required for unsaved tabs." }
                         }
                     }
                 },
@@ -394,7 +389,7 @@ namespace TxtAIEditor.Controls
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Relative path to the file" }
+                            path = new { type = "string", description = "Workspace-relative path." }
                         },
                         required = new[] { "path" }
                     }
@@ -402,14 +397,14 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "web_search_exa",
-                    Description = "Search the web using Exa/DuckDuckGo.",
+                    Description = "Search the web.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            query = new { type = "string", description = "Search query" },
-                            numResults = new { type = "integer", description = "Number of results to return (default: 5)" }
+                            query = new { type = "string" },
+                            numResults = new { type = "integer", description = "Default 5." }
                         },
                         required = new[] { "query" }
                     }
@@ -417,13 +412,13 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "web_fetch",
-                    Description = "Fetch the content of web pages.",
+                    Description = "Fetch web pages by URL.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            urls = new { type = "array", items = new { type = "string" }, description = "List of URLs to fetch" }
+                            urls = new { type = "array", items = new { type = "string" } }
                         },
                         required = new[] { "urls" }
                     }
@@ -433,13 +428,13 @@ namespace TxtAIEditor.Controls
             tools.Add(new LlmTool
             {
                 Name = "skill_use",
-                Description = "Read the full SKILL.md for an enabled skill by name or path. The result includes the SKILL.md path and Skill directory; relative scripts/assets in the skill are rooted there.",
+                Description = "Read an enabled skill's SKILL.md and return its resource directory.",
                 Parameters = new
                 {
                     type = "object",
                     properties = new
                     {
-                        name = new { type = "string", description = "Name of the skill, e.g., skill-name" }
+                        name = new { type = "string", description = "Skill name or SKILL.md path." }
                     },
                     required = new[] { "name" }
                 }
@@ -450,14 +445,14 @@ namespace TxtAIEditor.Controls
                 tools.Add(new LlmTool
                 {
                     Name = "make_plan",
-                    Description = "Save a new implementation plan (Markdown) or re-submit an existing plan file for approval. Use only in planning mode.",
+                    Description = "Submit a plan for approval.",
                     Parameters = new
                     {
                         type = "object",
                         properties = new
                         {
-                            markdown = new { type = "string", description = "Markdown plan content for a new plan. When path is provided, it replaces the plan section of that file." },
-                            path = new { type = "string", description = "Existing plan file path. Use after editing the saved plan file to request approval again." }
+                            markdown = new { type = "string", description = "Plan body. Required for new plans. With path, replaces the saved plan body." },
+                            path = new { type = "string", description = "Existing plan file to resubmit." }
                         },
                         required = new string[0]
                     }
