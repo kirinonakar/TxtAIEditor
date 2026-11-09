@@ -32,7 +32,8 @@ namespace TxtAIEditor.Core.Services.LLM
             builder.AppendLine();
             builder.AppendLine("""
                 Tool calls
-                - Use native function calls when supported. For text fallback, put optional commentary first, then end with adjacent tags containing one JSON call each.
+                - Before each tool call or batch, briefly tell the user what you will do and why.
+                - Use native function calls when supported. For text fallback, end the response with adjacent tags containing one JSON call each.
                 <tool_call>{"name":"read_file","arguments":{"path":"src/file.cs","startLine":1,"lineCount":120}}</tool_call>
                 - Use exact tool names. Escape Windows backslashes as \\ in JSON or use /. Reserve literal tool_call tags for live calls. Treat log_tool_call tags as history and label any examples.
                 - A response without calls ends the turn. Never invent tool results or verification.
