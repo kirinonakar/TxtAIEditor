@@ -60,6 +60,22 @@ namespace TxtAIEditor.Core.Services
                     declarations.Add(alignmentStyle);
                 }
 
+                XElement? margins = paragraphProperties.Descendants().FirstOrDefault(e => e.Name.LocalName == "margin");
+                foreach ((string name, string cssProperty) in new[]
+                {
+                    ("prev", "--hwpx-space-before"),
+                    ("next", "--hwpx-space-after")
+                })
+                {
+                    XElement? spacing = margins?.Elements().FirstOrDefault(e => e.Name.LocalName == name);
+                    if (GetAttributeValue(spacing, "unit") == "HWPUNIT" &&
+                        int.TryParse(GetAttributeValue(spacing, "value"), NumberStyles.Integer,
+                            CultureInfo.InvariantCulture, out int value) && value > 0)
+                    {
+                        declarations.Add(cssProperty + ":" + CssNumber(value / 100.0) + "pt");
+                    }
+                }
+
                 XElement? lineSpacing = paragraphProperties.Descendants()
                     .FirstOrDefault(e => e.Name.LocalName == "lineSpacing");
                 string lineSpacingType = GetAttributeValue(lineSpacing, "type");

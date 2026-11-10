@@ -42,6 +42,9 @@ export async function prepareOfficePdf() {
             margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; zoom: 1 !important; }
         .office-pdf-document-page { display: flow-root; min-height: 1px; }
         .office-pdf-document-page + .office-pdf-document-page { break-before: page; }
+        main.page .doc-paragraph.hwpx-paragraph {
+            margin-block: var(--hwpx-space-before, 0pt) var(--hwpx-space-after, 0pt);
+        }
         .doc-table-wrap, .sheet-object-table-wrap, .sheet-objects { overflow: visible !important; }
         .deck { display: block; margin: 0; padding: 0; }
         .slide { width: ${layout.width * 96}px !important; height: ${layout.height * 96}px !important;
@@ -104,20 +107,30 @@ function fitSavedDocumentPages(page, layout) {
     appendPage();
     page.replaceChildren(pages);
 
-    // Large intervals can contain uncached breaks. Keep those readable and let them flow.
     const minScale = 0.65;
     for (const section of page.children) {
-        let scale = 1;
-        // Zoom can change wrapping after glyph advances are rounded.
-        for (let attempt = 0; attempt < 3; attempt++) {
-            const fit = Math.min(1, width / (section.scrollWidth * scale), height / (section.scrollHeight * scale));
-            if (fit === 1) break;
-            scale *= fit;
-            if (scale < minScale) {
-                section.style.removeProperty('zoom');
-                break;
-            }
+        if (section.scrollWidth <= width && section.scrollHeight <= height) continue;
+
+        // Reflow at the full printable width while scaling both glyph axes equally.
+        const fitsAtScale = scale => {
+            section.style.width = (width / scale) + 'px';
             section.style.zoom = String(scale);
+            return section.scrollWidth * scale <= width + 1 && section.scrollHeight * scale <= height;
+        };
+        if (!fitsAtScale(minScale)) {
+            // Large intervals can contain uncached breaks. Let them flow across pages.
+            section.style.width = width + 'px';
+            section.style.removeProperty('zoom');
+            continue;
         }
+
+        let lower = minScale;
+        let upper = 1;
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const scale = (lower + upper) / 2;
+            if (fitsAtScale(scale)) lower = scale;
+            else upper = scale;
+        }
+        fitsAtScale(lower);
     }
 }

@@ -379,8 +379,8 @@ namespace TxtAIEditor.Core.Services
                 ? string.Empty
                 : " style=\"" + Html(paragraphStyle) + "\"";
             return content.Length == 0
-                ? "<p class=\"doc-paragraph empty-paragraph\"" + styleAttribute + "></p>"
-                : "<p class=\"doc-paragraph\"" + styleAttribute + ">" + content + "</p>";
+                ? "<p class=\"doc-paragraph hwpx-paragraph empty-paragraph\"" + styleAttribute + "></p>"
+                : "<p class=\"doc-paragraph hwpx-paragraph\"" + styleAttribute + ">" + content + "</p>";
         }
 
         private static IReadOnlyDictionary<XText, string> GetHwpxRenderedTextValues(
