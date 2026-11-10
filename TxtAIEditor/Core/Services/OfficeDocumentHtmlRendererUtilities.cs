@@ -83,6 +83,23 @@ body { padding: 28px 16px 44px; }
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+main.page .doc-paragraph.hwpx-paragraph {
+    margin-block: var(--hwpx-space-before, 0pt) var(--hwpx-space-after, 0pt);
+}
+main.page:not(.office-pdf-export) .hwpx-paragraph {
+    font-size: var(--hwpx-paragraph-font-size, inherit);
+}
+.hwpx-positioned-cover {
+    position: relative;
+    min-height: calc(var(--hwpx-cover-height) - var(--hwpx-cover-origin, 0pt));
+}
+.hwpx-cover-block { position: absolute; inset: calc(var(--hwpx-cover-offset) - var(--hwpx-cover-origin, 0pt)) 0 auto; }
+.hwpx-inline-table-anchor { display: none; }
+.hwpx-positioned-cover .hwpx-saved-single-line:not(:has(.doc-image, .hwpx-group-shape, br)) {
+    white-space: pre;
+    line-height: var(--hwpx-saved-line-height, 1) !important;
+}
+.hwpx-cover-distributed { text-align: left !important; letter-spacing: var(--hwpx-cover-letter-spacing); }
 .empty-paragraph { min-height: 1em; }
 .doc-page-break {
     display: block;
@@ -259,6 +276,33 @@ body { padding: 28px 16px 44px; }
     };
 
     fitPageToViewport();
+    if (page.querySelector('.hwpx-positioned-cover')) {
+        window.fitHwpxCover = () => {
+            const range = document.createRange();
+            for (const paragraph of page.querySelectorAll('.hwpx-positioned-cover .hwpx-saved-single-line:not(:has(.doc-image, .hwpx-group-shape, br))')) {
+                paragraph.style.removeProperty('width');
+                paragraph.style.removeProperty('zoom');
+                paragraph.classList.remove('hwpx-cover-distributed');
+                paragraph.style.removeProperty('--hwpx-cover-letter-spacing');
+                range.selectNodeContents(paragraph);
+                const width = paragraph.getBoundingClientRect().width;
+                const textWidth = range.getBoundingClientRect().width;
+                if (width > 1 && textWidth > width) {
+                    const scale = (width - 1) / textWidth;
+                    paragraph.style.width = (paragraph.clientWidth / scale) + 'px';
+                    paragraph.style.zoom = String(scale);
+                } else if (textWidth > 0 && width > textWidth && paragraph.style.getPropertyValue('--hwpx-distribute-characters')) {
+                    const gaps = [...paragraph.textContent.trim()].length - 1;
+                    if (gaps > 0) {
+                        const spacing = (1 - textWidth / width) * paragraph.clientWidth / gaps;
+                        paragraph.style.setProperty('--hwpx-cover-letter-spacing', spacing + 'px');
+                        paragraph.classList.add('hwpx-cover-distributed');
+                    }
+                }
+            }
+        };
+        document.fonts.ready.then(window.fitHwpxCover);
+    }
     window.addEventListener('resize', () => {
         if (resizeFrame) {
             return;

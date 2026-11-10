@@ -50,7 +50,7 @@ namespace TxtAIEditor.Core.Services
                     "RIGHT" => "text-align:right",
                     "CENTER" => "text-align:center",
                     "JUSTIFY" => "text-align:justify",
-                    "DISTRIBUTE" => "text-align:center",
+                    "DISTRIBUTE" => "text-align:center;--hwpx-distribute-characters:1",
                     "DISTRIBUTE_SPACE" => "text-align:justify;text-align-last:justify",
                     "LEFT" => "text-align:left",
                     _ => string.Empty

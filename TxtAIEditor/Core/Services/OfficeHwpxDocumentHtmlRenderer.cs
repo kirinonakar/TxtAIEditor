@@ -104,8 +104,9 @@ namespace TxtAIEditor.Core.Services
             foreach (ZipArchiveEntry sectionEntry in sectionEntries)
             {
                 XDocument section = await LoadHwpxSectionXmlAsync(sectionEntry).ConfigureAwait(false);
-                if (string.IsNullOrWhiteSpace(pageWidth) &&
-                    TryReadHwpxPageLayout(section, out string sectionPageWidth, out string sectionPagePadding, out string? sectionPageHeight))
+                bool hasPageLayout = TryReadHwpxPageLayout(section, out string sectionPageWidth,
+                    out string sectionPagePadding, out string? sectionPageHeight, out string? printLayout);
+                if (string.IsNullOrWhiteSpace(pageWidth) && hasPageLayout)
                 {
                     pageWidth = sectionPageWidth;
                     pagePadding = sectionPagePadding;
@@ -117,8 +118,26 @@ namespace TxtAIEditor.Core.Services
                     element.Name.LocalName == "colPr" && ReadHwpxDoubleAttribute(element, "colCount") > 1);
                 double? previousVerticalPosition = null;
                 int sectionStart = content.Length;
-                foreach (XElement block in section.Root?.Elements() ?? Enumerable.Empty<XElement>())
+                XElement[] blocks = section.Root?.Elements().ToArray() ?? Array.Empty<XElement>();
+                if (printLayout != null)
                 {
+                    content.Append("<div class=\"hwpx-section\" data-hwpx-print-layout=\"")
+                        .Append(printLayout).Append("\">");
+                }
+                int sectionContentStart = content.Length;
+                double coverHeight = 0;
+                double[]? coverOffsets = sectionStart == 0 && sectionEntries.Count > 1 && singleColumn
+                    ? ReadHwpxCoverOffsets(blocks, pageBreakBeforeStyles, out coverHeight)
+                    : null;
+                if (coverOffsets != null)
+                {
+                    content.Append("<div class=\"hwpx-positioned-cover\" style=\"--hwpx-cover-height:")
+                        .Append(HwpxPoints(coverHeight)).Append("\">");
+                }
+
+                for (int index = 0; index < blocks.Length; index++)
+                {
+                    XElement block = blocks[index];
                     Queue<int>? pageBreaks = null;
                     if (block.Name.LocalName == "p")
                     {
@@ -127,18 +146,40 @@ namespace TxtAIEditor.Core.Services
                         if (pageBreaks.TryPeek(out int offset) && offset == 0)
                         {
                             pageBreaks.Dequeue();
-                            if (content.Length > sectionStart)
+                            if (content.Length > sectionContentStart)
                             {
                                 content.Append(PageBreakHtml);
                             }
                         }
                     }
 
+                    if (coverOffsets != null)
+                    {
+                        content.Append("<div class=\"hwpx-cover-block\" style=\"--hwpx-cover-offset:")
+                            .Append(HwpxPoints(coverOffsets[index])).Append("\">");
+                    }
                     AppendHwpxBlockHtml(content, archive, binaryItems, characterStyles, paragraphStyles, borderFillStyles,
                         block, pageBreaks);
+                    if (coverOffsets != null)
+                    {
+                        content.Append("</div>");
+                    }
+                }
+                if (coverOffsets != null)
+                {
+                    content.Append("</div>");
                 }
 
-                if (sectionStart > 0 && content.Length > sectionStart)
+                if (content.Length == sectionContentStart)
+                {
+                    content.Length = sectionStart;
+                    continue;
+                }
+                if (printLayout != null)
+                {
+                    content.Append("</div>");
+                }
+                if (sectionStart > 0)
                 {
                     content.Insert(sectionStart, PageBreakHtml);
                 }
@@ -153,6 +194,53 @@ namespace TxtAIEditor.Core.Services
                 pageWidth, pagePadding, pageHeight, hasSavedPagination);
         }
 
+        private static double[]? ReadHwpxCoverOffsets(
+            XElement[] blocks, IReadOnlySet<string> pageBreakBeforeStyles, out double height)
+        {
+            // A standalone cover with complete one-line anchors can be positioned
+            // without inferring the layout of reflowed body paragraphs.
+            height = 0;
+            XElement? firstParagraph = blocks.FirstOrDefault();
+            if (firstParagraph == null || !blocks.SelectMany(block => block.Descendants()).Any(element =>
+                element.Name.LocalName == "pageHiding" && GetAttributeValue(element, "hidePageNum") is "1" or "true"))
+            {
+                return null;
+            }
+
+            XElement? page = firstParagraph.Descendants().FirstOrDefault(element => element.Name.LocalName == "pagePr");
+            XElement? margin = page?.Elements().FirstOrDefault(element => element.Name.LocalName == "margin");
+            double header = ReadHwpxDoubleAttribute(margin, "header");
+            double availableHeight = ReadHwpxDoubleAttribute(page, "height") -
+                ReadHwpxDoubleAttribute(margin, "top") - ReadHwpxDoubleAttribute(margin, "bottom");
+            var offsets = new double[blocks.Length];
+            for (int i = 0; i < blocks.Length; i++)
+            {
+                XElement paragraph = blocks[i];
+                XElement? line = GetHwpxSingleSavedLine(paragraph);
+                if (paragraph.Name.LocalName != "p" ||
+                    GetAttributeValue(paragraph, "pageBreak") is "1" or "true" ||
+                    pageBreakBeforeStyles.Contains(GetAttributeValue(paragraph, "paraPrIDRef")) ||
+                    !double.TryParse(GetAttributeValue(line, "vertpos"), NumberStyles.Integer,
+                        CultureInfo.InvariantCulture, out double position) ||
+                    position < 0 || (i > 0 && position + header <= offsets[i - 1]))
+                {
+                    return null;
+                }
+
+                offsets[i] = position + header;
+                height = Math.Max(height, offsets[i] + ReadHwpxDoubleAttribute(line, "vertsize"));
+            }
+
+            return height > 0 && height <= availableHeight ? offsets : null;
+        }
+
+        private static XElement? GetHwpxSingleSavedLine(XElement paragraph)
+        {
+            XElement? array = paragraph.Elements().FirstOrDefault(element => element.Name.LocalName == "linesegarray");
+            XElement? first = array?.Elements().FirstOrDefault();
+            return first != null && !first.ElementsAfterSelf().Any() ? first : null;
+        }
+
         private static Queue<int> ReadHwpxPageBreaks(
             XElement paragraph, IReadOnlySet<string> pageBreakBeforeStyles, bool singleColumn,
             ref double? previousVerticalPosition, ref bool hasSavedPagination)
@@ -164,6 +252,15 @@ namespace TxtAIEditor.Core.Services
                 breaks.Enqueue(0);
             }
 
+            int explicitBreakCount = breaks.Count;
+            AppendHwpxSavedPageBreaks(paragraph, singleColumn, ref previousVerticalPosition, breaks);
+            hasSavedPagination |= breaks.Count > explicitBreakCount;
+            return breaks;
+        }
+
+        private static void AppendHwpxSavedPageBreaks(
+            XElement paragraph, bool useVerticalReset, ref double? previousVerticalPosition, Queue<int> breaks)
+        {
             XElement? lineArray = paragraph.Elements().FirstOrDefault(element => element.Name.LocalName == "linesegarray");
             foreach (XElement line in lineArray?.Elements() ?? Enumerable.Empty<XElement>())
             {
@@ -176,18 +273,15 @@ namespace TxtAIEditor.Core.Services
                 bool firstLineOfPage = uint.TryParse(GetAttributeValue(line, "flags"), NumberStyles.Integer,
                     CultureInfo.InvariantCulture, out uint flags) && (flags & 1) != 0;
                 if (previousVerticalPosition.HasValue &&
-                    (firstLineOfPage || (singleColumn && verticalPosition < previousVerticalPosition.Value)) &&
+                    (firstLineOfPage || (useVerticalReset && verticalPosition < previousVerticalPosition.Value)) &&
                     int.TryParse(GetAttributeValue(line, "textpos"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int offset) &&
                     offset >= 0 && (breaks.Count == 0 || offset > breaks.Last()))
                 {
                     breaks.Enqueue(offset);
-                    hasSavedPagination = true;
                 }
 
                 previousVerticalPosition = verticalPosition;
             }
-
-            return breaks;
         }
 
         private static async Task<XDocument> LoadHwpxSectionXmlAsync(ZipArchiveEntry entry)
@@ -204,10 +298,19 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyDictionary<string, string> characterStyles,
             IReadOnlyDictionary<string, string> paragraphStyles,
             IReadOnlyDictionary<string, string> borderFillStyles,
-            IEnumerable<XElement> elements)
+            IEnumerable<XElement> elements,
+            IReadOnlyDictionary<XElement, Queue<int>>? paragraphPageBreaks = null)
         {
             foreach (XElement element in elements)
             {
+                Queue<int>? pageBreaks = null;
+                if (paragraphPageBreaks != null && paragraphPageBreaks.TryGetValue(element, out pageBreaks) &&
+                    pageBreaks.TryPeek(out int offset) && offset == 0)
+                {
+                    pageBreaks.Dequeue();
+                    builder.Append(PageBreakHtml);
+                }
+
                 AppendHwpxBlockHtml(
                     builder,
                     archive,
@@ -215,7 +318,8 @@ namespace TxtAIEditor.Core.Services
                     characterStyles,
                     paragraphStyles,
                     borderFillStyles,
-                    element);
+                    element,
+                    pageBreaks);
             }
         }
 
@@ -375,12 +479,50 @@ namespace TxtAIEditor.Core.Services
             }
 
             string paragraphStyle = GetHwpxParagraphStyle(paragraph, paragraphStyles);
+            // The browser's paragraph strut must use the document's font size too.
+            // A smaller styled run alone cannot reduce the height of its line box.
+            XElement? firstRun = paragraph.Elements().FirstOrDefault(element => element.Name.LocalName == "run");
+            if (characterStyles.TryGetValue(GetAttributeValue(firstRun, "charPrIDRef"), out string? runStyle))
+            {
+                string? fontSize = runStyle.Split(';').FirstOrDefault(declaration =>
+                    declaration.StartsWith("font-size:", StringComparison.Ordinal));
+                if (fontSize != null)
+                {
+                    paragraphStyle += ";--hwpx-paragraph-" + fontSize;
+                }
+            }
+            XElement? savedLine = GetHwpxSingleSavedLine(paragraph);
+            double lineHeight = ReadHwpxDoubleAttribute(savedLine, "vertsize");
+            double lineAdvance = lineHeight + ReadHwpxDoubleAttribute(savedLine, "spacing");
+            if (lineHeight > 0 && paragraph.Parent?.Name.LocalName == "subList")
+            {
+                double height = paragraph.ElementsAfterSelf().Any(element => element.Name.LocalName == "p") && lineAdvance > 0
+                    ? lineAdvance
+                    : lineHeight;
+                paragraphStyle += ";--hwpx-saved-line-height:" + HwpxPoints(height);
+            }
             string styleAttribute = string.IsNullOrWhiteSpace(paragraphStyle)
                 ? string.Empty
                 : " style=\"" + Html(paragraphStyle) + "\"";
-            return content.Length == 0
-                ? "<p class=\"doc-paragraph hwpx-paragraph empty-paragraph\"" + styleAttribute + "></p>"
-                : "<p class=\"doc-paragraph hwpx-paragraph\"" + styleAttribute + ">" + content + "</p>";
+            string classes = "doc-paragraph hwpx-paragraph";
+            if (savedLine != null)
+            {
+                classes += " hwpx-saved-single-line";
+            }
+            if (lineHeight > 0 && lineAdvance <= 0 && paragraph.Parent?.Parent == null)
+            {
+                classes += " hwpx-zero-advance";
+            }
+            if (content.Length == 0)
+            {
+                classes += " empty-paragraph";
+                if (paragraph.Descendants().Any(element => element.Name.LocalName == "tbl" &&
+                    GetAttributeValue(element.Elements().FirstOrDefault(child => child.Name.LocalName == "pos"), "treatAsChar") == "1"))
+                {
+                    classes += " hwpx-inline-table-anchor";
+                }
+            }
+            return "<p class=\"" + classes + "\"" + styleAttribute + ">" + content + "</p>";
         }
 
         private static IReadOnlyDictionary<XText, string> GetHwpxRenderedTextValues(
@@ -649,6 +791,7 @@ namespace TxtAIEditor.Core.Services
                 rows = table.Descendants().Where(e => e.Name.LocalName == "tr").ToList();
             }
 
+            var paragraphPageBreaks = ReadHwpxSingleCellPageBreaks(table, rows);
             var builder = new StringBuilder();
             bool hasColumnGrid = TryBuildHwpxTableTracks(
                 table,
@@ -668,7 +811,12 @@ namespace TxtAIEditor.Core.Services
             string tableStyle = BuildHwpxTableStyle(table, containingParagraph, paragraphStyles);
             builder.Append("<div class=\"doc-table-wrap hwpx-table-wrap\"");
             AppendStyleAttribute(builder, wrapperStyle);
-            builder.Append("><table class=\"doc-table hwpx-table\"");
+            builder.Append("><table class=\"doc-table hwpx-table");
+            if (paragraphPageBreaks != null)
+            {
+                builder.Append(" hwpx-split-table");
+            }
+            builder.Append('"');
             AppendStyleAttribute(builder, tableStyle);
             builder.Append('>');
             if (hasColumnGrid)
@@ -708,7 +856,12 @@ namespace TxtAIEditor.Core.Services
                 {
                     string colspan = ReadPositiveIntegerAttribute(cell, "colSpan");
                     string rowspan = ReadPositiveIntegerAttribute(cell, "rowSpan");
+                    XElement? subList = cell.Elements().FirstOrDefault(e => e.Name.LocalName == "subList");
                     builder.Append("<td");
+                    if (GetAttributeValue(subList, "lineWrap") == "SQUEEZE")
+                    {
+                        builder.Append(" class=\"hwpx-squeeze-cell\"");
+                    }
                     if (!string.IsNullOrWhiteSpace(colspan))
                     {
                         builder.Append(" colspan=\"").Append(Html(colspan)).Append('"');
@@ -750,7 +903,6 @@ namespace TxtAIEditor.Core.Services
                         cellStyles.Add(cellPadding);
                     }
 
-                    XElement? subList = cell.Elements().FirstOrDefault(e => e.Name.LocalName == "subList");
                     string verticalAlignment = GetAttributeValue(subList, "vertAlign").ToUpperInvariant();
                     cellStyles.Add("vertical-align:" + (verticalAlignment switch
                     {
@@ -776,7 +928,9 @@ namespace TxtAIEditor.Core.Services
                                     paragraphStyles,
                                     borderFillStyles,
                                     subList.Elements().Where(element =>
-                                        !IsHwpxFloatingObjectSpacerParagraph(element)));
+                                        paragraphPageBreaks?.ContainsKey(element) == true ||
+                                        !IsHwpxFloatingObjectSpacerParagraph(element)),
+                                    paragraphPageBreaks);
                             }
                             else
                             {
@@ -800,7 +954,8 @@ namespace TxtAIEditor.Core.Services
                             characterStyles,
                             paragraphStyles,
                             borderFillStyles,
-                            cell.Elements());
+                            paragraphPageBreaks != null && subList != null ? subList.Elements() : cell.Elements(),
+                            paragraphPageBreaks);
                     }
 
                     if (builder.Length == before)
@@ -816,6 +971,48 @@ namespace TxtAIEditor.Core.Services
 
             builder.Append("</tbody></table></div>");
             return builder.ToString();
+        }
+
+        private static IReadOnlyDictionary<XElement, Queue<int>>? ReadHwpxSingleCellPageBreaks(
+            XElement table, IReadOnlyList<XElement> rows)
+        {
+            if (rows.Count != 1 || GetAttributeValue(table, "pageBreak") != "CELL" ||
+                table.Ancestors().Any(element => element.Name.LocalName is "tbl" or "container"))
+            {
+                return null;
+            }
+
+            XElement[] cells = rows[0].Elements().Where(element => element.Name.LocalName == "tc").Take(2).ToArray();
+            if (cells.Length != 1)
+            {
+                return null;
+            }
+
+            XElement? subList = cells[0].Elements().FirstOrDefault(element => element.Name.LocalName == "subList");
+            if (subList == null)
+            {
+                return null;
+            }
+
+            // A split cell can report its full height while the table reports one fragment's height.
+            // Use that evidence before treating a drop in the cell's saved position as a page break.
+            bool useVerticalReset = TryReadHwpxDimensions(table, "sz", out _, out double tableHeight) &&
+                TryReadHwpxDimensions(cells[0], "cellSz", out _, out double cellHeight) &&
+                cellHeight > tableHeight;
+            Dictionary<XElement, Queue<int>>? paragraphPageBreaks = null;
+            double? previousVerticalPosition = null;
+            foreach (XElement paragraph in subList.Elements().Where(element => element.Name.LocalName == "p"))
+            {
+                var breaks = new Queue<int>();
+                AppendHwpxSavedPageBreaks(paragraph, useVerticalReset, ref previousVerticalPosition, breaks);
+                if (breaks.Count > 0)
+                {
+                    paragraphPageBreaks ??= new Dictionary<XElement, Queue<int>>();
+                    paragraphPageBreaks.Add(paragraph, breaks);
+                }
+            }
+
+            return paragraphPageBreaks;
         }
 
         private static bool HasHwpxFloatingContainer(XElement subList)
@@ -1735,11 +1932,13 @@ namespace TxtAIEditor.Core.Services
             XDocument section,
             out string pageWidth,
             out string pagePadding,
-            out string? pageHeight)
+            out string? pageHeight,
+            out string? printLayout)
         {
             pageWidth = string.Empty;
             pagePadding = string.Empty;
             pageHeight = null;
+            printLayout = null;
 
             XElement? pageProperties = section.Descendants()
                 .FirstOrDefault(element => element.Name.LocalName == "pagePr");
@@ -1749,8 +1948,12 @@ namespace TxtAIEditor.Core.Services
                 return false;
             }
 
-            pageWidth = HwpxPoints(width);
             double height = ReadHwpxDoubleAttribute(pageProperties, "height");
+            if (height > width && GetAttributeValue(pageProperties, "landscape") == "NARROWLY")
+            {
+                (width, height) = (height, width);
+            }
+            pageWidth = HwpxPoints(width);
             if (height > 0)
             {
                 pageHeight = HwpxPoints(height);
@@ -1759,12 +1962,20 @@ namespace TxtAIEditor.Core.Services
                 .FirstOrDefault(element => element.Name.LocalName == "margin");
             if (margin != null)
             {
+                double top = ReadHwpxDoubleAttribute(margin, "top");
+                double right = ReadHwpxDoubleAttribute(margin, "right");
+                double bottom = ReadHwpxDoubleAttribute(margin, "bottom");
+                double left = ReadHwpxDoubleAttribute(margin, "left");
+                double header = ReadHwpxDoubleAttribute(margin, "header");
+                double footer = ReadHwpxDoubleAttribute(margin, "footer");
                 pagePadding = string.Join(
                     ' ',
-                    HwpxPoints(ReadHwpxDoubleAttribute(margin, "top")),
-                    HwpxPoints(ReadHwpxDoubleAttribute(margin, "right")),
-                    HwpxPoints(ReadHwpxDoubleAttribute(margin, "bottom")),
-                    HwpxPoints(ReadHwpxDoubleAttribute(margin, "left")));
+                    HwpxPoints(top), HwpxPoints(right), HwpxPoints(bottom), HwpxPoints(left));
+                if (pageHeight != null)
+                {
+                    printLayout = string.Join(' ', pageWidth, pageHeight, HwpxPoints(top + header),
+                        HwpxPoints(right), HwpxPoints(bottom + footer), HwpxPoints(left), HwpxPoints(header));
+                }
             }
 
             return true;

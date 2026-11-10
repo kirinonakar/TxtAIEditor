@@ -1,4 +1,8 @@
 // Runs in the isolated export WebView, never in the visible Office viewer.
+const hwpxSingleLineSelector = '.hwpx-saved-single-line:not(:has(.doc-image, .hwpx-group-shape, br))';
+const hwpxCellLineSelector = `.hwpx-squeeze-cell > ${hwpxSingleLineSelector},
+    .hwpx-landscape .hwpx-table td > ${hwpxSingleLineSelector}`;
+
 export async function prepareOfficePdf() {
     const page = document.querySelector('main.page');
     const slide = document.querySelector('.slide');
@@ -6,6 +10,7 @@ export async function prepareOfficePdf() {
     if (!page && !slide && !workbook) {
         throw new Error(document.querySelector('.message')?.textContent || 'Could not render the Office document.');
     }
+    page?.classList.add('office-pdf-export');
     const layout = { width: 210 / 25.4, height: 297 / 25.4, top: .5, right: .5, bottom: .5, left: .5 };
     if (page) {
         const style = getComputedStyle(page);
@@ -42,8 +47,22 @@ export async function prepareOfficePdf() {
             margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; zoom: 1 !important; }
         .office-pdf-document-page { display: flow-root; min-height: 1px; }
         .office-pdf-document-page + .office-pdf-document-page { break-before: page; }
-        main.page .doc-paragraph.hwpx-paragraph {
-            margin-block: var(--hwpx-space-before, 0pt) var(--hwpx-space-after, 0pt);
+        .hwpx-section { display: contents; }
+        .hwpx-split-table, .hwpx-split-table > tbody > tr, .hwpx-split-table > tbody > tr > td {
+            height: auto !important;
+        }
+        ${hwpxCellLineSelector} {
+            white-space: pre;
+            line-height: var(--hwpx-saved-line-height, 1) !important;
+        }
+        .hwpx-squeeze-cell > .empty-paragraph, .hwpx-landscape .hwpx-table td > .empty-paragraph {
+            min-height: var(--hwpx-saved-line-height, 1em);
+        }
+        .hwpx-landscape .hwpx-zero-advance {
+            height: 0;
+            min-height: 0;
+            line-height: 1 !important;
+            margin-block: 0 !important;
         }
         .doc-table-wrap, .sheet-object-table-wrap, .sheet-objects { overflow: visible !important; }
         .deck { display: block; margin: 0; padding: 0; }
@@ -72,28 +91,85 @@ export async function prepareOfficePdf() {
         .forEach(element => element.classList.remove('selected-cell', 'active-cell', 'selected-column-heading', 'selected-row-heading'));
     document.querySelectorAll('.slide').forEach(element => window.fitSlide?.(element));
     await document.fonts.ready;
-    if (page?.hasAttribute('data-saved-pagination')) {
-        fitSavedDocumentPages(page, layout);
+    if (page) {
+        const namedPages = readHwpxPrintLayouts(page);
+        const hasSavedPagination = page.hasAttribute('data-saved-pagination') ||
+            !!page.querySelector('.hwpx-split-table .doc-page-break');
+        if (hasSavedPagination || namedPages.size) {
+            fitSavedDocumentPages(page, layout, namedPages, hasSavedPagination);
+        } else {
+            const cover = page.querySelector('.hwpx-positioned-cover');
+            if (cover) {
+                cover.style.width = getPrintableArea(layout).width + 'px';
+                window.fitHwpxCover?.();
+            }
+            fitHwpxLines(page, hwpxCellLineSelector);
+        }
+        layout.preferCssPageSize = namedPages.size > 0;
     }
     return layout;
 }
 
-function fitSavedDocumentPages(page, layout) {
-    const separators = page.querySelectorAll('.doc-page-break');
-    if (!separators.length) return;
+function readHwpxPrintLayouts(page) {
+    const layouts = new Map();
+    for (const section of page.querySelectorAll('.hwpx-section')) {
+        const key = section.dataset.hwpxPrintLayout;
+        if (!key || layouts.has(key)) continue;
+        const [width, height, top, right, bottom, left, header] = key.split(' ').map(Number.parseFloat);
+        if ([width, height, top, right, bottom, left, header].some(value => !Number.isFinite(value) || value < 0) ||
+            width <= left + right || height <= top + bottom) continue;
+        const name = 'hwpx' + layouts.size;
+        layouts.set(key, {
+            name, header,
+            rule: `@page ${name} { size: ${width}pt ${height}pt; margin: ${top}pt ${right}pt ${bottom}pt ${left}pt; }`,
+            layout: { width: width / 72, height: height / 72, top: top / 72,
+                right: right / 72, bottom: bottom / 72, left: left / 72 }
+        });
+    }
+    if (layouts.size === 1) {
+        const [{ layout }] = layouts.values();
+        if (layout.width <= layout.height) layouts.clear();
+    }
+    return layouts;
+}
 
-    // Reserve a pixel for the rounding of the printable area.
-    const width = Math.floor((layout.width - layout.left - layout.right) * 96) - 1;
-    const height = Math.floor((layout.height - layout.top - layout.bottom) * 96) - 1;
-    if (width <= 0 || height <= 0) return;
+function getPrintableArea(layout) {
+    // WebView2 rounds paper and margins separately when paginating. Allow a
+    // few layout pixels in height so a table edge cannot spill onto a blank page.
+    return {
+        width: Math.floor((layout.width - layout.left - layout.right) * 96) - 1,
+        height: Math.floor((layout.height - layout.top - layout.bottom) * 96) - 8
+    };
+}
+
+function fitSavedDocumentPages(page, layout, namedPages, hasSavedPagination) {
+    const separators = page.querySelectorAll('.doc-page-break');
+    if (!separators.length && !namedPages.size) return;
+    if (namedPages.size) {
+        const pageRules = document.createElement('style');
+        pageRules.textContent = [...namedPages.values()].map(entry => entry.rule).join('\n');
+        document.head.appendChild(pageRules);
+    }
 
     const pages = document.createDocumentFragment();
+    const printableAreas = new Map();
     const range = document.createRange();
     const appendPage = () => {
         const section = document.createElement('section');
         section.className = 'office-pdf-document-page';
-        section.style.width = width + 'px';
         section.append(range.extractContents());
+        const source = section.querySelector('.hwpx-section');
+        const named = namedPages.get(source?.dataset.hwpxPrintLayout);
+        const area = getPrintableArea(named?.layout || layout);
+        if (named) {
+            section.style.setProperty('page', named.name);
+            section.style.setProperty('--hwpx-cover-origin', named.header + 'pt');
+            if (named.layout.width > named.layout.height) section.classList.add('hwpx-landscape');
+        }
+        if (area.width > 0 && area.height > 0) {
+            section.style.width = area.width + 'px';
+            printableAreas.set(section, area);
+        }
         pages.append(section);
     };
     for (const separator of separators) {
@@ -106,17 +182,20 @@ function fitSavedDocumentPages(page, layout) {
     range.selectNodeContents(page);
     appendPage();
     page.replaceChildren(pages);
+    window.fitHwpxCover?.();
+    fitHwpxLines(page, hwpxCellLineSelector);
+    if (!hasSavedPagination) return;
 
     const minScale = 0.65;
-    for (const section of page.children) {
-        if (section.scrollWidth <= width && section.scrollHeight <= height) continue;
-
+    for (const [section, { width, height }] of printableAreas) {
         // Reflow at the full printable width while scaling both glyph axes equally.
         const fitsAtScale = scale => {
             section.style.width = (width / scale) + 'px';
-            section.style.zoom = String(scale);
-            return section.scrollWidth * scale <= width + 1 && section.scrollHeight * scale <= height;
+            section.style.zoom = scale === 1 ? '' : String(scale);
+            const contentHeight = Math.max(section.scrollHeight * scale, section.getBoundingClientRect().height);
+            return section.scrollWidth * scale <= width + 1 && contentHeight <= height;
         };
+        if (fitsAtScale(1)) continue;
         if (!fitsAtScale(minScale)) {
             // Large intervals can contain uncached breaks. Let them flow across pages.
             section.style.width = width + 'px';
@@ -132,5 +211,19 @@ function fitSavedDocumentPages(page, layout) {
             else upper = scale;
         }
         fitsAtScale(lower);
+    }
+}
+
+function fitHwpxLines(root, selector) {
+    const range = document.createRange();
+    for (const paragraph of root.querySelectorAll(selector)) {
+        range.selectNodeContents(paragraph);
+        const width = paragraph.getBoundingClientRect().width;
+        const textWidth = range.getBoundingClientRect().width;
+        if (width > 1 && textWidth > width) {
+            const scale = (width - 1) / textWidth;
+            paragraph.style.width = (paragraph.clientWidth / scale) + 'px';
+            paragraph.style.zoom = String(scale);
+        }
     }
 }

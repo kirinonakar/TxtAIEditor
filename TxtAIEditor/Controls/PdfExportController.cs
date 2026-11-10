@@ -141,8 +141,16 @@ namespace TxtAIEditor.Controls
                     printSettings.MarginBottom = layout.GetProperty("bottom").GetDouble();
                     printSettings.MarginLeft = layout.GetProperty("left").GetDouble();
                 }
-                if (!await core.PrintToPdfAsync(temporaryPath, printSettings))
+                if (officeLayout is JsonElement officePrintLayout &&
+                    officePrintLayout.TryGetProperty("preferCssPageSize", out var preferCssPageSize) &&
+                    preferCssPageSize.ValueKind == JsonValueKind.True)
+                {
+                    await PrintWithCssPageSizesAsync(core, temporaryPath, printSettings);
+                }
+                else if (!await core.PrintToPdfAsync(temporaryPath, printSettings))
+                {
                     throw new InvalidOperationException("WebView2 PDF export failed.");
+                }
 
                 // Complete generation before replacing an existing destination.
                 File.Move(temporaryPath, path, overwrite: true);
@@ -152,6 +160,55 @@ namespace TxtAIEditor.Controls
                 webView.Close();
                 host.Children.Remove(webView);
                 if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+            }
+        }
+
+        private static async Task PrintWithCssPageSizesAsync(
+            CoreWebView2 core, string path, CoreWebView2PrintSettings settings)
+        {
+            // WebView2's print settings describe one paper size. Request CSS
+            // page sizes explicitly so mixed-size HWPX sections retain theirs.
+            string printResult = await core.CallDevToolsProtocolMethodAsync("Page.printToPDF", JsonSerializer.Serialize(new
+            {
+                preferCSSPageSize = true,
+                transferMode = "ReturnAsStream",
+                printBackground = settings.ShouldPrintBackgrounds,
+                displayHeaderFooter = settings.ShouldPrintHeaderAndFooter,
+                paperWidth = settings.PageWidth,
+                paperHeight = settings.PageHeight,
+                marginTop = settings.MarginTop,
+                marginRight = settings.MarginRight,
+                marginBottom = settings.MarginBottom,
+                marginLeft = settings.MarginLeft
+            }));
+            using var result = JsonDocument.Parse(printResult);
+            string handle = result.RootElement.GetProperty("stream").GetString()
+                ?? throw new InvalidOperationException("WebView2 did not return a PDF stream.");
+            try
+            {
+                await using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, useAsync: true);
+                bool eof;
+                do
+                {
+                    string chunk = await core.CallDevToolsProtocolMethodAsync(
+                        "IO.read", JsonSerializer.Serialize(new { handle, size = 512 * 1024 }));
+                    using var response = JsonDocument.Parse(chunk);
+                    JsonElement part = response.RootElement;
+                    string? data = part.GetProperty("data").GetString();
+                    if (!string.IsNullOrEmpty(data))
+                    {
+                        if (!part.TryGetProperty("base64Encoded", out var encoded) || encoded.ValueKind != JsonValueKind.True)
+                        {
+                            throw new InvalidDataException("WebView2 returned an invalid PDF stream.");
+                        }
+                        await output.WriteAsync(Convert.FromBase64String(data));
+                    }
+                    eof = part.TryGetProperty("eof", out var end) && end.ValueKind == JsonValueKind.True;
+                } while (!eof);
+            }
+            finally
+            {
+                await core.CallDevToolsProtocolMethodAsync("IO.close", JsonSerializer.Serialize(new { handle }));
             }
         }
 
