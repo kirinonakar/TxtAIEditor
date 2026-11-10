@@ -111,6 +111,7 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
     overflow-x: auto;
     margin: 1em 0;
 }
+.hwpx-positioned-cover .hwpx-table-wrap { overflow: visible; }
 .doc-table {
     width: 100%;
     border-collapse: collapse;
