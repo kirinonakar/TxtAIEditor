@@ -73,7 +73,7 @@ namespace TxtAIEditor.Core.Services
             using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems = await LoadHwpxBinaryItemsAsync(archive).ConfigureAwait(false);
             IReadOnlyDictionary<string, string> characterStyles = await LoadHwpxCharacterStylesAsync(archive).ConfigureAwait(false);
-            IReadOnlyDictionary<string, string> paragraphStyles = await LoadHwpxParagraphStylesAsync(archive).ConfigureAwait(false);
+            var (paragraphStyles, pageBreakBeforeStyles) = await LoadHwpxParagraphStylesAsync(archive).ConfigureAwait(false);
             IReadOnlyDictionary<string, string> borderFillStyles = await LoadHwpxBorderFillStylesAsync(archive).ConfigureAwait(false);
             var sectionEntries = archive.Entries
                 .Where(entry => Regex.IsMatch(entry.FullName, @"^Contents/section\d+\.xml$", RegexOptions.IgnoreCase))
@@ -99,24 +99,49 @@ namespace TxtAIEditor.Core.Services
             var content = new StringBuilder();
             string? pageWidth = null;
             string? pagePadding = null;
+            string? pageHeight = null;
+            bool hasSavedPagination = false;
             foreach (ZipArchiveEntry sectionEntry in sectionEntries)
             {
                 XDocument section = await LoadHwpxSectionXmlAsync(sectionEntry).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(pageWidth) &&
-                    TryReadHwpxPageLayout(section, out string sectionPageWidth, out string sectionPagePadding))
+                    TryReadHwpxPageLayout(section, out string sectionPageWidth, out string sectionPagePadding, out string? sectionPageHeight))
                 {
                     pageWidth = sectionPageWidth;
                     pagePadding = sectionPagePadding;
+                    pageHeight = sectionPageHeight;
                 }
 
-                AppendHwpxChildrenHtml(
-                    content,
-                    archive,
-                    binaryItems,
-                    characterStyles,
-                    paragraphStyles,
-                    borderFillStyles,
-                    section.Root?.Elements() ?? Enumerable.Empty<XElement>());
+                // A drop in the saved vertical position can also mean a new column.
+                bool singleColumn = !section.Descendants().Any(element =>
+                    element.Name.LocalName == "colPr" && ReadHwpxDoubleAttribute(element, "colCount") > 1);
+                double? previousVerticalPosition = null;
+                int sectionStart = content.Length;
+                foreach (XElement block in section.Root?.Elements() ?? Enumerable.Empty<XElement>())
+                {
+                    Queue<int>? pageBreaks = null;
+                    if (block.Name.LocalName == "p")
+                    {
+                        pageBreaks = ReadHwpxPageBreaks(
+                            block, pageBreakBeforeStyles, singleColumn, ref previousVerticalPosition, ref hasSavedPagination);
+                        if (pageBreaks.TryPeek(out int offset) && offset == 0)
+                        {
+                            pageBreaks.Dequeue();
+                            if (content.Length > sectionStart)
+                            {
+                                content.Append(PageBreakHtml);
+                            }
+                        }
+                    }
+
+                    AppendHwpxBlockHtml(content, archive, binaryItems, characterStyles, paragraphStyles, borderFillStyles,
+                        block, pageBreaks);
+                }
+
+                if (sectionStart > 0 && content.Length > sectionStart)
+                {
+                    content.Insert(sectionStart, PageBreakHtml);
+                }
             }
 
             if (content.Length == 0)
@@ -124,7 +149,45 @@ namespace TxtAIEditor.Core.Services
                 return BuildErrorHtml(getString("OfficeViewerNoContent", "No content to display."));
             }
 
-            return BuildDocumentHtml(Path.GetFileName(filePath), content.ToString(), pageWidth, pagePadding);
+            return BuildDocumentHtml(Path.GetFileName(filePath), content.ToString(),
+                pageWidth, pagePadding, pageHeight, hasSavedPagination);
+        }
+
+        private static Queue<int> ReadHwpxPageBreaks(
+            XElement paragraph, IReadOnlySet<string> pageBreakBeforeStyles, bool singleColumn,
+            ref double? previousVerticalPosition, ref bool hasSavedPagination)
+        {
+            var breaks = new Queue<int>();
+            if (GetAttributeValue(paragraph, "pageBreak") is "1" or "true" ||
+                pageBreakBeforeStyles.Contains(GetAttributeValue(paragraph, "paraPrIDRef")))
+            {
+                breaks.Enqueue(0);
+            }
+
+            XElement? lineArray = paragraph.Elements().FirstOrDefault(element => element.Name.LocalName == "linesegarray");
+            foreach (XElement line in lineArray?.Elements() ?? Enumerable.Empty<XElement>())
+            {
+                if (!double.TryParse(GetAttributeValue(line, "vertpos"), NumberStyles.Integer, CultureInfo.InvariantCulture, out double verticalPosition))
+                {
+                    continue;
+                }
+
+                // Hancom files may omit the first-line-of-page flag even when the vertical position resets.
+                bool firstLineOfPage = uint.TryParse(GetAttributeValue(line, "flags"), NumberStyles.Integer,
+                    CultureInfo.InvariantCulture, out uint flags) && (flags & 1) != 0;
+                if (previousVerticalPosition.HasValue &&
+                    (firstLineOfPage || (singleColumn && verticalPosition < previousVerticalPosition.Value)) &&
+                    int.TryParse(GetAttributeValue(line, "textpos"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int offset) &&
+                    offset >= 0 && (breaks.Count == 0 || offset > breaks.Last()))
+                {
+                    breaks.Enqueue(offset);
+                    hasSavedPagination = true;
+                }
+
+                previousVerticalPosition = verticalPosition;
+            }
+
+            return breaks;
         }
 
         private static async Task<XDocument> LoadHwpxSectionXmlAsync(ZipArchiveEntry entry)
@@ -163,12 +226,13 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyDictionary<string, string> characterStyles,
             IReadOnlyDictionary<string, string> paragraphStyles,
             IReadOnlyDictionary<string, string> borderFillStyles,
-            XElement block)
+            XElement block,
+            Queue<int>? pageBreaks = null)
         {
             switch (block.Name.LocalName)
             {
                 case "p":
-                    builder.Append(BuildHwpxParagraphHtml(archive, binaryItems, characterStyles, paragraphStyles, block));
+                    builder.Append(BuildHwpxParagraphHtml(archive, binaryItems, characterStyles, paragraphStyles, block, pageBreaks));
                     foreach (XElement table in block.Descendants().Where(e =>
                         e.Name.LocalName == "tbl" &&
                         !IsInsideNestedElement(block, e, "tbl")))
@@ -211,12 +275,15 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyDictionary<string, HwpxBinaryItem> binaryItems,
             IReadOnlyDictionary<string, string> characterStyles,
             IReadOnlyDictionary<string, string> paragraphStyles,
-            XElement paragraph)
+            XElement paragraph,
+            Queue<int>? pageBreaks = null)
         {
             var content = new StringBuilder();
             var renderedImages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var renderedContainers = new HashSet<XElement>();
-            IReadOnlyDictionary<XText, string> textValues = GetHwpxRenderedTextValues(paragraph);
+            bool hasInlinePageBreaks = pageBreaks is { Count: > 0 };
+            IReadOnlyDictionary<XText, string> textValues = GetHwpxRenderedTextValues(paragraph, !hasInlinePageBreaks);
+            int textOffset = 0;
             foreach (XNode node in paragraph.DescendantNodes())
             {
                 if (IsInsideNestedElement(paragraph, node, "tbl") ||
@@ -227,10 +294,25 @@ namespace TxtAIEditor.Core.Services
 
                 if (node is XText textNode && textNode.Parent?.Name.LocalName == "t")
                 {
+                    string style = GetHwpxTextStyle(textNode, characterStyles);
                     string text = textValues.TryGetValue(textNode, out string? renderedText)
                         ? renderedText
                         : textNode.Value;
-                    AppendStyledText(content, text, GetHwpxTextStyle(textNode, characterStyles));
+                    int textEnd = textOffset + textNode.Value.Length;
+                    int start = 0;
+                    while (pageBreaks != null && pageBreaks.TryPeek(out int offset) && offset < textEnd)
+                    {
+                        int split = Math.Max(0, pageBreaks.Dequeue() - textOffset);
+                        if (split > 0 && char.IsLowSurrogate(textNode.Value[split]))
+                        {
+                            split--;
+                        }
+                        AppendStyledText(content, textNode.Value[start..split], style);
+                        content.Append(PageBreakHtml);
+                        start = split;
+                    }
+                    AppendStyledText(content, start == 0 ? text : textNode.Value[start..], style);
+                    textOffset = textEnd;
                     continue;
                 }
 
@@ -242,17 +324,21 @@ namespace TxtAIEditor.Core.Services
                 switch (element.Name.LocalName)
                 {
                     case "tab":
+                        textOffset += 8;
                         content.Append('\t');
                         break;
                     case "lineBreak":
                     case "br":
                     case "cr":
+                        textOffset++;
                         content.Append("<br>");
                         break;
                     case "nbSpace":
+                        textOffset++;
                         content.Append(' ');
                         break;
                     case "fwSpace":
+                        textOffset++;
                         string? listMarkerSpacing = GetHwpxListMarkerSpacing(element);
                         if (listMarkerSpacing == null)
                         {
@@ -297,7 +383,8 @@ namespace TxtAIEditor.Core.Services
                 : "<p class=\"doc-paragraph\"" + styleAttribute + ">" + content + "</p>";
         }
 
-        private static IReadOnlyDictionary<XText, string> GetHwpxRenderedTextValues(XElement paragraph)
+        private static IReadOnlyDictionary<XText, string> GetHwpxRenderedTextValues(
+            XElement paragraph, bool normalizeLeadingSpaces = true)
         {
             var textNodes = paragraph
                 .DescendantNodes()
@@ -339,7 +426,10 @@ namespace TxtAIEditor.Core.Services
                 }
             }
 
-            NormalizeHwpxLeadingSpaceRuns(paragraph, renderedValues);
+            if (normalizeLeadingSpaces)
+            {
+                NormalizeHwpxLeadingSpaceRuns(paragraph, renderedValues);
+            }
             return renderedValues;
         }
 
@@ -1644,10 +1734,12 @@ namespace TxtAIEditor.Core.Services
         private static bool TryReadHwpxPageLayout(
             XDocument section,
             out string pageWidth,
-            out string pagePadding)
+            out string pagePadding,
+            out string? pageHeight)
         {
             pageWidth = string.Empty;
             pagePadding = string.Empty;
+            pageHeight = null;
 
             XElement? pageProperties = section.Descendants()
                 .FirstOrDefault(element => element.Name.LocalName == "pagePr");
@@ -1658,6 +1750,11 @@ namespace TxtAIEditor.Core.Services
             }
 
             pageWidth = HwpxPoints(width);
+            double height = ReadHwpxDoubleAttribute(pageProperties, "height");
+            if (height > 0)
+            {
+                pageHeight = HwpxPoints(height);
+            }
             XElement? margin = pageProperties?.Elements()
                 .FirstOrDefault(element => element.Name.LocalName == "margin");
             if (margin != null)

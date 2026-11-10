@@ -40,6 +40,8 @@ export async function prepareOfficePdf() {
         .toolbar, #txt-office-find-panel, .slide-number { display: none !important; }
         main.page { width: 100% !important; min-width: 0 !important; min-height: 0 !important;
             margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; zoom: 1 !important; }
+        .office-pdf-document-page { display: flow-root; min-height: 1px; }
+        .office-pdf-document-page + .office-pdf-document-page { break-before: page; }
         .doc-table-wrap, .sheet-object-table-wrap, .sheet-objects { overflow: visible !important; }
         .deck { display: block; margin: 0; padding: 0; }
         .slide { width: ${layout.width * 96}px !important; height: ${layout.height * 96}px !important;
@@ -67,5 +69,55 @@ export async function prepareOfficePdf() {
         .forEach(element => element.classList.remove('selected-cell', 'active-cell', 'selected-column-heading', 'selected-row-heading'));
     document.querySelectorAll('.slide').forEach(element => window.fitSlide?.(element));
     await document.fonts.ready;
+    if (page?.hasAttribute('data-saved-pagination')) {
+        fitSavedDocumentPages(page, layout);
+    }
     return layout;
+}
+
+function fitSavedDocumentPages(page, layout) {
+    const separators = page.querySelectorAll('.doc-page-break');
+    if (!separators.length) return;
+
+    // Reserve a pixel for the rounding of the printable area.
+    const width = Math.floor((layout.width - layout.left - layout.right) * 96) - 1;
+    const height = Math.floor((layout.height - layout.top - layout.bottom) * 96) - 1;
+    if (width <= 0 || height <= 0) return;
+
+    const pages = document.createDocumentFragment();
+    const range = document.createRange();
+    const appendPage = () => {
+        const section = document.createElement('section');
+        section.className = 'office-pdf-document-page';
+        section.style.width = width + 'px';
+        section.append(range.extractContents());
+        pages.append(section);
+    };
+    for (const separator of separators) {
+        range.selectNodeContents(page);
+        const parent = separator.parentElement;
+        range.setEndBefore(parent.matches('p.doc-paragraph') && separator === parent.firstChild ? parent : separator);
+        appendPage();
+        separator.remove();
+    }
+    range.selectNodeContents(page);
+    appendPage();
+    page.replaceChildren(pages);
+
+    // Large intervals can contain uncached breaks. Keep those readable and let them flow.
+    const minScale = 0.65;
+    for (const section of page.children) {
+        let scale = 1;
+        // Zoom can change wrapping after glyph advances are rounded.
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const fit = Math.min(1, width / (section.scrollWidth * scale), height / (section.scrollHeight * scale));
+            if (fit === 1) break;
+            scale *= fit;
+            if (scale < minScale) {
+                section.style.removeProperty('zoom');
+                break;
+            }
+            section.style.zoom = String(scale);
+        }
+    }
 }

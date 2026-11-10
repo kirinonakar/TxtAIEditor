@@ -27,18 +27,21 @@ namespace TxtAIEditor.Core.Services
             return paragraphStyles.TryGetValue(styleId, out string? style) ? style : string.Empty;
         }
 
-        internal static async Task<IReadOnlyDictionary<string, string>> LoadHwpxParagraphStylesAsync(ZipArchive archive)
+        internal static async Task<(IReadOnlyDictionary<string, string> Styles, IReadOnlySet<string> PageBreakBefore)>
+            LoadHwpxParagraphStylesAsync(ZipArchive archive)
         {
             XDocument? header = await TryLoadXmlEntryAsync(archive, "Contents/header.xml").ConfigureAwait(false);
-            if (header == null)
-            {
-                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            }
-
             var styles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (XElement paragraphProperties in header.Descendants().Where(e => e.Name.LocalName == "paraPr"))
+            var pageBreakBefore = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (XElement paragraphProperties in (header?.Descendants() ?? Enumerable.Empty<XElement>())
+                .Where(e => e.Name.LocalName == "paraPr"))
             {
                 string id = GetAttributeValue(paragraphProperties, "id");
+                XElement? breakSetting = paragraphProperties.Elements().FirstOrDefault(e => e.Name.LocalName == "breakSetting");
+                if (!string.IsNullOrEmpty(id) && GetAttributeValue(breakSetting, "pageBreakBefore") is "1" or "true")
+                {
+                    pageBreakBefore.Add(id);
+                }
                 var declarations = new List<string>();
                 XElement? alignment = paragraphProperties.Elements().FirstOrDefault(e => e.Name.LocalName == "align");
                 string horizontal = GetAttributeValue(alignment, "horizontal").ToUpperInvariant();
@@ -77,7 +80,7 @@ namespace TxtAIEditor.Core.Services
                 }
             }
 
-            return styles;
+            return (styles, pageBreakBefore);
         }
 
         internal static async Task<IReadOnlyDictionary<string, string>> LoadHwpxBorderFillStylesAsync(ZipArchive archive)

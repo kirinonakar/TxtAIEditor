@@ -16,12 +16,15 @@ namespace TxtAIEditor.Core.Services
 {
     internal static class OfficeDocumentHtmlRendererUtilities
     {
+        internal const string PageBreakHtml = "<span class=\"doc-page-break\" role=\"separator\"></span>";
+
         internal static string BuildDocumentHtml(
             string title,
             string content,
             string? pageWidth = null,
             string? pagePadding = null,
-            string? pageHeight = null)
+            string? pageHeight = null,
+            bool hasSavedPagination = false)
         {
             string documentPageWidth = string.IsNullOrWhiteSpace(pageWidth) ? "920px" : pageWidth;
             string responsivePageWidth = string.IsNullOrWhiteSpace(pageWidth)
@@ -81,6 +84,11 @@ body { padding: 28px 16px 44px; }
     overflow-wrap: anywhere;
 }
 .empty-paragraph { min-height: 1em; }
+.doc-page-break {
+    display: block;
+    margin: 1.25rem 0;
+    border-top: 1px dotted var(--muted);
+}
 .doc-table-wrap {
     width: 100%;
     overflow-x: auto;
@@ -216,10 +224,17 @@ body { padding: 28px 16px 44px; }
         padding: var(--document-page-padding);
     }
 }
+@media print {
+    .doc-page-break {
+        break-before: page;
+        margin: 0;
+        border: 0;
+    }
+}
 </style>
 </head>
 <body>
-<main class="page">
+<main class="page"{{(hasSavedPagination ? " data-saved-pagination" : string.Empty)}}>
 {{content}}
 </main>
 <script>

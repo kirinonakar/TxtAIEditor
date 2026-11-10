@@ -36,10 +36,55 @@ namespace TxtAIEditor.Core.Services
                     getString("OfficeViewerNoBody", "No document body to display."));
             }
 
-            var content = new StringBuilder();
-            foreach (XElement block in body.Elements())
+            XDocument? styles = await TryLoadXmlEntryAsync(archive, "word/styles.xml").ConfigureAwait(false);
+            var paragraphStyles = new Dictionary<string, XElement>(StringComparer.Ordinal);
+            string defaultStyleId = string.Empty;
+            foreach (XElement style in styles?.Root?.Elements() ?? Enumerable.Empty<XElement>())
             {
-                AppendBlockHtml(content, archive, relationships, block);
+                if (style.Name.LocalName == "style" && GetAttributeValue(style, "type") == "paragraph")
+                {
+                    string id = GetAttributeValue(style, "styleId");
+                    paragraphStyles[id] = style;
+                    if (GetAttributeValue(style, "default") is "1" or "true" or "on")
+                    {
+                        defaultStyleId = id;
+                    }
+                }
+            }
+
+            List<XElement> blocks = EnumerateWordBlocks(body).ToList();
+            bool hasSavedPagination = blocks.Any(block => block.Name.LocalName == "p" &&
+                block.Descendants().Any(element => element.Name.LocalName == "lastRenderedPageBreak"));
+            var sections = new Queue<XElement>(blocks
+                .Select(block => GetDirectProperty(GetDirectProperty(block, "pPr"), "sectPr"))
+                .OfType<XElement>());
+            if (GetDirectProperty(body, "sectPr") is XElement finalSection)
+            {
+                sections.Enqueue(finalSection);
+            }
+
+            var content = new StringBuilder();
+            bool startNewSectionPage = false;
+            foreach (XElement block in blocks)
+            {
+                XElement? properties = GetDirectProperty(block, "pPr");
+                bool breakBefore = startNewSectionPage ||
+                    (block.Name.LocalName == "p" && HasWordPageBreakBefore(properties, paragraphStyles, defaultStyleId));
+                if (breakBefore && content.Length > 0 && !EndsWithPageBreak(content))
+                {
+                    content.Append(PageBreakHtml);
+                }
+
+                AppendBlockHtml(content, archive, relationships, block, documentFlow: true);
+                startNewSectionPage = false;
+                if (GetDirectProperty(properties, "sectPr") != null)
+                {
+                    sections.Dequeue();
+                    XElement? sectionType = sections.TryPeek(out XElement? nextSection)
+                        ? GetDirectProperty(nextSection, "type")
+                        : null;
+                    startNewSectionPage = GetAttributeValue(sectionType, "val") is not ("continuous" or "nextColumn");
+                }
             }
 
             if (content.Length == 0)
@@ -63,7 +108,8 @@ namespace TxtAIEditor.Core.Services
                 content.ToString(),
                 pageWidth,
                 pagePadding,
-                pageHeight);
+                pageHeight,
+                hasSavedPagination);
         }
 
         private static bool TryReadWordPageLayout(
@@ -128,16 +174,61 @@ namespace TxtAIEditor.Core.Services
             return (twips / 20.0).ToString("0.###", CultureInfo.InvariantCulture) + "pt";
         }
 
+        private static IEnumerable<XElement> EnumerateWordBlocks(XElement container)
+        {
+            foreach (XElement child in container.Elements())
+            {
+                if (child.Name.LocalName is "p" or "tbl")
+                {
+                    yield return child;
+                    continue;
+                }
+
+                foreach (XElement block in EnumerateWordBlocks(child))
+                {
+                    yield return block;
+                }
+            }
+        }
+
+        private static bool HasWordPageBreakBefore(
+            XElement? properties, IReadOnlyDictionary<string, XElement> styles, string defaultStyleId)
+        {
+            XElement? pageBreak = GetDirectProperty(properties, "pageBreakBefore");
+            string styleId = GetAttributeValue(GetDirectProperty(properties, "pStyle"), "val");
+            if (string.IsNullOrEmpty(styleId))
+            {
+                styleId = defaultStyleId;
+            }
+
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            while (pageBreak == null && styleId.Length > 0 &&
+                   styles.TryGetValue(styleId, out XElement? style) && visited.Add(styleId))
+            {
+                pageBreak = GetDirectProperty(GetDirectProperty(style, "pPr"), "pageBreakBefore");
+                styleId = GetAttributeValue(GetDirectProperty(style, "basedOn"), "val");
+            }
+
+            return pageBreak != null && GetAttributeValue(pageBreak, "val") is not ("0" or "false" or "off");
+        }
+
+        private static bool EndsWithPageBreak(StringBuilder builder)
+        {
+            return builder.Length >= PageBreakHtml.Length &&
+                builder.ToString(builder.Length - PageBreakHtml.Length, PageBreakHtml.Length) == PageBreakHtml;
+        }
+
         private static void AppendBlockHtml(
             StringBuilder builder,
             ZipArchive archive,
             IReadOnlyDictionary<string, string> relationships,
-            XElement block)
+            XElement block,
+            bool documentFlow = false)
         {
             switch (block.Name.LocalName)
             {
                 case "p":
-                    builder.Append(BuildParagraphHtml(archive, relationships, block));
+                    AppendParagraphHtml(builder, archive, relationships, block, documentFlow);
                     break;
                 case "tbl":
                     builder.Append(BuildTableHtml(archive, relationships, block));
@@ -152,13 +243,16 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static string BuildParagraphHtml(
+        private static void AppendParagraphHtml(
+            StringBuilder builder,
             ZipArchive archive,
             IReadOnlyDictionary<string, string> relationships,
-            XElement paragraph)
+            XElement paragraph,
+            bool documentFlow)
         {
             string paragraphStyle = BuildParagraphStyle(paragraph);
             var content = new StringBuilder();
+            bool suppressLeadingCachedBreak = builder.Length == 0 || EndsWithPageBreak(builder);
             foreach (XElement child in paragraph.Elements())
             {
                 if (child.Name.LocalName == "pPr")
@@ -166,15 +260,32 @@ namespace TxtAIEditor.Core.Services
                     continue;
                 }
 
-                AppendInlineHtml(content, archive, relationships, child);
+                AppendInlineHtml(content, archive, relationships, child, documentFlow, suppressLeadingCachedBreak);
             }
 
+            int trailingBreaks = 0;
+            while (EndsWithPageBreak(content))
+            {
+                content.Length -= PageBreakHtml.Length;
+                trailingBreaks++;
+            }
             string styleAttribute = string.IsNullOrWhiteSpace(paragraphStyle)
                 ? string.Empty
                 : " style=\"" + Html(paragraphStyle) + "\"";
-            return content.Length == 0
-                ? "<p class=\"doc-paragraph empty-paragraph\"" + styleAttribute + "></p>"
-                : "<p class=\"doc-paragraph\"" + styleAttribute + ">" + content + "</p>";
+            if (content.Length > 0)
+            {
+                builder.Append("<p class=\"doc-paragraph\"").Append(styleAttribute).Append('>')
+                    .Append(content).Append("</p>");
+            }
+            else if (trailingBreaks == 0)
+            {
+                builder.Append("<p class=\"doc-paragraph empty-paragraph\"").Append(styleAttribute).Append("></p>");
+            }
+
+            for (int i = 0; i < trailingBreaks; i++)
+            {
+                builder.Append(PageBreakHtml);
+            }
         }
 
         private static string BuildParagraphStyle(XElement paragraph)
@@ -206,12 +317,14 @@ namespace TxtAIEditor.Core.Services
             StringBuilder builder,
             ZipArchive archive,
             IReadOnlyDictionary<string, string> relationships,
-            XElement element)
+            XElement element,
+            bool documentFlow,
+            bool suppressLeadingCachedBreak)
         {
             switch (element.Name.LocalName)
             {
                 case "r":
-                    AppendRunHtml(builder, archive, relationships, element);
+                    AppendRunHtml(builder, archive, relationships, element, documentFlow, suppressLeadingCachedBreak);
                     break;
                 case "hyperlink":
                 case "ins":
@@ -220,7 +333,7 @@ namespace TxtAIEditor.Core.Services
                 case "sdtContent":
                     foreach (XElement child in element.Elements())
                     {
-                        AppendInlineHtml(builder, archive, relationships, child);
+                        AppendInlineHtml(builder, archive, relationships, child, documentFlow, suppressLeadingCachedBreak);
                     }
 
                     break;
@@ -229,7 +342,8 @@ namespace TxtAIEditor.Core.Services
                     break;
                 case "br":
                 case "cr":
-                    builder.Append("<br>");
+                case "lastRenderedPageBreak":
+                    AppendWordBreak(builder, element, documentFlow, suppressLeadingCachedBreak);
                     break;
                 case "drawing":
                 case "pict":
@@ -238,7 +352,7 @@ namespace TxtAIEditor.Core.Services
                 default:
                     foreach (XElement child in element.Elements())
                     {
-                        AppendInlineHtml(builder, archive, relationships, child);
+                        AppendInlineHtml(builder, archive, relationships, child, documentFlow, suppressLeadingCachedBreak);
                     }
 
                     break;
@@ -249,7 +363,9 @@ namespace TxtAIEditor.Core.Services
             StringBuilder builder,
             ZipArchive archive,
             IReadOnlyDictionary<string, string> relationships,
-            XElement run)
+            XElement run,
+            bool documentFlow,
+            bool suppressLeadingCachedBreak)
         {
             XElement? properties = run.Elements().FirstOrDefault(e => e.Name.LocalName == "rPr");
             string style = BuildRunStyle(properties);
@@ -265,7 +381,8 @@ namespace TxtAIEditor.Core.Services
                         break;
                     case "br":
                     case "cr":
-                        builder.Append("<br>");
+                    case "lastRenderedPageBreak":
+                        AppendWordBreak(builder, child, documentFlow, suppressLeadingCachedBreak);
                         break;
                     case "drawing":
                     case "pict":
@@ -273,6 +390,21 @@ namespace TxtAIEditor.Core.Services
                         break;
                 }
             }
+        }
+
+        private static void AppendWordBreak(
+            StringBuilder builder, XElement element, bool documentFlow, bool suppressLeadingCachedBreak)
+        {
+            if (element.Name.LocalName == "lastRenderedPageBreak")
+            {
+                if (documentFlow && !(builder.Length == 0 && suppressLeadingCachedBreak) && !EndsWithPageBreak(builder))
+                {
+                    builder.Append(PageBreakHtml);
+                }
+                return;
+            }
+
+            builder.Append(documentFlow && GetAttributeValue(element, "type") == "page" ? PageBreakHtml : "<br>");
         }
 
         private static string BuildRunStyle(XElement? properties)
