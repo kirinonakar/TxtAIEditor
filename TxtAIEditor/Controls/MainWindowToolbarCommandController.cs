@@ -481,16 +481,15 @@ namespace TxtAIEditor.Controls
 
         private async Task PrintViewerAsync(OpenedTab tab)
         {
-            nint owner = WinRT.Interop.WindowNative.GetWindowHandle(_ownerWindow);
             if (tab.IsOfficeDocumentViewer && _ownerWindow.Content is Panel host)
             {
-                await PrintOfficeAsync(host, tab, owner);
+                await PrintOfficeAsync(host, tab);
                 return;
             }
 
             if (tab.IsPdfViewer && tab.FilePath is { Length: > 0 } pdfPath)
             {
-                await PdfPrintController.ShowAsync(owner, pdfPath, tab.Title);
+                await ShowPdfPrintDialogAsync(pdfPath, tab.Title);
                 return;
             }
 
@@ -505,14 +504,14 @@ namespace TxtAIEditor.Controls
                 "문서를 인쇄할 준비가 되지 않았습니다. 문서를 확인한 뒤 다시 시도해 주세요."));
         }
 
-        private async Task PrintOfficeAsync(Panel host, OpenedTab tab, nint owner)
+        private async Task PrintOfficeAsync(Panel host, OpenedTab tab)
         {
             var directory = Directory.CreateTempSubdirectory("TxtAIEditor-Print-");
             string path = Path.Combine(directory.FullName, "document.pdf");
             try
             {
                 await ExportOfficePdfAsync(host, tab, path);
-                await PdfPrintController.ShowAsync(owner, path, tab.Title);
+                await ShowPdfPrintDialogAsync(path, tab.Title);
             }
             finally
             {
@@ -527,6 +526,10 @@ namespace TxtAIEditor.Controls
                 }
             }
         }
+
+        private Task ShowPdfPrintDialogAsync(string path, string title) =>
+            PdfPrintController.ShowAsync(_ownerWindow, path, title,
+                _getLocalizedString("PrintJobFailed", "인쇄를 완료하지 못했습니다. 프린터 상태를 확인하고 다시 시도해 주세요."));
 
         private async Task ExportOfficePdfAsync(Panel host, OpenedTab tab, string path)
         {

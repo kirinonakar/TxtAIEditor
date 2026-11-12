@@ -74,6 +74,9 @@
   <data name="PrintErrorTitle" xml:space="preserve">
     <value>打印失败</value>
   </data>
+  <data name="PrintJobFailed" xml:space="preserve">
+    <value>无法完成打印。请检查打印机状态后重试。</value>
+  </data>
   <data name="PrintDocumentUnavailable" xml:space="preserve">
     <value>文档尚未准备好打印。请检查文档后重试。</value>
   </data>

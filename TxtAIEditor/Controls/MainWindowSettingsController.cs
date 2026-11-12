@@ -267,6 +267,7 @@ namespace TxtAIEditor.Controls
                 _appWindow,
                 _rootElementProvider(),
                 ApplyMarkdownToolbarBackground);
+            (Application.Current as App)?.UpdateQuickNotesTheme(_getCurrentElementTheme());
             ApplyEditorSurfaceBackground(settings);
             RefreshAllSplitters();
         }

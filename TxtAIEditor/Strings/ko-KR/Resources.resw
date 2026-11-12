@@ -74,6 +74,9 @@
   <data name="PrintErrorTitle" xml:space="preserve">
     <value>인쇄 오류</value>
   </data>
+  <data name="PrintJobFailed" xml:space="preserve">
+    <value>인쇄를 완료하지 못했습니다. 프린터 상태를 확인하고 다시 시도해 주세요.</value>
+  </data>
   <data name="PrintDocumentUnavailable" xml:space="preserve">
     <value>문서를 인쇄할 준비가 되지 않았습니다. 문서를 확인한 뒤 다시 시도해 주세요.</value>
   </data>

@@ -23,6 +23,7 @@ namespace TxtAIEditor
         private Window? _window;
         private TrayIconService? _trayIconService;
         private QuickNotesController? _quickNotes;
+        private ElementTheme _quickNotesTheme;
         private MainWindow? _trayOwnerWindow;
         private bool _trayExitInProgress;
         private static Mutex? _singleInstanceMutex;
@@ -224,8 +225,9 @@ namespace TxtAIEditor
                 _trayOwnerWindow = owner;
                 string GetText(string key, string fallback) => owner.GetLocalizedString(key, fallback);
                 nint trayHandle = WinRT.Interop.WindowNative.GetWindowHandle(owner);
-                QuickNotesController GetQuickNotes() => _quickNotes ??= new QuickNotesController((key, fallback) =>
-                    _trayOwnerWindow?.GetLocalizedString(key, fallback) ?? fallback);
+                QuickNotesController GetQuickNotes() => _quickNotes ??= new QuickNotesController(
+                    (key, fallback) => _trayOwnerWindow?.GetLocalizedString(key, fallback) ?? fallback,
+                    _quickNotesTheme);
                 void QueueNoteAction(Action action) => owner.DispatcherQueue.TryEnqueue(() =>
                 {
                     if (Volatile.Read(ref _appCleanupStarted) == 0)
@@ -246,7 +248,7 @@ namespace TxtAIEditor
                         GetText("QuickNotesMenu", "빠른 메모"),
                         GetText("QuickNotesAdd", "추가"),
                         GetText("QuickNotesDelete", "삭제"),
-                        () => QueueNoteAction(() => GetQuickNotes().Add(trayHandle)),
+                        () => QueueNoteAction(() => _ = AppErrorHandler.RunAsync(() => GetQuickNotes().AddAsync(trayHandle))),
                         () => GetQuickNotes().GetTrayItems(trayHandle, QueueNoteAction)));
                 return true;
             }
@@ -272,6 +274,12 @@ namespace TxtAIEditor
             }
 
             EnsureTrayIcon(owner);
+        }
+
+        internal void UpdateQuickNotesTheme(ElementTheme theme)
+        {
+            _quickNotesTheme = theme;
+            _quickNotes?.UpdateTheme(theme);
         }
 
         private IReadOnlyList<TrayWindowItem> GetTrayWindowItems()

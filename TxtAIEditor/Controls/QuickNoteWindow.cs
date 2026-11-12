@@ -55,12 +55,13 @@ namespace TxtAIEditor.Controls
 
         public QuickNoteWindow(
             QuickNote note, Func<string, string, string> text, Func<string> displayTitle,
-            Action changed, Action<FrameworkElement> delete, int openCount)
+            Action changed, Action<FrameworkElement> delete, int openCount, ElementTheme appTheme)
         {
             _note = note;
             _text = text;
             _displayTitle = displayTitle;
             _changed = changed;
+            _root.RequestedTheme = appTheme;
             _hwnd = WindowNative.GetWindowHandle(this);
             _presenter = OverlappedPresenter.Create();
             _presenter.SetBorderAndTitleBar(true, false);
@@ -155,6 +156,15 @@ namespace TxtAIEditor.Controls
         {
             _storageError = message;
             UpdateStatus();
+        }
+
+        public void ApplyAppTheme(ElementTheme theme, bool refreshResources)
+        {
+            if (refreshResources && _root.RequestedTheme == theme)
+            {
+                _root.RequestedTheme = theme == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark;
+            }
+            _root.RequestedTheme = theme;
         }
 
         private static Button CreateIconButton(string glyph, string label)
@@ -343,11 +353,6 @@ namespace TxtAIEditor.Controls
             }
 
             bool hasCustomBackground = TryColor(_note.Background, out Color background);
-            ElementTheme theme = hasCustomBackground ? (IsDark(background) ? ElementTheme.Dark : ElementTheme.Light) : ElementTheme.Default;
-            if (_root.RequestedTheme != theme)
-            {
-                _root.RequestedTheme = theme;
-            }
             _background = hasCustomBackground ? background : _root.ActualTheme == ElementTheme.Dark
                 ? Color.FromArgb(255, 64, 55, 29) : Color.FromArgb(255, 255, 241, 166);
             _foreground = TryColor(_note.Foreground, out Color foreground)
