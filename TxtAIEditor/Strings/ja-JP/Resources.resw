@@ -68,6 +68,15 @@
   <data name="SavePdfErrorTitle" xml:space="preserve">
     <value>PDF保存エラー</value>
   </data>
+  <data name="PrintPreparing" xml:space="preserve">
+    <value>印刷を準備中…</value>
+  </data>
+  <data name="PrintErrorTitle" xml:space="preserve">
+    <value>印刷エラー</value>
+  </data>
+  <data name="PrintDocumentUnavailable" xml:space="preserve">
+    <value>文書を印刷する準備ができていません。文書を確認してから、もう一度お試しください。</value>
+  </data>
   <data name="SavePdfUnsupported" xml:space="preserve">
     <value>このタブはPDFとして保存できません。テキスト文書を開いて再試行してください。</value>
   </data>
@@ -4052,6 +4061,31 @@
   <data name="SettingsKeepInTrayOnClose" xml:space="preserve"><value>ウィンドウを閉じるときにシステム トレイに保持</value></data>
   <data name="TrayMenuOpen" xml:space="preserve"><value>開く</value></data>
   <data name="TrayMenuClose" xml:space="preserve"><value>閉じる</value></data>
+  <data name="QuickNotesMenu" xml:space="preserve"><value>クイックメモ</value></data>
+  <data name="QuickNotesAdd" xml:space="preserve"><value>追加</value></data>
+  <data name="QuickNotesTitle" xml:space="preserve"><value>タイトル</value></data>
+  <data name="QuickNotesBody" xml:space="preserve"><value>内容</value></data>
+  <data name="QuickNotesUntitled" xml:space="preserve"><value>無題のメモ</value></data>
+  <data name="QuickNotesEmpty" xml:space="preserve"><value>保存したメモはありません。</value></data>
+  <data name="QuickNotesDelete" xml:space="preserve"><value>削除</value></data>
+  <data name="QuickNotesDeletePrompt" xml:space="preserve"><value>「{0}」を削除</value></data>
+  <data name="QuickNotesDeleteConfirm" xml:space="preserve"><value>メモ「{0}」を削除しますか？</value></data>
+  <data name="QuickNotesCancel" xml:space="preserve"><value>キャンセル</value></data>
+  <data name="QuickNotesHide" xml:space="preserve"><value>トレイに格納</value></data>
+  <data name="QuickNotesMove" xml:space="preserve"><value>ドラッグして移動</value></data>
+  <data name="QuickNotesFold" xml:space="preserve"><value>折りたたむ</value></data>
+  <data name="QuickNotesExpand" xml:space="preserve"><value>展開する</value></data>
+  <data name="QuickNotesBackground" xml:space="preserve"><value>背景色</value></data>
+  <data name="QuickNotesForeground" xml:space="preserve"><value>文字色</value></data>
+  <data name="QuickNotesOpacity" xml:space="preserve"><value>不透明度</value></data>
+  <data name="QuickNotesHex" xml:space="preserve"><value>カラーコード</value></data>
+  <data name="QuickNotesApply" xml:space="preserve"><value>適用</value></data>
+  <data name="QuickNotesDefault" xml:space="preserve"><value>既定値</value></data>
+  <data name="QuickNotesSource" xml:space="preserve"><value>原文を表示</value></data>
+  <data name="QuickNotesLive" xml:space="preserve"><value>Markdown ライブプレビュー</value></data>
+  <data name="QuickNotesPreviewError" xml:space="preserve"><value>Markdown を表示できませんでした。</value></data>
+  <data name="QuickNotesSaveError" xml:space="preserve"><value>メモを保存できませんでした。</value></data>
+  <data name="QuickNotesLoadError" xml:space="preserve"><value>メモを読み込めませんでした。</value></data>
   <data name="TabMenuImageConvert" xml:space="preserve"><value>画像を変換</value></data>
   <data name="ImageConvertDialogTitle" xml:space="preserve"><value>画像変換 - {0}</value></data>
   <data name="ImageConvertSourceInfo" xml:space="preserve"><value>元のファイル: {0}&#xA;サイズ: {1} × {2}px · フレーム: {3}</value></data>

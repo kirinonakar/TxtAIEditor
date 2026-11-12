@@ -68,6 +68,15 @@
   <data name="SavePdfErrorTitle" xml:space="preserve">
     <value>PDF 저장 오류</value>
   </data>
+  <data name="PrintPreparing" xml:space="preserve">
+    <value>인쇄 준비 중…</value>
+  </data>
+  <data name="PrintErrorTitle" xml:space="preserve">
+    <value>인쇄 오류</value>
+  </data>
+  <data name="PrintDocumentUnavailable" xml:space="preserve">
+    <value>문서를 인쇄할 준비가 되지 않았습니다. 문서를 확인한 뒤 다시 시도해 주세요.</value>
+  </data>
   <data name="SavePdfUnsupported" xml:space="preserve">
     <value>이 탭은 PDF로 저장할 수 없습니다. 텍스트 문서를 열고 다시 시도해 주세요.</value>
   </data>
@@ -4094,6 +4103,31 @@
   <data name="SettingsKeepInTrayOnClose" xml:space="preserve"><value>창을 닫을 때 시스템 트레이에 유지</value></data>
   <data name="TrayMenuOpen" xml:space="preserve"><value>열기</value></data>
   <data name="TrayMenuClose" xml:space="preserve"><value>닫기</value></data>
+  <data name="QuickNotesMenu" xml:space="preserve"><value>빠른 메모</value></data>
+  <data name="QuickNotesAdd" xml:space="preserve"><value>추가</value></data>
+  <data name="QuickNotesTitle" xml:space="preserve"><value>제목</value></data>
+  <data name="QuickNotesBody" xml:space="preserve"><value>내용</value></data>
+  <data name="QuickNotesUntitled" xml:space="preserve"><value>제목 없음</value></data>
+  <data name="QuickNotesEmpty" xml:space="preserve"><value>저장된 메모가 없습니다.</value></data>
+  <data name="QuickNotesDelete" xml:space="preserve"><value>삭제</value></data>
+  <data name="QuickNotesDeletePrompt" xml:space="preserve"><value>‘{0}’ 메모 삭제</value></data>
+  <data name="QuickNotesDeleteConfirm" xml:space="preserve"><value>‘{0}’ 메모를 삭제할까요?</value></data>
+  <data name="QuickNotesCancel" xml:space="preserve"><value>취소</value></data>
+  <data name="QuickNotesHide" xml:space="preserve"><value>트레이로 닫기</value></data>
+  <data name="QuickNotesMove" xml:space="preserve"><value>끌어서 이동</value></data>
+  <data name="QuickNotesFold" xml:space="preserve"><value>접기</value></data>
+  <data name="QuickNotesExpand" xml:space="preserve"><value>펼치기</value></data>
+  <data name="QuickNotesBackground" xml:space="preserve"><value>바탕색</value></data>
+  <data name="QuickNotesForeground" xml:space="preserve"><value>글자색</value></data>
+  <data name="QuickNotesOpacity" xml:space="preserve"><value>불투명도</value></data>
+  <data name="QuickNotesHex" xml:space="preserve"><value>색상 코드</value></data>
+  <data name="QuickNotesApply" xml:space="preserve"><value>적용</value></data>
+  <data name="QuickNotesDefault" xml:space="preserve"><value>기본값</value></data>
+  <data name="QuickNotesSource" xml:space="preserve"><value>원본 보기</value></data>
+  <data name="QuickNotesLive" xml:space="preserve"><value>라이브 마크다운 보기</value></data>
+  <data name="QuickNotesPreviewError" xml:space="preserve"><value>마크다운을 표시할 수 없습니다.</value></data>
+  <data name="QuickNotesSaveError" xml:space="preserve"><value>메모를 저장할 수 없습니다.</value></data>
+  <data name="QuickNotesLoadError" xml:space="preserve"><value>메모를 불러올 수 없습니다.</value></data>
   <data name="TabMenuImageConvert" xml:space="preserve"><value>이미지 변환</value></data>
   <data name="ImageConvertDialogTitle" xml:space="preserve"><value>이미지 변환 - {0}</value></data>
   <data name="ImageConvertSourceInfo" xml:space="preserve"><value>원본: {0}&#xA;크기: {1} × {2}px · 프레임: {3}</value></data>

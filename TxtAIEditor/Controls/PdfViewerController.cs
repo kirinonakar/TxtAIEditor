@@ -237,7 +237,7 @@ namespace TxtAIEditor.Controls
             pdfWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
             pdfWebView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = false;
             pdfWebView.CoreWebView2.Settings.IsStatusBarEnabled = true;
-            HideNativePdfSearchButton(pdfWebView.CoreWebView2.Settings);
+            HideReplacedPdfToolbarItems(pdfWebView.CoreWebView2.Settings);
             pdfWebView.CoreWebView2.WebMessageReceived += (_, args) => OnWebMessageReceived(tab, pdfWebView, args);
 
             WebViewAppearanceService.ApplyPreferredColorScheme(pdfWebView.CoreWebView2, _settingsService.CurrentSettings.Theme);
@@ -247,11 +247,11 @@ namespace TxtAIEditor.Controls
             _ = InstallPdfFindBridgeAsync(pdfWebView, BuildPdfFindBridgeScript());
         }
 
-        private static void HideNativePdfSearchButton(CoreWebView2Settings settings)
+        private static void HideReplacedPdfToolbarItems(CoreWebView2Settings settings)
         {
             try
             {
-                settings.HiddenPdfToolbarItems |= CoreWebView2PdfToolbarItems.Search;
+                settings.HiddenPdfToolbarItems |= CoreWebView2PdfToolbarItems.Search | CoreWebView2PdfToolbarItems.Print;
             }
             catch
             {

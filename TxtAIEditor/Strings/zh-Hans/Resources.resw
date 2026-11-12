@@ -68,6 +68,15 @@
   <data name="SavePdfErrorTitle" xml:space="preserve">
     <value>PDF 保存失败</value>
   </data>
+  <data name="PrintPreparing" xml:space="preserve">
+    <value>正在准备打印…</value>
+  </data>
+  <data name="PrintErrorTitle" xml:space="preserve">
+    <value>打印失败</value>
+  </data>
+  <data name="PrintDocumentUnavailable" xml:space="preserve">
+    <value>文档尚未准备好打印。请检查文档后重试。</value>
+  </data>
   <data name="SavePdfUnsupported" xml:space="preserve">
     <value>此标签页无法另存为 PDF。请打开文本文档后重试。</value>
   </data>
@@ -4052,6 +4061,31 @@
   <data name="SettingsKeepInTrayOnClose" xml:space="preserve"><value>关闭窗口时保留在系统托盘</value></data>
   <data name="TrayMenuOpen" xml:space="preserve"><value>打开</value></data>
   <data name="TrayMenuClose" xml:space="preserve"><value>关闭</value></data>
+  <data name="QuickNotesMenu" xml:space="preserve"><value>便笺</value></data>
+  <data name="QuickNotesAdd" xml:space="preserve"><value>添加</value></data>
+  <data name="QuickNotesTitle" xml:space="preserve"><value>标题</value></data>
+  <data name="QuickNotesBody" xml:space="preserve"><value>内容</value></data>
+  <data name="QuickNotesUntitled" xml:space="preserve"><value>无标题便笺</value></data>
+  <data name="QuickNotesEmpty" xml:space="preserve"><value>没有已保存的便笺。</value></data>
+  <data name="QuickNotesDelete" xml:space="preserve"><value>删除</value></data>
+  <data name="QuickNotesDeletePrompt" xml:space="preserve"><value>删除“{0}”</value></data>
+  <data name="QuickNotesDeleteConfirm" xml:space="preserve"><value>要删除便笺“{0}”吗？</value></data>
+  <data name="QuickNotesCancel" xml:space="preserve"><value>取消</value></data>
+  <data name="QuickNotesHide" xml:space="preserve"><value>关闭到托盘</value></data>
+  <data name="QuickNotesMove" xml:space="preserve"><value>拖动以移动</value></data>
+  <data name="QuickNotesFold" xml:space="preserve"><value>折叠</value></data>
+  <data name="QuickNotesExpand" xml:space="preserve"><value>展开</value></data>
+  <data name="QuickNotesBackground" xml:space="preserve"><value>背景颜色</value></data>
+  <data name="QuickNotesForeground" xml:space="preserve"><value>文字颜色</value></data>
+  <data name="QuickNotesOpacity" xml:space="preserve"><value>不透明度</value></data>
+  <data name="QuickNotesHex" xml:space="preserve"><value>十六进制颜色</value></data>
+  <data name="QuickNotesApply" xml:space="preserve"><value>应用</value></data>
+  <data name="QuickNotesDefault" xml:space="preserve"><value>默认</value></data>
+  <data name="QuickNotesSource" xml:space="preserve"><value>查看原文</value></data>
+  <data name="QuickNotesLive" xml:space="preserve"><value>Markdown 实时预览</value></data>
+  <data name="QuickNotesPreviewError" xml:space="preserve"><value>无法显示 Markdown。</value></data>
+  <data name="QuickNotesSaveError" xml:space="preserve"><value>无法保存便笺。</value></data>
+  <data name="QuickNotesLoadError" xml:space="preserve"><value>无法加载便笺。</value></data>
   <data name="TabMenuImageConvert" xml:space="preserve"><value>转换图像</value></data>
   <data name="ImageConvertDialogTitle" xml:space="preserve"><value>图像转换 - {0}</value></data>
   <data name="ImageConvertSourceInfo" xml:space="preserve"><value>源文件：{0}&#xA;大小：{1} × {2}px · 帧数：{3}</value></data>

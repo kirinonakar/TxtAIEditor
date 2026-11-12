@@ -1,0 +1,25 @@
+:root {
+    color: var(--note-foreground);
+    background: var(--note-background);
+    font: 14px/1.5 "Segoe UI", sans-serif;
+}
+
+body { margin: 0; padding: 6px 9px; overflow-wrap: anywhere; }
+main > :first-child { margin-block-start: 0; }
+h1, h2, h3, h4, h5, h6 { line-height: 1.2; margin-block: .75em .35em; }
+h1 { font-size: 1.6em; }
+h2 { font-size: 1.35em; }
+h3 { font-size: 1.15em; }
+p, ul, ol, pre, table, blockquote { margin-block: .45em; }
+ul, ol { padding-inline-start: 1.65em; }
+a { color: inherit; text-underline-offset: .18em; }
+hr { border: 0; border-top: 1px solid currentColor; opacity: .35; }
+blockquote { border-inline-start: 3px solid currentColor; padding-inline-start: .75em; margin-inline: 0; }
+img { max-width: 100%; height: auto; }
+pre { white-space: pre-wrap; padding: .45em .65em; }
+pre, :not(pre) > code { background: color-mix(in srgb, currentColor 10%, transparent); border-radius: 4px; }
+:not(pre) > code { padding-inline: .2em; }
+table { border-collapse: collapse; }
+td, th { border: 1px solid color-mix(in srgb, currentColor 35%, transparent); padding: .2em .45em; }
+.align-center { text-align: center; }
+.align-right { text-align: right; }

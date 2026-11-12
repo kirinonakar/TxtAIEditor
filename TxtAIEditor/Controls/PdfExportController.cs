@@ -15,9 +15,17 @@ namespace TxtAIEditor.Controls
     {
         private static readonly TimeSpan PreparationTimeout = TimeSpan.FromSeconds(120);
 
-        public static async Task ExportAsync(
+        public static Task ExportAsync(
             Panel host, string path, object document, bool fullHtml,
-            Action<CoreWebView2> registerDocumentResources, bool officeDocument = false)
+            Action<CoreWebView2> registerDocumentResources) =>
+            ExportCoreAsync(host, path, document, fullHtml, registerDocumentResources, officeHtml: null);
+
+        public static Task ExportOfficeAsync(Panel host, string path, string html) =>
+            ExportCoreAsync(host, path, document: null, fullHtml: true, registerDocumentResources: null, officeHtml: html);
+
+        private static async Task ExportCoreAsync(
+            Panel host, string path, object? document, bool fullHtml,
+            Action<CoreWebView2>? registerDocumentResources, string? officeHtml)
         {
             // A separate, noninteractive document avoids changing the editor DOM,
             // IME composition, selection, scroll position, or dirty state.
@@ -31,97 +39,39 @@ namespace TxtAIEditor.Controls
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top
             };
+            if (officeHtml != null && host is Grid grid)
+            {
+                Grid.SetRowSpan(webView, Math.Max(1, grid.RowDefinitions.Count));
+            }
             string temporaryPath = Path.Combine(Path.GetDirectoryName(path)!, $".txtaieditor-{Guid.NewGuid():N}.pdf");
             host.Children.Add(webView);
             try
             {
                 var environment = await WebViewEnvironmentProvider.GetSharedAsync();
-                await webView.EnsureCoreWebView2Async(environment);
+                await webView.EnsureCoreWebView2Async(environment).AsTask().WaitAsync(PreparationTimeout);
                 var core = webView.CoreWebView2;
                 core.SetVirtualHostNameToFolderMapping(
                     PreviewWebResourceService.ResourceHostName,
                     PreviewWebResourceService.WebResourcesPath,
                     CoreWebView2HostResourceAccessKind.Allow);
-                registerDocumentResources(core);
+                registerDocumentResources?.Invoke(core);
                 core.Settings.AreDefaultScriptDialogsEnabled = false;
                 core.NewWindowRequested += (_, e) => e.Handled = true;
                 core.DownloadStarting += (_, e) => e.Cancel = true;
 
-                var ready = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                var prepared = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                string requestId = Guid.NewGuid().ToString("N");
-                string previewUrl = $"http://{PreviewWebResourceService.ResourceHostName}/preview.html?pdfExport=1&v={PreviewWebResourceService.GetWebResourceVersion("preview.html")}";
-                core.WebMessageReceived += (_, e) =>
+                JsonElement? officeLayout = null;
+                if (officeHtml != null)
                 {
-                    if (!string.Equals(e.Source, previewUrl, StringComparison.Ordinal)) return;
-                    using var message = JsonDocument.Parse(e.WebMessageAsJson);
-                    var root = message.RootElement;
-                    if (!root.TryGetProperty("type", out var type)) return;
-                    if (type.GetString() == "previewReady") ready.TrySetResult(true);
-                    if (type.GetString() != "pdfExportPrepared" ||
-                        !root.TryGetProperty("requestId", out var id) || id.GetString() != requestId) return;
-                    if (root.TryGetProperty("error", out var error))
-                        prepared.TrySetException(new InvalidOperationException(error.GetString()));
-                    else
-                        prepared.TrySetResult(true);
-                };
-                core.NavigationCompleted += (_, e) =>
-                {
-                    if (!e.IsSuccess)
-                    {
-                        var error = new InvalidOperationException($"PDF document navigation failed: {e.WebErrorStatus}");
-                        ready.TrySetException(error);
-                        prepared.TrySetException(error);
-                    }
-                };
-                core.Navigate(previewUrl);
-                await ready.Task.WaitAsync(PreparationTimeout);
-                string payload = JsonSerializer.Serialize(document);
-
-                // HTML/SVG must be a top-level document so its own print styles and
-                // pagination work; printing a viewport-sized iframe can clip pages.
-                using var htmlStream = new MemoryStream();
-                if (fullHtml)
-                {
-                    string result = await core.ExecuteScriptAsync($"window.buildPdfExportHtml({payload})");
-                    string html = JsonSerializer.Deserialize<string>(result)
-                        ?? throw new InvalidOperationException("PDF HTML document preparation failed.");
-                    byte[] bytes = Encoding.UTF8.GetBytes(html);
-                    await htmlStream.WriteAsync(bytes);
-                    htmlStream.Position = 0;
-                    string htmlUrl = $"http://pdf-document.{PreviewWebResourceService.ResourceHostName}/pdf-export-{requestId}.html";
-                    core.AddWebResourceRequestedFilter(htmlUrl, CoreWebView2WebResourceContext.Document);
-                    core.WebResourceRequested += (_, e) =>
-                    {
-                        if (e.Request.Uri == htmlUrl)
-                        {
-                            htmlStream.Position = 0;
-                            e.Response = environment.CreateWebResourceResponse(
-                                htmlStream.AsRandomAccessStream(), 200, "OK", "Content-Type: text/html; charset=utf-8");
-                        }
-                    };
-                    var loaded = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                    core.NavigationCompleted += (_, e) =>
-                    {
-                        if (e.IsSuccess) loaded.TrySetResult(true);
-                        else loaded.TrySetException(new InvalidOperationException($"PDF HTML navigation failed: {e.WebErrorStatus}"));
-                    };
-                    core.Navigate(htmlUrl);
-                    await loaded.Task.WaitAsync(PreparationTimeout);
+                    // Office renderers already produce complete HTML documents.
+                    await NavigateHtmlDocumentAsync(core, officeHtml, Guid.NewGuid().ToString("N"));
+                    await WaitForHtmlAssetsAsync(core);
+                    officeLayout = await PrepareOfficeDocumentAsync(core);
+                    // Workbook export creates the other sheets and their images.
                     await WaitForHtmlAssetsAsync(core);
                 }
                 else
                 {
-                    await core.ExecuteScriptAsync($"window.preparePdfExport({payload}, {JsonSerializer.Serialize(requestId)})");
-                    await prepared.Task.WaitAsync(PreparationTimeout);
-                }
-
-                JsonElement? officeLayout = null;
-                if (officeDocument)
-                {
-                    officeLayout = await PrepareOfficeDocumentAsync(core);
-                    // Workbook export creates the other sheets and their images.
-                    await WaitForHtmlAssetsAsync(core);
+                    await PrepareEditorDocumentAsync(core, document!, fullHtml);
                 }
                 await PdfExportFontEmbedding.EmbedAsync(core, fullHtml);
 
@@ -147,7 +97,7 @@ namespace TxtAIEditor.Controls
                 {
                     await PrintWithCssPageSizesAsync(core, temporaryPath, printSettings);
                 }
-                else if (!await core.PrintToPdfAsync(temporaryPath, printSettings))
+                else if (!await core.PrintToPdfAsync(temporaryPath, printSettings).AsTask().WaitAsync(PreparationTimeout))
                 {
                     throw new InvalidOperationException("WebView2 PDF export failed.");
                 }
@@ -160,6 +110,101 @@ namespace TxtAIEditor.Controls
                 webView.Close();
                 host.Children.Remove(webView);
                 if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+            }
+        }
+
+        private static async Task PrepareEditorDocumentAsync(CoreWebView2 core, object document, bool fullHtml)
+        {
+            var ready = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var prepared = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            string requestId = Guid.NewGuid().ToString("N");
+            string previewUrl = $"http://{PreviewWebResourceService.ResourceHostName}/preview.html?pdfExport=1&v={PreviewWebResourceService.GetWebResourceVersion("preview.html")}";
+            core.WebMessageReceived += (_, e) =>
+            {
+                if (!string.Equals(e.Source, previewUrl, StringComparison.Ordinal)) return;
+                using var message = JsonDocument.Parse(e.WebMessageAsJson);
+                var root = message.RootElement;
+                if (!root.TryGetProperty("type", out var type)) return;
+                if (type.GetString() == "previewReady") ready.TrySetResult(true);
+                if (type.GetString() != "pdfExportPrepared" ||
+                    !root.TryGetProperty("requestId", out var id) || id.GetString() != requestId) return;
+                if (root.TryGetProperty("error", out var error))
+                    prepared.TrySetException(new InvalidOperationException(error.GetString()));
+                else
+                    prepared.TrySetResult(true);
+            };
+            core.NavigationCompleted += (_, e) =>
+            {
+                if (!e.IsSuccess)
+                {
+                    var error = new InvalidOperationException($"PDF document navigation failed: {e.WebErrorStatus}");
+                    ready.TrySetException(error);
+                    prepared.TrySetException(error);
+                }
+            };
+            core.Navigate(previewUrl);
+            await ready.Task.WaitAsync(PreparationTimeout);
+            string payload = JsonSerializer.Serialize(document);
+
+            // HTML/SVG must be a top-level document so its own print styles and
+            // pagination work; printing a viewport-sized iframe can clip pages.
+            if (fullHtml)
+            {
+                string result = await core.ExecuteScriptAsync($"window.buildPdfExportHtml({payload})");
+                string html = JsonSerializer.Deserialize<string>(result)
+                    ?? throw new InvalidOperationException("PDF HTML document preparation failed.");
+                await NavigateHtmlDocumentAsync(core, html, requestId);
+                await WaitForHtmlAssetsAsync(core);
+            }
+            else
+            {
+                await core.ExecuteScriptAsync($"window.preparePdfExport({payload}, {JsonSerializer.Serialize(requestId)})");
+                await prepared.Task.WaitAsync(PreparationTimeout);
+            }
+
+        }
+
+        private static async Task NavigateHtmlDocumentAsync(CoreWebView2 core, string html, string requestId)
+        {
+            using var htmlStream = new MemoryStream(Encoding.UTF8.GetBytes(html), writable: false);
+            using var resource = htmlStream.AsRandomAccessStream();
+            string url = $"http://pdf-document.{PreviewWebResourceService.ResourceHostName}/pdf-export-{requestId}.html";
+            var loaded = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            ulong? navigationId = null;
+            void OnStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
+            {
+                if (args.Uri == url) navigationId = args.NavigationId;
+            }
+            void OnCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+            {
+                if (navigationId != args.NavigationId) return;
+                if (args.IsSuccess) loaded.TrySetResult(true);
+                else loaded.TrySetException(new InvalidOperationException($"PDF HTML navigation failed: {args.WebErrorStatus}"));
+            }
+            void OnRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
+            {
+                if (args.Request.Uri == url)
+                {
+                    resource.Seek(0);
+                    args.Response = core.Environment.CreateWebResourceResponse(resource, 200, "OK", "Content-Type: text/html; charset=utf-8");
+                }
+            }
+
+            core.AddWebResourceRequestedFilter(url, CoreWebView2WebResourceContext.Document);
+            core.NavigationStarting += OnStarting;
+            core.NavigationCompleted += OnCompleted;
+            core.WebResourceRequested += OnRequested;
+            try
+            {
+                core.Navigate(url);
+                await loaded.Task.WaitAsync(PreparationTimeout);
+            }
+            finally
+            {
+                core.NavigationStarting -= OnStarting;
+                core.NavigationCompleted -= OnCompleted;
+                core.WebResourceRequested -= OnRequested;
+                core.RemoveWebResourceRequestedFilter(url, CoreWebView2WebResourceContext.Document);
             }
         }
 
@@ -219,7 +264,7 @@ namespace TxtAIEditor.Controls
             {
                 expression = $"(async () => {{ const module = await import({JsonSerializer.Serialize(url)}); return module.prepareOfficePdf(); }})()",
                 awaitPromise = true, returnByValue = true
-            }));
+            })).AsTask().WaitAsync(PreparationTimeout);
             using var result = JsonDocument.Parse(json);
             if (result.RootElement.TryGetProperty("exceptionDetails", out var error))
             {

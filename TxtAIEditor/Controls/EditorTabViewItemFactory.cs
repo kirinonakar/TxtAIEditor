@@ -283,7 +283,7 @@ namespace TxtAIEditor.Controls
                 }
                 else if (contentKind == ViewerContentKind.Image)
                 {
-                    html = BuildImageViewerHtml(sourceUrl, backgroundColor);
+                    html = BuildImageViewerHtml(sourceUrl, fileName, backgroundColor);
                 }
                 else
                 {
@@ -399,6 +399,25 @@ namespace TxtAIEditor.Controls
             await LoadImageSourceAsync(imageWebView, filePath, GetViewerBackgroundColor(tabItem.Content as FrameworkElement));
         }
 
+        public static async Task<bool> TryShowImagePrintPreviewAsync(TabViewItem tabItem)
+        {
+            var webView = FindTaggedWebView(tabItem.Content as FrameworkElement, ImageViewerWebViewTag);
+            if (webView?.CoreWebView2 is not { } core)
+            {
+                return false;
+            }
+
+            string ready = await core.ExecuteScriptAsync(
+                "Boolean(document.images[0]?.complete && document.images[0].naturalWidth > 0)");
+            if (ready != "true")
+            {
+                return false;
+            }
+
+            core.ShowPrintUI(CoreWebView2PrintDialogKind.Browser);
+            return true;
+        }
+
         public static async Task ReloadMediaAsync(TabViewItem tabItem, string? filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath))
@@ -497,7 +516,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static string BuildImageViewerHtml(string sourceUrl, Windows.UI.Color backgroundColor)
+        private static string BuildImageViewerHtml(string sourceUrl, string fileName, Windows.UI.Color backgroundColor)
         {
             string src = WebUtility.HtmlEncode(sourceUrl);
             string background = ToCssColor(backgroundColor);
@@ -505,6 +524,7 @@ namespace TxtAIEditor.Controls
 <html>
 <head>
 <meta charset=""utf-8"">
+<title>{WebUtility.HtmlEncode(fileName)}</title>
 <style>
 :root {{ --viewer-bg: {background}; }}
 html, body {{
@@ -525,6 +545,16 @@ img {{
     width: auto;
     height: auto;
     object-fit: contain;
+}}
+@media print {{
+    html, body {{ background: #fff; }}
+    img {{
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        max-height: none;
+        object-fit: scale-down;
+    }}
 }}
 </style>
 </head>

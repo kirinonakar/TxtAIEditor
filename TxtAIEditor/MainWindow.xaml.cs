@@ -33,10 +33,6 @@ namespace TxtAIEditor
         private int _trayRestoreVersion;
         private bool _trayClosePending;
 
-        internal bool IsHiddenToTray { get; private set; }
-
-        internal bool KeepInTrayOnCloseEnabled => Operations.CurrentSettings.KeepInTrayOnClose;
-
         public bool ScrollSyncEnabled
         {
             get => Operations.ScrollSyncEnabled;
@@ -174,8 +170,6 @@ namespace TxtAIEditor
                             }
 
                             AppWindow.Hide();
-                            IsHiddenToTray = true;
-                            (Application.Current as App)?.UpdateTrayIconVisibility();
                         }
                         finally
                         {
@@ -216,7 +210,6 @@ namespace TxtAIEditor
         internal void RestoreAndActivate()
         {
             _trayRestoreVersion++;
-            IsHiddenToTray = false;
             AppWindow.Show();
             if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter &&
                 presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized)

@@ -75,6 +75,12 @@ namespace TxtAIEditor.Controls
             set => TopMostToggleButton.IsChecked = value;
         }
 
+        internal void SetPrintBusy(bool busy, Func<string, string, string> getString)
+        {
+            PrintButton.IsEnabled = !busy;
+            PrintButton.Label = busy ? getString("PrintPreparing", "인쇄 준비 중…") : getString("Print", "인쇄");
+        }
+
         public void Localize(Func<string, string, string> getString)
         {
             OpenFileButton.Label = getString("OpenFile", "파일 열기");

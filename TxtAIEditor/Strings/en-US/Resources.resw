@@ -68,6 +68,15 @@
   <data name="SavePdfErrorTitle" xml:space="preserve">
     <value>Save PDF failed</value>
   </data>
+  <data name="PrintPreparing" xml:space="preserve">
+    <value>Preparing to print…</value>
+  </data>
+  <data name="PrintErrorTitle" xml:space="preserve">
+    <value>Print failed</value>
+  </data>
+  <data name="PrintDocumentUnavailable" xml:space="preserve">
+    <value>The document is not ready to print. Check the document and try again.</value>
+  </data>
   <data name="SavePdfUnsupported" xml:space="preserve">
     <value>This tab cannot be saved as PDF. Open a text document and try again.</value>
   </data>
@@ -4094,6 +4103,31 @@ Plan: {0}</value>
   <data name="SettingsKeepInTrayOnClose" xml:space="preserve"><value>Keep in system tray when closing</value></data>
   <data name="TrayMenuOpen" xml:space="preserve"><value>Open</value></data>
   <data name="TrayMenuClose" xml:space="preserve"><value>Close</value></data>
+  <data name="QuickNotesMenu" xml:space="preserve"><value>Quick Notes</value></data>
+  <data name="QuickNotesAdd" xml:space="preserve"><value>Add</value></data>
+  <data name="QuickNotesTitle" xml:space="preserve"><value>Title</value></data>
+  <data name="QuickNotesBody" xml:space="preserve"><value>Note</value></data>
+  <data name="QuickNotesUntitled" xml:space="preserve"><value>Untitled note</value></data>
+  <data name="QuickNotesEmpty" xml:space="preserve"><value>No saved notes.</value></data>
+  <data name="QuickNotesDelete" xml:space="preserve"><value>Delete</value></data>
+  <data name="QuickNotesDeletePrompt" xml:space="preserve"><value>Delete “{0}”</value></data>
+  <data name="QuickNotesDeleteConfirm" xml:space="preserve"><value>Delete the note “{0}”?</value></data>
+  <data name="QuickNotesCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="QuickNotesHide" xml:space="preserve"><value>Close to tray</value></data>
+  <data name="QuickNotesMove" xml:space="preserve"><value>Drag to move</value></data>
+  <data name="QuickNotesFold" xml:space="preserve"><value>Collapse</value></data>
+  <data name="QuickNotesExpand" xml:space="preserve"><value>Expand</value></data>
+  <data name="QuickNotesBackground" xml:space="preserve"><value>Background color</value></data>
+  <data name="QuickNotesForeground" xml:space="preserve"><value>Text color</value></data>
+  <data name="QuickNotesOpacity" xml:space="preserve"><value>Opacity</value></data>
+  <data name="QuickNotesHex" xml:space="preserve"><value>Hex color</value></data>
+  <data name="QuickNotesApply" xml:space="preserve"><value>Apply</value></data>
+  <data name="QuickNotesDefault" xml:space="preserve"><value>Default</value></data>
+  <data name="QuickNotesSource" xml:space="preserve"><value>View source</value></data>
+  <data name="QuickNotesLive" xml:space="preserve"><value>Live Markdown preview</value></data>
+  <data name="QuickNotesPreviewError" xml:space="preserve"><value>Could not display Markdown.</value></data>
+  <data name="QuickNotesSaveError" xml:space="preserve"><value>Could not save notes.</value></data>
+  <data name="QuickNotesLoadError" xml:space="preserve"><value>Could not load notes.</value></data>
   <data name="TabMenuImageConvert" xml:space="preserve"><value>Image Convert</value></data>
   <data name="ImageConvertDialogTitle" xml:space="preserve"><value>Image Conversion - {0}</value></data>
   <data name="ImageConvertSourceInfo" xml:space="preserve"><value>Source: {0}&#xA;Size: {1} × {2}px · Frames: {3}</value></data>

@@ -22,6 +22,7 @@ namespace TxtAIEditor
         private readonly List<MainWindow> _windows = new List<MainWindow>();
         private Window? _window;
         private TrayIconService? _trayIconService;
+        private QuickNotesController? _quickNotes;
         private MainWindow? _trayOwnerWindow;
         private bool _trayExitInProgress;
         private static Mutex? _singleInstanceMutex;
@@ -221,14 +222,32 @@ namespace TxtAIEditor
 
                 _trayIconService?.Dispose();
                 _trayOwnerWindow = owner;
+                string GetText(string key, string fallback) => owner.GetLocalizedString(key, fallback);
+                nint trayHandle = WinRT.Interop.WindowNative.GetWindowHandle(owner);
+                QuickNotesController GetQuickNotes() => _quickNotes ??= new QuickNotesController((key, fallback) =>
+                    _trayOwnerWindow?.GetLocalizedString(key, fallback) ?? fallback);
+                void QueueNoteAction(Action action) => owner.DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (Volatile.Read(ref _appCleanupStarted) == 0)
+                    {
+                        action();
+                    }
+                });
+
                 _trayIconService = new TrayIconService(
-                    WinRT.Interop.WindowNative.GetWindowHandle(owner),
+                    trayHandle,
                     "TxtAIEditor",
                     owner.GetLocalizedString("TrayMenuOpen", "열기"),
                     owner.GetLocalizedString("TrayMenuClose", "닫기"),
                     GetTrayWindowItems,
                     RestoreAnyWindow,
-                    () => _ = RequestCloseAllFromTrayAsync());
+                    () => _ = RequestCloseAllFromTrayAsync(),
+                    new TrayQuickNotesMenu(
+                        GetText("QuickNotesMenu", "빠른 메모"),
+                        GetText("QuickNotesAdd", "추가"),
+                        GetText("QuickNotesDelete", "삭제"),
+                        () => QueueNoteAction(() => GetQuickNotes().Add(trayHandle)),
+                        () => GetQuickNotes().GetTrayItems(trayHandle, QueueNoteAction)));
                 return true;
             }
             catch (Exception ex)
@@ -243,10 +262,8 @@ namespace TxtAIEditor
 
         internal void UpdateTrayIconVisibility()
         {
-            bool shouldShow = _windows.Count > 1 ||
-                _windows.Any(window => window.IsHiddenToTray) ||
-                _windows.Any(window => window.KeepInTrayOnCloseEnabled);
-            if (!shouldShow)
+            MainWindow? owner = _windows.FirstOrDefault();
+            if (owner == null)
             {
                 _trayIconService?.Dispose();
                 _trayIconService = null;
@@ -254,11 +271,7 @@ namespace TxtAIEditor
                 return;
             }
 
-            MainWindow? owner = _windows.FirstOrDefault();
-            if (owner != null)
-            {
-                EnsureTrayIcon(owner);
-            }
+            EnsureTrayIcon(owner);
         }
 
         private IReadOnlyList<TrayWindowItem> GetTrayWindowItems()
@@ -721,6 +734,8 @@ namespace TxtAIEditor
             _trayIconService?.Dispose();
             _trayIconService = null;
             _trayOwnerWindow = null;
+
+            _quickNotes?.Flush();
 
             _shellActivationService?.Dispose();
             _shellActivationService = null;

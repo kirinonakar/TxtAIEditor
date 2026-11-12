@@ -47,6 +47,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool>? _printLivePreview;
         private readonly LivePreviewController? _pdfPreview;
         private bool _savingPdf;
+        private bool _printingViewer;
 
         public MainWindowToolbarCommandController(
             Window ownerWindow,
@@ -196,7 +197,8 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public void Print() => RunCommand(PrintAsync);
+        public void Print() => _ = AppErrorHandler.RunAsync(PrintAsync, ex =>
+            _dialogController.ShowErrorMessage(_getLocalizedString("PrintErrorTitle", "인쇄 오류"), ex.Message));
 
         private void WireEvents()
         {
@@ -296,10 +298,7 @@ namespace TxtAIEditor.Controls
 
                 if (officeDocument)
                 {
-                    string html = await _officeDocumentViewerController.BuildPdfHtmlAsync(tab);
-                    await PdfExportController.ExportAsync(host, file.Path,
-                        new { mode = "html", text = html, baseHref = string.Empty },
-                        fullHtml: true, _ => { }, officeDocument: true);
+                    await ExportOfficePdfAsync(host, tab, file.Path);
                     return;
                 }
 
@@ -440,17 +439,37 @@ namespace TxtAIEditor.Controls
 
         private async Task PrintAsync()
         {
+            if (_printingViewer)
+            {
+                return;
+            }
+
             var activeTab = _tabNavigationController.GetActiveTab();
+            if (activeTab != null && (activeTab.IsImageViewer || activeTab.IsPdfViewer || activeTab.IsOfficeDocumentViewer))
+            {
+                _printingViewer = true;
+                _topToolbar.SetPrintBusy(true, _getLocalizedString);
+                try
+                {
+                    await PrintViewerAsync(activeTab);
+                }
+                finally
+                {
+                    _printingViewer = false;
+                    _topToolbar.SetPrintBusy(false, _getLocalizedString);
+                }
+                return;
+            }
+
             if (activeTab?.InlineLivePreviewEnabled != true &&
                 _printLivePreview != null && _printLivePreview())
             {
                 return;
             }
 
-            if (_editorTabView.SelectedItem is TabViewItem activeTabItem &&
-                activeTabItem.Tag is string tabId &&
-                _editorSessions.TryGetValue(tabId, out var session) &&
-                _tabBridges.TryGetValue(tabId, out var bridgeGroup) &&
+            if (activeTab != null &&
+                _editorSessions.TryGetValue(activeTab.Id, out var session) &&
+                _tabBridges.TryGetValue(activeTab.Id, out var bridgeGroup) &&
                 bridgeGroup.WebView.CoreWebView2 != null)
             {
                 string fullText = session.GetText();
@@ -458,6 +477,61 @@ namespace TxtAIEditor.Controls
                 await bridgeGroup.WebView.CoreWebView2.ExecuteScriptAsync(
                     $"printDocument({jsonText})");
             }
+        }
+
+        private async Task PrintViewerAsync(OpenedTab tab)
+        {
+            nint owner = WinRT.Interop.WindowNative.GetWindowHandle(_ownerWindow);
+            if (tab.IsOfficeDocumentViewer && _ownerWindow.Content is Panel host)
+            {
+                await PrintOfficeAsync(host, tab, owner);
+                return;
+            }
+
+            if (tab.IsPdfViewer && tab.FilePath is { Length: > 0 } pdfPath)
+            {
+                await PdfPrintController.ShowAsync(owner, pdfPath, tab.Title);
+                return;
+            }
+
+            if (tab.IsImageViewer &&
+                _tabNavigationController.GetCurrentActiveTabView().SelectedItem is TabViewItem item &&
+                await EditorTabViewItemFactory.TryShowImagePrintPreviewAsync(item))
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(_getLocalizedString("PrintDocumentUnavailable",
+                "문서를 인쇄할 준비가 되지 않았습니다. 문서를 확인한 뒤 다시 시도해 주세요."));
+        }
+
+        private async Task PrintOfficeAsync(Panel host, OpenedTab tab, nint owner)
+        {
+            var directory = Directory.CreateTempSubdirectory("TxtAIEditor-Print-");
+            string path = Path.Combine(directory.FullName, "document.pdf");
+            try
+            {
+                await ExportOfficePdfAsync(host, tab, path);
+                await PdfPrintController.ShowAsync(owner, path, tab.Title);
+            }
+            finally
+            {
+                try
+                {
+                    File.Delete(path);
+                    directory.Delete();
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    AppErrorHandler.Report(ex);
+                }
+            }
+        }
+
+        private async Task ExportOfficePdfAsync(Panel host, OpenedTab tab, string path)
+        {
+            string html = await _officeDocumentViewerController.BuildPdfHtmlAsync(tab);
+            await PdfExportController.ExportOfficeAsync(host, path, html);
         }
     }
 }
