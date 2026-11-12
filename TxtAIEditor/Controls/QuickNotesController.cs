@@ -125,9 +125,6 @@ namespace TxtAIEditor.Controls
         private string DisplayTitle(QuickNote note) =>
             string.IsNullOrWhiteSpace(note.Title) ? _text("QuickNotesUntitled", "제목 없음") : note.Title.Trim();
 
-        private string DeletePrompt(QuickNote note) =>
-            string.Format(_text("QuickNotesDeleteConfirm", "‘{0}’ 메모를 삭제할까요?"), DisplayTitle(note));
-
         private void OpenNote(QuickNote note)
         {
             if (_notes?.Contains(note) != true)
@@ -139,7 +136,7 @@ namespace TxtAIEditor.Controls
             {
                 window = new QuickNoteWindow(
                     note, _text, () => DisplayTitle(note), OnNoteChanged,
-                    root => _ = AppErrorHandler.RunAsync(() => ConfirmDeleteAsync(note, root, nint.Zero)),
+                    () => Delete(note),
                     _openNotes.Count, _theme);
                 _openNotes.Add(note.Id, window);
                 window.Closed += (_, _) =>
@@ -163,26 +160,12 @@ namespace TxtAIEditor.Controls
             _saveTimer.Start();
         }
 
-        private Task DeleteFromTrayAsync(QuickNote note, nint trayOwner)
+        private async Task DeleteFromTrayAsync(QuickNote note, nint trayOwner)
         {
-            nint owner = _openNotes.TryGetValue(note.Id, out QuickNoteWindow? window)
-                ? WindowNative.GetWindowHandle(window) : trayOwner;
-            return ConfirmDeleteAsync(note, root: null, owner);
-        }
-
-        private async Task ConfirmDeleteAsync(QuickNote note, FrameworkElement? root, nint owner)
-        {
-            if (_notes?.Contains(note) != true)
+            if (!Delete(note))
             {
-                return;
-            }
-
-            string delete = _text("QuickNotesDelete", "삭제");
-            var dialog = CreateDialog(delete, DeletePrompt(note), _text("QuickNotesCancel", "취소"));
-            dialog.PrimaryButtonText = delete;
-            if (await ShowDialogAsync(dialog, root, owner) == ContentDialogResult.Primary &&
-                !Delete(note) && root == null)
-            {
+                nint owner = _openNotes.TryGetValue(note.Id, out QuickNoteWindow? window)
+                    ? WindowNative.GetWindowHandle(window) : trayOwner;
                 await ShowTrayErrorAsync(owner, _text("QuickNotesSaveError", "메모를 저장할 수 없습니다."));
             }
         }
@@ -209,39 +192,25 @@ namespace TxtAIEditor.Controls
             return true;
         }
 
-        private Task<ContentDialogResult> ShowTrayErrorAsync(nint owner, string message) =>
-            ShowDialogAsync(CreateDialog(
-                _text("QuickNotesMenu", "빠른 메모"), message, _text("Ok", "확인")), root: null, owner);
-
-        private ContentDialog CreateDialog(string title, string message, string closeText) => new()
-        {
-            RequestedTheme = _theme,
-            Title = title,
-            Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
-            CloseButtonText = closeText,
-            DefaultButton = ContentDialogButton.Close
-        };
-
-        private async Task<ContentDialogResult> ShowDialogAsync(ContentDialog dialog, FrameworkElement? root, nint owner)
+        private async Task ShowTrayErrorAsync(nint owner, string message)
         {
             if (_activeDialog != null)
             {
-                return ContentDialogResult.None;
+                return;
             }
 
+            var dialog = new ContentDialog
+            {
+                RequestedTheme = _theme,
+                Title = _text("QuickNotesMenu", "빠른 메모"),
+                Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+                CloseButtonText = _text("Ok", "확인"),
+                DefaultButton = ContentDialogButton.Close
+            };
             _activeDialog = dialog;
             try
             {
-                if (root == null)
-                {
-                    return await QuickNoteDialogWindow.ShowAsync(dialog, owner);
-                }
-                if (root.XamlRoot is XamlRoot xamlRoot)
-                {
-                    dialog.XamlRoot = xamlRoot;
-                    return await dialog.ShowAsync();
-                }
-                return ContentDialogResult.None;
+                await QuickNoteDialogWindow.ShowAsync(dialog, owner);
             }
             finally
             {

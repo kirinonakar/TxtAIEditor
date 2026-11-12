@@ -16,9 +16,10 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class QuickNoteWindow : Window
     {
-        private const int MinWidth = 280;
-        private const int MinHeight = 216;
+        private const int MinClientWidth = 256;
+        private const int MinClientHeight = 244;
         private const int FoldedHeight = 46;
+        private const int ButtonSize = 28;
         private static readonly string[] BackgroundColors = { "#FFF1A6", "#FFD5E6", "#C8E7FF", "#CDEFD4", "#E9DBFF", "#28272B" };
         private static readonly string[] ForegroundColors = { "#26201B", "#FFFFFF", "#A02640", "#1A54A0", "#13633C", "#7140A8" };
 
@@ -30,11 +31,11 @@ namespace TxtAIEditor.Controls
         private readonly OverlappedPresenter _presenter;
         private readonly Grid _root = new() { Padding = new Thickness(6, 4, 6, 4), RowSpacing = 4 };
         private readonly Grid _body = new();
-        private readonly StackPanel _toolbar = new() { Orientation = Orientation.Horizontal, Spacing = 3 };
+        private readonly StackPanel _toolbar = new() { Orientation = Orientation.Horizontal, Spacing = 2 };
         private readonly TextBox _titleInput;
         private readonly TextBox _source;
         private readonly TextBlock _foldedTitle = new() { TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-        private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12, Visibility = Visibility.Collapsed };
+        private readonly TextBlock _status = new() { TextTrimming = TextTrimming.CharacterEllipsis, FontSize = 12, Visibility = Visibility.Collapsed };
         private readonly Button _foldButton;
         private readonly Button _closeButton;
         private readonly ToggleButton _liveButton;
@@ -55,7 +56,7 @@ namespace TxtAIEditor.Controls
 
         public QuickNoteWindow(
             QuickNote note, Func<string, string, string> text, Func<string> displayTitle,
-            Action changed, Action<FrameworkElement> delete, int openCount, ElementTheme appTheme)
+            Action changed, Action delete, int openCount, ElementTheme appTheme)
         {
             _note = note;
             _text = text;
@@ -73,6 +74,7 @@ namespace TxtAIEditor.Controls
             _note.Opacity = Math.Clamp(_note.Opacity, 35, 100);
 
             _titleInput = CreateTextBox(note.Title, text("QuickNotesTitle", "제목"));
+            _titleInput.Height = 30;
             _titleInput.MaxLength = 200;
             _titleInput.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
             _titleInput.TextChanged += (_, _) =>
@@ -102,7 +104,8 @@ namespace TxtAIEditor.Controls
             _foldButton.Click += (_, _) => ToggleFold();
             _closeButton = CreateIconButton("\uE711", text("QuickNotesHide", "트레이로 닫기"));
             _closeButton.Click += (_, _) => Close();
-            _liveButton = new ToggleButton { Content = Icon("\uE890"), Padding = new Thickness(8, 4, 8, 4) };
+            _liveButton = new ToggleButton { Content = Icon("\uE890") };
+            SizeIconButton(_liveButton);
             _liveButton.Click += (_, _) =>
             {
                 _note.IsPreview = _liveButton.IsChecked == true;
@@ -116,7 +119,7 @@ namespace TxtAIEditor.Controls
             _toolbar.Children.Add(CreateColorButton(false));
             _toolbar.Children.Add(CreateOpacityButton());
             var deleteButton = CreateIconButton("\uE74D", text("QuickNotesDelete", "삭제"));
-            deleteButton.Click += (_, _) => delete(_root);
+            deleteButton.Click += (_, _) => delete();
             _toolbar.Children.Add(deleteButton);
 
             _preview = new QuickNotePreview(OnPreviewFailed);
@@ -134,7 +137,11 @@ namespace TxtAIEditor.Controls
             ApplyColors();
             ApplyOpacity();
             _root.ActualThemeChanged += (_, _) => ApplyColors();
-            _root.Loaded += (_, _) => ApplyMode();
+            _root.Loaded += (_, _) =>
+            {
+                RefreshSizeLimits();
+                ApplyMode();
+            };
             AppWindow appWindow = AppWindow;
             appWindow.Changed += OnWindowChanged;
             Closed += (_, _) =>
@@ -169,9 +176,19 @@ namespace TxtAIEditor.Controls
 
         private static Button CreateIconButton(string glyph, string label)
         {
-            var button = new Button { Content = Icon(glyph), Padding = new Thickness(8, 4, 8, 4) };
+            var button = new Button { Content = Icon(glyph) };
+            SizeIconButton(button);
             LabelControl(button, label);
             return button;
+        }
+
+        private static void SizeIconButton(ButtonBase button)
+        {
+            button.MinWidth = 0;
+            button.MinHeight = 0;
+            button.Width = ButtonSize;
+            button.Height = ButtonSize;
+            button.Padding = new Thickness(0);
         }
 
         private static FontIcon Icon(string glyph) => new() { Glyph = glyph, FontSize = 14 };
@@ -188,6 +205,9 @@ namespace TxtAIEditor.Controls
             {
                 Text = value,
                 PlaceholderText = placeholder,
+                MinWidth = 0,
+                MinHeight = 0,
+                Padding = new Thickness(5, 3, 5, 3),
                 BorderThickness = new Thickness(0)
             };
             AutomationProperties.SetName(box, placeholder);
@@ -211,8 +231,8 @@ namespace TxtAIEditor.Controls
             var handle = new Border
             {
                 Child = _dragIcon,
-                Width = 26,
-                MinHeight = 32,
+                Width = 22,
+                MinHeight = ButtonSize,
                 Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent)
             };
             ToolTipService.SetToolTip(handle, _text("QuickNotesMove", "끌어서 이동"));
@@ -265,22 +285,30 @@ namespace TxtAIEditor.Controls
         private Button CreateColorButton(bool background)
         {
             string label = background ? _text("QuickNotesBackground", "바탕색") : _text("QuickNotesForeground", "글자색");
-            var button = CreateIconButton(background ? "\uE81C" : "\uE8D3", label);
+            var button = CreateIconButton(background ? "\uE790" : "\uE8D3", label);
+            AttachOptions(button, label, dismiss => CreateColorOptions(background, dismiss));
+            return button;
+        }
+
+        private FrameworkElement CreateColorOptions(bool background, Action dismiss)
+        {
             var swatches = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
-            var hex = new TextBox { Header = _text("QuickNotesHex", "색상 코드"), MaxLength = 7, Width = 104 };
+            var hex = new TextBox
+            {
+                Header = _text("QuickNotesHex", "색상 코드"),
+                Text = ToHex(background ? _background : _foreground),
+                MaxLength = 7,
+                Width = 104
+            };
             var apply = new Button { Content = _text("QuickNotesApply", "적용"), VerticalAlignment = VerticalAlignment.Bottom };
             var inputRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             inputRow.Children.Add(hex);
             inputRow.Children.Add(apply);
             var reset = new Button { Content = _text("QuickNotesDefault", "기본값") };
             var content = new StackPanel { Spacing = 7 };
-            content.Children.Add(new TextBlock { Text = label });
             content.Children.Add(swatches);
             content.Children.Add(inputRow);
             content.Children.Add(reset);
-            var flyout = new Flyout { Content = content };
-            button.Flyout = flyout;
-
             void SelectColor(string? value)
             {
                 if (background)
@@ -293,7 +321,7 @@ namespace TxtAIEditor.Controls
                 }
                 ApplyColors();
                 _changed();
-                flyout.Hide();
+                dismiss();
             }
 
             foreach (string value in background ? BackgroundColors : ForegroundColors)
@@ -313,7 +341,6 @@ namespace TxtAIEditor.Controls
                 swatches.Children.Add(swatch);
             }
 
-            flyout.Opening += (_, _) => hex.Text = ToHex(background ? _background : _foreground);
             hex.TextChanged += (_, _) => apply.IsEnabled = TryColor(hex.Text, out _);
             apply.Click += (_, _) =>
             {
@@ -323,16 +350,22 @@ namespace TxtAIEditor.Controls
                 }
             };
             reset.Click += (_, _) => SelectColor(null);
-            return button;
+            return content;
         }
 
         private Button CreateOpacityButton()
         {
             string label = _text("QuickNotesOpacity", "불투명도");
             var button = CreateIconButton("\uE81A", label);
+            AttachOptions(button, label, _ => CreateOpacityOptions(label));
+            return button;
+        }
+
+        private Slider CreateOpacityOptions(string label)
+        {
             var slider = new Slider { Minimum = 35, Maximum = 100, StepFrequency = 5, Width = 170, Value = _note.Opacity };
             AutomationProperties.SetName(slider, label);
-            void UpdateLabel() => slider.Header = $"{label}  {slider.Value / 100:P0}";
+            void UpdateLabel() => slider.Header = $"{slider.Value / 100:P0}";
             UpdateLabel();
             slider.ValueChanged += (_, _) =>
             {
@@ -341,8 +374,27 @@ namespace TxtAIEditor.Controls
                 ApplyOpacity();
                 _changed();
             };
-            button.Flyout = new Flyout { Content = slider };
-            return button;
+            return slider;
+        }
+
+        private void AttachOptions(Button button, string title, Func<Action, FrameworkElement> createContent)
+        {
+            var flyout = new Flyout { Placement = FlyoutPlacementMode.Bottom, ShouldConstrainToRootBounds = true };
+            button.Click += (_, _) =>
+            {
+                if (flyout.IsOpen)
+                {
+                    flyout.Hide();
+                }
+                else
+                {
+                    var content = new StackPanel { Spacing = 7 };
+                    content.Children.Add(new TextBlock { Text = title });
+                    content.Children.Add(createContent(flyout.Hide));
+                    flyout.Content = content;
+                    flyout.ShowAt(button);
+                }
+            };
         }
 
         private void ApplyColors()
@@ -418,6 +470,7 @@ namespace TxtAIEditor.Controls
         {
             _status.Text = _storageError.Length > 0 ? _storageError : _previewError;
             _status.Visibility = !_note.IsCollapsed && _status.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            ToolTipService.SetToolTip(_status, _status.Visibility == Visibility.Visible ? _status.Text : null);
         }
 
         private void ApplyFold()
@@ -426,7 +479,6 @@ namespace TxtAIEditor.Controls
             _root.RowSpacing = folded ? 0 : 4;
             _foldedTitle.Visibility = folded ? Visibility.Visible : Visibility.Collapsed;
             _titleInput.Visibility = folded ? Visibility.Collapsed : Visibility.Visible;
-            _closeButton.Visibility = folded ? Visibility.Collapsed : Visibility.Visible;
             _toolbar.Visibility = folded ? Visibility.Collapsed : Visibility.Visible;
             _body.Visibility = folded ? Visibility.Collapsed : Visibility.Visible;
             _foldButton.Content = Icon(folded ? "\uE70D" : "\uE70E");
@@ -441,12 +493,12 @@ namespace TxtAIEditor.Controls
             {
                 _note.IsCollapsed = !_note.IsCollapsed;
                 ApplyFold();
-                ApplySizeLimits();
+                SizeInt32 minimum = ApplySizeLimits();
                 var position = AppWindow.Position;
                 var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
-                int width = AppWindow.Size.Width;
-                int height = _note.IsCollapsed ? Pixels(FoldedHeight) :
-                    Math.Clamp(_note.Height, Pixels(MinHeight), Math.Max(Pixels(MinHeight), workArea.Height));
+                int width = Math.Max(AppWindow.Size.Width, minimum.Width);
+                int height = _note.IsCollapsed ? minimum.Height :
+                    Math.Clamp(_note.Height, minimum.Height, Math.Max(minimum.Height, workArea.Height));
                 AppWindow.MoveAndResize(FitToWorkArea(workArea, position.X, position.Y, width, height));
                 CapturePlacement();
                 ApplyMode();
@@ -466,22 +518,20 @@ namespace TxtAIEditor.Controls
             DisplayArea? display = _note.X.HasValue && _note.Y.HasValue
                 ? DisplayArea.GetFromPoint(saved, DisplayAreaFallback.None) : null;
             RectInt32 area = (display ?? DisplayArea.Primary).WorkArea;
-            int width = Math.Clamp(_note.Width > 0 ? _note.Width : Pixels(350), Pixels(MinWidth), Math.Max(Pixels(MinWidth), area.Width));
-            int height = Math.Clamp(_note.Height > 0 ? _note.Height : Pixels(295), Pixels(MinHeight), Math.Max(Pixels(MinHeight), area.Height));
-            int visibleHeight = _note.IsCollapsed ? Pixels(FoldedHeight) : height;
+            SizeInt32 minimum = ApplySizeLimits();
+            int width = Math.Clamp(_note.Width > 0 ? _note.Width : Pixels(350), minimum.Width, Math.Max(minimum.Width, area.Width));
+            int height = _note.IsCollapsed ? minimum.Height :
+                Math.Clamp(_note.Height > 0 ? _note.Height : Pixels(295), minimum.Height, Math.Max(minimum.Height, area.Height));
             int inset = Pixels(16 + openCount % 8 * 22);
             int x = display != null ? saved.X : area.X + area.Width - width - inset;
             int y = display != null ? saved.Y : area.Y + inset;
             _note.Width = width;
-            _note.Height = height;
-            ApplySizeLimits();
-            AppWindow.MoveAndResize(FitToWorkArea(area, x, y, width, visibleHeight));
-            _scale = ReadScale();
-            ApplySizeLimits();
-            if (_note.IsCollapsed)
+            if (!_note.IsCollapsed)
             {
-                AppWindow.Resize(new SizeInt32(AppWindow.Size.Width, Pixels(FoldedHeight)));
+                _note.Height = height;
             }
+            AppWindow.MoveAndResize(FitToWorkArea(area, x, y, width, height));
+            RefreshSizeLimits();
             CapturePlacement();
             if (previous != (_note.X, _note.Y, _note.Width, _note.Height))
             {
@@ -493,11 +543,35 @@ namespace TxtAIEditor.Controls
             Math.Clamp(x, area.X, area.X + Math.Max(0, area.Width - width)),
             Math.Clamp(y, area.Y, area.Y + Math.Max(0, area.Height - height)), width, height);
 
-        private void ApplySizeLimits()
+        private SizeInt32 ApplySizeLimits()
         {
-            _presenter.PreferredMinimumWidth = Pixels(MinWidth);
-            _presenter.PreferredMinimumHeight = Pixels(_note.IsCollapsed ? FoldedHeight : MinHeight);
             _presenter.IsResizable = !_note.IsCollapsed;
+            // The presenter limits include the window frame, while flyouts fit in the client area.
+            SizeInt32 window = AppWindow.Size;
+            SizeInt32 client = AppWindow.ClientSize;
+            int frameWidth = client.Width > 0 ? Math.Max(0, window.Width - client.Width) : 0;
+            int frameHeight = client.Height > 0 ? Math.Max(0, window.Height - client.Height) : 0;
+            var minimum = new SizeInt32(
+                (int)Math.Ceiling(MinClientWidth * _scale) + frameWidth,
+                _note.IsCollapsed ? Pixels(FoldedHeight) : (int)Math.Ceiling(MinClientHeight * _scale) + frameHeight);
+            _presenter.PreferredMinimumWidth = minimum.Width;
+            _presenter.PreferredMinimumHeight = minimum.Height;
+            return minimum;
+        }
+
+        private void RefreshSizeLimits()
+        {
+            _scale = ReadScale();
+            SizeInt32 minimum = ApplySizeLimits();
+            SizeInt32 size = AppWindow.Size;
+            int width = Math.Max(size.Width, minimum.Width);
+            int height = _note.IsCollapsed ? minimum.Height : Math.Max(size.Height, minimum.Height);
+            if (width != size.Width || height != size.Height)
+            {
+                var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+                var position = AppWindow.Position;
+                AppWindow.MoveAndResize(FitToWorkArea(area, position.X, position.Y, width, height));
+            }
         }
 
         private void OnWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
@@ -507,15 +581,9 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            double scale = ReadScale();
-            if (_scale != scale)
+            if (_scale != ReadScale())
             {
-                _scale = scale;
-                ApplySizeLimits();
-                if (_note.IsCollapsed)
-                {
-                    sender.Resize(new SizeInt32(sender.Size.Width, Pixels(FoldedHeight)));
-                }
+                RefreshSizeLimits();
             }
             CapturePlacement();
             _changed();

@@ -4114,8 +4114,6 @@ Plan: {0}</value>
   <data name="QuickNotesEmpty" xml:space="preserve"><value>No saved notes.</value></data>
   <data name="QuickNotesDelete" xml:space="preserve"><value>Delete</value></data>
   <data name="QuickNotesDeletePrompt" xml:space="preserve"><value>Delete “{0}”</value></data>
-  <data name="QuickNotesDeleteConfirm" xml:space="preserve"><value>Delete the note “{0}”?</value></data>
-  <data name="QuickNotesCancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="QuickNotesHide" xml:space="preserve"><value>Close to tray</value></data>
   <data name="QuickNotesMove" xml:space="preserve"><value>Drag to move</value></data>
   <data name="QuickNotesFold" xml:space="preserve"><value>Collapse</value></data>

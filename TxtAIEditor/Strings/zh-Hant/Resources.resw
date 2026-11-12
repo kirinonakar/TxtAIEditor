@@ -4072,8 +4072,6 @@
   <data name="QuickNotesEmpty" xml:space="preserve"><value>沒有已儲存的便利貼。</value></data>
   <data name="QuickNotesDelete" xml:space="preserve"><value>刪除</value></data>
   <data name="QuickNotesDeletePrompt" xml:space="preserve"><value>刪除「{0}」</value></data>
-  <data name="QuickNotesDeleteConfirm" xml:space="preserve"><value>要刪除便利貼「{0}」嗎？</value></data>
-  <data name="QuickNotesCancel" xml:space="preserve"><value>取消</value></data>
   <data name="QuickNotesHide" xml:space="preserve"><value>關閉至系統匣</value></data>
   <data name="QuickNotesMove" xml:space="preserve"><value>拖曳以移動</value></data>
   <data name="QuickNotesFold" xml:space="preserve"><value>摺疊</value></data>

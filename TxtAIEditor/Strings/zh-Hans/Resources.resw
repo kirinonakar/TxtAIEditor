@@ -4072,8 +4072,6 @@
   <data name="QuickNotesEmpty" xml:space="preserve"><value>没有已保存的便笺。</value></data>
   <data name="QuickNotesDelete" xml:space="preserve"><value>删除</value></data>
   <data name="QuickNotesDeletePrompt" xml:space="preserve"><value>删除“{0}”</value></data>
-  <data name="QuickNotesDeleteConfirm" xml:space="preserve"><value>要删除便笺“{0}”吗？</value></data>
-  <data name="QuickNotesCancel" xml:space="preserve"><value>取消</value></data>
   <data name="QuickNotesHide" xml:space="preserve"><value>关闭到托盘</value></data>
   <data name="QuickNotesMove" xml:space="preserve"><value>拖动以移动</value></data>
   <data name="QuickNotesFold" xml:space="preserve"><value>折叠</value></data>

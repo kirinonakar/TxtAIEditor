@@ -4114,8 +4114,6 @@
   <data name="QuickNotesEmpty" xml:space="preserve"><value>저장된 메모가 없습니다.</value></data>
   <data name="QuickNotesDelete" xml:space="preserve"><value>삭제</value></data>
   <data name="QuickNotesDeletePrompt" xml:space="preserve"><value>‘{0}’ 메모 삭제</value></data>
-  <data name="QuickNotesDeleteConfirm" xml:space="preserve"><value>‘{0}’ 메모를 삭제할까요?</value></data>
-  <data name="QuickNotesCancel" xml:space="preserve"><value>취소</value></data>
   <data name="QuickNotesHide" xml:space="preserve"><value>트레이로 닫기</value></data>
   <data name="QuickNotesMove" xml:space="preserve"><value>끌어서 이동</value></data>
   <data name="QuickNotesFold" xml:space="preserve"><value>접기</value></data>

@@ -4072,8 +4072,6 @@
   <data name="QuickNotesEmpty" xml:space="preserve"><value>保存したメモはありません。</value></data>
   <data name="QuickNotesDelete" xml:space="preserve"><value>削除</value></data>
   <data name="QuickNotesDeletePrompt" xml:space="preserve"><value>「{0}」を削除</value></data>
-  <data name="QuickNotesDeleteConfirm" xml:space="preserve"><value>メモ「{0}」を削除しますか？</value></data>
-  <data name="QuickNotesCancel" xml:space="preserve"><value>キャンセル</value></data>
   <data name="QuickNotesHide" xml:space="preserve"><value>トレイに格納</value></data>
   <data name="QuickNotesMove" xml:space="preserve"><value>ドラッグして移動</value></data>
   <data name="QuickNotesFold" xml:space="preserve"><value>折りたたむ</value></data>

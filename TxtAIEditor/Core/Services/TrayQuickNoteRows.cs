@@ -22,6 +22,7 @@ namespace TxtAIEditor.Core.Services
         private const uint VkDelete = 0x2E;
         private const int MessageFilterHook = -1;
         private const int MenuMessage = 2;
+        private const int RowWidth = 176;
 
         private readonly nint _menu;
         private readonly string _deleteText;
@@ -98,7 +99,7 @@ namespace TxtAIEditor.Core.Services
                     var measure = Marshal.PtrToStructure<MeasureItem>(lParam);
                     if (measure.ControlType == MenuItemType && _rows.ContainsKey(measure.ItemId))
                     {
-                        measure.Width = (uint)Math.Max(Scale(285), _buttonWidth + Scale(84));
+                        measure.Width = (uint)Math.Max(Scale(RowWidth), _buttonWidth + Scale(96));
                         measure.Height = (uint)_rowHeight;
                         Marshal.StructureToPtr(measure, lParam, false);
                         return true;
