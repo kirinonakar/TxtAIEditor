@@ -314,6 +314,13 @@ namespace TxtAIEditor.Controls
                 if (background)
                 {
                     _note.Background = value;
+                    // Drop an ink color that no longer contrasts with the new paper, so the
+                    // automatic color (white on dark paper) is used instead.
+                    if (TryColor(value, out Color paper) &&
+                        (!TryColor(_note.Foreground, out Color ink) || IsDark(ink) == IsDark(paper)))
+                    {
+                        _note.Foreground = null;
+                    }
                 }
                 else
                 {
