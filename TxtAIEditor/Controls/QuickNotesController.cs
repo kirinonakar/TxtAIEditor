@@ -66,7 +66,7 @@ namespace TxtAIEditor.Controls
                 items.Add(new TrayQuickNoteItem(title,
                     string.Format(_text("QuickNotesDeletePrompt", "‘{0}’ 메모 삭제"), title),
                     () => enqueue(() => OpenNote(note)),
-                    () => enqueue(() => _ = AppErrorHandler.RunAsync(() => DeleteFromTrayAsync(note, trayOwner)))));
+                    () => DeleteFromTray(note, trayOwner, enqueue)));
             }
 
             string? status = _saveFailed ? _text("QuickNotesSaveError", "메모를 저장할 수 없습니다.") :
@@ -160,17 +160,39 @@ namespace TxtAIEditor.Controls
             _saveTimer.Start();
         }
 
-        private async Task DeleteFromTrayAsync(QuickNote note, nint trayOwner)
+        private bool DeleteFromTray(QuickNote note, nint trayOwner, Action<Action> enqueue)
         {
-            if (!Delete(note))
+            if (TryRemoveNote(note))
+            {
+                // Close the note outside the native menu input hook.
+                if (_openNotes.ContainsKey(note.Id))
+                {
+                    enqueue(() => CloseNote(note));
+                }
+                return true;
+            }
+
+            enqueue(() => _ = AppErrorHandler.RunAsync(() =>
             {
                 nint owner = _openNotes.TryGetValue(note.Id, out QuickNoteWindow? window)
                     ? WindowNative.GetWindowHandle(window) : trayOwner;
-                await ShowTrayErrorAsync(owner, _text("QuickNotesSaveError", "메모를 저장할 수 없습니다."));
-            }
+                return ShowTrayErrorAsync(owner, _text("QuickNotesSaveError", "메모를 저장할 수 없습니다."));
+            }));
+            return false;
         }
 
         private bool Delete(QuickNote note)
+        {
+            if (!TryRemoveNote(note))
+            {
+                return false;
+            }
+
+            CloseNote(note);
+            return true;
+        }
+
+        private bool TryRemoveNote(QuickNote note)
         {
             int index = _notes!.IndexOf(note);
             if (index < 0)
@@ -184,12 +206,15 @@ namespace TxtAIEditor.Controls
                 _notes.Insert(index, note);
                 return false;
             }
+            return true;
+        }
 
+        private void CloseNote(QuickNote note)
+        {
             if (_openNotes.TryGetValue(note.Id, out QuickNoteWindow? window))
             {
                 window.Close();
             }
-            return true;
         }
 
         private async Task ShowTrayErrorAsync(nint owner, string message)

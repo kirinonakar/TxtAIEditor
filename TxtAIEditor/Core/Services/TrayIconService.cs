@@ -260,11 +260,7 @@ namespace TxtAIEditor.Core.Services
                     }
                 }
 
-                if (_noteRows?.SelectedDelete is Action delete)
-                {
-                    selectedAction = delete;
-                }
-                else if (command == OpenMenuCommand)
+                if (command == OpenMenuCommand)
                 {
                     selectedAction = _openRequested;
                 }
@@ -337,7 +333,7 @@ namespace TxtAIEditor.Core.Services
                 }
                 if (AppendMenu(submenu, MfString, commandId, EscapeMenuLabel(note.DeleteLabel)))
                 {
-                    actions.Add(commandId++, note.Delete);
+                    actions.Add(commandId++, () => note.Delete());
                 }
             }
         }
@@ -474,5 +470,5 @@ namespace TxtAIEditor.Core.Services
 
     internal sealed record TrayQuickNoteItems(IReadOnlyList<TrayQuickNoteItem> Items, string? Status);
 
-    internal sealed record TrayQuickNoteItem(string Title, string DeleteLabel, Action Open, Action Delete);
+    internal sealed record TrayQuickNoteItem(string Title, string DeleteLabel, Action Open, Func<bool> Delete);
 }

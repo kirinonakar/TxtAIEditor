@@ -9,6 +9,8 @@ namespace TxtAIEditor.Core.Services
     internal sealed class TrayQuickNoteRows : IDisposable
     {
         private const uint OwnerDraw = 0x0100;
+        private const uint Grayed = 0x0001;
+        private const uint ByPosition = 0x0400;
         private const uint MenuItemType = 1;
         private const uint Selected = 0x0001;
         private const uint WmDrawItem = 0x002B;
@@ -19,7 +21,11 @@ namespace TxtAIEditor.Core.Services
         private const uint WmLeftButtonUp = 0x0202;
         private const uint WmRightButtonDown = 0x0204;
         private const uint WmRightButtonUp = 0x0205;
+        private const uint MnGetHmenu = 0x01E1;
         private const uint VkDelete = 0x2E;
+        private const int KeyPreviouslyDown = 1 << 30;
+        private const uint RedrawInvalidate = 0x0001;
+        private const uint RedrawUpdateNow = 0x0100;
         private const int MessageFilterHook = -1;
         private const int MenuMessage = 2;
         private const int RowWidth = 176;
@@ -56,8 +62,6 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        public Action? SelectedDelete { get; private set; }
-
         public bool Append(uint commandId, TrayQuickNoteItem item)
         {
             if (_hook == nint.Zero)
@@ -84,7 +88,7 @@ namespace TxtAIEditor.Core.Services
                 return false;
             }
 
-            _rows.Add(commandId, new Row(title, item.Delete, info));
+            _rows.Add(commandId, new Row(title, item.Delete, info, (uint)(GetMenuItemCount(_menu) - 1)));
             return true;
         }
 
@@ -124,24 +128,30 @@ namespace TxtAIEditor.Core.Services
             Rectangle bounds = item.Bounds.ToRectangle();
             Rectangle button = GetDeleteBounds(bounds);
             var title = Rectangle.FromLTRB(bounds.Left + Scale(20), bounds.Top, button.Left - Scale(8), bounds.Bottom);
-            bool selected = (item.State & Selected) != 0;
+            bool selected = !row.Deleted && (item.State & Selected) != 0;
             using var graphics = Graphics.FromHdc(item.DeviceContext);
             graphics.SetClip(bounds);
             using var background = new SolidBrush(selected ? SystemColors.Highlight : SystemColors.Menu);
-            using var foreground = new SolidBrush(selected ? SystemColors.HighlightText : SystemColors.MenuText);
-            using var border = new Pen(selected ? SystemColors.HighlightText : SystemColors.ControlDark);
+            using var foreground = new SolidBrush(row.Deleted ? SystemColors.GrayText :
+                selected ? SystemColors.HighlightText : SystemColors.MenuText);
             using var titleFormat = new StringFormat(StringFormatFlags.NoWrap)
             {
                 LineAlignment = StringAlignment.Center,
                 Trimming = StringTrimming.EllipsisCharacter
             };
+            graphics.FillRectangle(background, bounds);
+            graphics.DrawString(row.Title, _font, foreground, title, titleFormat);
+            if (row.Deleted)
+            {
+                return;
+            }
+
+            using var border = new Pen(selected ? SystemColors.HighlightText : SystemColors.ControlDark);
             using var buttonFormat = new StringFormat(StringFormatFlags.NoWrap)
             {
                 Alignment = StringAlignment.Center,
                 LineAlignment = StringAlignment.Center
             };
-            graphics.FillRectangle(background, bounds);
-            graphics.DrawString(row.Title, _font, foreground, title, titleFormat);
             graphics.DrawRectangle(border, button.X, button.Y, button.Width - 1, button.Height - 1);
             graphics.DrawString(_deleteText, _font, foreground, button, buttonFormat);
         }
@@ -152,7 +162,7 @@ namespace TxtAIEditor.Core.Services
         private Row? GetDeleteAt(Point point)
         {
             int position = MenuItemFromPoint(nint.Zero, _menu, point);
-            if (position < 0 || !_rows.TryGetValue(GetMenuItemID(_menu, position), out Row? row) ||
+            if (position < 0 || !_rows.TryGetValue(GetMenuItemID(_menu, position), out Row? row) || row.Deleted ||
                 !GetMenuItemRect(nint.Zero, _menu, (uint)position, out NativeRect bounds))
             {
                 return null;
@@ -186,7 +196,10 @@ namespace TxtAIEditor.Core.Services
                 }
                 else if (message.Id == WmKeyDown && message.WParam == VkDelete && _highlighted is Row highlighted)
                 {
-                    RequestDelete(highlighted);
+                    if ((message.LParam & KeyPreviouslyDown) == 0)
+                    {
+                        RequestDelete(highlighted);
+                    }
                     return 1;
                 }
             }
@@ -196,9 +209,43 @@ namespace TxtAIEditor.Core.Services
 
         private void RequestDelete(Row row)
         {
-            if (EndMenu())
+            if (row.Deleted)
             {
-                SelectedDelete = row.Delete;
+                return;
+            }
+
+            try
+            {
+                if (row.Delete())
+                {
+                    // Keep the row in place so the remaining delete buttons do not move under the pointer.
+                    row.Deleted = true;
+                    EnableMenuItem(_menu, row.Position, ByPosition | Grayed);
+                    RedrawRow(row);
+                    return;
+                }
+            }
+            catch (Exception ex) when (AppErrorHandler.IsRecoverable(ex))
+            {
+                AppErrorHandler.Report(ex);
+            }
+
+            // Release menu focus for the save error dialog.
+            EndMenu();
+        }
+
+        private void RedrawRow(Row row)
+        {
+            if (!GetMenuItemRect(nint.Zero, _menu, row.Position, out NativeRect bounds))
+            {
+                return;
+            }
+
+            nint popup = WindowFromPoint(new Point((bounds.Left + bounds.Right) / 2, (bounds.Top + bounds.Bottom) / 2));
+            if (popup != nint.Zero && GetWindowThreadProcessId(popup, nint.Zero) == GetCurrentThreadId() &&
+                SendMessage(popup, MnGetHmenu, nint.Zero, nint.Zero) == _menu)
+            {
+                RedrawWindow(popup, nint.Zero, nint.Zero, RedrawInvalidate | RedrawUpdateNow);
             }
         }
 
@@ -217,7 +264,10 @@ namespace TxtAIEditor.Core.Services
             _font.Dispose();
         }
 
-        private sealed record Row(string Title, Action Delete, nint AccessibleInfo);
+        private sealed record Row(string Title, Func<bool> Delete, nint AccessibleInfo, uint Position)
+        {
+            public bool Deleted { get; set; }
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct AccessibleMenuItem
@@ -286,7 +336,25 @@ namespace TxtAIEditor.Core.Services
         private static extern uint GetMenuItemID(nint menu, int position);
 
         [DllImport("user32.dll")]
+        private static extern int GetMenuItemCount(nint menu);
+
+        [DllImport("user32.dll")]
+        private static extern uint EnableMenuItem(nint menu, uint position, uint flags);
+
+        [DllImport("user32.dll")]
         private static extern bool GetMenuItemRect(nint window, nint menu, uint position, out NativeRect bounds);
+
+        [DllImport("user32.dll")]
+        private static extern nint WindowFromPoint(Point point);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(nint window, nint processId);
+
+        [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+        private static extern nint SendMessage(nint window, uint message, nint wParam, nint lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool RedrawWindow(nint window, nint rectangle, nint region, uint flags);
 
         [DllImport("user32.dll")]
         private static extern uint GetDpiForWindow(nint window);
