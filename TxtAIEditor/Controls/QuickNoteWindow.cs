@@ -443,10 +443,13 @@ namespace TxtAIEditor.Controls
 
         private void ApplyButtonColors(Control button)
         {
-            var surface = new SolidColorBrush(Blend(_background, _foreground, 0.12));
-            var hover = new SolidColorBrush(Blend(_background, _foreground, 0.2));
-            var pressed = new SolidColorBrush(Blend(_background, _foreground, 0.32));
-            var border = new SolidColorBrush(Blend(_background, _foreground, 0.26));
+            // Light paper keeps more of its own color so the buttons stay close to the note surface,
+            // while dark paper needs a stronger tint to stay visible.
+            double tint = IsDark(_background) ? 1.0 : 0.5;
+            var surface = new SolidColorBrush(Blend(_background, _foreground, 0.12 * tint));
+            var hover = new SolidColorBrush(Blend(_background, _foreground, 0.2 * tint));
+            var pressed = new SolidColorBrush(Blend(_background, _foreground, 0.32 * tint));
+            var border = new SolidColorBrush(Blend(_background, _foreground, 0.26 * tint));
             var ink = new SolidColorBrush(_foreground);
             button.Background = surface;
             button.Foreground = ink;
