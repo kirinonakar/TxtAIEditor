@@ -234,7 +234,7 @@ Copyright (c) 2026 **kirinonakar**. All rights reserved.
 
 ### Third-Party Licenses
 
-This software includes Mermaid, Pele, xterm.js, and KaTeX.
+This software includes Mermaid, Pele, xterm.js, KaTeX, and HarfBuzz.
 
 **Mermaid**  
 License: MIT License  
@@ -255,7 +255,13 @@ Copyright (c) 2012-2013, Christopher Jeffrey
 License: MIT License  
 Copyright (c) 2013-2020 Khan Academy and other contributors  
 
-The MIT license text below applies to the third-party components listed above.
+**[HarfBuzz](https://github.com/harfbuzz/harfbuzzjs)** (harfbuzzjs 1.6.4)<br>
+License: "Old MIT" License (harfbuzzjs wrapper: MIT License)<br>
+Copyright © 2010-2022 Google, Inc. and other HarfBuzz contributors<br>
+Copyright (c) 2019-2026 The harfbuzzjs project authors<br>
+The bundled [HarfBuzz license](TxtAIEditor/WebResources/harfbuzz/HARFBUZZ-LICENSE.txt) and [harfbuzzjs license](TxtAIEditor/WebResources/harfbuzz/LICENSE) contain the full notices.
+
+The MIT license text below applies to the MIT-licensed third-party components listed above. HarfBuzz is distributed under its own "Old MIT" license, bundled as noted above.
 
 The MIT License (MIT)
 
