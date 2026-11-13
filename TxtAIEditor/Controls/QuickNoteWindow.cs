@@ -412,23 +412,90 @@ namespace TxtAIEditor.Controls
                 : IsDark(_background) ? Microsoft.UI.Colors.White : Color.FromArgb(255, 38, 32, 27);
             _paper.Color = _background;
             _ink.Color = _foreground;
+            ConfigureTextColors(_titleInput);
+            ConfigureTextColors(_source);
+            ApplyChromeColors();
             if (_note.IsPreview && !_note.IsCollapsed && _root.IsLoaded)
             {
                 _preview.Update(_note.Text, ToHex(_background), ToHex(_foreground));
             }
         }
 
+        private void ApplyChromeColors()
+        {
+            ApplyButtonColors(_foldButton);
+            ApplyButtonColors(_closeButton);
+            foreach (UIElement child in _toolbar.Children)
+            {
+                if (child is Control control)
+                {
+                    ApplyButtonColors(control);
+                }
+            }
+        }
+
+        private void ApplyButtonColors(Control button)
+        {
+            var surface = new SolidColorBrush(Blend(_background, _foreground, 0.12));
+            var hover = new SolidColorBrush(Blend(_background, _foreground, 0.2));
+            var pressed = new SolidColorBrush(Blend(_background, _foreground, 0.32));
+            var border = new SolidColorBrush(Blend(_background, _foreground, 0.26));
+            var ink = new SolidColorBrush(_foreground);
+            button.Background = surface;
+            button.Foreground = ink;
+            button.BorderBrush = border;
+            ApplyStateResources(button, "Button", surface, hover, pressed, border, ink);
+            if (button is ToggleButton)
+            {
+                ApplyStateResources(button, "ToggleButton", surface, hover, pressed, border, ink);
+                button.Resources["ToggleButtonBackgroundChecked"] = hover;
+                button.Resources["ToggleButtonBackgroundCheckedPointerOver"] = pressed;
+                button.Resources["ToggleButtonBackgroundCheckedPressed"] = pressed;
+                button.Resources["ToggleButtonForegroundChecked"] = ink;
+                button.Resources["ToggleButtonForegroundCheckedPointerOver"] = ink;
+                button.Resources["ToggleButtonForegroundCheckedPressed"] = ink;
+                button.Resources["ToggleButtonBorderBrushChecked"] = border;
+                button.Resources["ToggleButtonBorderBrushCheckedPointerOver"] = border;
+                button.Resources["ToggleButtonBorderBrushCheckedPressed"] = border;
+            }
+        }
+
+        private static void ApplyStateResources(Control button, string prefix,
+            Brush surface, Brush hover, Brush pressed, Brush border, Brush ink)
+        {
+            button.Resources[prefix + "Background"] = surface;
+            button.Resources[prefix + "BackgroundPointerOver"] = hover;
+            button.Resources[prefix + "BackgroundPressed"] = pressed;
+            button.Resources[prefix + "BackgroundDisabled"] = surface;
+            button.Resources[prefix + "Foreground"] = ink;
+            button.Resources[prefix + "ForegroundPointerOver"] = ink;
+            button.Resources[prefix + "ForegroundPressed"] = ink;
+            button.Resources[prefix + "ForegroundDisabled"] = ink;
+            button.Resources[prefix + "BorderBrush"] = border;
+            button.Resources[prefix + "BorderBrushPointerOver"] = border;
+            button.Resources[prefix + "BorderBrushPressed"] = border;
+            button.Resources[prefix + "BorderBrushDisabled"] = border;
+        }
+
+        private static Color Blend(Color from, Color to, double amount) => Color.FromArgb(255,
+            (byte)Math.Round(from.R + (to.R - from.R) * amount),
+            (byte)Math.Round(from.G + (to.G - from.G) * amount),
+            (byte)Math.Round(from.B + (to.B - from.B) * amount));
+
+        // Fresh brushes on every call so a color change repaints the text right away.
         private void ConfigureTextColors(TextBox box)
         {
-            box.Background = _paper;
-            box.Foreground = _ink;
-            box.PlaceholderForeground = _ink;
-            box.Resources["TextControlBackgroundPointerOver"] = _paper;
-            box.Resources["TextControlBackgroundFocused"] = _paper;
-            box.Resources["TextControlForegroundPointerOver"] = _ink;
-            box.Resources["TextControlForegroundFocused"] = _ink;
-            box.Resources["TextControlPlaceholderForegroundPointerOver"] = _ink;
-            box.Resources["TextControlPlaceholderForegroundFocused"] = _ink;
+            var paper = new SolidColorBrush(_paper.Color);
+            var ink = new SolidColorBrush(_ink.Color);
+            box.Background = paper;
+            box.Foreground = ink;
+            box.PlaceholderForeground = ink;
+            box.Resources["TextControlBackgroundPointerOver"] = paper;
+            box.Resources["TextControlBackgroundFocused"] = paper;
+            box.Resources["TextControlForegroundPointerOver"] = ink;
+            box.Resources["TextControlForegroundFocused"] = ink;
+            box.Resources["TextControlPlaceholderForegroundPointerOver"] = ink;
+            box.Resources["TextControlPlaceholderForegroundFocused"] = ink;
         }
 
         private static bool IsDark(Color color) => 0.2126 * color.R + 0.7152 * color.G + 0.0722 * color.B < 128;
