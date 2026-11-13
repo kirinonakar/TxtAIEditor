@@ -22,7 +22,6 @@ namespace TxtAIEditor.Core.Services.LLM
         private static readonly Dictionary<(string providerKey, string model), (int context, int output)> _fallback =
             new()
             {
-                { ("opencode-go", "deepseek-v4-flash"), (1000000, 384000) },
                 { ("opencode-go", "deepseek-v4.1-flash"), (1000000, 384000) },
                 { ("opencode-go", "deepseek-v4-pro"), (1000000, 384000) },
                 { ("opencode-go", "glm-5.3-flash"), (1000000, 131072) },
@@ -43,15 +42,11 @@ namespace TxtAIEditor.Core.Services.LLM
                 { ("opencode", "gemini-3.5-flash"), (1048576, 65536) },
                 { ("opencode", "grok-build-0.1"), (256000, 256000) },
                 { ("opencode", "kimi-k2.6"), (262144, 65536) },
-                { ("opencode", "minimax-m2.5"), (204800, 131072) },
-                { ("opencode", "minimax-m2.7"), (204800, 131072) },
                 { ("opencode", "minimax-m3"), (512000, 131072) },
                 { ("opencode", "claude-fable-5"), (1000000, 128000) },
                 { ("opencode", "claude-opus-4-8"), (1000000, 128000) },
                 { ("opencode", "claude-opus-4-6"), (1000000, 128000) },
                 { ("opencode", "deepseek-v4-pro"), (1000000, 384000) },
-                { ("opencode", "deepseek-v4-flash"), (1000000, 384000) },
-                { ("opencode", "deepseek-v4-flash-free"), (200000, 128000) },
                 { ("opencode", "glm-5.3-flash"), (1000000, 131072) },
                 { ("opencode", "glm-5.2"), (1000000, 131072) },
                 { ("opencode", "kimi-k2.5"), (262144, 65536) },
@@ -90,7 +85,6 @@ namespace TxtAIEditor.Core.Services.LLM
                 { ("ollama-cloud", "nemotron-3-nano:30b"), (1048576, 131072) },
                 { ("ollama-cloud", "ministral-3:14b"), (262144, 128000) },
                 { ("ollama-cloud", "nemotron-3-super"), (262144, 65536) },
-                { ("ollama-cloud", "deepseek-v3.1:671b"), (163840, 163840) },
                 { ("ollama-cloud", "devstral-2:123b"), (262144, 262144) },
                 { ("ollama-cloud", "devstral-small-2:24b"), (262144, 262144) },
                 { ("ollama-cloud", "gemini-3-flash-preview"), (1048576, 65536) },

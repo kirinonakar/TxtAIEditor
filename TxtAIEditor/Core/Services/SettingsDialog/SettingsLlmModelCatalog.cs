@@ -216,18 +216,10 @@ namespace TxtAIEditor.Core.Services
                     "kimi-k2.6",
                     "mimo-v2.6-flash",
                     "mimo-v2.6-pro",
-                    "mimo-v2.5",
-                    "mimo-v2.5-pro",
                     "minimax-m3",
                     "qwen3.8-max",
-                    "qwen3.7-max",
-                    "qwen3.7-plus",
-                    "qwen3.6-plus",
                     "deepseek-v4-pro",
-                    "deepseek-v4-flash",
                     "deepseek-v4.1-flash",
-                    "deepseek-v4-flash-vision-exp",
-                    "hy3"
                 };
             }
 
@@ -252,8 +244,6 @@ namespace TxtAIEditor.Core.Services
                     "qwen3.6-plus",
                     "qwen3.5-plus",
                     "deepseek-v4-pro",
-                    "deepseek-v4-flash",
-                    "deepseek-v4-flash-vision-exp",
                     "minimax-m2.7",
                     "glm-5.3-flash",
                     "glm-5.2",
@@ -264,7 +254,6 @@ namespace TxtAIEditor.Core.Services
                     "mimo-v2.5-free",
                     "north-mini-code-free",
                     "nemotron-3-ultra-free",
-                    "deepseek-v4-flash-free",
                 };
             }
 
