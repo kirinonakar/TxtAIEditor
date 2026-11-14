@@ -14,7 +14,7 @@ namespace TxtAIEditor.Core.Services
         private readonly LlmAgentService _agentService;
         private readonly LlmCredentialStore _credentialStore;
         private readonly LlmTokenUsageTracker _tokenUsageTracker;
-        private readonly ExaSearchService _exaSearchService;
+        private readonly WebSearchService _webSearchService;
 
         public LLMService(
             ISettingsService settingsService,
@@ -32,7 +32,7 @@ namespace TxtAIEditor.Core.Services
 
             _textOperationService = new LlmTextOperationService(settingsService, requestExecutor);
             _agentService = new LlmAgentService(settingsService, requestExecutor);
-            _exaSearchService = new ExaSearchService(
+            _webSearchService = new WebSearchService(
                 settingsService,
                 _credentialStore,
                 new McpToolClient());
@@ -206,19 +206,19 @@ namespace TxtAIEditor.Core.Services
             return _credentialStore.GetApiKeyAsync(provider);
         }
 
-        public Task<string> SearchExaAsync(
+        public Task<string> SearchWebAsync(
             string query,
             int numResults,
             CancellationToken cancellationToken = default)
         {
-            return _exaSearchService.SearchExaAsync(query, numResults, cancellationToken);
+            return _webSearchService.SearchWebAsync(query, numResults, cancellationToken);
         }
 
         public Task<string> FetchExaAsync(
             string[] urls,
             CancellationToken cancellationToken = default)
         {
-            return _exaSearchService.FetchExaAsync(urls, cancellationToken);
+            return _webSearchService.FetchExaAsync(urls, cancellationToken);
         }
     }
 }

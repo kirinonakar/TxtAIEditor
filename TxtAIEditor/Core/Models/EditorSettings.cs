@@ -106,9 +106,9 @@ namespace TxtAIEditor.Core.Models
         public string LlmTargetLanguage { get; set; } = "Korean";
         public int LlmMaxToolCalls { get; set; } = 100;
 
-        // Exa Config
+        // Web search
+        public string AgentWebSearchProvider { get; set; } = "Exa";
         public string ExaEndpoint { get; set; } = "https://mcp.exa.ai/mcp";
-        public bool ExaUseApiKeyAfterFreeLimit { get; set; } = true;
 
         // ComfyUI built-in MCP plugin
         public string ComfyUiLaunchPath { get; set; } = string.Empty;

@@ -50,7 +50,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 - replace_range(path, startLine, endLine, newText, expectedStartLine, expectedEndLine) requires both original boundaries, with \n for multiline boundaries. Line correction is limited to ±3 lines.
                 - insert_to_file(path, content, insert_after, insert_before) requires both anchors, each with at least two unique context lines.
                 - insert_text(content), create_tab(title, content), edit_tab(title, content), save_tab([title], [path]), open_file(path). Use a title or ID to target an existing tab.
-                - web_search_exa(query, [numResults]), web_fetch(urls). Search for current facts or unfamiliar APIs, prefer primary sources, and cite URLs.
+                - web_search(query, [numResults]), web_fetch(urls). Search for current facts or unfamiliar APIs, prefer primary sources, and cite URLs.
                 - Use only the exact MCP aliases and argument schemas in the current [Enabled MCP servers] catalog.
 
                 Context and edits

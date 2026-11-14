@@ -2579,40 +2579,34 @@ Plan: {0}</value>
     <value>Do you want to modify the file?</value>
   </data>
   <data name="SettingsExaApiKey" xml:space="preserve">
-    <value>Exa API Key (for web search)</value>
+    <value>Exa API Key</value>
   </data>
   <data name="SettingsExaApiKeyPlaceholder" xml:space="preserve">
     <value>Enter Exa API Key (leave empty to delete)</value>
   </data>
-  <data name="SettingsExaApiKeyInfo" xml:space="preserve">
-    <value>The Exa API Key is used for the Agent's web search (Exa) function and is securely stored in the Windows Credential Manager.</value>
+  <data name="SettingsKeenableApiKey" xml:space="preserve">
+    <value>Keenable API Key</value>
   </data>
-  <data name="AgentExaApiKeyFallbackUsed" xml:space="preserve">
-    <value>Exa API key fallback was used.</value>
+  <data name="SettingsKeenableApiKeyPlaceholder" xml:space="preserve">
+    <value>Enter Keenable API key (leave blank to remove the saved key)</value>
   </data>
-  <data name="AgentExaNoApiKeyDuckDuckGoFallbackUsed" xml:space="preserve">
-    <value>No Exa API key is configured; DuckDuckGo fallback was used.</value>
+  <data name="SettingsWebSearchApiKeyInfo" xml:space="preserve">
+    <value>Search API keys are used when keyless search fails and are saved in Windows Credential Manager.</value>
   </data>
-  <data name="AgentExaApiKeyFallbackFailedToDuckDuckGo" xml:space="preserve">
-    <value>Exa API key fallback failed -&gt; DuckDuckGo fallback was used.</value>
+  <data name="SettingsWebSearchProvider" xml:space="preserve">
+    <value>Search provider</value>
   </data>
-  <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
-    <value>Exa web searching: {0}</value>
+  <data name="AgentActivityWebSearchFormat" xml:space="preserve">
+    <value>Searching the web: {0}</value>
+  </data>
+  <data name="AgentWebSearchFallbackFormat" xml:space="preserve">
+    <value>Used {0} for fallback web search.</value>
   </data>
   <data name="AgentActivityWebFetchFormat" xml:space="preserve">
     <value>Reading web page: {0}</value>
   </data>
   <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
     <value>Exa fetching web content: {0}</value>
-  </data>
-  <data name="SettingsExaEndpoint" xml:space="preserve">
-    <value>Exa Search API / MCP Endpoint</value>
-  </data>
-  <data name="SettingsExaEndpointPlaceholder" xml:space="preserve">
-    <value>e.g., https://mcp.exa.ai/mcp</value>
-  </data>
-  <data name="SettingsExaUseApiKeyAfterFreeLimit" xml:space="preserve">
-    <value>Use API key after the free limit is reached</value>
   </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell Execution Confirmation</value>
@@ -4013,7 +4007,7 @@ Plan: {0}</value>
     <value>Translation Settings</value>
   </data>
   <data name="SettingsLlmGroupWebSearch" xml:space="preserve">
-    <value>Web Search Extension (Exa)</value>
+    <value>Web Search</value>
   </data>
   <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
     <value>Token Usage Statistics</value>

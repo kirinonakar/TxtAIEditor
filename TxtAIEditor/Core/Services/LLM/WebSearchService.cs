@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -12,24 +13,35 @@ using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Core.Services.LLM
 {
-    internal sealed class ExaSearchService
+    internal sealed class WebSearchService
     {
+        internal const string ResultHeaderPrefix = "[Web search: ";
+
         private readonly ISettingsService _settingsService;
         private readonly LlmCredentialStore _credentialStore;
         private readonly McpToolClient _mcpToolClient;
+        private readonly HttpClient _searchHttpClient;
+        private static readonly HttpClient SearchHttpClient = new(new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+            UseCookies = false
+        });
 
-        public ExaSearchService(
+        public WebSearchService(
             ISettingsService settingsService,
             LlmCredentialStore credentialStore,
-            McpToolClient mcpToolClient)
+            McpToolClient mcpToolClient,
+            HttpClient? searchHttpClient = null)
         {
             _settingsService = settingsService;
             _credentialStore = credentialStore;
             _mcpToolClient = mcpToolClient;
+            _searchHttpClient = searchHttpClient ?? SearchHttpClient;
         }
 
         private static readonly HttpClient _exaHttpClient = new HttpClient();
         private const string DefaultExaMcpEndpoint = "https://mcp.exa.ai/mcp";
+        private const string KeenableSearchEndpoint = "https://api.keenable.ai/v1/search";
         private const int NoKeyFetchMaxCharacters = 6000;
 
         private static bool IsExaMcpEndpoint(string endpoint)
@@ -38,205 +50,165 @@ namespace TxtAIEditor.Core.Services.LLM
                    endpoint.Contains("/sse", StringComparison.OrdinalIgnoreCase);
         }
 
-        public async Task<string> SearchExaAsync(string query, int numResults, CancellationToken cancellationToken = default)
+        public async Task<string> SearchWebAsync(string query, int numResults, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(query))
             {
-                return "Exa search failed: query is empty.";
+                return "Web search failed: query is empty.";
             }
 
-            string apiKey = await GetExaApiKeyAsync();
-            string endpoint = _settingsService?.CurrentSettings?.ExaEndpoint ?? DefaultExaMcpEndpoint;
-            if (string.IsNullOrWhiteSpace(endpoint))
-            {
-                endpoint = DefaultExaMcpEndpoint;
-            }
+            var settings = _settingsService.CurrentSettings;
+            bool keenableFirst = string.Equals(settings.AgentWebSearchProvider, "Keenable", StringComparison.OrdinalIgnoreCase);
+            string exaEndpoint = string.IsNullOrWhiteSpace(settings.ExaEndpoint)
+                ? DefaultExaMcpEndpoint
+                : settings.ExaEndpoint.Trim();
+            query = query.Trim();
+            int resultsCount = numResults <= 0 ? 5 : Math.Min(numResults, 10);
 
-            bool useApiKeyAfterFreeLimit = _settingsService?.CurrentSettings?.ExaUseApiKeyAfterFreeLimit ?? true;
-            if (useApiKeyAfterFreeLimit)
+            (string Name, Func<CancellationToken, Task<string>> Search) exa = ("Exa",
+                token => SearchWithNoApiKeyExaAsync(query, resultsCount, exaEndpoint, token));
+            (string Name, Func<CancellationToken, Task<string>> Search) keenable = ("Keenable",
+                token => SearchKeenableAsync(query, resultsCount, string.Empty, token));
+            (string Name, Func<CancellationToken, Task<string>> Search) keenableWithKey = ("Keenable API key", async token =>
             {
+                string apiKey = await GetSearchApiKeyAsync("Keenable", "KEENABLE_API_KEY");
+                return string.IsNullOrWhiteSpace(apiKey)
+                    ? string.Empty
+                    : await SearchKeenableAsync(query, resultsCount, apiKey, token);
+            });
+            (string Name, Func<CancellationToken, Task<string>> Search) exaWithKey = ("Exa API key", async token =>
+            {
+                string apiKey = await GetSearchApiKeyAsync("Exa", "EXA_API_KEY");
+                return string.IsNullOrWhiteSpace(apiKey)
+                    ? string.Empty
+                    : await SearchWithApiKeyAsync(query, resultsCount, exaEndpoint, apiKey, token);
+            });
+            (string Name, Func<CancellationToken, Task<string>> Search) duckDuckGo = ("DuckDuckGo",
+                token => SearchDuckDuckGoAsync(query, resultsCount, token));
+
+            var attempts = keenableFirst
+                ? new[] { keenable, keenableWithKey, exa, exaWithKey, duckDuckGo }
+                : new[] { exa, exaWithKey, keenable, keenableWithKey, duckDuckGo };
+
+            string rateLimitNotice = string.Empty;
+            foreach (var attempt in attempts)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(TimeSpan.FromSeconds(15));
+
                 try
                 {
-                    // Start with Exa's free, unauthenticated MCP endpoint. A key is only used after
-                    // Exa reports that the free MCP limit has been reached.
-                    return await SearchWithNoApiKeyExaAsync(
-                        query,
-                        numResults,
-                        endpoint,
-                        cancellationToken);
-                }
-                catch (McpToolRateLimitException ex)
-                {
-                    string rateLimitNotice = BuildExaMcpRateLimitNotice(ex);
-                    if (string.IsNullOrWhiteSpace(apiKey))
+                    string result = await attempt.Search(timeout.Token);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!string.IsNullOrWhiteSpace(result))
                     {
-                        return await SearchWithDuckDuckGoFallbackAsync(
-                            query,
-                            numResults,
-                            cancellationToken,
-                            rateLimitNotice);
-                    }
-
-                    try
-                    {
-                        string keyResult = await SearchWithApiKeyAsync(
-                            query,
-                            numResults,
-                            endpoint,
-                            apiKey,
-                            cancellationToken);
-                        // Keep the existing rate-limit notice visible even when the key fallback succeeds.
-                        return BuildExaMcpRateLimitNotice(
-                                ex,
-                                McpToolRateLimitException.ExaApiKeyFallbackMarker) +
-                            Environment.NewLine +
-                            keyResult;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        throw;
-                    }
-                    catch (Exception keyException)
-                    {
-                        return await SearchWithDuckDuckGoFallbackAsync(
-                            query,
-                            numResults,
-                            cancellationToken,
-                            BuildExaMcpRateLimitNotice(
-                                ex,
-                                McpToolRateLimitException.ExaApiKeyFallbackFailedMarker) +
-                            Environment.NewLine +
-                            $"[Exa fallback: DuckDuckGo]\nExa API key search failed: {keyException.Message}");
+                        return $"{ResultHeaderPrefix}{attempt.Name}]" + Environment.NewLine + rateLimitNotice + result;
                     }
                 }
-                catch (OperationCanceledException)
+                catch (McpToolRateLimitException exception) when (attempt.Name == exa.Name && !cancellationToken.IsCancellationRequested)
                 {
-                    throw;
+                    rateLimitNotice = $"{McpToolRateLimitException.ExaFreeMcpRateLimitMarker}." + Environment.NewLine +
+                        $"Approximately {exception.GetApproximateRemainingHours()} hours until the next reset." + Environment.NewLine;
                 }
-                catch (Exception ex)
+                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Exa no-key MCP failed, falling back to DuckDuckGo: {ex.Message}");
-                    return await SearchWithDuckDuckGoFallbackAsync(
-                        query,
-                        numResults,
-                        cancellationToken,
-                        $"[Exa fallback: DuckDuckGo]\nExa no-key search failed: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"{attempt.Name} web search failed: {exception.GetType().Name}");
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(apiKey))
-            {
-                try
-                {
-                    return await SearchWithApiKeyAsync(
-                        query,
-                        numResults,
-                        endpoint,
-                        apiKey,
-                        cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    return await SearchWithDuckDuckGoFallbackAsync(
-                        query,
-                        numResults,
-                        cancellationToken,
-                        $"[Exa fallback: DuckDuckGo]\nExa API key search failed: {ex.Message}");
-                }
-            }
-
-            try
-            {
-                return await SearchWithNoApiKeyExaAsync(
-                    query,
-                    numResults,
-                    endpoint,
-                    cancellationToken);
-            }
-            catch (McpToolRateLimitException ex)
-            {
-                return await SearchWithDuckDuckGoFallbackAsync(
-                    query,
-                    numResults,
-                    cancellationToken,
-                    BuildExaMcpRateLimitNotice(ex));
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                return await SearchWithDuckDuckGoFallbackAsync(
-                    query,
-                    numResults,
-                    cancellationToken,
-                    $"[Exa fallback: DuckDuckGo]\nExa no-key search failed: {ex.Message}");
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return ("Web search failed: no provider returned results." + Environment.NewLine + rateLimitNotice).TrimEnd();
         }
 
-        private async Task<string> GetExaApiKeyAsync()
+        private async Task<string> GetSearchApiKeyAsync(string provider, string environmentVariable)
         {
-            string apiKey = await _credentialStore.GetApiKeyAsync("Exa");
+            string apiKey = await _credentialStore.GetApiKeyAsync(provider);
             return string.IsNullOrWhiteSpace(apiKey)
-                ? Environment.GetEnvironmentVariable("EXA_API_KEY") ?? string.Empty
+                ? Environment.GetEnvironmentVariable(environmentVariable)?.Trim() ?? string.Empty
                 : apiKey;
+        }
+
+        private async Task<string> SearchKeenableAsync(
+            string query,
+            int resultsCount,
+            string apiKey,
+            CancellationToken cancellationToken)
+        {
+            bool keyless = string.IsNullOrWhiteSpace(apiKey);
+            using var request = new HttpRequestMessage(HttpMethod.Post,
+                keyless ? KeenableSearchEndpoint + "/public" : KeenableSearchEndpoint);
+            request.Headers.Add("X-Keenable-Title", "TxtAIEditor");
+            if (!keyless)
+            {
+                request.Headers.Add("X-API-Key", apiKey);
+            }
+
+            // Realtime search enables Keenable's Dynamic Snippets by default.
+            request.Content = JsonContent.Create(new { query, mode = "realtime", max_results = resultsCount });
+            using var response = await _searchHttpClient.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            using var content = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(content, cancellationToken: cancellationToken);
+
+            var results = new StringBuilder();
+            int index = 1;
+            foreach (var item in document.RootElement.GetProperty("results").EnumerateArray())
+            {
+                string? url = item.GetProperty("url").GetString();
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    continue;
+                }
+
+                string? title = item.GetProperty("title").GetString();
+                results.AppendLine($"[{index++}] Title: {title ?? url}");
+                results.AppendLine($"URL: {url}");
+                if (item.TryGetProperty("snippet", out var snippet) && snippet.GetString() is { Length: > 0 } text)
+                {
+                    results.AppendLine($"Snippet: {text}");
+                }
+                results.AppendLine();
+            }
+
+            return results.ToString().TrimEnd();
         }
 
         private async Task<string> SearchWithNoApiKeyExaAsync(
             string query,
-            int numResults,
+            int resultsCount,
             string endpoint,
             CancellationToken cancellationToken)
         {
             string noKeyEndpoint = IsExaMcpEndpoint(endpoint) ? endpoint : DefaultExaMcpEndpoint;
-            int resultsCount = numResults <= 0 ? 5 : Math.Min(numResults, 10);
-            var arguments = new
-            {
-                query = query,
-                numResults = resultsCount,
-                highlights = true
-            };
-
-            return await _mcpToolClient.CallToolAsync(
-                noKeyEndpoint,
-                string.Empty,
-                "web_search_exa",
-                arguments,
-                cancellationToken);
+            return await SearchExaMcpAsync(query, resultsCount, noKeyEndpoint, string.Empty, cancellationToken);
         }
 
-        private async Task<string> SearchWithApiKeyAsync(
+        private async Task<string> SearchExaMcpAsync(
             string query,
             int numResults,
             string endpoint,
             string apiKey,
             CancellationToken cancellationToken)
         {
-            bool isMcpEndpoint = IsExaMcpEndpoint(endpoint);
-            if (isMcpEndpoint)
+            string result = await _mcpToolClient.CallToolAsync(
+                endpoint, apiKey, "web_search_exa", new { query, numResults, highlights = true }, cancellationToken);
+            return Regex.IsMatch(result, @"(?m)^URL:\s*https?://", RegexOptions.IgnoreCase)
+                ? result
+                : string.Empty;
+        }
+
+        private async Task<string> SearchWithApiKeyAsync(
+            string query,
+            int resultsCount,
+            string endpoint,
+            string apiKey,
+            CancellationToken cancellationToken)
+        {
+            if (IsExaMcpEndpoint(endpoint))
             {
-                int mcpResultsCount = numResults <= 0 ? 5 : Math.Min(numResults, 10);
-                var arguments = new
-                {
-                    query = query,
-                    numResults = mcpResultsCount,
-                    highlights = true
-                };
-
-                return await _mcpToolClient.CallToolAsync(
-                    endpoint,
-                    apiKey,
-                    "web_search_exa",
-                    arguments,
-                    cancellationToken);
+                return await SearchExaMcpAsync(query, resultsCount, endpoint, apiKey, cancellationToken);
             }
-
-            int resultsCount = numResults <= 0 ? 5 : Math.Min(numResults, 10);
 
             // If the endpoint is just a domain or base URL without path, default to /search.
             string requestUrl = endpoint;
@@ -264,7 +236,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 string jsonPayload = JsonSerializer.Serialize(payload);
                 request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
-                using (var response = await _exaHttpClient.SendAsync(request, cancellationToken))
+                using (var response = await _searchHttpClient.SendAsync(request, cancellationToken))
                 {
                     string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
                     if (!response.IsSuccessStatusCode)
@@ -287,6 +259,10 @@ namespace TxtAIEditor.Core.Services.LLM
                         {
                             string title = item.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? "No Title" : "No Title";
                             string url = item.TryGetProperty("url", out var urlProp) ? urlProp.GetString() ?? "" : "";
+                            if (string.IsNullOrWhiteSpace(url))
+                            {
+                                continue;
+                            }
                             string textContent = item.TryGetProperty("text", out var textProp) ? textProp.GetString() ?? "" : "";
 
                             sb.AppendLine($"[{index}] Title: {title}");
@@ -310,113 +286,52 @@ namespace TxtAIEditor.Core.Services.LLM
                             index++;
                         }
 
-                        return sb.Length == 0 ? "Exa search returned no results." : sb.ToString().TrimEnd();
-                    }
-                }
-            }
-        }
-
-        private async Task<string> SearchWithDuckDuckGoFallbackAsync(
-            string query,
-            int numResults,
-            CancellationToken cancellationToken,
-            string? notice = null)
-        {
-            string fallbackResult = await SearchWebWithoutApiKeyAsync(query, numResults, cancellationToken);
-            if (string.IsNullOrWhiteSpace(notice))
-            {
-                return fallbackResult;
-            }
-
-            return notice + Environment.NewLine + fallbackResult;
-        }
-
-        private static string BuildExaMcpRateLimitNotice(McpToolRateLimitException exception)
-        {
-            return BuildExaMcpRateLimitNotice(
-                exception,
-                McpToolRateLimitException.ExaDuckDuckGoFallbackMarker + Environment.NewLine +
-                "No Exa API key is configured; using DuckDuckGo search.");
-        }
-
-        private static string BuildExaMcpRateLimitNotice(
-            McpToolRateLimitException exception,
-            string fallbackMarker)
-        {
-            return fallbackMarker + Environment.NewLine +
-                $"{McpToolRateLimitException.ExaFreeMcpRateLimitMarker}." + Environment.NewLine +
-                $"Approximately {exception.GetApproximateRemainingHours()} hours until the next reset.";
-        }
-
-        private async Task<string> SearchWebWithoutApiKeyAsync(string query, int numResults, CancellationToken cancellationToken)
-        {
-            int resultsCount = numResults <= 0 ? 5 : Math.Min(numResults, 10);
-            string requestUrl = "https://html.duckduckgo.com/html/?q=" + Uri.EscapeDataString(query);
-
-            try
-            {
-                using (var request = new HttpRequestMessage(HttpMethod.Get, requestUrl))
-                {
-                    AddNoKeyWebHeaders(request);
-
-                    using (var response = await _exaHttpClient.SendAsync(request, cancellationToken))
-                    {
-                        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                        if (!response.IsSuccessStatusCode)
-                        {
-                            return $"No-key web search failed ({response.StatusCode}): {LimitText(StripHtmlToText(responseBody), 1000)}";
-                        }
-
-                        var matches = Regex.Matches(
-                            responseBody,
-                            "<a[^>]*class=[\"'][^\"']*result__a[^\"']*[\"'][^>]*href=[\"'](?<href>[^\"']+)[\"'][^>]*>(?<title>.*?)</a>",
-                            RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-                        var seenUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                        var sb = new StringBuilder();
-                        int index = 1;
-
-                        foreach (Match match in matches)
-                        {
-                            if (index > resultsCount)
-                            {
-                                break;
-                            }
-
-                            string title = StripHtmlToText(match.Groups["title"].Value);
-                            string url = DecodeDuckDuckGoHref(match.Groups["href"].Value);
-                            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(url) || !seenUrls.Add(url))
-                            {
-                                continue;
-                            }
-
-                            sb.AppendLine($"[{index}] Title: {title}");
-                            sb.AppendLine($"URL: {url}");
-                            sb.AppendLine("Snippet: No-key fallback result from DuckDuckGo HTML search.");
-                            sb.AppendLine();
-                            index++;
-                        }
-
-                        if (sb.Length == 0)
-                        {
-                            string pageText = LimitText(StripHtmlToText(responseBody), 1000);
-                            return string.IsNullOrWhiteSpace(pageText)
-                                ? "No-key web search returned no results."
-                                : $"No-key web search returned no parsed results. Raw page text:\n{pageText}";
-                        }
-
                         return sb.ToString().TrimEnd();
                     }
                 }
             }
-            catch (OperationCanceledException)
+        }
+
+        private async Task<string> SearchDuckDuckGoAsync(
+            string query,
+            int resultsCount,
+            CancellationToken cancellationToken)
+        {
+            string requestUrl = "https://html.duckduckgo.com/html/?q=" + Uri.EscapeDataString(query);
+            using var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
+            AddNoKeyWebHeaders(request);
+
+            using var response = await _searchHttpClient.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            string html = await response.Content.ReadAsStringAsync(cancellationToken);
+            var matches = Regex.Matches(
+                html,
+                "<a[^>]*class=[\"'][^\"']*result__a[^\"']*[\"'][^>]*href=[\"'](?<href>[^\"']+)[\"'][^>]*>(?<title>.*?)</a>",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            var seenUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var results = new StringBuilder();
+            int index = 1;
+            foreach (Match match in matches)
             {
-                throw;
+                if (index > resultsCount)
+                {
+                    break;
+                }
+
+                string title = StripHtmlToText(match.Groups["title"].Value);
+                string url = DecodeDuckDuckGoHref(match.Groups["href"].Value);
+                if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(url) || !seenUrls.Add(url))
+                {
+                    continue;
+                }
+
+                results.AppendLine($"[{index++}] Title: {title}");
+                results.AppendLine($"URL: {url}");
+                results.AppendLine();
             }
-            catch (Exception ex)
-            {
-                return $"No-key web search exception occurred: {ex.Message}";
-            }
+
+            return results.ToString().TrimEnd();
         }
 
         public async Task<string> FetchExaAsync(string[] urls, CancellationToken cancellationToken = default)

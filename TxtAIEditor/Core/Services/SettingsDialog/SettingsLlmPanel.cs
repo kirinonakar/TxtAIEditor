@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using TxtAIEditor.Core.Interfaces;
@@ -23,9 +24,9 @@ namespace TxtAIEditor.Core.Services
         private readonly ComboBox _visionFallbackModelCombo;
         private readonly ComboBox _visionFallbackThinkingLevelCombo;
         private readonly PasswordBox _llmApiKeyBox;
-        private readonly TextBox _exaEndpointBox;
+        private readonly ComboBox _webSearchProviderCombo;
         private readonly PasswordBox _exaApiKeyBox;
-        private readonly CheckBox _exaUseApiKeyAfterFreeLimitCheck;
+        private readonly PasswordBox _keenableApiKeyBox;
         private readonly CheckBox _confirmBeforeSendingCheck;
         private readonly CheckBox _agentVerboseCheck;
         private readonly CheckBox _retainThinkingCheck;
@@ -76,12 +77,17 @@ namespace TxtAIEditor.Core.Services
             _visionFallbackModelCombo = new ComboBox { PlaceholderText = getString("SettingsLlmSelectModel", "모델 선택"), HorizontalAlignment = HorizontalAlignment.Stretch, IsEditable = true, Tag = "LlmVisionFallbackModelCombo" };
             _visionFallbackModelCombo.Loaded += (_, __) => SettingsDialogStyler.ApplyEditableComboBoxVisualStyles(_visionFallbackModelCombo);
             _llmApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsLlmCredentialPlaceholder", "API Key 입력 (비워두면 저장된 자격 증명 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
-            _exaEndpointBox = new TextBox { PlaceholderText = getString("SettingsExaEndpointPlaceholder", "예: https://mcp.exa.ai/mcp"), Text = settings.ExaEndpoint, HorizontalAlignment = HorizontalAlignment.Stretch };
+            _webSearchProviderCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+            _webSearchProviderCombo.Items.Add("Exa");
+            _webSearchProviderCombo.Items.Add("Keenable");
+            _webSearchProviderCombo.SelectedItem =
+                string.Equals(settings.AgentWebSearchProvider, "Keenable", StringComparison.OrdinalIgnoreCase) ? "Keenable" : "Exa";
             _exaApiKeyBox = new PasswordBox { PasswordChar = "●", PlaceholderText = getString("SettingsExaApiKeyPlaceholder", "Exa API Key 입력 (비워두면 저장된 Key 삭제)"), HorizontalAlignment = HorizontalAlignment.Stretch };
-            _exaUseApiKeyAfterFreeLimitCheck = new CheckBox
+            _keenableApiKeyBox = new PasswordBox
             {
-                Content = getString("SettingsExaUseApiKeyAfterFreeLimit", "무료 한도 사용 후 API Key 사용"),
-                IsChecked = settings.ExaUseApiKeyAfterFreeLimit
+                PasswordChar = "●",
+                PlaceholderText = getString("SettingsKeenableApiKeyPlaceholder", "Keenable API Key 입력 (비워두면 저장된 Key 삭제)"),
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
 
             _confirmBeforeSendingCheck = new CheckBox { Content = getString("SettingsLlmConfirmBeforeSending", "전송 전 확인"), IsChecked = settings.LlmConfirmBeforeSending };
@@ -266,8 +272,7 @@ namespace TxtAIEditor.Core.Services
                 _ => "Default"
             };
             SettingsLlmModelCatalog.SaveProviderModel(settings);
-            settings.ExaEndpoint = _exaEndpointBox.Text.Trim();
-            settings.ExaUseApiKeyAfterFreeLimit = _exaUseApiKeyAfterFreeLimitCheck.IsChecked == true;
+            settings.AgentWebSearchProvider = _webSearchProviderCombo.SelectedItem as string ?? "Exa";
         }
 
         public async Task SaveSecretsAsync(EditorSettings settings)
@@ -280,6 +285,7 @@ namespace TxtAIEditor.Core.Services
             await EnsureSecretsLoadedAsync();
             await _llmService.SaveApiKeyAsync(settings.LlmProvider, _llmApiKeyBox.Password.Trim());
             await _llmService.SaveApiKeyAsync("Exa", _exaApiKeyBox.Password.Trim());
+            await _llmService.SaveApiKeyAsync("Keenable", _keenableApiKeyBox.Password.Trim());
         }
 
         public string CreateApiKeyStatusMessage(EditorSettings settings)
@@ -304,7 +310,8 @@ namespace TxtAIEditor.Core.Services
             string provider = GetSelectedProviderName();
             Task<string> llmApiKeyTask = _llmService.GetApiKeyAsync(provider);
             Task<string> exaApiKeyTask = _llmService.GetApiKeyAsync("Exa");
-            await Task.WhenAll(llmApiKeyTask, exaApiKeyTask);
+            Task<string> keenableApiKeyTask = _llmService.GetApiKeyAsync("Keenable");
+            await Task.WhenAll(llmApiKeyTask, exaApiKeyTask, keenableApiKeyTask);
 
             if (provider.Equals(GetSelectedProviderName(), StringComparison.OrdinalIgnoreCase))
             {
@@ -312,6 +319,7 @@ namespace TxtAIEditor.Core.Services
             }
 
             _exaApiKeyBox.Password = exaApiKeyTask.Result;
+            _keenableApiKeyBox.Password = keenableApiKeyTask.Result;
         }
 
         private StackPanel CreateSection()
@@ -480,17 +488,20 @@ namespace TxtAIEditor.Core.Services
         {
             var content = new StackPanel { Spacing = 6 };
 
-            SettingsDialogUi.AddLabel(content, _getString("SettingsExaEndpoint", "Exa 검색 API / MCP Endpoint"));
-            content.Children.Add(_exaEndpointBox);
-            content.Children.Add(_exaUseApiKeyAfterFreeLimitCheck);
+            string providerLabel = _getString("SettingsWebSearchProvider", "웹 검색 서비스");
+            SettingsDialogUi.AddLabel(content, providerLabel);
+            AutomationProperties.SetName(_webSearchProviderCombo, providerLabel);
+            content.Children.Add(_webSearchProviderCombo);
 
-            SettingsDialogUi.AddLabel(content, _getString("SettingsExaApiKey", "Exa API Key (웹 검색 기능용)"));
+            SettingsDialogUi.AddLabel(content, _getString("SettingsExaApiKey", "Exa API Key"));
             content.Children.Add(_exaApiKeyBox);
+            SettingsDialogUi.AddLabel(content, _getString("SettingsKeenableApiKey", "Keenable API Key"));
+            content.Children.Add(_keenableApiKeyBox);
             content.Children.Add(SettingsDialogUi.CreateMutedTextBlock(
-                _getString("SettingsExaApiKeyInfo", "Exa API Key는 Agent의 웹 검색(Exa) 기능에 사용되며, Windows 자격 증명 관리자에 안전하게 저장됩니다.")));
+                _getString("SettingsWebSearchApiKeyInfo", "검색 서비스의 API Key는 키 없는 검색이 실패했을 때 사용되며 Windows 자격 증명 관리자에 저장됩니다.")));
 
             return CreateCard(
-                _getString("SettingsLlmGroupWebSearch", "웹 검색 확장 (Exa)"),
+                _getString("SettingsLlmGroupWebSearch", "웹 검색"),
                 content,
                 "\uE721");
         }

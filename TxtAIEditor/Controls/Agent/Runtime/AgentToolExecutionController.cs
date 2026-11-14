@@ -127,7 +127,7 @@ namespace TxtAIEditor.Controls
                         "make_plan" => _makePlanAsync != null
                             ? await _makePlanAsync(arguments, cancellationToken)
                             : "make_plan failed: planning tool is not available.",
-                        "web_search_exa" => await _llmService.SearchExaAsync(
+                        "web_search" => await _llmService.SearchWebAsync(
                             GetStringArgument(arguments, "query"),
                             GetIntArgument(arguments, "numResults", 5),
                             cancellationToken),
@@ -201,12 +201,11 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (!verbose && normalizedToolName == "web_search_exa" &&
-                toolResult.Contains(
-                    McpToolRateLimitException.ExaFreeMcpRateLimitMarker,
-                    StringComparison.OrdinalIgnoreCase))
+            if (!verbose && normalizedToolName == "web_search" &&
+                toolResult.StartsWith(WebSearchService.ResultHeaderPrefix, StringComparison.Ordinal) &&
+                FormatExaRateLimitNotice(toolResult) is { } rateLimitNotice)
             {
-                return BuildExaRateLimitDisplayResult(toolResult);
+                return rateLimitNotice;
             }
 
             if (!verbose && !successful)
@@ -261,37 +260,22 @@ namespace TxtAIEditor.Controls
             return string.Empty;
         }
 
-        private string BuildExaRateLimitDisplayResult(string toolResult)
+        private string? FormatExaRateLimitNotice(string toolResult)
         {
-            string rateLimitLine = toolResult
-                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
-                .FirstOrDefault(line => line.Contains(
-                    McpToolRateLimitException.ExaFreeMcpRateLimitMarker,
-                    StringComparison.OrdinalIgnoreCase))
-                ?? $"{McpToolRateLimitException.ExaFreeMcpRateLimitMarker}.";
-            string resetLine = toolResult
-                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
-                .FirstOrDefault(line => line.StartsWith("Approximately ", StringComparison.OrdinalIgnoreCase))
-                ?? "Approximately unknown hours until the next reset.";
-            string fallbackLine = toolResult.Contains(
-                    McpToolRateLimitException.ExaApiKeyFallbackFailedMarker,
-                    StringComparison.OrdinalIgnoreCase)
-                ? _getString(
-                    "AgentExaApiKeyFallbackFailedToDuckDuckGo",
-                    "Exa API key fallback failed -> DuckDuckGo fallback was used.")
-                : toolResult.Contains(
-                    McpToolRateLimitException.ExaApiKeyFallbackMarker,
-                    StringComparison.OrdinalIgnoreCase)
-                    ? _getString("AgentExaApiKeyFallbackUsed", "Exa API key fallback was used.")
-                    : toolResult.Contains(McpToolRateLimitException.ExaDuckDuckGoFallbackMarker, StringComparison.OrdinalIgnoreCase)
-                        ? _getString("AgentExaNoApiKeyDuckDuckGoFallbackUsed", "No Exa API key is configured; DuckDuckGo fallback was used.")
-                        : string.Empty;
+            string[] lines = toolResult.Split('\n', 4);
+            if (lines.Length < 4 ||
+                !lines[1].StartsWith(McpToolRateLimitException.ExaFreeMcpRateLimitMarker, StringComparison.Ordinal))
+            {
+                return null;
+            }
 
+            string header = lines[0].TrimEnd('\r');
+            string provider = header[WebSearchService.ResultHeaderPrefix.Length..^1];
             return string.Join(
                 Environment.NewLine,
-                rateLimitLine,
-                resetLine,
-                fallbackLine);
+                lines[1].TrimEnd('\r'),
+                lines[2].TrimEnd('\r'),
+                string.Format(_getString("AgentWebSearchFallbackFormat", "대체 웹 검색에 {0} 사용"), provider));
         }
 
         private async Task<string> ReadImageToolAsync(JsonElement arguments)
@@ -417,8 +401,8 @@ namespace TxtAIEditor.Controls
                     _getString("AgentActivityOpenFileFormat", "파일 여는 중: {0}"),
                     GetStringArgument(arguments, "path")),
                 "make_plan" => _getString("AgentActivityMakePlan", "계획서 저장 중"),
-                "web_search_exa" => string.Format(
-                    _getString("AgentActivityWebSearchExaFormat", "Exa 웹 검색 중: {0}"),
+                "web_search" => string.Format(
+                    _getString("AgentActivityWebSearchFormat", "웹 검색 중: {0}"),
                     GetStringArgument(arguments, "query")),
                 "web_fetch" => string.Format(
                     _getString("AgentActivityWebFetchFormat", "웹 페이지 읽는 중: {0}"),

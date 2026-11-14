@@ -2579,40 +2579,34 @@
     <value>您想修改该文件吗？</value>
   </data>
   <data name="SettingsExaApiKey" xml:space="preserve">
-    <value>Exa API Key（用于网络搜索）</value>
+    <value>Exa API Key</value>
   </data>
   <data name="SettingsExaApiKeyPlaceholder" xml:space="preserve">
     <value>Enter Exa API Key（留空即可删除）</value>
   </data>
-  <data name="SettingsExaApiKeyInfo" xml:space="preserve">
-    <value>Exa API Key 用于 Agent 的网络搜索 (Exa) 功能，并安全地存储在 Windows Credential Manager 中。</value>
+  <data name="SettingsKeenableApiKey" xml:space="preserve">
+    <value>Keenable API Key</value>
   </data>
-  <data name="AgentExaApiKeyFallbackUsed" xml:space="preserve">
-    <value>已使用 Exa API Key fallback。</value>
+  <data name="SettingsKeenableApiKeyPlaceholder" xml:space="preserve">
+    <value>输入 Keenable API Key（留空将删除已保存的密钥）</value>
   </data>
-  <data name="AgentExaNoApiKeyDuckDuckGoFallbackUsed" xml:space="preserve">
-    <value>未配置 Exa API Key，已改用 DuckDuckGo 搜索。</value>
+  <data name="SettingsWebSearchApiKeyInfo" xml:space="preserve">
+    <value>无密钥搜索失败时使用搜索 API 密钥。密钥保存在 Windows 凭据管理器中。</value>
   </data>
-  <data name="AgentExaApiKeyFallbackFailedToDuckDuckGo" xml:space="preserve">
-    <value>Exa API Key fallback 失败 -&gt; 已使用 DuckDuckGo fallback。</value>
+  <data name="SettingsWebSearchProvider" xml:space="preserve">
+    <value>网页搜索服务</value>
   </data>
-  <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
-    <value>Exa 网页搜索：{0}</value>
+  <data name="AgentActivityWebSearchFormat" xml:space="preserve">
+    <value>正在搜索网页：{0}</value>
+  </data>
+  <data name="AgentWebSearchFallbackFormat" xml:space="preserve">
+    <value>已使用 {0} 进行备用网页搜索。</value>
   </data>
   <data name="AgentActivityWebFetchFormat" xml:space="preserve">
     <value>阅读网页：{0}</value>
   </data>
   <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
     <value>Exa 获取网页内容：{0}</value>
-  </data>
-  <data name="SettingsExaEndpoint" xml:space="preserve">
-    <value>Exa 搜索 API / MCP 端点</value>
-  </data>
-  <data name="SettingsExaEndpointPlaceholder" xml:space="preserve">
-    <value>例如，https://mcp.exa.ai/mcp</value>
-  </data>
-  <data name="SettingsExaUseApiKeyAfterFreeLimit" xml:space="preserve">
-    <value>达到免费额度后使用 API Key</value>
   </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell 执行确认</value>
@@ -3971,7 +3965,7 @@
     <value>翻译设置</value>
   </data>
   <data name="SettingsLlmGroupWebSearch" xml:space="preserve">
-    <value>Web 搜索扩展 (Exa)</value>
+    <value>网页搜索</value>
   </data>
   <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
     <value>Token 使用量统计</value>

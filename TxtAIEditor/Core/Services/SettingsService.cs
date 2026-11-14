@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
@@ -11,6 +12,7 @@ namespace TxtAIEditor.Core.Services
     public class SettingsService : ISettingsService
     {
         private readonly string _settingsFilePath;
+        private readonly SemaphoreSlim _settingsWriteGate = new(1, 1);
         public EditorSettings CurrentSettings { get; private set; } = new EditorSettings();
         public bool IsLoaded { get; private set; }
 
@@ -67,11 +69,13 @@ namespace TxtAIEditor.Core.Services
 
         public async Task SaveSettingsAsync(EditorSettings settings)
         {
+            CurrentSettings = settings;
+            LlmRequestTuning.Apply(CurrentSettings.LlmApiFormat, CurrentSettings.LlmMaxContextLength, CurrentSettings.LlmDisableTemperature);
+            IsLoaded = true;
+
+            await _settingsWriteGate.WaitAsync();
             try
             {
-                CurrentSettings = settings;
-                LlmRequestTuning.Apply(CurrentSettings.LlmApiFormat, CurrentSettings.LlmMaxContextLength, CurrentSettings.LlmDisableTemperature);
-                IsLoaded = true;
                 string? dir = Path.GetDirectoryName(_settingsFilePath);
                 if (dir != null && !Directory.Exists(dir))
                 {
@@ -84,6 +88,10 @@ namespace TxtAIEditor.Core.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to save settings: {ex.Message}");
+            }
+            finally
+            {
+                _settingsWriteGate.Release();
             }
         }
     }

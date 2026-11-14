@@ -2579,40 +2579,34 @@
     <value>파일을 수정하시겠습니까?</value>
   </data>
   <data name="SettingsExaApiKey" xml:space="preserve">
-    <value>Exa API Key (웹 검색 기능용)</value>
+    <value>Exa API Key</value>
   </data>
   <data name="SettingsExaApiKeyPlaceholder" xml:space="preserve">
     <value>Exa API Key 입력 (비워두면 저장된 Key 삭제)</value>
   </data>
-  <data name="SettingsExaApiKeyInfo" xml:space="preserve">
-    <value>Exa API Key는 Agent의 웹 검색(Exa) 기능에 사용되며, Windows 자격 증명 관리자에 안전하게 저장됩니다.</value>
+  <data name="SettingsKeenableApiKey" xml:space="preserve">
+    <value>Keenable API Key</value>
   </data>
-  <data name="AgentExaApiKeyFallbackUsed" xml:space="preserve">
-    <value>Exa API Key fallback을 사용했습니다.</value>
+  <data name="SettingsKeenableApiKeyPlaceholder" xml:space="preserve">
+    <value>Keenable API Key 입력 (비워두면 저장된 Key 삭제)</value>
   </data>
-  <data name="AgentExaNoApiKeyDuckDuckGoFallbackUsed" xml:space="preserve">
-    <value>Exa API Key가 없어 DuckDuckGo로 우회 검색했습니다.</value>
+  <data name="SettingsWebSearchApiKeyInfo" xml:space="preserve">
+    <value>검색 서비스의 API Key는 키 없는 검색이 실패했을 때 사용되며 Windows 자격 증명 관리자에 저장됩니다.</value>
   </data>
-  <data name="AgentExaApiKeyFallbackFailedToDuckDuckGo" xml:space="preserve">
-    <value>Exa API Key fallback 실패 -&gt; DuckDuckGo fallback을 사용했습니다.</value>
+  <data name="SettingsWebSearchProvider" xml:space="preserve">
+    <value>웹 검색 서비스</value>
   </data>
-  <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
-    <value>Exa 웹 검색 중: {0}</value>
+  <data name="AgentActivityWebSearchFormat" xml:space="preserve">
+    <value>웹 검색 중: {0}</value>
+  </data>
+  <data name="AgentWebSearchFallbackFormat" xml:space="preserve">
+    <value>대체 웹 검색에 {0} 사용</value>
   </data>
   <data name="AgentActivityWebFetchFormat" xml:space="preserve">
     <value>웹 페이지 읽는 중: {0}</value>
   </data>
   <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
     <value>Exa 웹 페이지 읽는 중: {0}</value>
-  </data>
-  <data name="SettingsExaEndpoint" xml:space="preserve">
-    <value>Exa 검색 API / MCP Endpoint</value>
-  </data>
-  <data name="SettingsExaEndpointPlaceholder" xml:space="preserve">
-    <value>예: https://mcp.exa.ai/mcp</value>
-  </data>
-  <data name="SettingsExaUseApiKeyAfterFreeLimit" xml:space="preserve">
-    <value>무료 한도 사용 후 API Key 사용</value>
   </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell 실행 확인</value>
@@ -4013,7 +4007,7 @@
     <value>번역 설정</value>
   </data>
   <data name="SettingsLlmGroupWebSearch" xml:space="preserve">
-    <value>웹 검색 확장 (Exa)</value>
+    <value>웹 검색</value>
   </data>
   <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
     <value>토큰 사용량 통계</value>

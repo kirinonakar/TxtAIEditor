@@ -396,7 +396,7 @@ namespace TxtAIEditor.Controls
                 },
                 new LlmTool
                 {
-                    Name = "web_search_exa",
+                    Name = "web_search",
                     Description = "Search the web.",
                     Parameters = new
                     {

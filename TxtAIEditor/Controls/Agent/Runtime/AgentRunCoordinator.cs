@@ -759,7 +759,7 @@ namespace TxtAIEditor.Controls
                             currentArguments = SanitizeApplyPatchArguments(currentArguments);
                         }
 
-                        if (toolCalls.Count > 1 && normalizedToolName == "web_search_exa")
+                        if (toolCalls.Count > 1 && normalizedToolName == "web_search")
                         {
                             if (hasWebSearchCallInBatch)
                             {

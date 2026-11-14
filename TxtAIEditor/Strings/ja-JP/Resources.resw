@@ -2579,40 +2579,34 @@
     <value>ファイルを修正しますか？</value>
   </data>
   <data name="SettingsExaApiKey" xml:space="preserve">
-    <value>Exa API Key (ウェブ検索用)</value>
+    <value>Exa API Key</value>
   </data>
   <data name="SettingsExaApiKeyPlaceholder" xml:space="preserve">
     <value>Exa API Keyを入力 (空欄の場合は保存されたKeyを削除)</value>
   </data>
-  <data name="SettingsExaApiKeyInfo" xml:space="preserve">
-    <value>Exa API KeyはAgentのウェブ検索(Exa)機能に使用され、Windows資格情報マネージャーに安全に保存されます。</value>
+  <data name="SettingsKeenableApiKey" xml:space="preserve">
+    <value>Keenable API Key</value>
   </data>
-  <data name="AgentExaApiKeyFallbackUsed" xml:space="preserve">
-    <value>Exa API Key fallbackを使用しました。</value>
+  <data name="SettingsKeenableApiKeyPlaceholder" xml:space="preserve">
+    <value>Keenable API Key を入力（空欄にすると保存済みのキーを削除）</value>
   </data>
-  <data name="AgentExaNoApiKeyDuckDuckGoFallbackUsed" xml:space="preserve">
-    <value>Exa API Keyが未設定のため、DuckDuckGoで代替検索しました。</value>
+  <data name="SettingsWebSearchApiKeyInfo" xml:space="preserve">
+    <value>キーなしの検索に失敗した場合に API キーを使用します。キーは Windows 資格情報マネージャーに保存されます。</value>
   </data>
-  <data name="AgentExaApiKeyFallbackFailedToDuckDuckGo" xml:space="preserve">
-    <value>Exa API Key fallbackに失敗 -&gt; DuckDuckGo fallbackを使用しました。</value>
+  <data name="SettingsWebSearchProvider" xml:space="preserve">
+    <value>ウェブ検索サービス</value>
   </data>
-  <data name="AgentActivityWebSearchExaFormat" xml:space="preserve">
-    <value>Exaウェブ検索中: {0}</value>
+  <data name="AgentActivityWebSearchFormat" xml:space="preserve">
+    <value>ウェブ検索中: {0}</value>
+  </data>
+  <data name="AgentWebSearchFallbackFormat" xml:space="preserve">
+    <value>代替ウェブ検索に {0} を使用しました。</value>
   </data>
   <data name="AgentActivityWebFetchFormat" xml:space="preserve">
     <value>ウェブページ読込中: {0}</value>
   </data>
   <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
     <value>Exaウェブページ読込中: {0}</value>
-  </data>
-  <data name="SettingsExaEndpoint" xml:space="preserve">
-    <value>Exa 検索 API / MCP Endpoint</value>
-  </data>
-  <data name="SettingsExaEndpointPlaceholder" xml:space="preserve">
-    <value>例: https://mcp.exa.ai/mcp</value>
-  </data>
-  <data name="SettingsExaUseApiKeyAfterFreeLimit" xml:space="preserve">
-    <value>無料枠の上限到達後に API Key を使用</value>
   </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell 実行の確認</value>
@@ -3971,7 +3965,7 @@
     <value>翻訳設定</value>
   </data>
   <data name="SettingsLlmGroupWebSearch" xml:space="preserve">
-    <value>Web検索拡張 (Exa)</value>
+    <value>ウェブ検索</value>
   </data>
   <data name="SettingsLlmGroupTokenUsage" xml:space="preserve">
     <value>トークン使用量統計</value>
