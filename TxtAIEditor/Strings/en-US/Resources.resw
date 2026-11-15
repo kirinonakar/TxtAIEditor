@@ -2506,9 +2506,6 @@ Plan: {0}</value>
   <data name="AgentIncludeActiveFile" xml:space="preserve">
     <value>Planning mode</value>
   </data>
-  <data name="AgentPdfActiveTabExcluded" xml:space="preserve">
-    <value>{0} (PDF excluded)</value>
-  </data>
   <data name="AgentPromptPlaceholder" xml:space="preserve">
     <value>Enter task for Agent...</value>
   </data>

@@ -2506,9 +2506,6 @@
   <data name="AgentIncludeActiveFile" xml:space="preserve">
     <value>계획 모드 (Planning mode)</value>
   </data>
-  <data name="AgentPdfActiveTabExcluded" xml:space="preserve">
-    <value>{0} (PDF 제외)</value>
-  </data>
   <data name="AgentPromptPlaceholder" xml:space="preserve">
     <value>Agent에게 맡길 작업 입력...</value>
   </data>

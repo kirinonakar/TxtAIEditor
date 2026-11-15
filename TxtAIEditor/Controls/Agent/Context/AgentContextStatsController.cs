@@ -106,10 +106,6 @@ namespace TxtAIEditor.Controls
             else
             {
                 tabPart = Path.GetFileName(string.IsNullOrWhiteSpace(activeTab.FilePath) ? activeTab.Title : activeTab.FilePath);
-                if (AgentWorkspaceContextBuilder.IsPdfTab(activeTab))
-                {
-                    tabPart = string.Format(_getString("AgentPdfActiveTabExcluded", "{0} (PDF 제외)"), tabPart);
-                }
             }
 
             string activeSelectionText = _activeSelectionTextProvider();

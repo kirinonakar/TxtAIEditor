@@ -2506,9 +2506,6 @@
   <data name="AgentIncludeActiveFile" xml:space="preserve">
     <value>計画モード (Planning mode)</value>
   </data>
-  <data name="AgentPdfActiveTabExcluded" xml:space="preserve">
-    <value>{0} (PDF 除外)</value>
-  </data>
   <data name="AgentPromptPlaceholder" xml:space="preserve">
     <value>Agentに指示する作業を入力...</value>
   </data>
