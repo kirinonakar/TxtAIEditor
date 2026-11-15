@@ -32,6 +32,7 @@ namespace TxtAIEditor.Core.Services
         private const uint OpenMenuCommand = 1;
         private const uint CloseMenuCommand = 2;
         private const uint AddNoteCommand = 3;
+        private const uint OpenAllNotesCommand = 4;
         private const uint WindowMenuCommandBase = 100;
         private const uint LastMenuCommand = ushort.MaxValue - 1;
         private const nuint SubclassId = 0x54524159;
@@ -228,7 +229,10 @@ namespace TxtAIEditor.Core.Services
                 }
 
                 AppendMenu(menu, MfSeparator, 0, null);
-                AppendQuickNotesMenu(menu, actions, commandId);
+                TrayQuickNoteItems notes = _quickNotes.GetItems();
+                AppendQuickNotesMenu(menu, actions, commandId, notes);
+                AppendMenu(menu, notes.Items.Count == 0 ? MfString | MfGrayed : MfString,
+                    OpenAllNotesCommand, _quickNotes.OpenAllText);
                 AppendMenu(menu, MfString, OpenMenuCommand, _openText);
                 AppendMenu(menu, MfString, CloseMenuCommand, _closeText);
                 GetCursorPos(out Point cursorPosition);
@@ -272,6 +276,10 @@ namespace TxtAIEditor.Core.Services
                 {
                     selectedAction = _quickNotes.Add;
                 }
+                else if (command == OpenAllNotesCommand)
+                {
+                    selectedAction = _quickNotes.OpenAll;
+                }
                 else
                 {
                     actions.TryGetValue(command, out selectedAction);
@@ -287,7 +295,8 @@ namespace TxtAIEditor.Core.Services
             selectedAction?.Invoke();
         }
 
-        private void AppendQuickNotesMenu(IntPtr menu, Dictionary<uint, Action> actions, uint commandId)
+        private void AppendQuickNotesMenu(
+            IntPtr menu, Dictionary<uint, Action> actions, uint commandId, TrayQuickNoteItems notes)
         {
             IntPtr submenu = CreatePopupMenu();
             if (submenu == IntPtr.Zero)
@@ -303,7 +312,6 @@ namespace TxtAIEditor.Core.Services
 
             AppendMenu(submenu, MfString, AddNoteCommand, _quickNotes.AddText);
             AppendMenu(submenu, MfSeparator, 0, null);
-            TrayQuickNoteItems notes = _quickNotes.GetItems();
             if (notes.Status is string status)
             {
                 AppendMenu(submenu, MfString | MfGrayed, 0, EscapeMenuLabel(status));
@@ -466,7 +474,9 @@ namespace TxtAIEditor.Core.Services
 
     internal sealed record TrayWindowItem(string Title, Action Activate);
 
-    internal sealed record TrayQuickNotesMenu(string Title, string AddText, string DeleteText, Action Add, Func<TrayQuickNoteItems> GetItems);
+    internal sealed record TrayQuickNotesMenu(
+        string Title, string AddText, string OpenAllText, string DeleteText,
+        Action Add, Action OpenAll, Func<TrayQuickNoteItems> GetItems);
 
     internal sealed record TrayQuickNoteItems(IReadOnlyList<TrayQuickNoteItem> Items, string? Status);
 

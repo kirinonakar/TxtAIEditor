@@ -4099,6 +4099,7 @@ Plan: {0}</value>
   <data name="TrayMenuClose" xml:space="preserve"><value>Close</value></data>
   <data name="QuickNotesMenu" xml:space="preserve"><value>Quick Notes</value></data>
   <data name="QuickNotesAdd" xml:space="preserve"><value>Add</value></data>
+  <data name="QuickNotesOpenAll" xml:space="preserve"><value>Open All</value></data>
   <data name="QuickNotesTitle" xml:space="preserve"><value>Title</value></data>
   <data name="QuickNotesBody" xml:space="preserve"><value>Note</value></data>
   <data name="QuickNotesUntitled" xml:space="preserve"><value>Untitled note</value></data>

@@ -4057,6 +4057,7 @@
   <data name="TrayMenuClose" xml:space="preserve"><value>關閉</value></data>
   <data name="QuickNotesMenu" xml:space="preserve"><value>便利貼</value></data>
   <data name="QuickNotesAdd" xml:space="preserve"><value>新增</value></data>
+  <data name="QuickNotesOpenAll" xml:space="preserve"><value>全部開啟</value></data>
   <data name="QuickNotesTitle" xml:space="preserve"><value>標題</value></data>
   <data name="QuickNotesBody" xml:space="preserve"><value>內容</value></data>
   <data name="QuickNotesUntitled" xml:space="preserve"><value>無標題便利貼</value></data>

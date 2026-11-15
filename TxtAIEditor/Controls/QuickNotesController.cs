@@ -51,6 +51,20 @@ namespace TxtAIEditor.Controls
             OpenNote(note);
         }
 
+        public async Task OpenAllAsync(nint trayOwner)
+        {
+            if (!EnsureLoaded())
+            {
+                await ShowTrayErrorAsync(trayOwner, _text("QuickNotesLoadError", "메모를 불러올 수 없습니다."));
+                return;
+            }
+
+            foreach (QuickNote note in _notes!)
+            {
+                OpenNote(note);
+            }
+        }
+
         public TrayQuickNoteItems GetTrayItems(nint trayOwner, Action<Action> enqueue)
         {
             if (!EnsureLoaded())

@@ -247,8 +247,10 @@ namespace TxtAIEditor
                     new TrayQuickNotesMenu(
                         GetText("QuickNotesMenu", "빠른 메모"),
                         GetText("QuickNotesAdd", "추가"),
+                        GetText("QuickNotesOpenAll", "모두 열기"),
                         GetText("QuickNotesDelete", "삭제"),
                         () => QueueNoteAction(() => _ = AppErrorHandler.RunAsync(() => GetQuickNotes().AddAsync(trayHandle))),
+                        () => QueueNoteAction(() => _ = AppErrorHandler.RunAsync(() => GetQuickNotes().OpenAllAsync(trayHandle))),
                         () => GetQuickNotes().GetTrayItems(trayHandle, QueueNoteAction)));
                 return true;
             }

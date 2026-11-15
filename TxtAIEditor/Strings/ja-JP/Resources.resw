@@ -4057,6 +4057,7 @@
   <data name="TrayMenuClose" xml:space="preserve"><value>閉じる</value></data>
   <data name="QuickNotesMenu" xml:space="preserve"><value>クイックメモ</value></data>
   <data name="QuickNotesAdd" xml:space="preserve"><value>追加</value></data>
+  <data name="QuickNotesOpenAll" xml:space="preserve"><value>すべて開く</value></data>
   <data name="QuickNotesTitle" xml:space="preserve"><value>タイトル</value></data>
   <data name="QuickNotesBody" xml:space="preserve"><value>内容</value></data>
   <data name="QuickNotesUntitled" xml:space="preserve"><value>無題のメモ</value></data>

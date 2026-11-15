@@ -4099,6 +4099,7 @@
   <data name="TrayMenuClose" xml:space="preserve"><value>닫기</value></data>
   <data name="QuickNotesMenu" xml:space="preserve"><value>빠른 메모</value></data>
   <data name="QuickNotesAdd" xml:space="preserve"><value>추가</value></data>
+  <data name="QuickNotesOpenAll" xml:space="preserve"><value>모두 열기</value></data>
   <data name="QuickNotesTitle" xml:space="preserve"><value>제목</value></data>
   <data name="QuickNotesBody" xml:space="preserve"><value>내용</value></data>
   <data name="QuickNotesUntitled" xml:space="preserve"><value>제목 없음</value></data>
