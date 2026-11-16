@@ -133,11 +133,11 @@ namespace TxtAIEditor.Controls
             return builder.ToString().Trim();
         }
 
-        public string BuildFixedPromptContext()
+        public string BuildFixedPromptContext(string? workspaceRoot = null, bool includeMcp = true)
         {
-            string mcpSection = _mcpController.BuildSelectedMcpSection();
+            string mcpSection = includeMcp ? _mcpController.BuildSelectedMcpSection() : string.Empty;
             string globalAgentsMdSection = BuildGlobalAgentsMdSection();
-            string agentsMdSection = BuildWorkspaceAgentsMdSection();
+            string agentsMdSection = BuildWorkspaceAgentsMdSection(workspaceRoot);
             if (string.IsNullOrWhiteSpace(mcpSection) &&
                 string.IsNullOrWhiteSpace(globalAgentsMdSection) &&
                 string.IsNullOrWhiteSpace(agentsMdSection))
@@ -178,10 +178,10 @@ namespace TxtAIEditor.Controls
             return section + Environment.NewLine + "[End global agent rules]";
         }
 
-        public string BuildFixedPromptContextForRun()
+        public string BuildFixedPromptContextForRun(string? workspaceRoot = null, bool includeMcp = true)
         {
             string skills = _skillController.BuildSelectedSkillSection();
-            return BuildFixedPromptContext() + Environment.NewLine + Environment.NewLine +
+            return BuildFixedPromptContext(workspaceRoot, includeMcp) + Environment.NewLine + Environment.NewLine +
                 "[Current plugin selection for this model turn]" + Environment.NewLine +
                 "The enabled MCP catalog above and skill list below are authoritative for this turn. They supersede older plugin selections in conversation history. Read a relevant enabled skill with skill_use before applying it." + Environment.NewLine +
                 (string.IsNullOrWhiteSpace(skills) ? "No agent skills are currently enabled." : skills);
@@ -262,9 +262,9 @@ namespace TxtAIEditor.Controls
                 "[Global agent rules]");
         }
 
-        private string BuildWorkspaceAgentsMdSection()
+        private string BuildWorkspaceAgentsMdSection(string? workspaceRoot)
         {
-            string workspaceRoot = _fileTools.WorkspaceRoot;
+            workspaceRoot ??= _fileTools.WorkspaceRoot;
             if (string.IsNullOrWhiteSpace(workspaceRoot))
             {
                 return string.Empty;
@@ -331,6 +331,11 @@ namespace TxtAIEditor.Controls
                     ? $"MCP tool '{alias.ToolName}' from server '{alias.ServerName}'."
                     : alias.Description);
                 tokens += EstimateCompactJsonTokens(alias.InputSchemaJson);
+            }
+
+            if (_agentPane.UseSubagents)
+            {
+                tokens += AgentTokenEstimator.EstimateToolsTokens(AgentSubagentCoordinator.Tools);
             }
 
             return tokens;

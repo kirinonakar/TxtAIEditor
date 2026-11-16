@@ -123,7 +123,9 @@ namespace TxtAIEditor.Controls
             return !string.IsNullOrWhiteSpace(sessionId) && _pendingCloseSessionIds.Remove(sessionId);
         }
 
-        public AgentOpenSessionState EnsureSession(string sessionId)
+        public AgentOpenSessionState EnsureSession(string sessionId) => EnsureSession(sessionId, null);
+
+        public AgentOpenSessionState EnsureSession(string sessionId, AgentOpenSessionState? previousState)
         {
             var session = _openSessions.FirstOrDefault(item =>
                 string.Equals(item.Id, sessionId, StringComparison.Ordinal));
@@ -132,7 +134,7 @@ namespace TxtAIEditor.Controls
                 return session;
             }
 
-            session = CreateBlankSession(sessionId);
+            session = previousState ?? CreateBlankSession(sessionId);
             _openSessions.Insert(0, session);
             return session;
         }
@@ -203,6 +205,7 @@ namespace TxtAIEditor.Controls
             var session = EnsureSession(_currentSessionIdProvider());
             session.PromptText = _agentPane.Prompt.Text ?? string.Empty;
             session.OutputText = _agentPane.GetRawOutputText();
+            session.UseSubagents = _agentPane.UseSubagents;
             session.ActivityText = _agentPane.Activity.Text ?? string.Empty;
             session.WorkspaceRoot = CaptureCurrentWorkspaceRoot();
             SyncVisibleThinkingStateToSession(session);
@@ -261,6 +264,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 _agentPane.Prompt.Text = session.PromptText ?? string.Empty;
+                _agentPane.UseSubagents = session.UseSubagents;
                 _agentPane.ResetOutput(string.IsNullOrEmpty(session.OutputText)
                     ? _displayText.OutputPlaceholder
                     : session.OutputText);
@@ -490,10 +494,10 @@ namespace TxtAIEditor.Controls
             if (!HasRealSessionTitle(session))
             {
                 // 아직 제목이 없는 새 세션: 워크스페이스만 표시한다.
-                return prefix.TrimEnd();
+                return (AgentSessionLabels.Prefix(session.Role) + prefix).TrimEnd();
             }
 
-            return $"{prefix}{session.Title}";
+            return $"{AgentSessionLabels.Prefix(session.Role)}{prefix}{session.Title}";
         }
 
         private bool HasRealSessionTitle(AgentOpenSessionState session)
@@ -535,7 +539,7 @@ namespace TxtAIEditor.Controls
         {
             bool isCurrentSessionRunning = IsCurrentSessionRunning();
             var currentSession = EnsureSession(_currentSessionIdProvider());
-            _agentPane.SetBusy(isCurrentSessionRunning);
+            _agentPane.SetBusy(isCurrentSessionRunning, currentSession.Role == AgentSessionRole.Subagent);
             _agentPane.SetCanRewindSession(!isCurrentSessionRunning && currentSession.RewindSnapshots.Count > 0);
         }
 
@@ -1125,7 +1129,7 @@ namespace TxtAIEditor.Controls
             public Task? FlushTask { get; set; }
         }
 
-        private static EditorSettings CloneSessionSettings(EditorSettings settings)
+        internal static EditorSettings CloneSessionSettings(EditorSettings settings)
         {
             return new EditorSettings
             {
@@ -1133,6 +1137,8 @@ namespace TxtAIEditor.Controls
                 LlmProvider = settings.LlmProvider,
                 LlmEndpoint = settings.LlmEndpoint,
                 LlmModel = settings.LlmModel,
+                LlmApiFormat = settings.LlmApiFormat,
+                LlmMaxContextLength = settings.LlmMaxContextLength,
                 LlmModelGemini = settings.LlmModelGemini,
                 LlmModelOpenAI = settings.LlmModelOpenAI,
                 LlmModelOpenRouter = settings.LlmModelOpenRouter,
@@ -1150,6 +1156,7 @@ namespace TxtAIEditor.Controls
                 LlmConfirmBeforeSending = settings.LlmConfirmBeforeSending,
                 LlmAgentVerbose = settings.LlmAgentVerbose,
                 LlmRetainThinking = settings.LlmRetainThinking,
+                LlmDisableTemperature = settings.LlmDisableTemperature,
                 LlmAgentAutoApproveGitEdits = settings.LlmAgentAutoApproveGitEdits,
                 LlmAgentAutoApprovePowerShell = settings.LlmAgentAutoApprovePowerShell,
                 LlmAgentAutoApprovePlanning = settings.LlmAgentAutoApprovePlanning,

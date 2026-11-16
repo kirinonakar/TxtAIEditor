@@ -626,6 +626,42 @@
   <data name="SettingsLlmSourceLanguage" xml:space="preserve">
     <value>來源語言</value>
   </data>
+  <data name="AgentUseSubagents" xml:space="preserve">
+    <value>子代理</value>
+  </data>
+  <data name="SettingsLlmMaxSubagents" xml:space="preserve">
+    <value>子代理數量上限</value>
+  </data>
+  <data name="SettingsLlmSubagentProvider" xml:space="preserve">
+    <value>子代理提供者</value>
+  </data>
+  <data name="SettingsLlmSubagentModel" xml:space="preserve">
+    <value>子代理模型</value>
+  </data>
+  <data name="SettingsLlmSubagentInherit" xml:space="preserve">
+    <value>與協調代理相同</value>
+  </data>
+  <data name="AgentSubagentStartedFormat" xml:space="preserve">
+    <value>子代理開始工作 · {0}</value>
+  </data>
+  <data name="AgentSubagentFollowUpFormat" xml:space="preserve">
+    <value>子代理開始後續工作 · {0}</value>
+  </data>
+  <data name="AgentSubagentWaiting" xml:space="preserve">
+    <value>正在等待子代理的結果</value>
+  </data>
+  <data name="AgentSubagentProgressFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="AgentSubagentCompletedFormat" xml:space="preserve">
+    <value>子代理完成工作 · {0}</value>
+  </data>
+  <data name="AgentSubagentStoppedFormat" xml:space="preserve">
+    <value>子代理停止工作 · {0}</value>
+  </data>
+  <data name="AgentSubagentFailedFormat" xml:space="preserve">
+    <value>子代理工作失敗 · {0}</value>
+  </data>
   <data name="SettingsLlmMaxToolCalls" xml:space="preserve">
     <value>最大工具呼叫次數</value>
   </data>

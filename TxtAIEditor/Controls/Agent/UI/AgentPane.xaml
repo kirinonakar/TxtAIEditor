@@ -364,6 +364,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -382,11 +383,11 @@
                                    Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
-                    <CheckBox x:Name="AgentPlanningModeCheckBox"
-                              Content="계획 모드 (Planning mode)"
-                              IsChecked="False"
-                              FontSize="12"
-                              MinHeight="0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="8">
+                    <CheckBox x:Name="AgentPlanningModeCheckBox" FontSize="12" MinWidth="0" MinHeight="0"/>
+                    <CheckBox x:Name="AgentSubagentsCheckBox" FontSize="12" MinWidth="0" MinHeight="0"/>
                 </StackPanel>
 
                 <Button x:Name="AgentMcpButton"
@@ -503,7 +504,7 @@
 
 
                 <ListView x:Name="AgentAttachmentsList"
-                          Grid.Row="1"
+                          Grid.Row="2"
                           Grid.Column="0"
                           Grid.ColumnSpan="3"
                           MaxHeight="96"

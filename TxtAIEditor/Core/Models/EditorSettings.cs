@@ -6,6 +6,7 @@ namespace TxtAIEditor.Core.Models
 {
     public class EditorSettings
     {
+        public const int MaxSubagentLimit = 8;
         public const string DefaultExternalViewerPath = "uviewer";
         public const int DefaultWindowWidth = 1200;
         public const int DefaultWindowHeight = 800;
@@ -105,6 +106,10 @@ namespace TxtAIEditor.Core.Models
         public string LlmSourceLanguage { get; set; } = "Auto";
         public string LlmTargetLanguage { get; set; } = "Korean";
         public int LlmMaxToolCalls { get; set; } = 100;
+        public int LlmMaxSubagents { get; set; } = 3;
+        public string LlmSubagentProvider { get; set; } = string.Empty;
+        public string LlmSubagentModel { get; set; } = string.Empty;
+        public string LlmSubagentThinkingLevel { get; set; } = "default";
 
         // Web search
         public string AgentWebSearchProvider { get; set; } = "Exa";

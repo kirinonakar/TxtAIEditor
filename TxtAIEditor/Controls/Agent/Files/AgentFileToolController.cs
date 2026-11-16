@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
             public string? LastFilePath { get; set; }
             public AgentSelectionSnapshot? SelectionSnapshot { get; set; }
             public string? ActiveTabPath { get; set; }
+            public bool UseCapturedContextOnly { get; set; }
             public HashSet<string> WrittenFiles { get; } = new(StringComparer.OrdinalIgnoreCase);
         }
 
@@ -50,11 +51,12 @@ namespace TxtAIEditor.Controls
             _currentRunState.Value = new RunFileToolState();
         }
 
-        public void SetRunContext(AgentSelectionSnapshot selectionSnapshot, OpenedTab? activeTab)
+        public void SetRunContext(AgentSelectionSnapshot selectionSnapshot, OpenedTab? activeTab, bool useCapturedContextOnly)
         {
             RunFileToolState state = _currentRunState.Value ??= new RunFileToolState();
             state.SelectionSnapshot = selectionSnapshot;
             state.ActiveTabPath = activeTab?.FilePath;
+            state.UseCapturedContextOnly = useCapturedContextOnly;
         }
 
         public void FinishRun()
@@ -563,7 +565,8 @@ namespace TxtAIEditor.Controls
         private AgentSelectionSnapshot CaptureActiveSelectionSnapshot()
         {
             AgentSelectionSnapshot? runSelection = _currentRunState.Value?.SelectionSnapshot;
-            if (runSelection != null && !string.IsNullOrEmpty(runSelection.Text))
+            if (runSelection != null && (!string.IsNullOrEmpty(runSelection.Text) ||
+                _currentRunState.Value?.UseCapturedContextOnly == true))
             {
                 return runSelection;
             }
@@ -586,7 +589,12 @@ namespace TxtAIEditor.Controls
                 return currentRunLastFilePath;
             }
 
-            string activePath = _currentRunState.Value?.ActiveTabPath ?? _activeTabProvider()?.FilePath ?? string.Empty;
+            RunFileToolState? state = _currentRunState.Value;
+            string? activePath = state?.ActiveTabPath;
+            if (activePath == null && state?.UseCapturedContextOnly != true)
+            {
+                activePath = _activeTabProvider()?.FilePath;
+            }
             return string.IsNullOrWhiteSpace(activePath) ? string.Empty : activePath;
         }
 

@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.Core.Services.LLM;
 using static TxtAIEditor.Controls.AgentToolHelpers;
 
@@ -51,8 +52,6 @@ namespace TxtAIEditor.Controls
         private readonly Action<bool> _updateContextStatsImmediate;
         private readonly List<LlmMessageAttachment> _currentRunImageToolAttachments = new();
 
-        private bool _isRunning;
-        private CancellationTokenSource? _runCancellation;
         private double _currentRunTranscriptTokens;
 
         public AgentRunCoordinator(
@@ -184,7 +183,9 @@ namespace TxtAIEditor.Controls
 
         public async Task RunAgentAsync()
         {
-            if (_runningSessions.ContainsKey(_currentSessionIdProvider()))
+            string sessionId = _currentSessionIdProvider();
+            var activeOpenSession = _openSessionController.EnsureSession(sessionId);
+            if (_runningSessions.ContainsKey(sessionId) || activeOpenSession.Role == AgentSessionRole.Subagent)
             {
                 return;
             }
@@ -193,6 +194,7 @@ namespace TxtAIEditor.Controls
 
             string userInstruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
             bool requestedPlanningMode = _agentPane.PlanningMode;
+            bool useSubagents = _agentPane.UseSubagents;
             if (requestedPlanningMode && string.IsNullOrWhiteSpace(userInstruction))
             {
                 _showError(
@@ -203,8 +205,12 @@ namespace TxtAIEditor.Controls
 
             await _mcpController.ApplyPendingPluginChangesAsync(CancellationToken.None);
             await _mcpController.EnsureActiveToolsAsync(CancellationToken.None);
+            if (!_openSessionController.IsSessionVisible(sessionId) || _runningSessions.ContainsKey(sessionId))
+            {
+                return;
+            }
+
             string targetLanguage = settings?.ResolveTargetLanguage() ?? "Korean";
-            var activeOpenSession = _openSessionController.EnsureSession(_currentSessionIdProvider());
             string pendingPlanPath = requestedPlanningMode
                 ? activeOpenSession.PendingPlanPath ?? string.Empty
                 : string.Empty;
@@ -231,59 +237,100 @@ namespace TxtAIEditor.Controls
             string preservedWorkspaceRoot = activeOpenSession.WorkspaceRoot;
             _openSessionController.SaveActiveFromUI();
             activeOpenSession.RewindSnapshots.Add(AgentSessionRewindSnapshot.Capture(activeOpenSession));
+            if (useSubagents)
+            {
+                activeOpenSession.Role = AgentSessionRole.Orchestrator;
+            }
             _openSessionController.UpdateSessionTitle(activeOpenSession, userInstruction);
             activeOpenSession.PromptText = _agentPane.Prompt.Text ?? string.Empty;
             _agentPane.ClearPromptForRun();
             activeOpenSession.UpdatedAt = DateTime.Now;
-            activeOpenSession.IsRunning = true;
             activeOpenSession.WorkspaceRoot = _runWorkspaceResolver.Resolve(
                 preservedWorkspaceRoot,
                 activeOpenSession.WorkspaceRoot,
                 userInstruction);
             EditorSettings runSettings = await _openSessionController.ResolveRunSessionSettingsAsync(activeOpenSession);
 
-            var runContext = new AgentRunContext
+            var runContext = CreateRunContext(activeOpenSession, runSettings, userInstruction);
+            runContext.StreamToTab = _agentPane.StreamToTab;
+            runContext.IsPlanningMode = requestedPlanningMode;
+            runContext.PendingPlanPath = pendingPlanPath;
+            await ExecuteRunAsync(activeOpenSession, runContext, conversationTurn, useSubagents);
+        }
+
+        private AgentRunContext CreateRunContext(AgentOpenSessionState session, EditorSettings settings, string instruction)
+        {
+            var context = new AgentRunContext
             {
-                SessionId = activeOpenSession.Id,
-                SessionHistoryTokenCount = activeOpenSession.SessionHistoryTokenCount,
-                CurrentRunTranscriptTokens = 0,
-                Attachments = activeOpenSession.Attachments.ToList(),
-                SessionEdits = activeOpenSession.SessionEdits.ToList(),
-                LastAnswerText = activeOpenSession.LastAnswerText,
-                StreamToTab = _agentPane.StreamToTab,
-                WorkspaceRoot = activeOpenSession.WorkspaceRoot,
-                LlmSettings = runSettings,
-                IsPlanningMode = requestedPlanningMode,
+                SessionId = session.Id,
+                SessionHistoryTokenCount = session.SessionHistoryTokenCount,
+                Attachments = session.Attachments.ToList(),
+                SessionEdits = session.SessionEdits.ToList(),
+                LastAnswerText = session.Role == AgentSessionRole.Subagent ? string.Empty : session.LastAnswerText,
+                WorkspaceRoot = session.WorkspaceRoot,
+                LlmSettings = settings,
                 HasEnabledSkills = _skillController.HasSelectedSkills(),
                 HasEnabledMcp = _mcpController.HasSelectedMcpServers(),
-                OriginalUserInstruction = userInstruction,
-                PendingPlanPath = pendingPlanPath
+                OriginalUserInstruction = instruction
             };
-            runContext.SessionHistory.Append(activeOpenSession.SessionHistoryText ?? string.Empty);
-            string modelSessionHistory = activeOpenSession.ModelSessionHistoryText;
+            context.SessionHistory.Append(session.SessionHistoryText);
+            string modelSessionHistory = session.ModelSessionHistoryText;
             if (string.IsNullOrEmpty(modelSessionHistory))
             {
-                modelSessionHistory = _promptContextService.PrepareSessionHistoryForPrompt(
-                    activeOpenSession.SessionHistoryText ?? string.Empty);
+                modelSessionHistory = _promptContextService.PrepareSessionHistoryForPrompt(session.SessionHistoryText);
             }
-            runContext.ModelSessionHistory.Append(modelSessionHistory);
-  
-            _isRunning = true;
+            context.ModelSessionHistory.Append(modelSessionHistory);
+            return context;
+        }
+
+        private async Task<AgentRunContext> RunSubagentAsync(
+            AgentRunContext parent,
+            EditorSettings workerSettings,
+            OpenedTab? activeTab,
+            AgentSelectionSnapshot selection,
+            AgentOpenSessionState session,
+            string instruction,
+            Func<string, Task> reportProgress,
+            CancellationToken cancellationToken)
+        {
+            session.WorkspaceRoot = parent.WorkspaceRoot;
+            session.LlmSettings = workerSettings;
+            session.Attachments = parent.Attachments.ToList();
+            var context = CreateRunContext(session, workerSettings, instruction);
+            context.IsPlanResearch = parent.IsPlanningMode;
+            context.ReportToOrchestrator = reportProgress;
+            string turn = $"[user]\n{AgentSessionLabels.OrchestratorPrompt}\n{instruction}";
+            await ExecuteRunAsync(session, context, turn, false, activeTab, selection, cancellationToken);
+            return context;
+        }
+
+        private async Task ExecuteRunAsync(
+            AgentOpenSessionState activeOpenSession,
+            AgentRunContext runContext,
+            string conversationTurn,
+            bool useSubagents,
+            OpenedTab? inheritedTab = null,
+            AgentSelectionSnapshot? inheritedSelection = null,
+            CancellationToken parentCancellation = default)
+        {
+            string userInstruction = runContext.OriginalUserInstruction;
+            bool isSubagent = activeOpenSession.Role == AgentSessionRole.Subagent;
+            using var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(parentCancellation);
+            runContext.Cancellation = cancellationSource;
+            CancellationToken cancellationToken = cancellationSource.Token;
+            activeOpenSession.IsRunning = true;
+            activeOpenSession.UpdatedAt = DateTime.Now;
             _runningSessions[activeOpenSession.Id] = runContext;
             _openSessionController.UpdateUI();
-            _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
-            _fileToolController.StartRun();
-            _currentRunImageToolAttachments.Clear();
-            _selectionContextController.ClearRunSnapshots();
-            _currentRunTranscriptTokens = 0;
-            var cancellationSource = new CancellationTokenSource();
-            runContext.Cancellation = cancellationSource;
-            _runCancellation = cancellationSource;
-            CancellationToken cancellationToken = cancellationSource.Token;
             _openSessionController.UpdateActiveSessionBusyState();
-            await _runOutputController.ClearRunActivityAsync(runContext, _getString("AgentActivityStarting", "시작 중"));
-            await _runOutputController.BeginRunOutputBlockAsync(runContext, _runTextFormatter.BuildRunHeader(_promptContextService.BuildInstructionDisplay(userInstruction)));
-            await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityCollectingContext", "맥락 수집 중"));
+            _fileToolController.StartRun();
+            if (!isSubagent)
+            {
+                _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
+                _currentRunImageToolAttachments.Clear();
+                _selectionContextController.ClearRunSnapshots();
+                _currentRunTranscriptTokens = 0;
+            }
 
             string initialTranscript = string.Empty;
             string transcript = string.Empty;
@@ -293,8 +340,15 @@ namespace TxtAIEditor.Controls
 
             bool historyReady = false;
             bool responseStreamInProgress = false;
+            AgentSubagentCoordinator? orchestration = null;
             void FinishRun(string? responseLine, AgentRunStatus status = AgentRunStatus.Completed)
             {
+                if (string.IsNullOrEmpty(transcript))
+                {
+                    transcript = conversationTurn + Environment.NewLine;
+                    modelTranscript = runContext.ModelSessionHistory.ToString().TrimEnd() +
+                        Environment.NewLine + transcript;
+                }
                 AgentRunTranscriptRecorder.AppendPromptTranscriptAndResponse(
                     runContext, conversationTurn, transcript,
                     initialTranscript, responseLine, modelTranscript);
@@ -305,7 +359,12 @@ namespace TxtAIEditor.Controls
             _activeWorkspaceRunContext.Value = runContext;
             try
             {
-                string fixedPromptContext = _promptContextService.BuildFixedPromptContext();
+                await _runOutputController.ClearRunActivityAsync(runContext, _getString("AgentActivityStarting", "시작 중"));
+                await _runOutputController.BeginRunOutputBlockAsync(runContext, _runTextFormatter.BuildRunHeader(
+                    isSubagent ? userInstruction : _promptContextService.BuildInstructionDisplay(userInstruction), isSubagent));
+                await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityCollectingContext", "맥락 수집 중"));
+                cancellationToken.ThrowIfCancellationRequested();
+
                 string globalAgentsMdLogSection = _promptContextService.BuildGlobalAgentsMdLogSection();
                 if (!string.IsNullOrWhiteSpace(globalAgentsMdLogSection))
                 {
@@ -315,10 +374,36 @@ namespace TxtAIEditor.Controls
                         globalAgentsMdLogSection + Environment.NewLine + Environment.NewLine);
                 }
 
-                OpenedTab? currentRunActiveTab = await CaptureActiveTabForRunAsync();
-                AgentSelectionSnapshot currentRunSelectionSnapshot = _selectionContextController.CaptureSelectionForRun(_isRunning);
+                OpenedTab? currentRunActiveTab = isSubagent ? inheritedTab : await CaptureActiveTabForRunAsync();
+                AgentSelectionSnapshot currentRunSelectionSnapshot = inheritedSelection ?? _selectionContextController.CaptureSelectionForRun(true);
+                if (useSubagents)
+                {
+                    EditorSettings config = _settingsService.CurrentSettings;
+                    EditorSettings workerSettings = CreateSubagentSettings(runContext.LlmSettings, config);
+                    var workerSessions = new Dictionary<string, AgentOpenSessionState>();
+                    orchestration = new AgentSubagentCoordinator(
+                        Math.Clamp(config.LlmMaxSubagents, 1, EditorSettings.MaxSubagentLimit),
+                        (id, title, instruction, progress, token) =>
+                        {
+                            workerSessions.TryGetValue(id, out AgentOpenSessionState? previousState);
+                            var workerSession = _openSessionController.EnsureSession(id, previousState);
+                            workerSession.Role = AgentSessionRole.Subagent;
+                            workerSession.Title = title;
+                            workerSessions[id] = workerSession;
+                            return RunSubagentAsync(runContext, workerSettings, currentRunActiveTab, currentRunSelectionSnapshot,
+                                workerSession, instruction, progress, token);
+                        },
+                        async message =>
+                        {
+                            await _runOutputController.AppendRunActivityAsync(runContext, message);
+                            await _runOutputController.AppendRunOutputLineAsync(runContext, message);
+                        },
+                        _getString,
+                        cancellationToken);
+                }
+
                 runContext.StreamToTabTargetTabId = currentRunActiveTab?.Id;
-                _fileToolController.SetRunContext(currentRunSelectionSnapshot, currentRunActiveTab);
+                _fileToolController.SetRunContext(currentRunSelectionSnapshot, currentRunActiveTab, useCapturedContextOnly: isSubagent);
                 string currentWorkspaceContext = await _promptContextService.BuildWorkspaceContextAsync(
                     conversationTurn,
                     currentRunActiveTab,
@@ -345,9 +430,8 @@ namespace TxtAIEditor.Controls
                 string response = string.Empty;
 
                 bool completed = false;
-                bool reachedToolStepLimit = false;
                 var retries = new AgentStepRetryPolicy();
-                bool planningMode = requestedPlanningMode;
+                bool planningMode = runContext.IsPlanningMode;
                 int maxToolSteps = runContext.LlmSettings.LlmMaxToolCalls >= 50 ? runContext.LlmSettings.LlmMaxToolCalls : 100;
                 var toolInvocationCounts = new Dictionary<string, int>(StringComparer.Ordinal);
                 int currentTaskStartEditIndex = runContext.SessionEdits.Count;
@@ -355,13 +439,26 @@ namespace TxtAIEditor.Controls
                 for (int step = 0; step < maxToolSteps; step++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    fixedPromptContext = await _uiDispatcher.RunAsync<string>(async () =>
+                    if (orchestration != null)
+                    {
+                        transcript += orchestration.DrainProgressLog();
+                    }
+                    string fixedPromptContext = await _uiDispatcher.RunAsync<string>(async () =>
                     {
                         await _mcpController.ApplyPendingPluginChangesAsync(cancellationToken);
                         runContext.HasEnabledSkills = _skillController.HasSelectedSkills();
-                        runContext.HasEnabledMcp = _mcpController.HasSelectedMcpServers();
-                        return _promptContextService.BuildFixedPromptContextForRun();
+                        runContext.HasEnabledMcp = !runContext.IsPlanResearch && _mcpController.HasSelectedMcpServers();
+                        return _promptContextService.BuildFixedPromptContextForRun(
+                            runContext.WorkspaceRoot, includeMcp: !runContext.IsPlanResearch);
                     });
+                    if (orchestration != null)
+                    {
+                        fixedPromptContext += "\n\n" + orchestration.BuildInstructions(planningMode);
+                    }
+                    else if (isSubagent)
+                    {
+                        fixedPromptContext += "\n\n" + AgentSubagentCoordinator.BuildWorkerInstructions(runContext.IsPlanResearch);
+                    }
                     string? queuedFollowUpPrompt = TakeQueuedFollowUpPrompt(runContext);
                     if (!string.IsNullOrWhiteSpace(queuedFollowUpPrompt))
                     {
@@ -386,8 +483,17 @@ namespace TxtAIEditor.Controls
                         runContext.SessionEdits);
                     IReadOnlyList<LlmTool> agentTools = _llmToolCatalog.Build(
                         planningMode,
-                        _mcpController.GetActiveToolAliases(),
+                        runContext.IsPlanResearch ? Array.Empty<AgentMcpToolAlias>() : _mcpController.GetActiveToolAliases(),
                         runContext.HasEnabledSkills);
+                    if (orchestration != null)
+                    {
+                        agentTools = agentTools.Concat(AgentSubagentCoordinator.Tools).ToArray();
+                    }
+                    else if (isSubagent)
+                    {
+                        agentTools = agentTools.Where(tool => IsAvailableToSubagent(runContext, tool.Name))
+                            .Append(AgentSubagentCoordinator.ProgressTool).ToArray();
+                    }
                     IReadOnlyList<LlmMessageAttachment> imageAttachments =
                         _promptContextService.GetImageAttachmentsForRun(runContext);
                     AgentContextCompressionResult compressionResult =
@@ -445,6 +551,7 @@ namespace TxtAIEditor.Controls
                     }
 
                     responseStreamInProgress = true;
+                    bool awaitingSubagents = orchestration?.HasUncollectedResults == true;
                     AgentResponseStreamResult streamResult = await _responseStreamService.RunAsync(
                         runContext,
                         fixedPromptContext,
@@ -454,7 +561,8 @@ namespace TxtAIEditor.Controls
                         planningMode,
                         agentTools,
                         imageAttachments,
-                        cancellationToken);
+                        cancellationToken,
+                        deferAnswer: awaitingSubagents);
                     responseStreamInProgress = false;
 
                     if (!string.IsNullOrWhiteSpace(runContext.PendingVisionFallbackContext))
@@ -581,7 +689,7 @@ namespace TxtAIEditor.Controls
                         }
                     }
 
-                    if (planningMode && responseHasToolSyntax && !responseLooksLikeToolResultReplay)
+                    if ((planningMode || awaitingSubagents) && responseHasToolSyntax && !responseLooksLikeToolResultReplay)
                     {
                         int toolCallIndex = AgentToolCallParser.FindToolCallIndex(cleanResponse);
                         if (toolCallIndex > 0)
@@ -612,12 +720,12 @@ namespace TxtAIEditor.Controls
                             }
                         }
                     }
-                    else if (!planningMode && !responseRequiresToolHandling && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(cleanResponse))
+                    else if (!planningMode && !awaitingSubagents && !responseRequiresToolHandling && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(cleanResponse))
                     {
                         visibleTextFlushed = true;
                         await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, cleanResponse);
                     }
-                    else if (!planningMode && printedLength < endLength)
+                    else if (!planningMode && !awaitingSubagents && printedLength < endLength)
                     {
                         string remainingText = cleanResponse.Substring(printedLength, endLength - printedLength);
                         visibleTextFlushed = true;
@@ -677,6 +785,16 @@ namespace TxtAIEditor.Controls
                                 throw new LlmRequestException(limitMessage);
                             }
 
+                            continue;
+                        }
+
+                        if (orchestration?.HasUncollectedResults == true)
+                        {
+                            string results = await orchestration.CollectOutstandingAsync();
+                            string resultText = "\n\n[Subagent results]\n" + results +
+                                "\nReview these results before completing the user's request.";
+                            modelTranscript += resultText;
+                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(resultText);
                             continue;
                         }
 
@@ -743,6 +861,10 @@ namespace TxtAIEditor.Controls
 
                     bool stopAfterLoopGuard = false;
                     toolCalls = OrderToolCallsForExecution(toolCalls, runContext.WorkspaceRoot);
+                    if (planningMode && orchestration != null)
+                    {
+                        toolCalls = toolCalls.OrderBy(call => NormalizeToolName(call.ToolName) == "make_plan").ToList();
+                    }
                     var toolCallResults = new List<(string Name, JsonElement Args, string Result, string ResultForTranscript, bool Skipped, string NormalizedName)>();
                     bool hasWebSearchCallInBatch = false;
 
@@ -777,7 +899,25 @@ namespace TxtAIEditor.Controls
                         string toolResultForTranscript;
                         retries.Reset(AgentRetryReason.ToolCallFormat);
 
-                        if (!planningMode && normalizedToolName == "make_plan")
+                        if (AgentSubagentCoordinator.IsCoordinationTool(normalizedToolName))
+                        {
+                            toolResult = orchestration != null
+                                ? await orchestration.ExecuteAsync(normalizedToolName, currentArguments)
+                                : await ExecuteSubagentProgressAsync(runContext, normalizedToolName, currentArguments);
+                            toolResultForTranscript = toolResult;
+                        }
+                        else if (isSubagent && !IsAvailableToSubagent(runContext, normalizedToolName))
+                        {
+                            toolResult = $"Tool failed: {normalizedToolName} is unavailable for this subagent run.";
+                            toolResultForTranscript = toolResult;
+                        }
+                        else if (normalizedToolName == "make_plan" && orchestration?.HasUncollectedResults == true)
+                        {
+                            string results = await orchestration.CollectOutstandingAsync();
+                            toolResult = "make_plan failed: incorporate the collected subagent results and submit the revised plan.\n" + results;
+                            toolResultForTranscript = toolResult;
+                        }
+                        else if (!planningMode && normalizedToolName == "make_plan")
                         {
                             toolResult = "make_plan failed: this tool is only available when planning mode is enabled.";
                             toolResultForTranscript = toolResult;
@@ -897,6 +1037,10 @@ namespace TxtAIEditor.Controls
                         return (Text: addedPart, Tokens: AgentTokenEstimator.Estimate(addedPart));
                     }, cancellationToken);
                     transcript += transcriptUpdate.Text;
+                    if (orchestration != null)
+                    {
+                        transcript += orchestration.DrainProgressLog();
+                    }
                     modelTranscript += transcriptUpdate.Text;
                     runContext.CurrentRunTranscriptTokens += transcriptUpdate.Tokens;
                     await _uiDispatcher.RunAsync(() => _updateContextStatsImmediate(true));
@@ -904,6 +1048,16 @@ namespace TxtAIEditor.Controls
                     foreach (var tcRes in toolCallResults)
                     {
                         bool toolSucceeded = IsSuccessfulToolResult(tcRes.Result);
+                        if (isSubagent && tcRes.NormalizedName == AgentSubagentCoordinator.ReportProgressTool && toolSucceeded)
+                        {
+                            string progressLine = AgentSubagentCoordinator.FormatProgressLine(GetStringArgument(tcRes.Args, "message"));
+                            transcript += "\n" + AgentSubagentCoordinator.ProgressMarker + progressLine + "\n";
+                        }
+                        if (!runContext.LlmSettings.LlmAgentVerbose && toolSucceeded &&
+                            AgentSubagentCoordinator.IsCoordinationTool(tcRes.NormalizedName))
+                        {
+                            continue;
+                        }
                         string displayResult = _toolExecutionController.FormatDisplayResult(
                             tcRes.NormalizedName,
                             tcRes.Args,
@@ -958,12 +1112,13 @@ namespace TxtAIEditor.Controls
                         await _runOutputController.AppendRunActivityAsync(runContext, loopMessage);
                         await _runOutputController.AppendRunOutputLineAsync(runContext, loopMessage);
 
+                        runContext.FailureReason = loopMessage;
                         FinishRun(null, AgentRunStatus.Failed);
 
                         completed = true;
                         break;
                     }
-                    if (toolCalls.Count == 1)
+                    if (toolCalls.Count == 1 && !isSubagent && orchestration == null)
                     {
                         var tcRes = toolCallResults[0];
                         bool isFileEditTool = tcRes.NormalizedName is "search_replace" or "replace_range"
@@ -986,14 +1141,9 @@ namespace TxtAIEditor.Controls
                             break;
                         }
                     }
-
-                    if (step == maxToolSteps - 1)
-                    {
-                        reachedToolStepLimit = true;
-                    }
                 }
 
-                if (!completed && reachedToolStepLimit)
+                if (!completed)
                 {
                     string limitMsg = _getString(
                         "AgentToolStepLimitReached",
@@ -1002,6 +1152,7 @@ namespace TxtAIEditor.Controls
                     await _runOutputController.AppendRunActivityAsync(runContext, limitMsg);
                     await _runOutputController.AppendRunOutputLineAsync(runContext, limitMsg);
 
+                    runContext.FailureReason = limitMsg;
                     FinishRun(null, AgentRunStatus.Failed);
                 }
             }
@@ -1033,6 +1184,7 @@ namespace TxtAIEditor.Controls
                 string failureMessage = string.Format(
                     _getString("AgentExceptionFormat", "Agent 실행 도중 예외가 발생했습니다: {0}"),
                     ex.Message);
+                runContext.FailureReason = failureMessage;
                 await _runOutputController.AppendRunActivityAsync(runContext, failureMessage);
                 await _runOutputController.AppendRunOutputLineAsync(runContext, failureMessage);
                 AgentRunTranscriptRecorder.AppendFailedRun(
@@ -1042,6 +1194,19 @@ namespace TxtAIEditor.Controls
             }
             finally
             {
+                if (orchestration != null)
+                {
+                    using (orchestration)
+                    {
+                        await orchestration.StopAsync();
+                        string progressLog = orchestration.DrainProgressLog();
+                        if (progressLog.Length > 0)
+                        {
+                            AgentRunTranscriptRecorder.AppendLine(runContext, progressLog);
+                        }
+                    }
+                }
+
                 await _uiDispatcher.RunAsync(async () => await _runOutputController.FinishStreamToTabAsync(runContext));
                 activeOpenSession.SessionHistoryText = runContext.SessionHistory.ToString();
                 activeOpenSession.ModelSessionHistoryText = runContext.ModelSessionHistory.ToString();
@@ -1067,15 +1232,11 @@ namespace TxtAIEditor.Controls
                 _activeWorkspaceRunContext.Value = null;
                 activeOpenSession.IsRunning = false;
                 _runningSessions.Remove(runContext.SessionId);
-                _isRunning = _openSessionController.IsAnySessionRunning();
-                _selectionContextController.ClearRunSnapshots();
-                _fileToolController.FinishRun();
-                if (ReferenceEquals(_runCancellation, cancellationSource))
+                if (!isSubagent)
                 {
-                    _runCancellation = null;
+                    _selectionContextController.ClearRunSnapshots();
                 }
-
-                cancellationSource.Dispose();
+                _fileToolController.FinishRun();
                 _openSessionController.ClearThinkingState(activeOpenSession);
                 bool completedInBackground = !_runOutputController.IsSessionVisible(runContext.SessionId);
                 if (_runOutputController.IsSessionVisible(runContext.SessionId))
@@ -1110,7 +1271,7 @@ namespace TxtAIEditor.Controls
 
             if (!string.IsNullOrWhiteSpace(approvedPlanExecutionPrompt))
             {
-                await StartApprovedPlanSessionAsync(approvedPlanExecutionPrompt, approvedPlanWorkspaceRoot);
+                await StartApprovedPlanSessionAsync(approvedPlanExecutionPrompt, approvedPlanWorkspaceRoot, useSubagents);
             }
 
             string? pendingFollowUp = TakeQueuedFollowUpPrompt(runContext);
@@ -1339,7 +1500,64 @@ namespace TxtAIEditor.Controls
                 "Do not answer with the plan as plain text. Save it by including exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename.";
         }
 
-        private async Task StartApprovedPlanSessionAsync(string executionPrompt, string workspaceRoot)
+        private static EditorSettings CreateSubagentSettings(EditorSettings parent, EditorSettings preferences)
+        {
+            var settings = AgentOpenSessionController.CloneSessionSettings(parent);
+            string provider = preferences.LlmSubagentProvider?.Trim() ?? string.Empty;
+            string model = preferences.LlmSubagentModel?.Trim() ?? string.Empty;
+            if (provider.Length > 0 && !provider.Equals(parent.LlmProvider, StringComparison.OrdinalIgnoreCase))
+            {
+                settings.LlmProvider = provider;
+                settings.LlmEndpoint = SettingsLlmModelCatalog.GetDefaultEndpoint(provider, preferences.LlmEndpointCustom);
+                settings.LlmModel = SettingsLlmModelCatalog.GetModelForProviderChange(preferences, provider);
+                settings.LlmApiFormat = LlmRequestTuning.ApiFormatAuto;
+            }
+
+            if (model.Length > 0)
+            {
+                settings.LlmModel = model;
+            }
+            if (!settings.LlmProvider.Equals(parent.LlmProvider, StringComparison.OrdinalIgnoreCase) ||
+                !settings.LlmModel.Equals(parent.LlmModel, StringComparison.OrdinalIgnoreCase))
+            {
+                settings.LlmMaxContextLength = LlmRequestTuning.MaxContextLengthAuto;
+            }
+            settings.LlmThinkingLevel = preferences.LlmSubagentThinkingLevel ?? "default";
+            return settings;
+        }
+
+        private static bool IsAvailableToSubagent(AgentRunContext context, string toolName)
+        {
+            if (toolName is "make_plan" or "open_file" or "insert_text" or "create_tab" or "edit_tab" or "save_tab")
+            {
+                return false;
+            }
+
+            return !context.IsPlanResearch || toolName is "list_files" or "search_text" or "run_rg" or "run_rga"
+                or "read_file" or "read_image" or "web_search" or "web_fetch" or "web_fetch_exa" or "skill_use";
+        }
+
+        private async Task<string> ExecuteSubagentProgressAsync(AgentRunContext context, string name, JsonElement arguments)
+        {
+            if (name != AgentSubagentCoordinator.ReportProgressTool || context.ReportToOrchestrator == null)
+            {
+                return $"Unknown tool: {name}";
+            }
+
+            string message = GetStringArgument(arguments, "message").Trim();
+            if (message.Length == 0)
+            {
+                return "Tool failed: message is required.";
+            }
+
+            await context.ReportToOrchestrator(message);
+            string line = AgentSubagentCoordinator.FormatProgressLine(message);
+            await _runOutputController.AppendRunActivityAsync(context, line);
+            await _runOutputController.AppendRunOutputLineAsync(context, line);
+            return "Progress shared with the orchestrator.";
+        }
+
+        private async Task StartApprovedPlanSessionAsync(string executionPrompt, string workspaceRoot, bool useSubagents)
         {
             await _uiDispatcher.RunAsync(() =>
             {
@@ -1360,6 +1578,7 @@ namespace TxtAIEditor.Controls
                 session.RewindSnapshots.Clear();
                 session.WorkspaceRoot = string.IsNullOrWhiteSpace(workspaceRoot) ? _fileTools.WorkspaceRoot : workspaceRoot;
                 session.LlmSettings = _openSessionController.CreateSessionSettingsSnapshot();
+                session.UseSubagents = useSubagents;
                 session.UpdatedAt = DateTime.Now;
 
                 _agentPane.PlanningModeCheckBox.IsChecked = false;
@@ -1371,6 +1590,11 @@ namespace TxtAIEditor.Controls
 
         public void QueueFollowUpPrompt(string prompt)
         {
+            if (_openSessionController.EnsureSession(_currentSessionIdProvider()).Role == AgentSessionRole.Subagent)
+            {
+                return;
+            }
+
             string trimmedPrompt = prompt?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(trimmedPrompt))
             {

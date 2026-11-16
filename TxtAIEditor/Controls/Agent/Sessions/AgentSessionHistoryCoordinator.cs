@@ -47,7 +47,10 @@ namespace TxtAIEditor.Controls
             }
 
             var openSession = _openSessionController.EnsureSession(context.SessionId);
-            _openSessionController.UpdateSessionTitle(openSession, userInstruction);
+            if (openSession.Role != AgentSessionRole.Subagent)
+            {
+                _openSessionController.UpdateSessionTitle(openSession, userInstruction);
+            }
             string historyText = AgentRunTranscriptService.ConvertToolCallTagsToLogTags(context.SessionHistory.ToString());
             historyText = AgentRunTranscriptService.ConvertUserRequestMarkersForHistory(historyText);
             openSession.SessionHistoryText = historyText;
@@ -66,6 +69,7 @@ namespace TxtAIEditor.Controls
                 Id = context.SessionId,
                 Timestamp = DateTime.Now,
                 Title = openSession.Title,
+                Role = openSession.Role,
                 SessionHistoryText = historyText,
                 ModelSessionHistoryText = context.ModelSessionHistory.ToString(),
                 LastAnswerText = context.LastAnswerText,
@@ -98,6 +102,8 @@ namespace TxtAIEditor.Controls
             session.Title = _titleResolver.Resolve(
                 item,
                 string.Empty);
+            session.Role = item.Role;
+            session.UseSubagents = item.Role == AgentSessionRole.Orchestrator;
             session.PromptText = string.Empty;
             session.OutputText = AgentHistoryFormatter.Format(
                 item.SessionHistoryText,

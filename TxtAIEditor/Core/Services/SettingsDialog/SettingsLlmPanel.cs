@@ -48,6 +48,11 @@ namespace TxtAIEditor.Core.Services
         private readonly TextBlock _tokenUsageSummaryHeaderTextBlock;
         private readonly TextBlock _tokenUsageSummaryText;
         private readonly Slider _maxToolCallsSlider;
+        private readonly NumberBox _maxSubagentsBox;
+        private readonly ComboBox _subagentProviderCombo;
+        private readonly ComboBox _subagentModelCombo;
+        private readonly ComboBox _subagentThinkingLevelCombo;
+        private readonly Button _subagentRefreshModelsButton;
         private Task? _secretsLoadTask;
         private bool _secretsLoadRequested;
         private string _lastSelectedProviderName = string.Empty;
@@ -161,6 +166,38 @@ namespace TxtAIEditor.Core.Services
                 StepFrequency = 1,
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
+            _maxSubagentsBox = new NumberBox
+            {
+                Header = getString("SettingsLlmMaxSubagents", "서브에이전트 최대 개수"),
+                Minimum = 1,
+                Maximum = EditorSettings.MaxSubagentLimit,
+                Value = Math.Clamp(settings.LlmMaxSubagents, 1, EditorSettings.MaxSubagentLimit),
+                SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline
+            };
+            _subagentProviderCombo = CreateProviderCombo(settings.LlmSubagentProvider);
+            _subagentProviderCombo.Items.Insert(0, getString("SettingsLlmSubagentInherit", "오케스트레이터와 동일"));
+            _subagentProviderCombo.SelectedIndex = string.IsNullOrWhiteSpace(settings.LlmSubagentProvider)
+                ? 0
+                : SettingsLlmModelCatalog.GetProviderIndex(settings.LlmSubagentProvider) + 1;
+            _subagentModelCombo = new ComboBox
+            {
+                PlaceholderText = getString("SettingsLlmSubagentInherit", "오케스트레이터와 동일"),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                IsEditable = true,
+                Tag = "LlmVisionFallbackModelCombo"
+            };
+            _subagentModelCombo.Loaded += (_, _) => SettingsDialogStyler.ApplyEditableComboBoxVisualStyles(_subagentModelCombo);
+            _subagentThinkingLevelCombo = CreateThinkingLevelCombo(settings.LlmSubagentThinkingLevel, getString);
+            _subagentRefreshModelsButton = new Button
+            {
+                Content = new FontIcon { Glyph = "\uE72C", FontSize = 12 },
+                Width = 32,
+                Padding = new Thickness(0),
+                Tag = "IconOnlyButton"
+            };
+            ToolTipService.SetToolTip(_subagentRefreshModelsButton, getString("SettingsLlmLoadModels", "모델 목록 불러오기"));
+            AutomationProperties.SetName(_subagentRefreshModelsButton, getString("SettingsLlmLoadModels", "모델 목록 불러오기"));
+            PopulateSubagentModels(settings.LlmSubagentModel ?? string.Empty);
 
             PopulateModelChoices(GetSelectedProviderName(), settings.LlmModel);
             PopulateVisionFallbackModelChoices(
@@ -209,16 +246,7 @@ namespace TxtAIEditor.Core.Services
             settings.LlmVisionFallbackModel = (!string.IsNullOrEmpty(selectedVisionFallbackModelText)
                 ? selectedVisionFallbackModelText
                 : (_visionFallbackModelCombo.SelectedItem as string ?? settings.LlmVisionFallbackModel)).Trim();
-            settings.LlmVisionFallbackThinkingLevel = _visionFallbackThinkingLevelCombo.SelectedIndex switch
-            {
-                1 => "disabled",
-                2 => "low",
-                3 => "medium",
-                4 => "high",
-                5 => "xhigh",
-                6 => "max",
-                _ => "default"
-            };
+            settings.LlmVisionFallbackThinkingLevel = GetThinkingLevel(_visionFallbackThinkingLevelCombo);
             settings.LlmConfirmBeforeSending = _confirmBeforeSendingCheck.IsChecked == true;
             settings.LlmAgentVerbose = _agentVerboseCheck.IsChecked == true;
             settings.LlmRetainThinking = _retainThinkingCheck.IsChecked == true;
@@ -227,16 +255,14 @@ namespace TxtAIEditor.Core.Services
             settings.LlmAgentAutoApprovePowerShell = _agentAutoApprovePowerShellCheck.IsChecked == true;
             settings.LlmAgentAutoApprovePlanning = _agentAutoApprovePlanningCheck.IsChecked == true;
             settings.LlmMaxToolCalls = (int)Math.Clamp(_maxToolCallsSlider.Value, 50, 1000);
-            settings.LlmThinkingLevel = _llmThinkingLevelCombo.SelectedIndex switch
+            if (!double.IsNaN(_maxSubagentsBox.Value))
             {
-                1 => "disabled",
-                2 => "low",
-                3 => "medium",
-                4 => "high",
-                5 => "xhigh",
-                6 => "max",
-                _ => "default"
-            };
+                settings.LlmMaxSubagents = Math.Clamp((int)_maxSubagentsBox.Value, 1, EditorSettings.MaxSubagentLimit);
+            }
+            settings.LlmSubagentProvider = _subagentProviderCombo.SelectedIndex == 0 ? string.Empty : GetEffectiveSubagentProvider();
+            settings.LlmSubagentModel = _subagentModelCombo.Text?.Trim() ?? string.Empty;
+            settings.LlmSubagentThinkingLevel = GetThinkingLevel(_subagentThinkingLevelCombo);
+            settings.LlmThinkingLevel = GetThinkingLevel(_llmThinkingLevelCombo);
             settings.LlmApiFormat = _llmApiFormatCombo.SelectedIndex switch
             {
                 1 => LlmRequestTuning.ApiFormatChatCompletions,
@@ -327,6 +353,7 @@ namespace TxtAIEditor.Core.Services
             var section = new StackPanel { Spacing = 10, Width = 460, Padding = new Thickness(2, 6, 2, 2) };
             section.Children.Add(CreateMainServiceCard());
             section.Children.Add(CreateVisionFallbackCard());
+            section.Children.Add(CreateSubagentCard());
             section.Children.Add(CreateAgentPermissionsCard());
             section.Children.Add(CreateTranslationCard());
             section.Children.Add(CreateWebSearchCard());
@@ -402,17 +429,7 @@ namespace TxtAIEditor.Core.Services
             content.Children.Add(_visionFallbackProviderCombo);
 
             SettingsDialogUi.AddLabel(content, _getString("SettingsLlmVisionFallbackModel", "Vision fallback 모델"));
-            var visionModelGrid = new Grid();
-            visionModelGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            visionModelGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            _visionFallbackModelCombo.HorizontalAlignment = HorizontalAlignment.Stretch;
-            _visionFallbackRefreshModelsButton.HorizontalAlignment = HorizontalAlignment.Right;
-            _visionFallbackRefreshModelsButton.Margin = new Thickness(6, 0, 0, 0);
-            Grid.SetColumn(_visionFallbackModelCombo, 0);
-            Grid.SetColumn(_visionFallbackRefreshModelsButton, 1);
-            visionModelGrid.Children.Add(_visionFallbackModelCombo);
-            visionModelGrid.Children.Add(_visionFallbackRefreshModelsButton);
-            content.Children.Add(visionModelGrid);
+            content.Children.Add(CreateSecondaryModelPicker(_visionFallbackModelCombo, _visionFallbackRefreshModelsButton));
 
             SettingsDialogUi.AddLabel(content, _getString("SettingsLlmThinkingLevel", "Thinking Level"));
             content.Children.Add(_visionFallbackThinkingLevelCombo);
@@ -421,6 +438,30 @@ namespace TxtAIEditor.Core.Services
                 _getString("SettingsLlmGroupVisionFallback", "비전 대체 모델"),
                 content,
                 "\uE8B9");
+        }
+
+        private Border CreateSubagentCard()
+        {
+            var content = new StackPanel { Spacing = 6 };
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmSubagentProvider", "서브에이전트 공급자"));
+            content.Children.Add(_subagentProviderCombo);
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmSubagentModel", "서브에이전트 모델"));
+            content.Children.Add(CreateSecondaryModelPicker(_subagentModelCombo, _subagentRefreshModelsButton));
+            SettingsDialogUi.AddLabel(content, _getString("SettingsLlmThinkingLevel", "Thinking Level"));
+            content.Children.Add(_subagentThinkingLevelCombo);
+            content.Children.Add(_maxSubagentsBox);
+            return CreateCard(_getString("AgentUseSubagents", "서브에이전트"), content, "\uE716");
+        }
+
+        private static Grid CreateSecondaryModelPicker(ComboBox modelCombo, Button refreshButton)
+        {
+            var grid = new Grid { ColumnSpacing = 6 };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(refreshButton, 1);
+            grid.Children.Add(modelCombo);
+            grid.Children.Add(refreshButton);
+            return grid;
         }
 
         private Border CreateAgentPermissionsCard()
@@ -547,6 +588,10 @@ namespace TxtAIEditor.Core.Services
                 _lastSelectedProviderName = provider;
                 PopulateModelChoices(provider, SettingsLlmModelCatalog.GetModelForProviderChange(_settings, provider));
                 UpdateModelRefreshButtonVisibility();
+                if (_subagentProviderCombo.SelectedIndex == 0)
+                {
+                    PopulateSubagentModels(string.Empty);
+                }
 
                 string apiKey = await _llmService.GetApiKeyAsync(provider);
                 if (!provider.Equals(GetSelectedProviderName(), StringComparison.OrdinalIgnoreCase))
@@ -571,7 +616,13 @@ namespace TxtAIEditor.Core.Services
             };
 
             _refreshModelsButton.Click += async (_, __) => await RefreshModelsAsync();
-            _visionFallbackRefreshModelsButton.Click += async (_, __) => await RefreshVisionFallbackModelsAsync();
+            _visionFallbackRefreshModelsButton.Click += async (_, __) => await RefreshSecondaryModelsAsync(
+                GetSelectedVisionFallbackProviderName, _visionFallbackModelCombo, _visionFallbackRefreshModelsButton,
+                preserveSelection: false);
+            _subagentProviderCombo.SelectionChanged += (_, _) => PopulateSubagentModels(string.Empty);
+            _subagentRefreshModelsButton.Click += async (_, _) => await RefreshSecondaryModelsAsync(
+                GetEffectiveSubagentProvider, _subagentModelCombo, _subagentRefreshModelsButton,
+                preserveSelection: true);
             _tokenUsageStatsButton.Click += (_, __) => OpenTokenUsageStatsInEditor();
             _tokenUsageHtmlButton.Click += (_, __) => OpenTokenUsageStatsHtmlInEditor();
             _tokenUsageResetButton.Click += (_, __) =>
@@ -748,6 +799,24 @@ namespace TxtAIEditor.Core.Services
             return _visionFallbackProviderCombo.SelectedItem as string ?? "OpenAI";
         }
 
+        private string GetEffectiveSubagentProvider() =>
+            _subagentProviderCombo.SelectedIndex > 0 ? (string)_subagentProviderCombo.SelectedItem : GetSelectedProviderName();
+
+        private void PopulateSubagentModels(string selectedModel)
+        {
+            string provider = GetEffectiveSubagentProvider();
+            bool inheritsMainModel = _subagentProviderCombo.SelectedIndex == 0;
+            _subagentModelCombo.PlaceholderText = inheritsMainModel
+                ? _getString("SettingsLlmSubagentInherit", "오케스트레이터와 동일")
+                : _getString("SettingsLlmSelectModel", "모델 선택");
+            string targetModel = string.IsNullOrWhiteSpace(selectedModel) && !inheritsMainModel
+                ? SettingsLlmModelCatalog.GetModelForProviderChange(_settings, provider)
+                : selectedModel;
+            SetSecondaryModelChoices(_subagentModelCombo, SettingsLlmModelCatalog.GetStaticModels(provider), targetModel);
+            _subagentRefreshModelsButton.Visibility = SettingsLlmModelCatalog.SupportsRemoteModelFetch(provider)
+                ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         private void AddModelChoice(string model)
         {
             if (!string.IsNullOrWhiteSpace(model) && !_llmModelCombo.Items.Contains(model))
@@ -782,31 +851,23 @@ namespace TxtAIEditor.Core.Services
 
         private void PopulateVisionFallbackModelChoices(string provider, string selectedModel)
         {
-            _visionFallbackModelCombo.Items.Clear();
-            foreach (string model in SettingsLlmModelCatalog.GetStaticModels(provider))
-            {
-                if (!string.IsNullOrWhiteSpace(model) && !_visionFallbackModelCombo.Items.Contains(model))
-                {
-                    _visionFallbackModelCombo.Items.Add(model);
-                }
-            }
-
             string targetModel = string.IsNullOrWhiteSpace(selectedModel)
                 ? SettingsLlmModelCatalog.GetModelForProviderChange(_settings, provider)
                 : selectedModel;
-            if (!string.IsNullOrWhiteSpace(targetModel) && !_visionFallbackModelCombo.Items.Contains(targetModel))
-            {
-                _visionFallbackModelCombo.Items.Add(targetModel);
-            }
+            var models = SettingsLlmModelCatalog.GetStaticModels(provider);
+            SetSecondaryModelChoices(_visionFallbackModelCombo, models, string.IsNullOrWhiteSpace(targetModel)
+                ? models.FirstOrDefault() ?? string.Empty : targetModel);
+        }
 
-            if (!string.IsNullOrWhiteSpace(targetModel))
+        private static void SetSecondaryModelChoices(ComboBox combo, System.Collections.Generic.IEnumerable<string> models, string selectedModel)
+        {
+            combo.Items.Clear();
+            foreach (string model in models.Append(selectedModel).Where(model => !string.IsNullOrWhiteSpace(model)).Distinct())
             {
-                _visionFallbackModelCombo.SelectedItem = targetModel;
+                combo.Items.Add(model);
             }
-            else if (_visionFallbackModelCombo.Items.Count > 0)
-            {
-                _visionFallbackModelCombo.SelectedIndex = 0;
-            }
+            combo.SelectedItem = string.IsNullOrWhiteSpace(selectedModel) ? null : selectedModel;
+            combo.Text = selectedModel;
         }
 
         private void ApplyProviderDefaults(string provider, string previousProvider)
@@ -875,21 +936,22 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private async Task RefreshVisionFallbackModelsAsync()
+        private async Task RefreshSecondaryModelsAsync(
+            Func<string> getProvider, ComboBox modelCombo, Button refreshButton, bool preserveSelection)
         {
-            string provider = GetSelectedVisionFallbackProviderName();
+            string provider = getProvider();
             if (!SettingsLlmModelCatalog.SupportsRemoteModelFetch(provider))
             {
                 return;
             }
 
-            string currentModel = (_visionFallbackModelCombo.Text ??
-                _visionFallbackModelCombo.SelectedItem as string ??
+            string currentModel = (modelCombo.Text ??
+                modelCombo.SelectedItem as string ??
                 string.Empty).Trim();
 
             try
             {
-                _visionFallbackRefreshModelsButton.IsEnabled = false;
+                refreshButton.IsEnabled = false;
                 bool sameProvider = provider.Equals(GetSelectedProviderName(), StringComparison.OrdinalIgnoreCase);
                 string endpoint = sameProvider
                     ? _llmEndpointBox.Text.Trim()
@@ -899,34 +961,21 @@ namespace TxtAIEditor.Core.Services
                     : await _llmService.GetApiKeyAsync(provider);
                 var models = await SettingsLlmModelFetcher.FetchModelsAsync(endpoint, apiKey);
 
-                _visionFallbackModelCombo.Items.Clear();
-                foreach (string model in models)
+                if (provider.Equals(getProvider(), StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!string.IsNullOrWhiteSpace(model) && !_visionFallbackModelCombo.Items.Contains(model))
-                    {
-                        _visionFallbackModelCombo.Items.Add(model);
-                    }
-                }
-
-                string targetModel = models.Contains(currentModel)
-                    ? currentModel
-                    : models.FirstOrDefault() ?? currentModel;
-                if (!string.IsNullOrWhiteSpace(targetModel))
-                {
-                    if (!_visionFallbackModelCombo.Items.Contains(targetModel))
-                    {
-                        _visionFallbackModelCombo.Items.Add(targetModel);
-                    }
-                    _visionFallbackModelCombo.SelectedItem = targetModel;
+                    string selectedModel = preserveSelection || models.Contains(currentModel)
+                        ? currentModel
+                        : models.FirstOrDefault() ?? currentModel;
+                    SetSecondaryModelChoices(modelCombo, models, selectedModel);
                 }
             }
             catch
             {
-                PopulateVisionFallbackModelChoices(provider, currentModel);
+                // Preserve the current selection and model list if fetching fails.
             }
             finally
             {
-                _visionFallbackRefreshModelsButton.IsEnabled = true;
+                refreshButton.IsEnabled = true;
             }
         }
 
@@ -1230,9 +1279,25 @@ namespace TxtAIEditor.Core.Services
             comboBox.Text = normalized;
         }
 
+        private static string GetThinkingLevel(ComboBox combo) => combo.SelectedIndex switch
+        {
+            1 => "disabled",
+            2 => "low",
+            3 => "medium",
+            4 => "high",
+            5 => "xhigh",
+            6 => "max",
+            _ => "default"
+        };
+
         private static ComboBox CreateThinkingLevelCombo(string thinkingLevel, Func<string, string, string> getString)
         {
-            var comboBox = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, Visibility = Visibility.Collapsed };
+            var comboBox = new ComboBox
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Tag = SettingsDialogStyler.ThinkingLevelComboTag
+            };
+            AutomationProperties.SetName(comboBox, getString("SettingsLlmThinkingLevel", "Thinking Level"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelDefault", "기본값 (Default)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelDisabled", "비활성화 (Disable)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelLow", "낮음 (Low)"));
@@ -1240,7 +1305,7 @@ namespace TxtAIEditor.Core.Services
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelHigh", "높음 (High)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelXHigh", "매우 높음 (xhigh)"));
             comboBox.Items.Add(getString("SettingsLlmThinkingLevelMax", "최대 (Max)"));
-            comboBox.SelectedIndex = thinkingLevel.ToLowerInvariant() switch
+            comboBox.SelectedIndex = thinkingLevel?.ToLowerInvariant() switch
             {
                 "disabled" => 1,
                 "low" => 2,

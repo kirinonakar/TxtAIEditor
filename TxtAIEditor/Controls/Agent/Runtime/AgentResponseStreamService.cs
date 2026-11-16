@@ -55,7 +55,8 @@ namespace TxtAIEditor.Controls
             bool planningMode,
             IReadOnlyList<LlmTool> agentToolsList,
             IReadOnlyList<LlmMessageAttachment> imageAttachments,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool deferAnswer = false)
         {
             string thinkingLabel = _getString("AgentActivityThinking", "생각중");
             var requestThinking = new ThinkingProgress(_displayText);
@@ -90,7 +91,7 @@ namespace TxtAIEditor.Controls
             bool? isJsonToolCall = null;
             bool hasToolCall = false;
             bool nativeFunctionToolCallDetected = false;
-            bool suppressStreamingText = planningMode;
+            bool suppressStreamingText = planningMode || deferAnswer;
 
             bool inThoughtBlock = false;
             var thoughtTextBuilder = new StringBuilder();

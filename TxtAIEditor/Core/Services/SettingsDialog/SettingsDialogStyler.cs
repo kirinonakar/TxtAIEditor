@@ -7,6 +7,7 @@ namespace TxtAIEditor.Core.Services
 {
     internal static class SettingsDialogStyler
     {
+        public const string ThinkingLevelComboTag = "LlmThinkingLevelCombo";
         private const double InputFontSize = 11;
         private const double BodyFontSize = 11.5;
 
@@ -50,8 +51,9 @@ namespace TxtAIEditor.Core.Services
                 }
                 else if (ctrl is ComboBox || ctrl is TextBox || ctrl is PasswordBox || ctrl is Button)
                 {
-                    ctrl.MinHeight = 26;
-                    ctrl.Height = 26;
+                    bool isThinkingLevelCombo = ctrl.Tag as string == ThinkingLevelComboTag;
+                    ctrl.MinHeight = isThinkingLevelCombo ? 32 : 26;
+                    ctrl.Height = isThinkingLevelCombo ? double.NaN : 26;
                     ctrl.Padding = ctrl.Tag as string == "LlmModelCombo"
                         ? new Thickness(4, 1, 4, 1)
                         : (ctrl.Tag as string == "IconOnlyButton"

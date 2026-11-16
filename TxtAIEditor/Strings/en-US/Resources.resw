@@ -626,6 +626,42 @@
   <data name="SettingsLlmSourceLanguage" xml:space="preserve">
     <value>Source Language</value>
   </data>
+  <data name="AgentUseSubagents" xml:space="preserve">
+    <value>Subagents</value>
+  </data>
+  <data name="SettingsLlmMaxSubagents" xml:space="preserve">
+    <value>Maximum subagents</value>
+  </data>
+  <data name="SettingsLlmSubagentProvider" xml:space="preserve">
+    <value>Subagent provider</value>
+  </data>
+  <data name="SettingsLlmSubagentModel" xml:space="preserve">
+    <value>Subagent model</value>
+  </data>
+  <data name="SettingsLlmSubagentInherit" xml:space="preserve">
+    <value>Same as orchestrator</value>
+  </data>
+  <data name="AgentSubagentStartedFormat" xml:space="preserve">
+    <value>Subagent started · {0}</value>
+  </data>
+  <data name="AgentSubagentFollowUpFormat" xml:space="preserve">
+    <value>Subagent follow-up started · {0}</value>
+  </data>
+  <data name="AgentSubagentWaiting" xml:space="preserve">
+    <value>Waiting for subagent results</value>
+  </data>
+  <data name="AgentSubagentProgressFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="AgentSubagentCompletedFormat" xml:space="preserve">
+    <value>Subagent finished · {0}</value>
+  </data>
+  <data name="AgentSubagentStoppedFormat" xml:space="preserve">
+    <value>Subagent stopped · {0}</value>
+  </data>
+  <data name="AgentSubagentFailedFormat" xml:space="preserve">
+    <value>Subagent failed · {0}</value>
+  </data>
   <data name="SettingsLlmMaxToolCalls" xml:space="preserve">
     <value>Max Tool Calls</value>
   </data>

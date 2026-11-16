@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Services.LLM;
 
@@ -14,6 +15,7 @@ namespace TxtAIEditor.Controls
         public string Id { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; }
         public string Title { get; set; } = string.Empty;
+        public AgentSessionRole Role { get; set; }
         public string SessionHistoryText { get; set; } = string.Empty;
         public string ModelSessionHistoryText { get; set; } = string.Empty;
         public string LastAnswerText { get; set; } = string.Empty;
@@ -29,6 +31,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentPane _agentPane;
         private readonly string _historyFilePath;
         private readonly List<AgentHistoryItem> _history = new();
+        private readonly SemaphoreSlim _saveGate = new(1, 1);
 
         public AgentHistoryController(AgentPane agentPane)
         {
@@ -76,6 +79,7 @@ namespace TxtAIEditor.Controls
             {
                 existing.Timestamp = session.Timestamp;
                 existing.Title = session.Title;
+                existing.Role = session.Role;
                 existing.SessionHistoryText = session.SessionHistoryText;
                 existing.ModelSessionHistoryText = session.ModelSessionHistoryText;
                 existing.LastAnswerText = session.LastAnswerText;
@@ -146,7 +150,7 @@ namespace TxtAIEditor.Controls
                     return new AgentHistoryItemViewModel
                     {
                         Id = h.Id,
-                        Title = $"{prefix}{h.Title}",
+                        Title = $"{AgentSessionLabels.Prefix(h.Role)}{prefix}{h.Title}",
                         TimeText = h.Timestamp.ToString("MM-dd HH:mm")
                     };
                 })
@@ -160,6 +164,7 @@ namespace TxtAIEditor.Controls
 
         private async Task SaveAsync(string currentSessionId)
         {
+            await _saveGate.WaitAsync();
             try
             {
                 string? dir = Path.GetDirectoryName(_historyFilePath);
@@ -174,6 +179,10 @@ namespace TxtAIEditor.Controls
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to save agent history: {ex.Message}");
+            }
+            finally
+            {
+                _saveGate.Release();
             }
 
             UpdateUI(currentSessionId);
@@ -450,7 +459,27 @@ namespace TxtAIEditor.Controls
                     inPlanningModeTaskDetails = false;
                 }
 
-                if (line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase))
+                if (line.StartsWith(AgentSessionLabels.OrchestratorPrompt, StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith(AgentSubagentCoordinator.ProgressMarker, StringComparison.Ordinal))
+                {
+                    inToolCall = false;
+                    toolCallSyntaxReached = false;
+                    inToolResult = false;
+                    inUserPromptInstructionMetadata = false;
+                    suppressInstructionMetadataSection = false;
+                    inPlanningModeTaskDetails = false;
+                    afterUserRequest = false;
+                    if (line.StartsWith(AgentSessionLabels.OrchestratorPrompt, StringComparison.OrdinalIgnoreCase))
+                    {
+                        StartUserTurn();
+                        result.AppendLine(line);
+                    }
+                    else
+                    {
+                        result.AppendLine(line.Substring(AgentSubagentCoordinator.ProgressMarker.Length));
+                    }
+                }
+                else if (line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase))
                 {
                     inToolCall = false;
                     toolCallSyntaxReached = false;
@@ -682,6 +711,12 @@ namespace TxtAIEditor.Controls
                 }
 
                 bool isUserRoleLine = lines[i].StartsWith("[user]", StringComparison.OrdinalIgnoreCase);
+                if (isUserRoleLine && i + 1 < lines.Length &&
+                    lines[i + 1].StartsWith(AgentSessionLabels.OrchestratorPrompt, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 bool isUserPromptLine = lines[i].StartsWith("[User Prompt]:", StringComparison.OrdinalIgnoreCase);
                 if (!isUserRoleLine && !isUserPromptLine)
                 {
@@ -846,7 +881,9 @@ namespace TxtAIEditor.Controls
 
         private static bool IsHistorySectionBoundaryLine(string line)
         {
-            return line.StartsWith("[assistant:", StringComparison.OrdinalIgnoreCase) ||
+            return line.StartsWith(AgentSessionLabels.OrchestratorPrompt, StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith(AgentSubagentCoordinator.ProgressMarker, StringComparison.Ordinal) ||
+                line.StartsWith("[assistant:", StringComparison.OrdinalIgnoreCase) ||
                 line.StartsWith("[LLM API:", StringComparison.OrdinalIgnoreCase) ||
                 line.StartsWith("[Retry detail:", StringComparison.OrdinalIgnoreCase) ||
                 line.StartsWith("[End retry detail]", StringComparison.OrdinalIgnoreCase) ||

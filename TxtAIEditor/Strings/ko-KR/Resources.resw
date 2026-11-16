@@ -626,6 +626,42 @@
   <data name="SettingsLlmSourceLanguage" xml:space="preserve">
     <value>번역 원본 언어 (Source Language)</value>
   </data>
+  <data name="AgentUseSubagents" xml:space="preserve">
+    <value>서브에이전트</value>
+  </data>
+  <data name="SettingsLlmMaxSubagents" xml:space="preserve">
+    <value>서브에이전트 최대 개수</value>
+  </data>
+  <data name="SettingsLlmSubagentProvider" xml:space="preserve">
+    <value>서브에이전트 공급자</value>
+  </data>
+  <data name="SettingsLlmSubagentModel" xml:space="preserve">
+    <value>서브에이전트 모델</value>
+  </data>
+  <data name="SettingsLlmSubagentInherit" xml:space="preserve">
+    <value>오케스트레이터와 동일</value>
+  </data>
+  <data name="AgentSubagentStartedFormat" xml:space="preserve">
+    <value>서브에이전트 작업 시작 · {0}</value>
+  </data>
+  <data name="AgentSubagentFollowUpFormat" xml:space="preserve">
+    <value>서브에이전트 후속 작업 시작 · {0}</value>
+  </data>
+  <data name="AgentSubagentWaiting" xml:space="preserve">
+    <value>서브에이전트 결과를 기다리는 중</value>
+  </data>
+  <data name="AgentSubagentProgressFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="AgentSubagentCompletedFormat" xml:space="preserve">
+    <value>서브에이전트 작업 완료 · {0}</value>
+  </data>
+  <data name="AgentSubagentStoppedFormat" xml:space="preserve">
+    <value>서브에이전트 작업 중단 · {0}</value>
+  </data>
+  <data name="AgentSubagentFailedFormat" xml:space="preserve">
+    <value>서브에이전트 작업 실패 · {0}</value>
+  </data>
   <data name="SettingsLlmMaxToolCalls" xml:space="preserve">
     <value>도구 호출 최대 횟수 (Max Tool Calls)</value>
   </data>

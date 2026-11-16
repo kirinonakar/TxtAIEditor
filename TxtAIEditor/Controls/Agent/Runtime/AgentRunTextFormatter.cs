@@ -6,10 +6,12 @@ namespace TxtAIEditor.Controls
     {
         private const int MaxUserPromptDisplayChars = 200;
 
-        public string BuildRunHeader(string instruction)
+        public string BuildRunHeader(string instruction, bool fromOrchestrator = false)
         {
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
-            return $"{timestamp}  [User Prompt]: {TruncateUserPrompt(instruction)}";
+            string marker = fromOrchestrator ? AgentSessionLabels.OrchestratorPrompt : "[User Prompt]:";
+            string display = fromOrchestrator ? instruction : TruncateUserPrompt(instruction);
+            return $"{timestamp}  {marker} {display}";
         }
 
         public static string TruncateUserPrompt(string value)

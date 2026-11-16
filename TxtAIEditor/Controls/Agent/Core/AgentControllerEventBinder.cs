@@ -93,6 +93,8 @@ namespace TxtAIEditor.Controls
             agentPane.Prompt.LostFocus += (_, _) => updateContextStats();
             agentPane.PlanningModeCheckBox.Checked += (_, _) => updateContextStats();
             agentPane.PlanningModeCheckBox.Unchecked += (_, _) => updateContextStats();
+            agentPane.SubagentsCheckBox.Checked += (_, _) => updateContextStats();
+            agentPane.SubagentsCheckBox.Unchecked += (_, _) => updateContextStats();
 
             agentPane.DiffApproved += (_, _) => confirmationController.ApprovePending();
             agentPane.DiffCancelled += (_, _) => confirmationController.CancelPending();

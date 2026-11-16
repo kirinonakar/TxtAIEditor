@@ -220,6 +220,12 @@ namespace TxtAIEditor.Controls
         public TextBlock TokenCount => AgentTokenCountText;
         public CheckBox PlanningModeCheckBox => AgentPlanningModeCheckBox;
         public bool PlanningMode => AgentPlanningModeCheckBox.IsChecked == true;
+        public bool UseSubagents
+        {
+            get => AgentSubagentsCheckBox.IsChecked == true;
+            set => AgentSubagentsCheckBox.IsChecked = value;
+        }
+        public CheckBox SubagentsCheckBox => AgentSubagentsCheckBox;
         public ToggleButton StreamToTabToggleButton => AgentStreamToTabToggleButton;
         public bool StreamToTab => AgentStreamToTabToggleButton.IsChecked == true;
 
@@ -264,6 +270,7 @@ namespace TxtAIEditor.Controls
 
             AgentContextStatsText.Text = getString("AgentContextStatsDefault", "현재 탭과 선택 영역을 맥락으로 사용");
             AgentPlanningModeCheckBox.Content = getString("AgentIncludeActiveFile", "계획 모드 (Planning mode)");
+            AgentSubagentsCheckBox.Content = getString("AgentUseSubagents", "서브에이전트");
             string streamToTabText = getString("AgentStreamToTab", "탭에 스트리밍");
             ToolTipService.SetToolTip(AgentStreamToTabToggleButton, streamToTabText);
             AutomationProperties.SetName(AgentStreamToTabToggleButton, streamToTabText);
@@ -324,7 +331,7 @@ namespace TxtAIEditor.Controls
             _sessionMenuCoordinator.Localize(getString, newSessionButtonText);
         }
 
-        public void SetBusy(bool isBusy)
+        public void SetBusy(bool isBusy, bool isSubagent)
         {
             if (!isBusy)
             {
@@ -333,7 +340,10 @@ namespace TxtAIEditor.Controls
             }
 
             _isBusy = isBusy;
-            AgentRunButton.IsEnabled = true;
+            AgentRunButton.IsEnabled = isBusy || !isSubagent;
+            AgentPromptInput.IsReadOnly = isSubagent;
+            AgentPlanningModeCheckBox.IsEnabled = !isSubagent;
+            AgentSubagentsCheckBox.IsEnabled = !isBusy && !isSubagent;
             UpdateRunButtonContent();
             AgentNewSessionButton.IsEnabled = true;
             UpdateRewindSessionButtonEnabled();
@@ -478,6 +488,11 @@ private Style? _accentRunButtonStyle;
 
         private void RequestRunFromPrompt()
         {
+            if (AgentPromptInput.IsReadOnly)
+            {
+                return;
+            }
+
             if (_isBusy)
             {
                 if (!string.IsNullOrWhiteSpace(AgentPromptInput.Text))

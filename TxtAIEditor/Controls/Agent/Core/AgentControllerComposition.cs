@@ -260,7 +260,7 @@ namespace TxtAIEditor.Controls
                 callbacks.GetActiveTabForContext,
                 callbacks.GetActiveSelectionText,
                 callbacks.BuildActiveSelectionContext,
-                promptContextService.BuildFixedPromptContextForRun,
+                () => promptContextService.BuildFixedPromptContextForRun(),
                 promptContextService.BuildConversationTurn,
                 promptContextService.BuildWorkspaceContext,
                 promptContextService.BuildSessionHistoryForPrompt,

@@ -3,15 +3,32 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services.LLM;
 
 namespace TxtAIEditor.Controls
 {
+    internal enum AgentSessionRole { Default, Orchestrator, Subagent }
+
+    internal static class AgentSessionLabels
+    {
+        public const string OrchestratorPrompt = "[Orchestrator]:";
+
+        public static string Prefix(AgentSessionRole role) => role switch
+        {
+            AgentSessionRole.Orchestrator => "[O] ",
+            AgentSessionRole.Subagent => "[S] ",
+            _ => string.Empty
+        };
+    }
+
     internal sealed class AgentOpenSessionState
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Title { get; set; } = string.Empty;
+        public AgentSessionRole Role { get; set; }
+        public bool UseSubagents { get; set; }
         public string PromptText { get; set; } = string.Empty;
         public string OutputText { get; set; } = string.Empty;
         public string ActivityText { get; set; } = string.Empty;
@@ -79,6 +96,9 @@ namespace TxtAIEditor.Controls
         // committed to the transcript. Keep this separate from native reasoning tokens.
         public double InFlightResponseTokens { get; set; }
         public bool IsPlanningMode { get; set; }
+        public bool IsPlanResearch { get; set; }
+        public Func<string, Task>? ReportToOrchestrator { get; set; }
+        public string FailureReason { get; set; } = string.Empty;
         public bool HasEnabledSkills { get; set; }
         public bool HasEnabledMcp { get; set; }
         public string OriginalUserInstruction { get; set; } = string.Empty;

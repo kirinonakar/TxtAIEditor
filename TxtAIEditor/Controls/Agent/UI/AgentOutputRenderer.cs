@@ -773,6 +773,11 @@ namespace TxtAIEditor.Controls
 
             const string userPromptMarker = "[User Prompt]:";
             int markerIndex = line.IndexOf(userPromptMarker, StringComparison.Ordinal);
+            int orchestratorMarkerIndex = line.IndexOf(AgentSessionLabels.OrchestratorPrompt, StringComparison.Ordinal);
+            if (orchestratorMarkerIndex >= 0 && (markerIndex < 0 || orchestratorMarkerIndex < markerIndex))
+            {
+                markerIndex = orchestratorMarkerIndex;
+            }
             if (markerIndex < 0)
             {
                 return false;

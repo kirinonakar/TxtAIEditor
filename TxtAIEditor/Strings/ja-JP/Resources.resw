@@ -626,6 +626,42 @@
   <data name="SettingsLlmSourceLanguage" xml:space="preserve">
     <value>翻訳元言語 (Source Language)</value>
   </data>
+  <data name="AgentUseSubagents" xml:space="preserve">
+    <value>サブエージェント</value>
+  </data>
+  <data name="SettingsLlmMaxSubagents" xml:space="preserve">
+    <value>サブエージェントの最大数</value>
+  </data>
+  <data name="SettingsLlmSubagentProvider" xml:space="preserve">
+    <value>サブエージェントのプロバイダー</value>
+  </data>
+  <data name="SettingsLlmSubagentModel" xml:space="preserve">
+    <value>サブエージェントのモデル</value>
+  </data>
+  <data name="SettingsLlmSubagentInherit" xml:space="preserve">
+    <value>オーケストレーターと同じ</value>
+  </data>
+  <data name="AgentSubagentStartedFormat" xml:space="preserve">
+    <value>サブエージェントが作業を開始 · {0}</value>
+  </data>
+  <data name="AgentSubagentFollowUpFormat" xml:space="preserve">
+    <value>サブエージェントが追加作業を開始 · {0}</value>
+  </data>
+  <data name="AgentSubagentWaiting" xml:space="preserve">
+    <value>サブエージェントの結果を待機中</value>
+  </data>
+  <data name="AgentSubagentProgressFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="AgentSubagentCompletedFormat" xml:space="preserve">
+    <value>サブエージェントの作業が完了 · {0}</value>
+  </data>
+  <data name="AgentSubagentStoppedFormat" xml:space="preserve">
+    <value>サブエージェントの作業が停止 · {0}</value>
+  </data>
+  <data name="AgentSubagentFailedFormat" xml:space="preserve">
+    <value>サブエージェントの作業が失敗 · {0}</value>
+  </data>
   <data name="SettingsLlmMaxToolCalls" xml:space="preserve">
     <value>ツール呼び出し最大回数</value>
   </data>
