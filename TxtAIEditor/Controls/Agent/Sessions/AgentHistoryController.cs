@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Services.LLM;
@@ -16,6 +17,7 @@ namespace TxtAIEditor.Controls
         public DateTime Timestamp { get; set; }
         public string Title { get; set; } = string.Empty;
         public AgentSessionRole Role { get; set; }
+        public string? OrchestratorSessionId { get; set; }
         public string SessionHistoryText { get; set; } = string.Empty;
         public string ModelSessionHistoryText { get; set; } = string.Empty;
         public string LastAnswerText { get; set; } = string.Empty;
@@ -54,6 +56,7 @@ namespace TxtAIEditor.Controls
                     {
                         _history.Clear();
                         _history.AddRange(loaded.Where(h => !string.IsNullOrWhiteSpace(h.Id)));
+                        RestoreLegacySubagentLinks();
                     }
                 }
             }
@@ -70,6 +73,39 @@ namespace TxtAIEditor.Controls
             return _history.FirstOrDefault(h => h.Id == historyId);
         }
 
+        private void RestoreLegacySubagentLinks()
+        {
+            var unlinked = _history.Where(item =>
+                item.Role == AgentSessionRole.Subagent && string.IsNullOrEmpty(item.OrchestratorSessionId)).ToList();
+            if (unlinked.Count == 0)
+            {
+                return;
+            }
+
+            foreach (AgentHistoryItem parent in _history.Where(item => item.Role == AgentSessionRole.Orchestrator))
+            {
+                // Older history recorded the new session ID in the spawn tool result.
+                var matches = Regex.Matches(parent.SessionHistoryText ?? string.Empty,
+                    @"^\[tool: spawn[_ -]subagent result\]\r?\nStarted subagent ([0-9a-f-]{36}) \(",
+                    RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                foreach (Match match in matches)
+                {
+                    string childId = match.Groups[1].Value;
+                    var child = unlinked.FirstOrDefault(item => string.Equals(item.Id, childId, StringComparison.Ordinal));
+                    if (child != null)
+                    {
+                        child.OrchestratorSessionId = parent.Id;
+                        unlinked.Remove(child);
+                    }
+                }
+
+                if (unlinked.Count == 0)
+                {
+                    return;
+                }
+            }
+        }
+
         public async Task SaveSessionAsync(AgentHistoryItem session, string currentSessionId)
         {
             session.SessionHistoryText = AgentRunTranscriptService.ConvertToolCallTagsToLogTags(session.SessionHistoryText);
@@ -80,6 +116,7 @@ namespace TxtAIEditor.Controls
                 existing.Timestamp = session.Timestamp;
                 existing.Title = session.Title;
                 existing.Role = session.Role;
+                existing.OrchestratorSessionId = session.OrchestratorSessionId;
                 existing.SessionHistoryText = session.SessionHistoryText;
                 existing.ModelSessionHistoryText = session.ModelSessionHistoryText;
                 existing.LastAnswerText = session.LastAnswerText;

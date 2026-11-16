@@ -340,6 +340,7 @@ namespace TxtAIEditor.Controls
 
             bool historyReady = false;
             bool responseStreamInProgress = false;
+            bool sessionClosed = false;
             AgentSubagentCoordinator? orchestration = null;
             void FinishRun(string? responseLine, AgentRunStatus status = AgentRunStatus.Completed)
             {
@@ -385,19 +386,17 @@ namespace TxtAIEditor.Controls
                         Math.Clamp(config.LlmMaxSubagents, 1, EditorSettings.MaxSubagentLimit),
                         (id, title, instruction, progress, token) =>
                         {
+                            token.ThrowIfCancellationRequested();
                             workerSessions.TryGetValue(id, out AgentOpenSessionState? previousState);
                             var workerSession = _openSessionController.EnsureSession(id, previousState);
                             workerSession.Role = AgentSessionRole.Subagent;
+                            workerSession.OrchestratorSessionId = runContext.SessionId;
                             workerSession.Title = title;
                             workerSessions[id] = workerSession;
                             return RunSubagentAsync(runContext, workerSettings, currentRunActiveTab, currentRunSelectionSnapshot,
                                 workerSession, instruction, progress, token);
                         },
-                        async message =>
-                        {
-                            await _runOutputController.AppendRunActivityAsync(runContext, message);
-                            await _runOutputController.AppendRunOutputLineAsync(runContext, message);
-                        },
+                        message => _runOutputController.AppendRunActivityAsync(runContext, message),
                         _getString,
                         cancellationToken);
                 }
@@ -1248,9 +1247,9 @@ namespace TxtAIEditor.Controls
                 }
                 _openSessionController.UpdateActiveSessionBusyState();
 
-                if (_openSessionController.IsPendingClose(runContext.SessionId))
+                if (_openSessionController.ConsumePendingClose(runContext.SessionId))
                 {
-                    _openSessionController.ConsumePendingClose(runContext.SessionId);
+                    sessionClosed = true;
                     _openSessionController.CloseSession(runContext.SessionId);
                 }
                 else
@@ -1267,6 +1266,11 @@ namespace TxtAIEditor.Controls
                         _openSessionController.UpdateUI();
                     }
                 }
+            }
+
+            if (sessionClosed)
+            {
+                return;
             }
 
             if (!string.IsNullOrWhiteSpace(approvedPlanExecutionPrompt))
@@ -1553,7 +1557,6 @@ namespace TxtAIEditor.Controls
             await context.ReportToOrchestrator(message);
             string line = AgentSubagentCoordinator.FormatProgressLine(message);
             await _runOutputController.AppendRunActivityAsync(context, line);
-            await _runOutputController.AppendRunOutputLineAsync(context, line);
             return "Progress shared with the orchestrator.";
         }
 

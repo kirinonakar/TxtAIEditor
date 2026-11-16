@@ -70,6 +70,7 @@ namespace TxtAIEditor.Controls
                 Timestamp = DateTime.Now,
                 Title = openSession.Title,
                 Role = openSession.Role,
+                OrchestratorSessionId = openSession.OrchestratorSessionId,
                 SessionHistoryText = historyText,
                 ModelSessionHistoryText = context.ModelSessionHistory.ToString(),
                 LastAnswerText = context.LastAnswerText,
@@ -103,6 +104,7 @@ namespace TxtAIEditor.Controls
                 item,
                 string.Empty);
             session.Role = item.Role;
+            session.OrchestratorSessionId = item.OrchestratorSessionId;
             session.UseSubagents = item.Role == AgentSessionRole.Orchestrator;
             session.PromptText = string.Empty;
             session.OutputText = AgentHistoryFormatter.Format(

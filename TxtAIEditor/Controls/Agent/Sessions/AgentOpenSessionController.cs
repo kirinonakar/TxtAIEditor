@@ -127,8 +127,7 @@ namespace TxtAIEditor.Controls
 
         public AgentOpenSessionState EnsureSession(string sessionId, AgentOpenSessionState? previousState)
         {
-            var session = _openSessions.FirstOrDefault(item =>
-                string.Equals(item.Id, sessionId, StringComparison.Ordinal));
+            var session = FindOpenSession(sessionId);
             if (session != null)
             {
                 return session;
@@ -138,6 +137,9 @@ namespace TxtAIEditor.Controls
             _openSessions.Insert(0, session);
             return session;
         }
+
+        private AgentOpenSessionState? FindOpenSession(string sessionId) =>
+            _openSessions.FirstOrDefault(item => string.Equals(item.Id, sessionId, StringComparison.Ordinal));
 
         public AgentOpenSessionState CreateBlankSession(string? sessionId = null)
         {
@@ -331,6 +333,7 @@ namespace TxtAIEditor.Controls
         public void SwitchSession(string sessionId)
         {
             if (string.IsNullOrWhiteSpace(sessionId) ||
+                IsPendingClose(sessionId) ||
                 string.Equals(_currentSessionIdProvider(), sessionId, StringComparison.Ordinal))
             {
                 return;
@@ -349,33 +352,41 @@ namespace TxtAIEditor.Controls
 
         public void CloseSession(string sessionId)
         {
-            if (string.IsNullOrWhiteSpace(sessionId))
+            var session = FindOpenSession(sessionId);
+            if (session == null)
             {
                 return;
             }
 
-            bool isRunningSession = _runningSessions.TryGetValue(sessionId, out _);
-            if (isRunningSession)
+            var sessionsToClose = _openSessions.Where(item =>
+                item == session ||
+                (session.Role == AgentSessionRole.Orchestrator &&
+                    string.Equals(item.OrchestratorSessionId, session.Id, StringComparison.Ordinal))).ToArray();
+            var sessionsToStop = new List<string>();
+            bool closedVisibleSession = false;
+            foreach (var item in sessionsToClose)
             {
-                _pendingCloseSessionIds.Add(sessionId);
-                _stopAgent(sessionId);
-                UpdateUI();
-                if (string.Equals(_currentSessionIdProvider(), sessionId, StringComparison.Ordinal))
+                if (_runningSessions.ContainsKey(item.Id))
                 {
-                    return;
+                    if (_pendingCloseSessionIds.Add(item.Id))
+                    {
+                        sessionsToStop.Add(item.Id);
+                    }
+                    continue;
                 }
+
+                closedVisibleSession |= IsSessionVisible(item.Id);
+                _openSessions.Remove(item);
             }
 
-            if (!isRunningSession && string.Equals(_currentSessionIdProvider(), sessionId, StringComparison.Ordinal))
+            foreach (string runningSessionId in sessionsToStop)
             {
-                var current = _openSessions.FirstOrDefault(item =>
-                    string.Equals(item.Id, sessionId, StringComparison.Ordinal));
-                if (current != null)
-                {
-                    _openSessions.Remove(current);
-                }
+                _stopAgent(runningSessionId);
+            }
 
-                var next = _openSessions.FirstOrDefault();
+            if (closedVisibleSession)
+            {
+                var next = _openSessions.FirstOrDefault(item => !IsPendingClose(item.Id));
                 if (next == null)
                 {
                     next = CreateBlankSession();
@@ -386,19 +397,15 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var session = _openSessions.FirstOrDefault(item =>
-                string.Equals(item.Id, sessionId, StringComparison.Ordinal));
-            if (session != null)
-            {
-                _openSessions.Remove(session);
-                UpdateUI();
-            }
+            UpdateUI();
         }
 
         public void UpdateUI()
         {
             string currentSessionId = _currentSessionIdProvider();
             var items = _openSessions
+                .Where(session => string.Equals(session.Id, currentSessionId, StringComparison.Ordinal) ||
+                    !IsPendingClose(session.Id))
                 .Select(session =>
                 {
                     bool isSelected = string.Equals(session.Id, currentSessionId, StringComparison.Ordinal);
@@ -581,7 +588,11 @@ namespace TxtAIEditor.Controls
             await FlushQueuedRunOutputTextAsync(context);
             await RunOnUIThreadAsync(() =>
             {
-                var session = EnsureSession(context.SessionId);
+                var session = FindOpenSession(context.SessionId);
+                if (session == null)
+                {
+                    return;
+                }
                 string timestamp = DateTime.Now.ToString("HH:mm:ss");
                 string line = $"{timestamp}  {message}";
                 CompleteThinkingInSession(session);
@@ -641,7 +652,11 @@ namespace TxtAIEditor.Controls
                 DispatcherQueuePriority.Low,
                 () =>
                 {
-                    var session = EnsureSession(context.SessionId);
+                    var session = FindOpenSession(context.SessionId);
+                    if (session == null)
+                    {
+                        return;
+                    }
                     if (IsSessionVisible(context.SessionId))
                     {
                         activeAction();
@@ -813,7 +828,11 @@ namespace TxtAIEditor.Controls
 
         private void AppendRunOutputTextOnCurrentThread(AgentRunContext context, string text)
         {
-            var session = EnsureSession(context.SessionId);
+            var session = FindOpenSession(context.SessionId);
+            if (session == null)
+            {
+                return;
+            }
             if (IsSessionVisible(context.SessionId))
             {
                 _agentPane.AppendOutputText(text);

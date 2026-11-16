@@ -28,6 +28,7 @@ namespace TxtAIEditor.Controls
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Title { get; set; } = string.Empty;
         public AgentSessionRole Role { get; set; }
+        public string? OrchestratorSessionId { get; set; }
         public bool UseSubagents { get; set; }
         public string PromptText { get; set; } = string.Empty;
         public string OutputText { get; set; } = string.Empty;

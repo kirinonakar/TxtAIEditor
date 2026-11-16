@@ -149,6 +149,7 @@ namespace TxtAIEditor.Controls
                 Timestamp = DateTime.Now,
                 Title = session.Title,
                 Role = session.Role,
+                OrchestratorSessionId = session.OrchestratorSessionId,
                 SessionHistoryText = session.SessionHistoryText,
                 ModelSessionHistoryText = session.ModelSessionHistoryText,
                 LastAnswerText = session.LastAnswerText,
