@@ -114,6 +114,11 @@ namespace TxtAIEditor.Controls
 
                 _configuration.ApplyConnectionSettings(existing, connection);
                 _configuration.ApplyAuthSettings(existing, authSettings, deleteEmptySecrets: true);
+                if (input.Description.Length > 0)
+                {
+                    existing.Description = input.Description;
+                }
+
                 _connections.Reset(existing.Id);
                 savedServer = existing;
             }
@@ -121,7 +126,8 @@ namespace TxtAIEditor.Controls
             {
                 var server = new AgentMcpServer
                 {
-                    Name = name
+                    Name = name,
+                    Description = input.Description
                 };
                 _configuration.ApplyConnectionSettings(server, connection);
                 _configuration.ApplyAuthSettings(server, authSettings, deleteEmptySecrets: true);
@@ -169,6 +175,7 @@ namespace TxtAIEditor.Controls
             AgentMcpDialogInput? input = await _dialogService.ShowEditAsync(new AgentMcpDialogInput
             {
                 Name = server.Name,
+                Description = server.Description,
                 Transport = server.Transport,
                 Stateless = server.Stateless,
                 Endpoint = server.Endpoint,
@@ -263,6 +270,7 @@ namespace TxtAIEditor.Controls
             DateTimeOffset previousOAuthAccessTokenExpiresAt = server.OAuthAccessTokenExpiresAt;
 
             server.Name = name;
+            server.Description = input.Description;
             _credentialStore.DeleteCredentialsForRemovedHeaders(server, authSettings.Headers);
             _credentialStore.DeleteCredentialsForRemovedEnvironment(server, connection.Environment);
             if (!IsOAuthAuthType(server.AuthType) || !IsOAuthAuthType(authType))
@@ -321,6 +329,7 @@ namespace TxtAIEditor.Controls
                 foreach (var item in imported)
                 {
                     string name = item.Name?.Trim() ?? string.Empty;
+                    string description = item.Description?.Trim() ?? string.Empty;
                     item.Transport = AgentMcpTransportTypes.Normalize(item.Transport, item.Command);
                     item.Stateless = !AgentMcpTransportTypes.IsStdio(item.Transport) && item.Stateless;
                     item.Endpoint = item.Endpoint?.Trim() ?? string.Empty;
@@ -344,6 +353,10 @@ namespace TxtAIEditor.Controls
                         var headers = AgentMcpConfigurationService.NormalizeHeaders(item.Headers);
                         _credentialStore.DeleteCredentialsForRemovedHeaders(existing, headers);
                         _credentialStore.DeleteCredentialsForRemovedEnvironment(existing, item.Environment);
+                        if (description.Length > 0)
+                        {
+                            existing.Description = description;
+                        }
                         existing.Transport = item.Transport;
                         existing.Stateless = item.Stateless;
                         existing.Endpoint = item.Endpoint;
@@ -360,6 +373,7 @@ namespace TxtAIEditor.Controls
                         var server = new AgentMcpServer
                         {
                             Name = name,
+                            Description = description,
                             Transport = item.Transport,
                             Stateless = item.Stateless,
                             Endpoint = item.Endpoint,

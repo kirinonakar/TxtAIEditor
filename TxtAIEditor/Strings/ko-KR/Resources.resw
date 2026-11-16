@@ -3253,6 +3253,9 @@
   <data name="AgentMcpNameLabel" xml:space="preserve">
     <value>MCP 이름</value>
   </data>
+  <data name="AgentMcpDescriptionLabel" xml:space="preserve">
+    <value>설명 (선택)</value>
+  </data>
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP 주소</value>
   </data>

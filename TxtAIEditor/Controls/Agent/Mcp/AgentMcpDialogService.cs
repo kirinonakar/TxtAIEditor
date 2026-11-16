@@ -14,6 +14,7 @@ namespace TxtAIEditor.Controls
     internal sealed class AgentMcpDialogInput
     {
         public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
         public string Transport { get; set; } = AgentMcpTransportTypes.Http;
         public bool Stateless { get; set; }
         public string Endpoint { get; set; } = string.Empty;
@@ -418,6 +419,16 @@ namespace TxtAIEditor.Controls
         {
             var nameBox = CreateTextBox(_getString("AgentMcpNamePlaceholder", "MCP 이름 입력..."));
             nameBox.Text = initial.Name;
+            var descriptionBox = new TextBox
+            {
+                Header = _getString("AgentMcpDescriptionLabel", "설명 (선택)"),
+                Text = initial.Description,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                MinHeight = 56,
+                MaxHeight = 110,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap
+            };
             var transportBox = CreateTransportComboBox(initial.Transport);
             var endpointLabel = CreateLabel(_getString("AgentMcpEndpointLabel", "MCP 주소"));
             var endpointBox = CreateTextBox(_getString("AgentMcpEndpointPlaceholder", "https://server.example/mcp"));
@@ -632,6 +643,7 @@ namespace TxtAIEditor.Controls
             stack.Children.Add(standardPastePanel);
             stack.Children.Add(CreateLabel(_getString("AgentMcpNameLabel", "MCP 이름")));
             stack.Children.Add(nameBox);
+            stack.Children.Add(descriptionBox);
             stack.Children.Add(CreateLabel(_getString("AgentMcpTransportLabel", "연결 방식")));
             stack.Children.Add(transportBox);
             stack.Children.Add(endpointLabel);
@@ -707,6 +719,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 nameBox.Text = server.Name;
+                descriptionBox.Text = server.Description;
                 transportBox.SelectedItem = transportBox.Items.OfType<ComboBoxItem>()
                     .First(item => string.Equals(item.Tag as string, server.Transport, StringComparison.OrdinalIgnoreCase));
                 endpointBox.Text = server.Endpoint;
@@ -773,6 +786,7 @@ namespace TxtAIEditor.Controls
             return new AgentMcpDialogInput
             {
                 Name = nameBox.Text?.Trim() ?? string.Empty,
+                Description = descriptionBox.Text.Trim(),
                 Transport = GetSelectedTransport(transportBox),
                 Stateless = statelessCheckBox.IsChecked == true,
                 Endpoint = endpointBox.Text?.Trim() ?? string.Empty,

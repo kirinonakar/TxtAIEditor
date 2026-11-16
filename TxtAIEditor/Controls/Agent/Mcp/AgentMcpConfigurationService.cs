@@ -112,6 +112,10 @@ namespace TxtAIEditor.Controls
                 servers.Add(new AgentMcpServer
                 {
                     Name = property.Name,
+                    Description = property.Value.TryGetProperty("description", out var description) &&
+                        description.ValueKind == JsonValueKind.String
+                            ? description.GetString() ?? string.Empty
+                            : string.Empty,
                     Transport = AgentMcpTransportTypes.Normalize(
                         TryGetStringProperty(property.Value, "transport"),
                         command),

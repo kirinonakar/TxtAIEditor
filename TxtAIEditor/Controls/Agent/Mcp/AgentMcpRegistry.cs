@@ -61,6 +61,7 @@ namespace TxtAIEditor.Controls
                                 }
 
                                 s.Name = s.Name.Trim();
+                                s.Description = s.Description?.Trim() ?? string.Empty;
                                 s.Transport = AgentMcpTransportTypes.Normalize(s.Transport, s.Command);
                                 s.Stateless = !AgentMcpTransportTypes.IsStdio(s.Transport) && s.Stateless;
                                 s.Endpoint = s.Endpoint?.Trim() ?? string.Empty;

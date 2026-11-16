@@ -423,7 +423,8 @@ namespace TxtAIEditor.Controls
                     "Browser and Windows application tools.", _selectedServerIds.Contains(_browserUseTool.ServerId))
             };
             entries.AddRange(_registry.Servers.Select(server => new AgentPluginEntry(
-                "mcp:" + server.Id, "mcp", server.Name, server.AgentPluginName,
+                "mcp:" + server.Id, "mcp", server.Name,
+                string.IsNullOrWhiteSpace(server.Description) ? server.AgentPluginName : server.Description,
                 _selectedServerIds.Contains(server.Id))));
             entries.AddRange(await _skillController.GetPluginManagerEntriesAsync());
             return entries;

@@ -3253,6 +3253,9 @@ Plan: {0}</value>
   <data name="AgentMcpNameLabel" xml:space="preserve">
     <value>MCP Name</value>
   </data>
+  <data name="AgentMcpDescriptionLabel" xml:space="preserve">
+    <value>Description (optional)</value>
+  </data>
   <data name="AgentMcpEndpointLabel" xml:space="preserve">
     <value>MCP Address</value>
   </data>

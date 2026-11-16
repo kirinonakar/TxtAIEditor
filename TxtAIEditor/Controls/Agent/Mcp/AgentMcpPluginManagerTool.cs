@@ -42,7 +42,7 @@ namespace TxtAIEditor.Controls
         {
             return new[]
             {
-                CreateAlias("list_plugin", "List installed MCPs and skills with activation state, including inactive entries.", ListSchema),
+                CreateAlias("list_plugin", "List installed MCPs and skills with descriptions and activation state, including inactive entries.", ListSchema),
                 CreateAlias("activate_plugin", "Enable an installed MCP or skill.", ChangeSchema),
                 CreateAlias("deactivate_plugin", "Disable an installed MCP or skill.", ChangeSchema),
                 CreateAlias("search_plugin", "Search names, IDs, and descriptions of installed MCPs and skills, including inactive entries.", SearchSchema)
