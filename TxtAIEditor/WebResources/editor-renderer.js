@@ -42,8 +42,8 @@ import {
 } from './editor-csv-table.js';
 import { isPointOnScrollContainerScrollbar, revealPendingInputCaret } from './editor-caret.js';
 import { createFullHtmlLivePreviewRenderer } from './editor-html-live-preview.js';
-import { paragraphContainsInlineMath, renderEditableMarkdownLine, renderGroupedEditableMarkdown, usesMarkdownPreviewEditing, usesMarkdownTableEditing } from './editor-markdown-preview-edit.js';
-import { containsInlineMath } from './markdown-preview-renderer.js';
+import { renderEditableMarkdownLine, renderGroupedEditableMarkdown, usesMarkdownPreviewEditing, usesMarkdownTableEditing } from './editor-markdown-preview-edit.js';
+import { blockContainsInlineMath, containsInlineMath } from './markdown-preview-renderer.js';
 import { syncMarkdownTableUi } from './editor-markdown-table-ui.js';
 import { syncMarkdownListLineNumbers } from './editor-markdown-list-gutter.js';
 import { livePreviewLayoutRange, patchLivePreviewRows } from './editor-live-preview-render-state.js';
@@ -227,7 +227,8 @@ function createEditorRenderer({
         const lastVisibleLine = lineAt(
             scrollContainer.scrollTop + Math.max(scrollContainer.clientHeight, viewportController.lineHeight));
         const previewBlockOptions = { tabSize: state.tabSize || 4,
-            blockContextCache: { code: new Map(), math: new Map() } };
+            blockContextCache: { code: new Map(), math: new Map() },
+            outermostList: true };
         livePreviewLayout = state.inlineLivePreviewEnabled
             ? livePreviewLayoutRange(livePreviewLayout, firstVisibleLine, lastVisibleLine, state.lineCount,
                 `${state.language}:${state.lineCount}:${scrollContainer.clientWidth}:${scrollContainer.clientHeight}:${state.wordWrap}:${foldingController.version}`)
@@ -263,12 +264,28 @@ function createEditorRenderer({
         const activeCaret = isFocused ? getCaretOffset(activeEl) : 0;
         const getCachedLine = lineNumber => state.cache.has(lineNumber) ? state.cache.get(lineNumber) : undefined;
         const editInPreview = usesMarkdownPreviewEditing(state);
+        const inlineMathByBlock = new Map();
+        const hasInlineMathInBlock = block => {
+            if (block?.kind !== 'paragraph' && block?.kind !== 'list') return false;
+            const key = `${block.kind}:${block.startLine}:${block.endLine}`;
+            if (!inlineMathByBlock.has(key)) {
+                inlineMathByBlock.set(key, blockContainsInlineMath(block, getCachedLine, previewBlockOptions));
+            }
+            return inlineMathByBlock.get(key);
+        };
         const preservePointerPaint = editInPreview && state.markdownPreviewPointerActive && lastPreviewPaint &&
             lastPreviewPaint.scrollTop === scrollContainer.scrollTop &&
             lastPreviewPaint.scrollLeft === scrollContainer.scrollLeft &&
             lastPreviewPaint.width === scrollContainer.clientWidth &&
             lastPreviewPaint.height === scrollContainer.clientHeight &&
             lastPreviewPaint.revision === state.cache.revision;
+        // Typing a formula into an editable list item or paragraph switches
+        // it to source editing. Keep the caret on that line through the switch.
+        if (editInPreview && isFocused && !preserveComposition &&
+            ['paragraph', 'list', 'continuation'].includes(activeEl.dataset.markdownPreviewLine) &&
+            containsInlineMath(getCachedLine(activeLine))) {
+            state.inlineLivePreviewSourceLine = activeLine;
+        }
         const requestedSourceLine = state.inlineLivePreviewEnabled
             ? (state.inlineLivePreviewSourceLine || 0)
             : 0;
@@ -299,10 +316,11 @@ function createEditorRenderer({
         // Full-document caret moves already patch editing-row in place. Including
         // focus here rebuilds every row on the first scroll after the host focuses
         // the editor, even though neither the text nor the rendered range changed.
-        const mathParagraphSource = paragraphContainsInlineMath(editablePreviewBlock, getCachedLine);
-        const standaloneMathSource = sourceLine && ((!editablePreviewBlock && containsInlineMath(state.cache.get(sourceLine))) || mathParagraphSource);
-        const hasStandaloneMathEditor = !!viewport.querySelector('.md-preview-math-decoration');
-        const stablePreviewLayout = editInPreview && !standaloneMathSource && !hasStandaloneMathEditor && (!editablePreviewBlock || ['list', 'table', 'paragraph'].includes(editablePreviewBlock.kind) ||
+        const inlineMathInSourceBlock = hasInlineMathInBlock(editablePreviewBlock);
+        const hasInlineMathSource = inlineMathInSourceBlock ||
+            (sourceLine > 0 && !editablePreviewBlock && containsInlineMath(getCachedLine(sourceLine)));
+        const hasMathDecoration = !!viewport.querySelector('.md-preview-math-decoration');
+        const stablePreviewLayout = editInPreview && !hasInlineMathSource && !hasMathDecoration && (!editablePreviewBlock || ['list', 'table', 'paragraph'].includes(editablePreviewBlock.kind) ||
             (editablePreviewBlock.kind === 'code' && !['math', 'latex', 'mermaid'].includes(editablePreviewBlock.language?.toLowerCase())));
         const focusRenderKey = renderFullDocument || stablePreviewLayout ? '' : `${activeLine || 0}:${state.editingLine || 0}`;
         const searchRenderKey = JSON.stringify([searchController.query, searchController.documentVersion, searchController.matches.length,
@@ -407,13 +425,13 @@ function createEditorRenderer({
                 line <= editablePreviewBlock.endLine;
             const detectedPreviewBlock = editInPreview
                 ? findEditablePreviewBlockContaining(line, state.lineCount, getCachedLine, previewBlockOptions)
-                : null;
+                : isEditablePreviewBlockLine ? editablePreviewBlock : null;
             const standaloneMath = !detectedPreviewBlock && containsInlineMath(text);
             const isRenderedBlockLine = detectedPreviewBlock?.kind === 'math' ||
                 (detectedPreviewBlock?.kind === 'code' && ['math', 'latex', 'mermaid'].includes(detectedPreviewBlock.language?.toLowerCase())) ||
-                paragraphContainsInlineMath(detectedPreviewBlock, getCachedLine) || standaloneMath;
+                hasInlineMathInBlock(detectedPreviewBlock) || standaloneMath;
             const renderedSourceBlock = isEditablePreviewBlockLine &&
-                (mathParagraphSource || editablePreviewBlock.kind === 'math' || (editablePreviewBlock.kind === 'code' &&
+                (inlineMathInSourceBlock || editablePreviewBlock.kind === 'math' || (editablePreviewBlock.kind === 'code' &&
                     ['math', 'latex', 'mermaid'].includes(editablePreviewBlock.language?.toLowerCase())))
                 ? editablePreviewBlock : standaloneMath && line === sourceLine ? { startLine: line, endLine: line } : null;
             const isRenderedSourceLine = !!renderedSourceBlock;
@@ -452,7 +470,7 @@ function createEditorRenderer({
                         ? `${isMathFenceLine ? ' live-preview-source-math-fence' : ''}`
                         : `${editablePreviewBlock.kind === 'table' && line === editablePreviewBlock.separatorLine ? ' live-preview-source-table-separator' : ''}`;
                 livePreviewClass = ` live-preview-source-block live-preview-source-${editablePreviewBlock.kind}${blockEdgeClass}${blockMetaClass}`;
-                if (mathParagraphSource) livePreviewClass += ' live-preview-source-math';
+                if (inlineMathInSourceBlock) livePreviewClass += ' live-preview-source-math';
                 const commonAttributes = ` data-live-preview-block-kind="${editablePreviewBlock.kind}" data-live-preview-block-start="${editablePreviewBlock.startLine}" data-live-preview-block-end="${editablePreviewBlock.endLine}"`;
                 livePreviewAttributes = editablePreviewBlock.kind === 'code'
                     ? `${commonAttributes} data-live-preview-block-body-start="${editablePreviewBlock.bodyStartLine}" data-live-preview-block-body-end="${editablePreviewBlock.bodyEndLine}" data-live-preview-block-language="${escapeHtml(editablePreviewBlock.language || '')}"`
@@ -486,7 +504,7 @@ function createEditorRenderer({
 
             // Put the rendered result after every source line, including the
             // closing fence, so a tall diagram cannot overlap its own editor.
-            if (editInPreview && isRenderedSourceLine && line === renderedSourceBlock.endLine) {
+            if (isRenderedSourceLine && (editInPreview || hasInlineMathSource) && line === renderedSourceBlock.endLine) {
                 const preview = renderPreviewLineAt(renderedSourceBlock.startLine, state.lineCount, getCachedLine,
                     { ...livePreviewOptions, sourceLine: 0 }, { val: 0 });
                 if (!preview.pending && !preview.source) {
@@ -794,7 +812,8 @@ function createEditorRenderer({
 
         const existing = state.inlineLivePreviewEditableBlock;
         const detected = findEditablePreviewBlockContaining(lineNumber, state.lineCount, getLine, {
-            tabSize: state.tabSize || 4
+            tabSize: state.tabSize || 4,
+            outermostList: true
         });
         if (containsInlineLivePreviewBlockLine(existing, lineNumber) &&
             (!detected || isInlinePreviewBlockInside(existing, detected))) {
@@ -861,7 +880,8 @@ function createEditorRenderer({
             state.lineCount,
             line => state.cache.has(line) ? state.cache.get(line) : undefined,
             {
-                tabSize: state.tabSize || 4
+                tabSize: state.tabSize || 4,
+                outermostList: true
             });
         if (block?.kind === 'math') {
             safeLine = editableLineForMathBlock(safeLine, block);

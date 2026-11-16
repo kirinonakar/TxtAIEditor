@@ -416,6 +416,8 @@ function inlineMarkdown(text, options = {}) {
     out = out.replace(/!\[([^\]]*)\]\(([^)]*)\)/g, (_, alt, target) => stash(renderMarkdownImage(alt, target, options)));
     out = stashInlineMath(out, stash, mathFragments);
     out = stashHtmlTags(out, stash);
+    // Block parsing has already treated an escaped list marker as plain text.
+    out = out.replace(/^([ \t]*\d+)\\([.)])(?=[ \t])/, '$1$2');
     out = escapeHtml(out);
     out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_, label, href) => {
         return `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${label}</a>`;
@@ -1237,6 +1239,32 @@ function renderMarkdownListBlock(block, options = {}) {
     return html;
 }
 
+function blockContainsInlineMath(block, getLine, options = {}) {
+    if (block?.kind === 'list') {
+        const lines = Array.from({ length: block.endLine - block.startLine + 1 },
+            (_, index) => getLine(block.startLine + index));
+        if (!lines.some(containsInlineMath)) return false;
+        let found = false;
+        const checkInline = text => {
+            found ||= containsInlineMath(text);
+            return '';
+        };
+        // Use the same list parsing as editable preview, including nested fences.
+        renderMarkdownListBlock({ startLine: block.startLine, lines }, {
+            tabSize: options.tabSize,
+            editableListItem: (_, __, info) => checkInline(info.content),
+            editableListContinuation: checkInline,
+            editableCodeBlock: () => ''
+        });
+        return found;
+    }
+    if (block?.kind !== 'paragraph') return false;
+    for (let line = block.startLine; line <= block.endLine; line++) {
+        if (containsInlineMath(getLine(line))) return true;
+    }
+    return false;
+}
+
 function renderMarkdownLine(line, options = {}) {
     const raw = String(line ?? '');
     const trimmed = raw.trim();
@@ -1521,6 +1549,7 @@ function initializeMermaid(theme = diagramTheme) {
 }
 
 export {
+    blockContainsInlineMath,
     configureDiagramRenderer,
     containsInlineMath,
     ensureDiagramRenderer,
