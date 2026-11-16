@@ -532,8 +532,19 @@ namespace TxtAIEditor.Controls
             return false;
         }
 
-        public void ApplyAuthSettings(AgentMcpServer server, AgentMcpAuthSettings settings, bool deleteEmptySecrets)
+        public void ApplyAuthSettings(
+            AgentMcpServer server, AgentMcpAuthSettings settings, string endpoint, bool deleteEmptySecrets)
         {
+            bool usesBrowserOAuth = settings.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase);
+            bool sameOAuthClient =
+                usesBrowserOAuth &&
+                server.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(server.OAuthClientId, settings.OAuthClientId, StringComparison.Ordinal) &&
+                string.Equals(server.OAuthAuthorizationEndpoint, settings.OAuthAuthorizationEndpoint, StringComparison.Ordinal) &&
+                string.Equals(server.OAuthTokenEndpoint, settings.OAuthTokenEndpoint, StringComparison.Ordinal) &&
+                string.Equals(server.OAuthScopes, settings.OAuthScopes, StringComparison.Ordinal) &&
+                string.Equals(_credentialStore.GetOAuthClientSecret(server), settings.OAuthClientSecret, StringComparison.Ordinal);
+
             server.AuthType = settings.AuthType;
             server.Headers = settings.AuthType.Equals(AuthTypeApiKey, StringComparison.OrdinalIgnoreCase)
                 ? _credentialStore.StoreHeaderSecrets(server, settings.Headers, deleteEmptySecrets)
@@ -544,18 +555,19 @@ namespace TxtAIEditor.Controls
                 _credentialStore.DeleteCredentialsForRemovedHeaders(server, server.Headers);
             }
 
-            server.OAuthClientId = settings.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase)
-                ? settings.OAuthClientId
-                : string.Empty;
-            server.OAuthAuthorizationEndpoint = settings.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase)
-                ? settings.OAuthAuthorizationEndpoint
-                : string.Empty;
-            server.OAuthTokenEndpoint = settings.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase)
-                ? settings.OAuthTokenEndpoint
-                : string.Empty;
-            server.OAuthScopes = settings.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase)
-                ? settings.OAuthScopes
-                : string.Empty;
+            if (sameOAuthClient && string.Equals(server.Endpoint, endpoint, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            server.OAuthClientId = usesBrowserOAuth ? settings.OAuthClientId : string.Empty;
+            server.OAuthAuthorizationEndpoint = usesBrowserOAuth ? settings.OAuthAuthorizationEndpoint : string.Empty;
+            server.OAuthTokenEndpoint = usesBrowserOAuth ? settings.OAuthTokenEndpoint : string.Empty;
+            server.OAuthScopes = usesBrowserOAuth ? settings.OAuthScopes : string.Empty;
+            if (!sameOAuthClient)
+            {
+                server.OAuthClientDynamicallyRegistered = usesBrowserOAuth ? false : null;
+            }
 
             if (settings.AuthType.Equals(AuthTypeOAuthBearer, StringComparison.OrdinalIgnoreCase))
             {
@@ -564,15 +576,12 @@ namespace TxtAIEditor.Controls
                 server.OAuthClientSecret = string.Empty;
                 server.OAuthAccessTokenExpiresAt = DateTimeOffset.MaxValue;
             }
-            else if (settings.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase))
+            else if (usesBrowserOAuth)
             {
                 server.OAuthAccessToken = _credentialStore.StoreOAuthSecret(server, "access_token", settings.OAuthAccessToken, deleteEmptySecrets);
                 server.OAuthRefreshToken = _credentialStore.StoreOAuthSecret(server, "refresh_token", settings.OAuthRefreshToken, deleteEmptySecrets);
                 server.OAuthClientSecret = _credentialStore.StoreOAuthSecret(server, "client_secret", settings.OAuthClientSecret, deleteEmptySecrets);
-                if (settings.OAuthAccessTokenExpiresAt != default)
-                {
-                    server.OAuthAccessTokenExpiresAt = settings.OAuthAccessTokenExpiresAt;
-                }
+                server.OAuthAccessTokenExpiresAt = settings.OAuthAccessTokenExpiresAt;
             }
             else
             {

@@ -25,50 +25,67 @@ namespace TxtAIEditor.Controls
         private readonly AgentMcpCredentialStore _credentialStore;
         private readonly Func<string, string, string> _getString;
         private readonly Func<Task> _saveAsync;
+        private readonly Action<string> _launchBrowser;
 
         public AgentMcpOAuthService(
             AgentMcpCredentialStore credentialStore,
             Func<string, string, string> getString,
-            Func<Task> saveAsync)
+            Func<Task> saveAsync,
+            Action<string>? launchBrowser = null)
         {
             _credentialStore = credentialStore;
             _getString = getString;
             _saveAsync = saveAsync;
+            _launchBrowser = launchBrowser ?? LaunchBrowser;
         }
 
-        public async Task<string> EnsureAccessTokenAsync(AgentMcpServer server, CancellationToken cancellationToken)
+        public async Task<string> EnsureAccessTokenAsync(
+            AgentMcpServer server, CancellationToken cancellationToken, string? rejectedAccessToken = null)
         {
             if (server.AuthType.Equals(AuthTypeOAuthBearer, StringComparison.OrdinalIgnoreCase))
             {
                 return _credentialStore.GetOAuthSecret(server, "access_token", server.OAuthAccessToken);
             }
 
-            if (!server.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase))
+            if (!server.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) &&
+                !server.AuthType.Equals(AuthTypeNone, StringComparison.OrdinalIgnoreCase))
             {
                 return string.Empty;
             }
 
-            string accessToken = _credentialStore.GetOAuthSecret(server, "access_token", server.OAuthAccessToken);
-            if (!string.IsNullOrWhiteSpace(accessToken) &&
-                server.OAuthAccessTokenExpiresAt > DateTimeOffset.UtcNow.AddMinutes(1))
+            await server.OAuthLoginGate.WaitAsync(cancellationToken);
+            try
             {
-                return accessToken;
-            }
+                if (server.AuthType.Equals(AuthTypeNone, StringComparison.OrdinalIgnoreCase))
+                {
+                    return await RunBrowserLoginAsync(server, cancellationToken);
+                }
 
-            string refreshToken = _credentialStore.GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken);
-            if (!string.IsNullOrWhiteSpace(refreshToken))
+                string accessToken = GetUsableAccessToken(server);
+                if (accessToken.Length > 0 && !string.Equals(accessToken, rejectedAccessToken, StringComparison.Ordinal))
+                {
+                    return accessToken;
+                }
+
+                string refreshToken = _credentialStore.GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken);
+                if (!NeedsAutomaticOAuth(server) && !string.IsNullOrWhiteSpace(refreshToken))
+                {
+                    try
+                    {
+                        return await RefreshAccessTokenAsync(server, refreshToken, cancellationToken);
+                    }
+                    catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
+                    {
+                        Debug.WriteLine($"MCP OAuth refresh rejected with HTTP {(int?)ex.StatusCode}; signing in again.");
+                    }
+                }
+
+                return await RunBrowserLoginAsync(server, cancellationToken);
+            }
+            finally
             {
-                try
-                {
-                    return await RefreshAccessTokenAsync(server, refreshToken, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Failed to refresh MCP OAuth token: {ex.Message}");
-                }
+                server.OAuthLoginGate.Release();
             }
-
-            return await RunBrowserLoginAsync(server, cancellationToken);
         }
 
         public async Task RunInitialLoginIfNeededAsync(
@@ -81,22 +98,27 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            bool automaticOAuth = NeedsAutomaticOAuth(server);
-            if (!automaticOAuth &&
-                (!server.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) ||
-                 !string.IsNullOrWhiteSpace(_credentialStore.GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken))))
-            {
-                return;
-            }
-
             try
             {
-                await RunBrowserLoginAsync(server, CancellationToken.None);
+                if (server.AuthType.Equals(AuthTypeNone, StringComparison.OrdinalIgnoreCase) ||
+                    (server.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) &&
+                     (NeedsAutomaticOAuth(server) || string.IsNullOrWhiteSpace(
+                         _credentialStore.GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken)))))
+                {
+                    await EnsureAccessTokenAsync(server, CancellationToken.None);
+                }
             }
             catch (Exception ex)
             {
                 showError(errorTitle, ex.Message);
             }
+        }
+
+        private string GetUsableAccessToken(AgentMcpServer server)
+        {
+            return server.OAuthAccessTokenExpiresAt > DateTimeOffset.UtcNow
+                ? _credentialStore.GetOAuthAccessToken(server)
+                : string.Empty;
         }
 
         private async Task<string> RefreshAccessTokenAsync(
@@ -122,32 +144,23 @@ namespace TxtAIEditor.Controls
         {
             int port = GetFreeTcpPort();
             string redirectUri = $"http://127.0.0.1:{port}/callback/";
-            if (NeedsAutomaticOAuth(server))
+            OAuthClient? registeredClient = await TryRegisterOAuthClientAsync(server, redirectUri, cancellationToken);
+            if (registeredClient == null &&
+                (NeedsAutomaticOAuth(server) || server.OAuthClientDynamicallyRegistered == true))
             {
-                bool configured = await TryConfigureAutomaticOAuthAsync(server, redirectUri, cancellationToken);
-                if (!configured)
+                if (server.AuthType.Equals(AuthTypeNone, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (server.AuthType.Equals(AuthTypeNone, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return string.Empty;
-                    }
-
-                    throw new InvalidOperationException(_getString(
-                        "AgentMcpOAuthClientConfigRequired",
-                        "OAuth Client ID, Authorization URL, Token URL을 입력해주세요. Client Secret은 공개 클라이언트에서는 생략할 수 있습니다."));
+                    return string.Empty;
                 }
 
-                await _saveAsync();
+                throw new InvalidOperationException(_getString(
+                    "AgentMcpOAuthClientConfigRequired",
+                    "OAuth Client ID, Authorization URL, Token URL을 입력해주세요. Client Secret은 공개 클라이언트에서는 생략할 수 있습니다."));
             }
 
-            string clientSecret = _credentialStore.GetOAuthClientSecret(server);
-            if (!server.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) ||
-                string.IsNullOrWhiteSpace(server.OAuthClientId) ||
-                string.IsNullOrWhiteSpace(server.OAuthAuthorizationEndpoint) ||
-                string.IsNullOrWhiteSpace(server.OAuthTokenEndpoint))
-            {
-                throw new InvalidOperationException(_getString("AgentMcpOAuthClientConfigRequired", "OAuth Client ID, Authorization URL, Token URL을 입력해주세요."));
-            }
+            OAuthClient client = registeredClient ?? new OAuthClient(
+                server.OAuthClientId, _credentialStore.GetOAuthClientSecret(server),
+                server.OAuthAuthorizationEndpoint, server.OAuthTokenEndpoint, server.OAuthScopes);
 
             string state = CreateRandomBase64Url(32);
             string codeVerifier = CreateRandomBase64Url(64);
@@ -156,12 +169,12 @@ namespace TxtAIEditor.Controls
             listener.Prefixes.Add(redirectUri);
             listener.Start();
 
-            string authorizationUrl = BuildUrl(server.OAuthAuthorizationEndpoint, new Dictionary<string, string>
+            string authorizationUrl = BuildUrl(client.AuthorizationEndpoint, new Dictionary<string, string>
             {
                 ["response_type"] = "code",
-                ["client_id"] = server.OAuthClientId,
+                ["client_id"] = client.Id,
                 ["redirect_uri"] = redirectUri,
-                ["scope"] = server.OAuthScopes,
+                ["scope"] = client.Scopes,
                 ["state"] = state,
                 ["code_challenge"] = codeChallenge,
                 ["code_challenge_method"] = "S256",
@@ -170,11 +183,7 @@ namespace TxtAIEditor.Controls
                 ["prompt"] = "consent"
             });
 
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = authorizationUrl,
-                UseShellExecute = true
-            });
+            _launchBrowser(authorizationUrl);
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(TimeSpan.FromMinutes(5));
@@ -182,6 +191,7 @@ namespace TxtAIEditor.Controls
             Task completed = await Task.WhenAny(contextTask, Task.Delay(Timeout.InfiniteTimeSpan, timeoutCts.Token));
             if (completed != contextTask)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 throw new TimeoutException(_getString("AgentMcpOAuthLoginTimeout", "OAuth 브라우저 로그인이 시간 초과되었습니다."));
             }
 
@@ -210,18 +220,36 @@ namespace TxtAIEditor.Controls
                 ["grant_type"] = "authorization_code",
                 ["code"] = code,
                 ["redirect_uri"] = redirectUri,
-                ["client_id"] = server.OAuthClientId,
-                ["client_secret"] = clientSecret,
+                ["client_id"] = client.Id,
+                ["client_secret"] = client.Secret,
                 ["code_verifier"] = codeVerifier,
                 ["resource"] = GetResourceIdentifier(server.Endpoint)
             };
-            OAuthTokenResponse token = await SendOAuthTokenRequestAsync(server.OAuthTokenEndpoint, form, cancellationToken);
-            SaveOAuthTokenResponse(
-                server,
-                token,
-                _credentialStore.GetOAuthSecret(server, "refresh_token", server.OAuthRefreshToken));
+            OAuthTokenResponse token = await SendOAuthTokenRequestAsync(client.TokenEndpoint, form, cancellationToken);
+            if (registeredClient != null)
+            {
+                server.OAuthClientSecret = _credentialStore.StoreOAuthSecret(
+                    server, "client_secret", client.Secret, deleteEmptySecret: true);
+                server.AuthType = AuthTypeOAuthAuthorizationCode;
+                server.OAuthClientId = client.Id;
+                server.OAuthAuthorizationEndpoint = client.AuthorizationEndpoint;
+                server.OAuthTokenEndpoint = client.TokenEndpoint;
+                server.OAuthScopes = client.Scopes;
+                server.OAuthClientDynamicallyRegistered = true;
+            }
+
+            SaveOAuthTokenResponse(server, token, string.Empty);
             await _saveAsync();
             return token.AccessToken;
+        }
+
+        private static void LaunchBrowser(string authorizationUrl)
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = authorizationUrl,
+                UseShellExecute = true
+            });
         }
 
         private static bool NeedsAutomaticOAuth(AgentMcpServer server)
@@ -237,15 +265,24 @@ namespace TxtAIEditor.Controls
                  string.IsNullOrWhiteSpace(server.OAuthTokenEndpoint));
         }
 
-        private async Task<bool> TryConfigureAutomaticOAuthAsync(
+        private async Task<OAuthClient?> TryRegisterOAuthClientAsync(
             AgentMcpServer server,
             string redirectUri,
             CancellationToken cancellationToken)
         {
+            bool requiresRegistration = NeedsAutomaticOAuth(server) || server.OAuthClientDynamicallyRegistered == true;
+            // Old settings did not record how the client ID was obtained.
+            bool couldBeLegacyRegistration = server.OAuthClientDynamicallyRegistered == null &&
+                string.IsNullOrWhiteSpace(_credentialStore.GetOAuthClientSecret(server));
+            if (!requiresRegistration && !couldBeLegacyRegistration)
+            {
+                return null;
+            }
+
             if (!Uri.TryCreate(server.Endpoint, UriKind.Absolute, out Uri? resourceUri) ||
                 !IsHttpScheme(resourceUri.Scheme))
             {
-                return false;
+                return null;
             }
 
             using var discoveryCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -257,16 +294,41 @@ namespace TxtAIEditor.Controls
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                return false;
+                return null;
+            }
+            catch (HttpRequestException) when (!requiresRegistration)
+            {
+                return null;
             }
 
             if (discovery == null)
             {
-                return false;
+                return null;
+            }
+
+            if (!requiresRegistration &&
+                (!string.Equals(server.OAuthAuthorizationEndpoint, discovery.AuthorizationEndpoint, StringComparison.Ordinal) ||
+                 !string.Equals(server.OAuthTokenEndpoint, discovery.TokenEndpoint, StringComparison.Ordinal) ||
+                 !string.Equals(server.OAuthScopes, discovery.Scopes, StringComparison.Ordinal) ||
+                 !discovery.SupportsPkce))
+            {
+                return null;
+            }
+
+            if (!discovery.SupportsPkce)
+            {
+                throw new InvalidOperationException(_getString(
+                    "AgentMcpOAuthPkceUnsupported",
+                    "MCP OAuth 서버가 PKCE S256을 지원한다고 알리지 않아 로그인을 진행할 수 없습니다."));
             }
 
             if (string.IsNullOrWhiteSpace(discovery.RegistrationEndpoint))
             {
+                if (!requiresRegistration)
+                {
+                    return null;
+                }
+
                 throw new InvalidOperationException(_getString(
                     "AgentMcpOAuthRegistrationRequired",
                     "이 MCP 서버는 OAuth 로그인을 지원하지만 자동 클라이언트 등록을 제공하지 않습니다. OAuth 설정을 직접 입력해주세요."));
@@ -308,20 +370,9 @@ namespace TxtAIEditor.Controls
                     "OAuth 클라이언트 자동 등록 응답에 Client ID가 없습니다."));
             }
 
-            server.AuthType = AuthTypeOAuthAuthorizationCode;
-            server.OAuthClientId = clientId;
-            server.OAuthClientSecret = _credentialStore.StoreOAuthSecret(
-                server,
-                "client_secret",
-                TryGetStringProperty(registrationRoot, "client_secret"),
-                deleteEmptySecret: true);
-            server.OAuthAuthorizationEndpoint = discovery.AuthorizationEndpoint;
-            server.OAuthTokenEndpoint = discovery.TokenEndpoint;
-            server.OAuthScopes = discovery.Scopes;
-            server.OAuthAccessToken = string.Empty;
-            server.OAuthRefreshToken = string.Empty;
-            server.OAuthAccessTokenExpiresAt = default;
-            return true;
+            return new OAuthClient(
+                clientId, TryGetStringProperty(registrationRoot, "client_secret"),
+                discovery.AuthorizationEndpoint, discovery.TokenEndpoint, discovery.Scopes);
         }
 
         private async Task<OAuthDiscovery?> DiscoverOAuthAsync(
@@ -354,13 +405,6 @@ namespace TxtAIEditor.Controls
                         continue;
                     }
 
-                    if (!authorizationMetadata.CodeChallengeMethods.Contains("S256", StringComparer.OrdinalIgnoreCase))
-                    {
-                        throw new InvalidOperationException(_getString(
-                            "AgentMcpOAuthPkceUnsupported",
-                            "MCP OAuth 서버가 PKCE S256을 지원한다고 알리지 않아 로그인을 진행할 수 없습니다."));
-                    }
-
                     string scopes = resourceMetadata.Scopes.Count > 0
                         ? string.Join(" ", resourceMetadata.Scopes)
                         : string.Join(" ", authorizationMetadata.Scopes);
@@ -369,7 +413,8 @@ namespace TxtAIEditor.Controls
                         AuthorizationEndpoint = authorizationMetadata.AuthorizationEndpoint,
                         TokenEndpoint = authorizationMetadata.TokenEndpoint,
                         RegistrationEndpoint = authorizationMetadata.RegistrationEndpoint,
-                        Scopes = scopes
+                        Scopes = scopes,
+                        SupportsPkce = authorizationMetadata.CodeChallengeMethods.Contains("S256", StringComparer.OrdinalIgnoreCase)
                     };
                 }
             }
@@ -535,7 +580,7 @@ namespace TxtAIEditor.Controls
             string json = await response.Content.ReadAsStringAsync(cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                throw new InvalidOperationException($"{(int)response.StatusCode} {response.ReasonPhrase}: {json}");
+                throw new HttpRequestException($"{(int)response.StatusCode} {response.ReasonPhrase}: {json}", null, response.StatusCode);
             }
 
             using JsonDocument document = JsonDocument.Parse(json);
@@ -547,6 +592,7 @@ namespace TxtAIEditor.Controls
 
             int expiresIn = 3600;
             if (document.RootElement.TryGetProperty("expires_in", out var expiresElement) &&
+                expiresElement.ValueKind == JsonValueKind.Number &&
                 expiresElement.TryGetInt32(out int parsedExpiresIn))
             {
                 expiresIn = parsedExpiresIn;
@@ -556,7 +602,7 @@ namespace TxtAIEditor.Controls
             {
                 AccessToken = accessToken,
                 RefreshToken = TryGetStringProperty(document.RootElement, "refresh_token"),
-                ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, expiresIn))
+                ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(Math.Max(0, expiresIn))
             };
         }
 
@@ -567,7 +613,7 @@ namespace TxtAIEditor.Controls
                 server,
                 "refresh_token",
                 string.IsNullOrWhiteSpace(token.RefreshToken) ? existingRefreshToken : token.RefreshToken,
-                deleteEmptySecret: false);
+                deleteEmptySecret: true);
             server.OAuthAccessTokenExpiresAt = token.ExpiresAt;
         }
 
@@ -620,7 +666,7 @@ namespace TxtAIEditor.Controls
 
             return property.ValueKind == JsonValueKind.String
                 ? property.GetString() ?? string.Empty
-                : property.GetRawText();
+                : string.Empty;
         }
 
         private static List<string> GetStringArrayProperty(JsonElement element, string propertyName)
@@ -672,6 +718,9 @@ namespace TxtAIEditor.Controls
             return resource;
         }
 
+        private sealed record OAuthClient(
+            string Id, string Secret, string AuthorizationEndpoint, string TokenEndpoint, string Scopes);
+
         private sealed class OAuthTokenResponse
         {
             public string AccessToken { get; set; } = string.Empty;
@@ -685,6 +734,7 @@ namespace TxtAIEditor.Controls
             public string TokenEndpoint { get; set; } = string.Empty;
             public string RegistrationEndpoint { get; set; } = string.Empty;
             public string Scopes { get; set; } = string.Empty;
+            public bool SupportsPkce { get; set; }
         }
 
         private sealed class OAuthProtectedResourceMetadata

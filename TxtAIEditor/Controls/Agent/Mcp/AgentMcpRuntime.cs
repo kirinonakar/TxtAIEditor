@@ -416,6 +416,36 @@ namespace TxtAIEditor.Controls
             }
 
             string json = JsonSerializer.Serialize(payload);
+            string accessToken = IsOAuthAuthType(server.AuthType) && !server.IsAgentPlugin
+                ? await _oauthService.EnsureAccessTokenAsync(server, cancellationToken)
+                : string.Empty;
+            try
+            {
+                return await PostHttpAsync(server, session, method, mcpName, json, accessToken, cancellationToken);
+            }
+            catch (McpHttpException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized && !server.IsAgentPlugin &&
+                (server.AuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) ||
+                 server.AuthType.Equals(AuthTypeNone, StringComparison.OrdinalIgnoreCase)))
+            {
+                string renewedToken = await _oauthService.EnsureAccessTokenAsync(server, cancellationToken, accessToken);
+                if (string.IsNullOrWhiteSpace(renewedToken))
+                {
+                    throw;
+                }
+
+                return await PostHttpAsync(server, session, method, mcpName, json, renewedToken, cancellationToken);
+            }
+        }
+
+        private async Task<string> PostHttpAsync(
+            AgentMcpServer server,
+            AgentMcpSession session,
+            string method,
+            string? mcpName,
+            string json,
+            string accessToken,
+            CancellationToken cancellationToken)
+        {
             using var request = new HttpRequestMessage(HttpMethod.Post, server.Endpoint)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
@@ -445,13 +475,9 @@ namespace TxtAIEditor.Controls
                     }
                 }
             }
-            else if (IsOAuthAuthType(server.AuthType))
+            else if (!string.IsNullOrWhiteSpace(accessToken))
             {
-                string accessToken = await _oauthService.EnsureAccessTokenAsync(server, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(accessToken))
-                {
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-                }
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
             }
 
             if (session.UseSessionId && !string.IsNullOrEmpty(session.SessionId))
@@ -461,6 +487,14 @@ namespace TxtAIEditor.Controls
 
             HttpClient httpClient = server.IsAgentPlugin ? AgentPluginHttpClient : HttpClient;
             using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
+            string body = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new McpHttpException(
+                    response.StatusCode,
+                    _credentialStore.RedactServerSecrets(server, $"{(int)response.StatusCode} {response.ReasonPhrase}: {body}"));
+            }
+
             if (!session.UsesStatelessProtocol && response.Headers.TryGetValues("Mcp-Session-Id", out var sessionIds))
             {
                 string sessionId = sessionIds.FirstOrDefault() ?? string.Empty;
@@ -469,14 +503,6 @@ namespace TxtAIEditor.Controls
                     session.SessionId = sessionId;
                     session.UseSessionId = true;
                 }
-            }
-
-            string body = await response.Content.ReadAsStringAsync(cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new McpHttpException(
-                    response.StatusCode,
-                    _credentialStore.RedactServerSecrets(server, $"{(int)response.StatusCode} {response.ReasonPhrase}: {body}"));
             }
 
             return body;

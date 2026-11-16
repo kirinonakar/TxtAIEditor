@@ -112,8 +112,8 @@ namespace TxtAIEditor.Controls
                     _credentialStore.DeleteOAuthCredentials(existing);
                 }
 
+                _configuration.ApplyAuthSettings(existing, authSettings, connection.Endpoint, deleteEmptySecrets: true);
                 _configuration.ApplyConnectionSettings(existing, connection);
-                _configuration.ApplyAuthSettings(existing, authSettings, deleteEmptySecrets: true);
                 if (input.Description.Length > 0)
                 {
                     existing.Description = input.Description;
@@ -129,8 +129,8 @@ namespace TxtAIEditor.Controls
                     Name = name,
                     Description = input.Description
                 };
+                _configuration.ApplyAuthSettings(server, authSettings, connection.Endpoint, deleteEmptySecrets: true);
                 _configuration.ApplyConnectionSettings(server, connection);
-                _configuration.ApplyAuthSettings(server, authSettings, deleteEmptySecrets: true);
                 _registry.Servers.Add(server);
                 savedServer = server;
             }
@@ -259,16 +259,6 @@ namespace TxtAIEditor.Controls
                 _connections.Reset(duplicate.Id);
             }
 
-            string previousAuthType = server.AuthType;
-            string previousOAuthClientId = server.OAuthClientId;
-            string previousOAuthAuthorizationEndpoint = server.OAuthAuthorizationEndpoint;
-            string previousOAuthTokenEndpoint = server.OAuthTokenEndpoint;
-            string previousOAuthRefreshToken = _credentialStore.GetOAuthSecret(
-                server,
-                "refresh_token",
-                server.OAuthRefreshToken);
-            DateTimeOffset previousOAuthAccessTokenExpiresAt = server.OAuthAccessTokenExpiresAt;
-
             server.Name = name;
             server.Description = input.Description;
             _credentialStore.DeleteCredentialsForRemovedHeaders(server, authSettings.Headers);
@@ -278,23 +268,8 @@ namespace TxtAIEditor.Controls
                 _credentialStore.DeleteOAuthCredentials(server);
             }
 
+            _configuration.ApplyAuthSettings(server, authSettings, connection.Endpoint, deleteEmptySecrets: true);
             _configuration.ApplyConnectionSettings(server, connection);
-            _configuration.ApplyAuthSettings(server, authSettings, deleteEmptySecrets: true);
-            bool preserveOAuthRefreshToken =
-                previousAuthType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) &&
-                authType.Equals(AuthTypeOAuthAuthorizationCode, StringComparison.OrdinalIgnoreCase) &&
-                previousOAuthClientId.Equals(server.OAuthClientId, StringComparison.Ordinal) &&
-                previousOAuthAuthorizationEndpoint.Equals(server.OAuthAuthorizationEndpoint, StringComparison.Ordinal) &&
-                previousOAuthTokenEndpoint.Equals(server.OAuthTokenEndpoint, StringComparison.Ordinal);
-            if (preserveOAuthRefreshToken)
-            {
-                server.OAuthRefreshToken = _credentialStore.StoreOAuthSecret(
-                    server,
-                    "refresh_token",
-                    previousOAuthRefreshToken,
-                    deleteEmptySecret: false);
-                server.OAuthAccessTokenExpiresAt = previousOAuthAccessTokenExpiresAt;
-            }
 
             _connections.Reset(server.Id);
             await _saveAsync();

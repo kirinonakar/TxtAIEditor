@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using System.Threading;
 
 namespace TxtAIEditor.Controls
 {
@@ -24,7 +26,10 @@ namespace TxtAIEditor.Controls
         public string OAuthAuthorizationEndpoint { get; set; } = string.Empty;
         public string OAuthTokenEndpoint { get; set; } = string.Empty;
         public string OAuthScopes { get; set; } = string.Empty;
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? OAuthClientDynamicallyRegistered { get; set; }
         public DateTimeOffset OAuthAccessTokenExpiresAt { get; set; }
+        internal SemaphoreSlim OAuthLoginGate { get; } = new(1, 1);
         public Dictionary<string, string> Headers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public string AgentPluginName { get; set; } = string.Empty;
         public string AgentPluginId { get; set; } = string.Empty;
