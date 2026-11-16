@@ -1,6 +1,8 @@
 using System;
+using System.Buffers;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Text.Unicode;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -443,34 +445,37 @@ namespace TxtAIEditor.Core.Services
 
         public static bool IsValidUtf8(byte[] bytes)
         {
-            try
-            {
-                var decoder = Encoding.UTF8.GetDecoder();
-                decoder.Fallback = new DecoderExceptionFallback();
-                _ = decoder.GetCharCount(bytes, 0, bytes.Length);
-                return true;
-            }
-            catch
+            if (bytes == null)
             {
                 return false;
             }
+
+            // Encoding samples can end in the middle of a UTF-8 character.
+            int invalidIndex = Utf8.IndexOfInvalidSubsequence(bytes);
+            return invalidIndex < 0 ||
+                Rune.DecodeFromUtf8(bytes.AsSpan(invalidIndex), out _, out _) == OperationStatus.NeedMoreData;
         }
 
         private static bool ContainsJisEscapeSequences(byte[] bytes)
         {
-            int len = bytes.Length;
-            for (int i = 0; i < len - 2; i++)
+            ReadOnlySpan<byte> remaining = bytes;
+            while (remaining.Length >= 3)
             {
-                if (bytes[i] == 0x1B) // ESC
+                int escapeIndex = remaining[..^2].IndexOf((byte)0x1B);
+                if (escapeIndex < 0)
                 {
-                    byte b1 = bytes[i + 1];
-                    byte b2 = bytes[i + 2];
-                    if ((b1 == 0x24 && (b2 == 0x40 || b2 == 0x42)) ||
-                        (b1 == 0x28 && (b2 == 0x42 || b2 == 0x4A || b2 == 0x49)))
-                    {
-                        return true;
-                    }
+                    return false;
                 }
+
+                byte b1 = remaining[escapeIndex + 1];
+                byte b2 = remaining[escapeIndex + 2];
+                if ((b1 == 0x24 && (b2 == 0x40 || b2 == 0x42)) ||
+                    (b1 == 0x28 && (b2 == 0x42 || b2 == 0x4A || b2 == 0x49)))
+                {
+                    return true;
+                }
+
+                remaining = remaining[(escapeIndex + 1)..];
             }
             return false;
         }

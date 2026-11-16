@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://dotnet.microsoft.com/download/dotnet/10.0"><img src="https://img.shields.io/badge/.NET-10.0-blueviolet.svg?style=flat-square" alt="Target Framework" /></a>
+  <a href="https://dotnet.microsoft.com/download/dotnet/11.0"><img src="https://img.shields.io/badge/.NET-11.0-blueviolet.svg?style=flat-square" alt="Target Framework" /></a>
   <a href="https://learn.microsoft.com/en-us/windows/apps/winui/winui3/"><img src="https://img.shields.io/badge/WinUI-3-blue.svg?style=flat-square" alt="UI Framework" /></a>
   <a href="https://github.com/microsoft/WindowsAppSDK"><img src="https://img.shields.io/badge/Windows%20App%20SDK-2.4.0-orange.svg?style=flat-square" alt="SDK Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License" /></a>
@@ -21,7 +21,7 @@
 
 ## 🌟 Overview
 
-**TxtAIEditor** is a high-performance, elegant, and modern desktop text editor shell built for Windows. It marries the robust, native desktop capabilities of **WinUI 3 (.NET 10.0)** with the intelligence of an **integrated AI agent**.
+**TxtAIEditor** is a high-performance, elegant, and modern desktop text editor shell built for Windows. It marries the robust, native desktop capabilities of **WinUI 3 (.NET 11.0)** with the intelligence of an **integrated AI agent**.
 
 Designed for developers, writers, and power users, TxtAIEditor provides a fluid, distraction-free environment. It features standard workspace tools like a **live Markdown/HTML/LaTeX previewer**, a **built-in terminal**, **comprehensive Git integration**, **multi-provider AI assistance and AI agent**, and a **virtualized editor core** capable of opening and editing files from small snippets to 200MB+ texts seamlessly.
 
@@ -205,8 +205,8 @@ You can download the latest installer (built using **Inno Setup**) from the [Rel
 
 To build and run TxtAIEditor locally, make sure you have:
 *   **Windows 10 / 11**
-*   **Visual Studio 2022** (v17.10 or later recommended)
-*   **.NET 10.0 SDK**
+*   **Visual Studio 2026** (v18.12 or later)
+*   **.NET 11.0 SDK** (11.0.100 or later .NET 11 stable SDK)
 *   **Windows App SDK** component installed inside Visual Studio.
 *   **WebView2 Runtime** (installed by default on modern Windows).
 
