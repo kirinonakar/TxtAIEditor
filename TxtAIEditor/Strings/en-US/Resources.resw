@@ -647,6 +647,9 @@
   <data name="AgentSubagentFollowUpFormat" xml:space="preserve">
     <value>Subagent follow-up started · {0}</value>
   </data>
+  <data name="AgentSubagentWaitInterrupted" xml:space="preserve">
+    <value>Resumed from the subagent wait to handle your new instruction.</value>
+  </data>
   <data name="AgentSubagentWaiting" xml:space="preserve">
     <value>Waiting for subagent results</value>
   </data>

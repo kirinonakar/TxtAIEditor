@@ -647,6 +647,9 @@
   <data name="AgentSubagentFollowUpFormat" xml:space="preserve">
     <value>子代理開始後續工作 · {0}</value>
   </data>
+  <data name="AgentSubagentWaitInterrupted" xml:space="preserve">
+    <value>已收到追加指示，結束等待子代理結果。</value>
+  </data>
   <data name="AgentSubagentWaiting" xml:space="preserve">
     <value>正在等待子代理的結果</value>
   </data>

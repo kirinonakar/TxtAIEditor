@@ -647,6 +647,9 @@
   <data name="AgentSubagentFollowUpFormat" xml:space="preserve">
     <value>서브에이전트 후속 작업 시작 · {0}</value>
   </data>
+  <data name="AgentSubagentWaitInterrupted" xml:space="preserve">
+    <value>추가 지시를 받아 서브에이전트 대기를 해제했습니다.</value>
+  </data>
   <data name="AgentSubagentWaiting" xml:space="preserve">
     <value>서브에이전트 결과를 기다리는 중</value>
   </data>

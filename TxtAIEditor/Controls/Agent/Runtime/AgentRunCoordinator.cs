@@ -458,7 +458,7 @@ namespace TxtAIEditor.Controls
                     {
                         fixedPromptContext += "\n\n" + AgentSubagentCoordinator.BuildWorkerInstructions(runContext.IsPlanResearch);
                     }
-                    string? queuedFollowUpPrompt = TakeQueuedFollowUpPrompt(runContext);
+                    string? queuedFollowUpPrompt = runContext.TakeQueuedFollowUpPrompt();
                     if (!string.IsNullOrWhiteSpace(queuedFollowUpPrompt))
                     {
                         string followUpTurn = _promptContextService.BuildConversationTurn(queuedFollowUpPrompt);
@@ -476,6 +476,7 @@ namespace TxtAIEditor.Controls
                             _promptContextService.BuildInstructionDisplay(queuedFollowUpPrompt));
                         await _runOutputController.AppendRunOutputLineAsync(runContext, followUpHeader);
                     }
+                    Task followUpRequested = runContext.FollowUpRequested;
                     string currentTranscript = _runTranscriptService.BuildWithEditLedger(
                         modelTranscript,
                         currentTaskStartEditIndex,
@@ -789,9 +790,11 @@ namespace TxtAIEditor.Controls
 
                         if (orchestration?.HasUncollectedResults == true)
                         {
-                            string results = await orchestration.CollectOutstandingAsync();
-                            string resultText = "\n\n[Subagent results]\n" + results +
-                                "\nReview these results before completing the user's request.";
+                            string result = await orchestration.CollectNextAsync(followUpRequested);
+                            string resultText = result == AgentSubagentCoordinator.WaitInterruptedResult
+                                ? "\n\n[Subagent wait interrupted]\n" + result
+                                : "\n\n[Subagent result]\n" + result +
+                                    "\nReview this result now. Use report_progress to share useful findings with the user, then decide whether to send a follow-up or wait again.";
                             modelTranscript += resultText;
                             runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(resultText);
                             continue;
@@ -866,6 +869,7 @@ namespace TxtAIEditor.Controls
                     }
                     var toolCallResults = new List<(string Name, JsonElement Args, string Result, string ResultForTranscript, bool Skipped, string NormalizedName)>();
                     bool hasWebSearchCallInBatch = false;
+                    bool waitedForSubagentInBatch = false;
 
                     foreach (var tc in toolCalls)
                     {
@@ -896,13 +900,25 @@ namespace TxtAIEditor.Controls
                         int currentInvocationCount = toolInvocationCounts[toolInvocationKey];
                         string toolResult;
                         string toolResultForTranscript;
+                        bool interruptedSubagentWait = false;
                         retries.Reset(AgentRetryReason.ToolCallFormat);
 
                         if (AgentSubagentCoordinator.IsCoordinationTool(normalizedToolName))
                         {
-                            toolResult = orchestration != null
-                                ? await orchestration.ExecuteAsync(normalizedToolName, currentArguments)
-                                : await ExecuteSubagentProgressAsync(runContext, normalizedToolName, currentArguments);
+                            bool isWait = normalizedToolName == AgentSubagentCoordinator.WaitTool;
+                            if (isWait && waitedForSubagentInBatch)
+                            {
+                                toolResult = "Wait deferred. Review the subagent result already returned in this response before waiting again.";
+                            }
+                            else
+                            {
+                                int outstandingBeforeWait = isWait ? orchestration?.OutstandingResultCount ?? 0 : 0;
+                                toolResult = orchestration != null
+                                    ? await orchestration.ExecuteAsync(normalizedToolName, currentArguments, followUpRequested)
+                                    : await ExecuteSubagentProgressAsync(runContext, normalizedToolName, currentArguments);
+                                waitedForSubagentInBatch |= (orchestration?.OutstandingResultCount ?? 0) < outstandingBeforeWait;
+                                interruptedSubagentWait = isWait && toolResult == AgentSubagentCoordinator.WaitInterruptedResult;
+                            }
                             toolResultForTranscript = toolResult;
                         }
                         else if (isSubagent && !IsAvailableToSubagent(runContext, normalizedToolName))
@@ -910,10 +926,17 @@ namespace TxtAIEditor.Controls
                             toolResult = $"Tool failed: {normalizedToolName} is unavailable for this subagent run.";
                             toolResultForTranscript = toolResult;
                         }
-                        else if (normalizedToolName == "make_plan" && orchestration?.HasUncollectedResults == true)
+                        else if (planningMode && normalizedToolName == "make_plan" && orchestration != null &&
+                            (waitedForSubagentInBatch || orchestration.HasUncollectedResults))
                         {
-                            string results = await orchestration.CollectOutstandingAsync();
-                            toolResult = "make_plan failed: incorporate the collected subagent results and submit the revised plan.\n" + results;
+                            toolResult = "make_plan failed: review the subagent result now and collect any remaining results before submitting the revised plan.";
+                            if (!waitedForSubagentInBatch)
+                            {
+                                string result = await orchestration.CollectNextAsync(followUpRequested);
+                                interruptedSubagentWait = result == AgentSubagentCoordinator.WaitInterruptedResult;
+                                toolResult += "\n" + result;
+                                waitedForSubagentInBatch = true;
+                            }
                             toolResultForTranscript = toolResult;
                         }
                         else if (!planningMode && normalizedToolName == "make_plan")
@@ -970,7 +993,7 @@ namespace TxtAIEditor.Controls
                             }
                         }
 
-                        if (IsSuccessfulToolResult(toolResult))
+                        if (!interruptedSubagentWait && IsSuccessfulToolResult(toolResult))
                         {
                             toolResultForTranscript = $"{toolResult}\n\n[Tool execution status: success.]";
                             if (normalizedToolName == "read_file" && currentInvocationCount >= 4)
@@ -988,9 +1011,9 @@ namespace TxtAIEditor.Controls
                             toolResultForTranscript,
                             toolResult);
 
-                        toolCallResults.Add((currentToolName, currentArguments, toolResult, toolResultForTranscript, false, normalizedToolName));
+                        toolCallResults.Add((currentToolName, currentArguments, toolResult, toolResultForTranscript, interruptedSubagentWait, normalizedToolName));
 
-                        if (stopAfterLoopGuard ||
+                        if (interruptedSubagentWait || stopAfterLoopGuard ||
                             (!IsSuccessfulToolResult(toolResult) && toolCalls.Count == 1))
                         {
                             break;
@@ -1046,6 +1069,11 @@ namespace TxtAIEditor.Controls
                     
                     foreach (var tcRes in toolCallResults)
                     {
+                        if (tcRes.Skipped)
+                        {
+                            continue;
+                        }
+
                         bool toolSucceeded = IsSuccessfulToolResult(tcRes.Result);
                         if (isSubagent && tcRes.NormalizedName == AgentSubagentCoordinator.ReportProgressTool && toolSucceeded)
                         {
@@ -1278,7 +1306,7 @@ namespace TxtAIEditor.Controls
                 await StartApprovedPlanSessionAsync(approvedPlanExecutionPrompt, approvedPlanWorkspaceRoot, useSubagents);
             }
 
-            string? pendingFollowUp = TakeQueuedFollowUpPrompt(runContext);
+            string? pendingFollowUp = runContext.TakeQueuedFollowUpPrompt();
             if (!string.IsNullOrWhiteSpace(pendingFollowUp))
             {
                 await _uiDispatcher.RunAsync(async () =>
@@ -1614,16 +1642,11 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            Interlocked.Exchange(ref context.QueuedFollowUpPrompt, trimmedPrompt);
+            context.QueueFollowUpPrompt(trimmedPrompt);
             string queuedNotice = _getString(
                 "AgentFollowUpQueued",
                 "추가 지시가 대기 중입니다. 다음 도구 호출이 끝나면 전송됩니다.");
             _ = _runOutputController.AppendRunActivityAsync(context, queuedNotice);
-        }
-
-        private static string? TakeQueuedFollowUpPrompt(AgentRunContext context)
-        {
-            return Interlocked.Exchange(ref context.QueuedFollowUpPrompt, null);
         }
 
         public void StopAgent()

@@ -13,6 +13,9 @@ namespace TxtAIEditor.Controls
     {
         public const string ProgressMarker = "[Orchestrator progress] ";
         public const string ReportProgressTool = "report_progress";
+        public const string WaitTool = "wait_subagent";
+        public const string WaitInterruptedResult =
+            "Subagent wait interrupted by new user instructions. Running subagents continue. Consider the new instructions before waiting again.";
 
         public static IReadOnlyList<LlmTool> Tools { get; } = (LlmTool[])
         [
@@ -21,8 +24,8 @@ namespace TxtAIEditor.Controls
             CreateTool("send_subagent_message", "Give a finished subagent another instruction in the same conversation.",
                 new { agentId = Text("ID returned by spawn_subagent"), instruction = Text("Question or follow-up task") }, "agentId", "instruction"),
             CreateTool("subagent_status", "Get the status and latest progress of every subagent without waiting.", new { }),
-            CreateTool("wait_subagent", "Wait for and collect findings, errors, and changed files. Omit agentId to collect all outstanding results.",
-                new { agentId = Text("Optional subagent ID") }),
+            CreateTool(WaitTool, "Collect one subagent result, including findings, errors, and changed files. Omit agentId to return as soon as any outstanding subagent finishes.",
+                new { agentId = Text("Only specify an ID when you need a particular subagent's result") }),
             CreateTool(ReportProgressTool, "Report a concise milestone, finding, or blocker.",
                 new { message = Text("Progress update in the user's language") }, "message")
         ];
@@ -51,7 +54,8 @@ namespace TxtAIEditor.Controls
             _cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         }
 
-        public bool HasUncollectedResults => _workers.Values.Any(worker => !worker.Collected);
+        public int OutstandingResultCount => _workers.Values.Count(worker => !worker.Collected);
+        public bool HasUncollectedResults => OutstandingResultCount > 0;
 
         public static bool IsCoordinationTool(string name) => Tools.Any(tool => tool.Name == name);
 
@@ -60,8 +64,11 @@ namespace TxtAIEditor.Controls
             You own the user's task, integration, verification, and final answer. Delegate tasks that benefit from independent work.
             You may create up to {{_limit}} subagent sessions for this run. Launch independent assignments before waiting so they can run concurrently.
             Give each subagent the needed context, expected result, and a distinct scope. Coordinate changes to shared files and check their results.
-            Use subagent_status to see progress and blockers. Use wait_subagent to collect results and send_subagent_message for questions or follow-up work in the same session.
-            Use report_progress in the user's language when starting a stage, receiving important findings, or encountering a blocker.
+            Use subagent_status to see progress and blockers. Call wait_subagent without an agentId to receive the next finished result. Specify an agentId only for a particular dependency.
+            Review each result as soon as you receive it. Share the useful findings, failures, or next action with the user via report_progress in their language before waiting again.
+            Use send_subagent_message to ask questions or assign follow-up work in the same session. Continue other work or wait for the next result when you are ready.
+            Issue at most one wait_subagent call per response so you can act on each result as it arrives.
+            If the user interrupts a wait with new instructions, address those instructions and reassess outstanding work before waiting again.
             Collect and assess all delegated results before finalizing or submitting a plan. {{(planningMode ? "Delegate investigation and plan review only." : "")}}
             For text tool calls, use the normal tool_call syntax with these names and JSON keys:
             spawn_subagent(title, instruction), send_subagent_message(agentId, instruction), subagent_status(), wait_subagent(optional agentId), report_progress(message).
@@ -75,7 +82,7 @@ namespace TxtAIEditor.Controls
             Avoid unrelated changes and coordinate overlapping work through the orchestrator.
             """ + (planningMode ? "\nThis is plan research. Investigate and report findings without changing files, tabs, or external state." : "");
 
-        public async Task<string> ExecuteAsync(string name, JsonElement arguments)
+        public async Task<string> ExecuteAsync(string name, JsonElement arguments, Task? followUpRequested = null)
         {
             _cancellation.Token.ThrowIfCancellationRequested();
             string id = GetStringArgument(arguments, "agentId").Trim();
@@ -117,13 +124,13 @@ namespace TxtAIEditor.Controls
                         : string.Join("\n", _workers.Values.Select(item =>
                             $"{item.Id} ({item.Title}): {(item.Run.IsCompletedSuccessfully ? item.Run.Result.Status : AgentRunStatus.Running)}. {item.LatestProgress}"));
 
-                case "wait_subagent":
+                case WaitTool:
                     if (id.Length == 0)
                     {
-                        return await CollectOutstandingAsync();
+                        return await CollectNextAsync(followUpRequested);
                     }
                     return _workers.TryGetValue(id, out Worker? requested)
-                        ? await CollectAsync([requested])
+                        ? await CollectAsync([requested], followUpRequested)
                         : "Tool failed: unknown subagent ID.";
 
                 case ReportProgressTool:
@@ -140,29 +147,39 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public Task<string> CollectOutstandingAsync() =>
-            CollectAsync(_workers.Values.Where(worker => !worker.Collected).ToArray());
+        public Task<string> CollectNextAsync(Task? followUpRequested = null) =>
+            CollectAsync(_workers.Values.Where(worker => !worker.Collected).ToArray(), followUpRequested);
 
-        private async Task<string> CollectAsync(Worker[] workers)
+        private async Task<string> CollectAsync(Worker[] workers, Task? followUpRequested)
         {
             if (workers.Length == 0)
             {
                 return "No outstanding subagent results.";
             }
 
-            if (workers.Any(worker => !worker.Run.IsCompleted))
+            if (followUpRequested?.IsCompleted != true && workers.All(worker => !worker.Run.IsCompleted))
             {
                 await PublishAsync(_getString("AgentSubagentWaiting", "서브에이전트 결과를 기다리는 중"));
             }
 
-            WorkerResult[] results = await Task.WhenAll(workers.Select(worker => worker.Run)).WaitAsync(_cancellation.Token);
-            foreach (Worker worker in workers)
+            IEnumerable<Task> pending = workers.Select(worker => (Task)worker.Run);
+            if (followUpRequested != null)
             {
-                worker.Collected = true;
+                pending = pending.Append(followUpRequested);
             }
 
-            return string.Join("\n\n", workers.Zip(results, (worker, result) =>
-                $"{worker.Id} ({worker.Title}) · {result.Status}\n{result.Text}"));
+            Task completed = await Task.WhenAny(pending).WaitAsync(_cancellation.Token);
+            _cancellation.Token.ThrowIfCancellationRequested();
+            if (followUpRequested?.IsCompleted == true)
+            {
+                await PublishAsync(_getString("AgentSubagentWaitInterrupted", "추가 지시를 받아 서브에이전트 대기를 해제했습니다."));
+                return WaitInterruptedResult;
+            }
+
+            Worker worker = workers.First(item => item.Run == completed);
+            WorkerResult result = await worker.Run;
+            worker.Collected = true;
+            return $"{worker.Id} ({worker.Title}) · {result.Status}\n{result.Text}\n\nOutstanding subagent results: {OutstandingResultCount}.";
         }
 
         private void Start(Worker worker, string instruction, string resource, string fallback)

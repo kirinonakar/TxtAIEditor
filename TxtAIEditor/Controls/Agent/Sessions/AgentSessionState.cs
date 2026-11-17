@@ -59,6 +59,10 @@ namespace TxtAIEditor.Controls
 
     internal sealed class AgentRunContext
     {
+        private readonly object _followUpGate = new();
+        private TaskCompletionSource _followUpRequested = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private string? _queuedFollowUpPrompt;
+
         public AgentRunStatus Status { get; set; } = AgentRunStatus.Running;
         public AgentRequestTokenCalibration RequestTokenCalibration { get; } = new();
         public string SessionId { get; set; } = string.Empty;
@@ -109,7 +113,41 @@ namespace TxtAIEditor.Controls
         // Plan file that may be revised in this run (session pending plan at run start).
         public string PendingPlanPath { get; set; } = string.Empty;
         public bool PlanResubmittedForApproval { get; set; }
-        public string? QueuedFollowUpPrompt;
+        public Task FollowUpRequested
+        {
+            get
+            {
+                lock (_followUpGate)
+                {
+                    return _followUpRequested.Task;
+                }
+            }
+        }
+
+        public void QueueFollowUpPrompt(string prompt)
+        {
+            lock (_followUpGate)
+            {
+                _queuedFollowUpPrompt = _queuedFollowUpPrompt == null
+                    ? prompt
+                    : _queuedFollowUpPrompt + Environment.NewLine + Environment.NewLine + prompt;
+                _followUpRequested.TrySetResult();
+            }
+        }
+
+        public string? TakeQueuedFollowUpPrompt()
+        {
+            lock (_followUpGate)
+            {
+                string? prompt = _queuedFollowUpPrompt;
+                if (prompt != null)
+                {
+                    _queuedFollowUpPrompt = null;
+                    _followUpRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+                return prompt;
+            }
+        }
     }
 
     internal sealed class AgentSessionRewindSnapshot

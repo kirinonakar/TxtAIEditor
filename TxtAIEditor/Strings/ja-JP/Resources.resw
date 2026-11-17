@@ -647,6 +647,9 @@
   <data name="AgentSubagentFollowUpFormat" xml:space="preserve">
     <value>サブエージェントが追加作業を開始 · {0}</value>
   </data>
+  <data name="AgentSubagentWaitInterrupted" xml:space="preserve">
+    <value>追加の指示を受けて、サブエージェントの待機を解除しました。</value>
+  </data>
   <data name="AgentSubagentWaiting" xml:space="preserve">
     <value>サブエージェントの結果を待機中</value>
   </data>
