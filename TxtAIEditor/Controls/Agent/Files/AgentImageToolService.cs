@@ -71,6 +71,7 @@ namespace TxtAIEditor.Controls
 
             try
             {
+                _workspace.VerifyResolvedPath(fullPath);
                 LlmMessageAttachment attachment = await CreateImageAttachmentAsync(fullPath, mimeType, original);
                 string relativePath = _workspace.RelativePath(fullPath);
                 string resizedNote = original

@@ -659,6 +659,12 @@
   <data name="AgentSubagentCompletedFormat" xml:space="preserve">
     <value>子代理完成工作 · {0}</value>
   </data>
+  <data name="AgentSubagentShutdownDelayedFormat" xml:space="preserve">
+    <value>子代理关闭延迟 · {0}</value>
+  </data>
+  <data name="AgentSubagentShutdownDelayed" xml:space="preserve">
+    <value>取消后，任务仍在退出。</value>
+  </data>
   <data name="AgentSubagentStoppedFormat" xml:space="preserve">
     <value>子代理停止工作 · {0}</value>
   </data>

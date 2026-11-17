@@ -101,6 +101,7 @@ namespace TxtAIEditor.Controls
             var responseInspector = new AgentResponseInspector();
 
             fileTools.WorkspaceRootOverrideProvider = callbacks.GetActiveRunWorkspaceRoot;
+            fileTools.RunCancellationTokenProvider = () => callbacks.GetActiveRunContext()?.CancellationToken ?? default;
 
             var attachmentController = new AgentAttachmentController(
                 agentPane,

@@ -659,6 +659,12 @@
   <data name="AgentSubagentCompletedFormat" xml:space="preserve">
     <value>서브에이전트 작업 완료 · {0}</value>
   </data>
+  <data name="AgentSubagentShutdownDelayedFormat" xml:space="preserve">
+    <value>서브에이전트 종료 지연 · {0}</value>
+  </data>
+  <data name="AgentSubagentShutdownDelayed" xml:space="preserve">
+    <value>종료 요청 후에도 작업이 정리 중입니다.</value>
+  </data>
   <data name="AgentSubagentStoppedFormat" xml:space="preserve">
     <value>서브에이전트 작업 중단 · {0}</value>
   </data>

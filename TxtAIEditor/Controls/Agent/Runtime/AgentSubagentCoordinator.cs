@@ -21,7 +21,13 @@ namespace TxtAIEditor.Controls
         private const int ResultPageLength = 1600;
         private const int MaxEventBatchLength = 4800;
         private const int MaxEventsPerBatch = 8;
+        private const int MaxPendingReports = 32;
+        private const int MaxPendingReportChars = 16000;
+        private const int MaxArchivedReports = 512;
+        private const int MaxArchivedReportChars = 256000;
         private static readonly TimeSpan ProgressBatchInterval = TimeSpan.FromMilliseconds(350);
+        private readonly TimeSpan _stopTimeout;
+        private Task? _shutdown;
         public const string WaitInterruptedResult =
             "Subagent wait interrupted by new user instructions. Running subagents continue. Consider the new instructions before waiting again.";
 
@@ -46,6 +52,8 @@ namespace TxtAIEditor.Controls
                     offset = new { type = "integer", minimum = 0, description = "Start offset. Use nextOffset to continue." },
                     limit = new { type = "integer", minimum = 2, maximum = ResultPageLength }
                 }, "resultId"),
+            CreateTool("list_subagent_reports", "List archived finding and blocker IDs from this run, including reports omitted from automatic delivery.",
+                new { offset = new { type = "integer", minimum = 0 }, agentId = Text("Optional subagent ID") }),
             CreateTool(ReportProgressTool, "Report progress or flag a finding or blocker that needs the orchestrator.",
                 new
                 {
@@ -57,29 +65,37 @@ namespace TxtAIEditor.Controls
         public static LlmTool ProgressTool => Tools[^1];
 
         private readonly int _limit;
-        private readonly Func<string, string, string, AgentFollowUpQueue, Func<string, string, Task>, CancellationToken, Task<AgentRunContext>> _run;
+        private readonly Func<string, string, string, AgentFollowUpQueue, Func<string, string, Task<string>>, CancellationToken, Task<AgentRunContext>> _run;
         private readonly Func<string, Task> _publishProgress;
         private readonly Func<string, string, string> _getString;
         private readonly CancellationTokenSource _cancellation;
         private readonly Dictionary<string, Worker> _workers = new(StringComparer.Ordinal);
         private readonly List<WorkerTurn> _turns = new();
         private readonly ConcurrentQueue<string> _progressLog = new();
-        private readonly Queue<WorkerEvent> _events = new();
+        private readonly object _eventGate = new();
+        private readonly List<WorkerReport> _pendingReports = new();
+        private readonly Dictionary<string, WorkerReport> _reports = new(StringComparer.Ordinal);
+        private readonly HashSet<(string AgentId, string Kind, string Message)> _reportKeys = new();
+        private int _pendingReportChars;
+        private int _archivedReportChars;
+        private int _overflowReportCount;
         private TaskCompletionSource _eventAvailable = NewSignal();
         private TaskCompletionSource _completionAvailable = NewSignal();
 
         public AgentSubagentCoordinator(
             int limit,
-            Func<string, string, string, AgentFollowUpQueue, Func<string, string, Task>, CancellationToken, Task<AgentRunContext>> run,
+            Func<string, string, string, AgentFollowUpQueue, Func<string, string, Task<string>>, CancellationToken, Task<AgentRunContext>> run,
             Func<string, Task> publishProgress,
             Func<string, string, string> getString,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            TimeSpan? stopTimeout = null)
         {
             _limit = limit;
             _run = run;
             _publishProgress = publishProgress;
             _getString = getString;
             _cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _stopTimeout = stopTimeout ?? TimeSpan.FromSeconds(10);
         }
 
         public bool HasUncollectedResults => _turns.Any(turn => !turn.Delivered);
@@ -87,9 +103,9 @@ namespace TxtAIEditor.Controls
         {
             get
             {
-                lock (_events)
+                lock (_eventGate)
                 {
-                    return HasUncollectedResults || _events.Any(IsPendingEvent);
+                    return HasUncollectedResults || HasPendingReports;
                 }
             }
         }
@@ -102,11 +118,12 @@ namespace TxtAIEditor.Controls
             Give each subagent the needed context, expected result, and a distinct scope. Coordinate changes to shared files and check their results.
             Subagent findings, failures, and completed results arrive as [Subagent events] in your conversation. Act on them and continue any work that is ready.
             Use read_subagent_result with the result ID when you need details beyond the completion preview.
+            Use list_subagent_reports to find archived findings or blockers that could not be delivered automatically.
             Use send_subagent_message to steer a running subagent or assign a follow-up. Use cancel_subagent to stop one subagent and subagent_status to inspect current work.
             If no work is ready, return a brief answer and the runtime will wait asynchronously for the next event. Use wait_subagent only when you specifically need a completion, optionally with a timeout.
             Consider new user instructions if they interrupt a wait. Review the delegated results before finalizing or submitting a plan. {{(planningMode ? "Delegate investigation and plan review only." : "")}}
             For text tool calls, use the normal tool_call syntax with these names and JSON keys:
-            spawn_subagent(title, instruction), send_subagent_message(agentId, instruction), cancel_subagent(agentId), subagent_status(), wait_subagent(optional agentId, optional timeoutSeconds), read_subagent_result(resultId, optional offset, optional limit), report_progress(message).
+            spawn_subagent(title, instruction), send_subagent_message(agentId, instruction), cancel_subagent(agentId), subagent_status(), wait_subagent(optional agentId, optional timeoutSeconds), read_subagent_result(resultId, optional offset, optional limit), list_subagent_reports(optional agentId, optional offset), report_progress(message).
             """;
 
         public static string BuildWorkerInstructions(bool planningMode) => """
@@ -150,8 +167,10 @@ namespace TxtAIEditor.Controls
                         return $"Queued a message for subagent {recipient.Id} ({recipient.Title}).";
                     }
 
-                    Start(recipient, instruction);
-                    return $"Scheduled a follow-up for subagent {recipient.Id} ({recipient.Title}).";
+                    WorkerTurn followUp = Start(recipient, instruction);
+                    return followUp.WaitingForPreviousTurn
+                        ? $"Subagent {recipient.Id} ({recipient.Title}) is WaitingForPreviousTurn. The follow-up will fail if the previous turn does not exit in {_stopTimeout.TotalSeconds:g} seconds."
+                        : $"Scheduled a follow-up for subagent {recipient.Id} ({recipient.Title}).";
 
                 case "cancel_subagent":
                     if (!_workers.TryGetValue(id, out Worker? target))
@@ -162,7 +181,7 @@ namespace TxtAIEditor.Controls
                     WorkerTurn[] active = _turns.Where(turn => turn.Worker == target && !turn.Run.IsCompleted).ToArray();
                     foreach (WorkerTurn turn in active)
                     {
-                        await CancelBestEffortAsync(turn.Cancellation);
+                        RequestCancellation(turn);
                     }
                     return active.Length == 0 ? $"Subagent {id} has already finished." : $"Cancellation requested for subagent {id}.";
 
@@ -174,7 +193,12 @@ namespace TxtAIEditor.Controls
                             WorkerTurn turn = item.Turn!;
                             WorkerResult? result = turn.Result;
                             string status = result?.Status.ToString() ??
-                                (turn.Cancellation.IsCancellationRequested ? "Cancelling" : "Running");
+                                (turn.Cancellation.IsCancellationRequested ? "Cancelling" :
+                                    turn.WaitingForPreviousTurn ? "WaitingForPreviousTurn" : "Running");
+                            if (result != null && _turns.Any(previous => previous.Worker == item && previous != turn && !previous.Run.IsCompleted))
+                            {
+                                status += " (previous turn still exiting)";
+                            }
                             string resultReference = result != null ? $" Result ID: {turn.ResultId}." : string.Empty;
                             return $"{item.Id} ({item.Title}): {status}.{resultReference}";
                         }));
@@ -198,6 +222,9 @@ namespace TxtAIEditor.Controls
                 case "read_subagent_result":
                     return ReadResult(arguments);
 
+                case "list_subagent_reports":
+                    return ListReports(arguments);
+
                 case ReportProgressTool:
                     string message = GetStringArgument(arguments, "message").Trim();
                     if (message.Length == 0)
@@ -215,9 +242,9 @@ namespace TxtAIEditor.Controls
         public async Task WaitForEventAsync(Task followUpRequested)
         {
             Task? signal = null;
-            lock (_events)
+            lock (_eventGate)
             {
-                if (!_events.Any(IsPendingEvent))
+                if (!HasPendingReports && !HasReadyCompletion)
                 {
                     if (!HasUncollectedResults)
                     {
@@ -240,9 +267,9 @@ namespace TxtAIEditor.Controls
             if (!followUpRequested.IsCompleted)
             {
                 Task? completion = null;
-                lock (_events)
+                lock (_eventGate)
                 {
-                    if (!_events.Any(item => item.IsCompletion && IsPendingEvent(item)))
+                    if (!HasReadyCompletion)
                     {
                         if (_completionAvailable.Task.IsCompleted)
                         {
@@ -269,35 +296,47 @@ namespace TxtAIEditor.Controls
             const string header = "\n\n[Subagent events]\n";
             int length = header.Length;
             var messages = new List<string>();
-            lock (_events)
+            bool Add(string text)
             {
-                while (messages.Count < MaxEventsPerBatch && _events.TryPeek(out WorkerEvent? item))
+                string indented = "  " + text.ReplaceLineEndings("\n").Replace("\n", "\n  ", StringComparison.Ordinal);
+                int nextLength = length + indented.Length + (messages.Count == 0 ? 0 : 2);
+                if (nextLength > MaxEventBatchLength || messages.Count >= MaxEventsPerBatch)
                 {
-                    if (!IsPendingEvent(item))
-                    {
-                        _events.Dequeue();
-                        continue;
-                    }
-                    string text = "  " + item.Text.ReplaceLineEndings("\n").Replace("\n", "\n  ", StringComparison.Ordinal);
-                    int nextLength = length + text.Length + (messages.Count == 0 ? 0 : 2);
-                    if (nextLength > MaxEventBatchLength)
-                    {
-                        break;
-                    }
-                    _events.Dequeue();
-                    if (item.IsCompletion)
-                    {
-                        item.Turn.Delivered = true;
-                    }
-                    messages.Add(text);
-                    length = nextLength;
+                    return false;
+                }
+                messages.Add(indented);
+                length = nextLength;
+                return true;
+            }
+
+            lock (_eventGate)
+            {
+                foreach (WorkerTurn turn in _turns.Where(turn => !turn.Delivered && turn.Result != null)
+                    .OrderByDescending(turn => turn.Result!.Status == AgentRunStatus.Failed))
+                {
+                    if (!Add(FormatResultPreview(turn, turn.Result!))) break;
+                    turn.Delivered = true;
+                }
+
+                foreach (WorkerReport report in _pendingReports.OrderByDescending(report => report.Kind == "blocker").ToArray())
+                {
+                    if (!Add(FormatReportPreview(report))) break;
+                    _pendingReports.Remove(report);
+                    _pendingReportChars -= report.Message.Length;
+                }
+
+                if (_overflowReportCount > 0 &&
+                    Add($"{_overflowReportCount} additional reports were archived. Use list_subagent_reports to find them."))
+                {
+                    _overflowReportCount = 0;
                 }
             }
 
             return messages.Count == 0 ? string.Empty : header + string.Join("\n\n", messages);
         }
 
-        private static bool IsPendingEvent(WorkerEvent item) => !item.IsCompletion || !item.Turn.Delivered;
+        private bool HasPendingReports => _pendingReports.Count > 0 || _overflowReportCount > 0;
+        private bool HasReadyCompletion => _turns.Any(turn => !turn.Delivered && turn.Result != null);
 
         private async Task<string> CollectAsync(string id, TimeSpan timeout, Task followUpRequested)
         {
@@ -338,45 +377,59 @@ namespace TxtAIEditor.Controls
             return FormatResultPreview(turn, result);
         }
 
-        private void Start(Worker worker, string instruction)
+        private WorkerTurn Start(Worker worker, string instruction)
         {
-            WorkerTurn? previous = worker.Turn;
-            var turn = new WorkerTurn(worker, CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token));
+            bool followUp = worker.Turn != null;
+            Task[] pending = _turns.Where(turn => turn.Worker == worker && !turn.Run.IsCompleted).Select(turn => (Task)turn.Run).ToArray();
+            var turn = new WorkerTurn(worker, CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token))
+            {
+                WaitingForPreviousTurn = pending.Length > 0
+            };
             worker.Turn = turn;
             _turns.Add(turn);
-            turn.Run = RunWorkerAsync(turn, previous?.Run, instruction);
+            turn.Run = RunWorkerAsync(turn, pending, followUp, instruction);
+            return turn;
         }
 
-        private async Task<WorkerResult> RunWorkerAsync(WorkerTurn turn, Task<WorkerResult>? previous, string instruction)
+        private async Task<WorkerResult> RunWorkerAsync(WorkerTurn turn, Task[] pending, bool followUp, string instruction)
         {
             await Task.Yield();
             WorkerResult result;
             try
             {
-                if (previous != null)
+                if (pending.Length > 0)
                 {
-                    await previous.WaitAsync(turn.Cancellation.Token);
+                    try
+                    {
+                        await Task.WhenAll(pending).WaitAsync(_stopTimeout, turn.Cancellation.Token);
+                    }
+                    catch (TimeoutException ex)
+                    {
+                        throw new InvalidOperationException(
+                            "The follow-up did not start because a previous turn is still exiting. Use a new subagent session for independent work.", ex);
+                    }
                 }
+                turn.WaitingForPreviousTurn = false;
                 turn.Cancellation.Token.ThrowIfCancellationRequested();
-                PublishResource(previous == null ? "AgentSubagentStartedFormat" : "AgentSubagentFollowUpFormat",
-                    previous == null ? "서브에이전트 작업 시작 · {0}" : "서브에이전트 후속 작업 시작 · {0}", turn.Worker.Title);
+                PublishResource(followUp ? "AgentSubagentFollowUpFormat" : "AgentSubagentStartedFormat",
+                    followUp ? "서브에이전트 후속 작업 시작 · {0}" : "서브에이전트 작업 시작 · {0}", turn.Worker.Title);
 
                 AgentRunContext context = await _run(turn.Worker.Id, turn.Worker.Title, instruction, turn.Inbox, (message, kind) =>
                 {
-                    if (kind is "finding" or "blocker")
-                    {
-                        string preview = TakeText(message, 0, ProgressPreviewLength);
-                        EnqueueEvent(new WorkerEvent(turn, $"{Describe(turn)} · {kind}\n{preview}", IsCompletion: false));
-                    }
-                    PublishResource("AgentSubagentProgressFormat", "{0} · {1}", turn.Worker.Title, message);
-                    return Task.CompletedTask;
+                    turn.Cancellation.Token.ThrowIfCancellationRequested();
+                    string outcome = kind is "finding" or "blocker"
+                        ? ArchiveReport(turn, kind, message)
+                        : "Progress recorded in the UI.";
+                    PublishResource("AgentSubagentProgressFormat", "{0} · {1}", turn.Worker.Title, TakeText(message, 0, 4000));
+                    return Task.FromResult(outcome);
                 }, turn.Cancellation.Token);
 
                 string[] editedPaths = context.SessionEdits.Skip(context.InitialEditCount)
                     .Select(edit => edit.RelativePath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
                 string changes = editedPaths.Length > 0 ? "Changed files: " + string.Join(", ", editedPaths) + "\n\n" : string.Empty;
                 string answer = context.Status == AgentRunStatus.Failed ? context.FailureReason : context.LastAnswerText;
-                result = new WorkerResult(context.Status, changes + answer);
+                AgentRunStatus statusAfterRun = turn.Cancellation.IsCancellationRequested ? AgentRunStatus.Stopped : context.Status;
+                result = new WorkerResult(statusAfterRun, changes + answer);
             }
             catch (OperationCanceledException) when (turn.Cancellation.IsCancellationRequested)
             {
@@ -391,8 +444,12 @@ namespace TxtAIEditor.Controls
             {
                 result = result with { Text = result.Text + "\nFollow-up messages pending when this assignment ended:\n" + undelivered };
             }
-            turn.Result = result;
-            EnqueueEvent(new WorkerEvent(turn, FormatResultPreview(turn, result), IsCompletion: true));
+            lock (_eventGate)
+            {
+                turn.Result = result;
+                _eventAvailable.TrySetResult();
+                _completionAvailable.TrySetResult();
+            }
 
             (string resource, string fallback) = result.Status switch
             {
@@ -404,16 +461,69 @@ namespace TxtAIEditor.Controls
             return result;
         }
 
-        private void EnqueueEvent(WorkerEvent item)
+        private string ArchiveReport(WorkerTurn turn, string kind, string message)
         {
-            lock (_events)
+            lock (_eventGate)
             {
-                _events.Enqueue(item);
-                _eventAvailable.TrySetResult();
-                if (item.IsCompletion)
+                var key = (turn.Worker.Id, kind, message);
+                if (_reportKeys.Contains(key))
                 {
-                    _completionAvailable.TrySetResult();
+                    return "Duplicate report already recorded.";
                 }
+                if (message.Length > 4000 || _reports.Count >= MaxArchivedReports ||
+                    message.Length > MaxArchivedReportChars - _archivedReportChars)
+                {
+                    return "Tool failed: the report exceeds the archive limit. Include the finding in your final answer.";
+                }
+
+                var report = new WorkerReport(Guid.NewGuid().ToString("N"), turn, kind, message);
+                _reports.Add(report.Id, report);
+                _reportKeys.Add(key);
+                _archivedReportChars += message.Length;
+                bool CanQueue() => _pendingReports.Count < MaxPendingReports &&
+                    message.Length <= MaxPendingReportChars - _pendingReportChars;
+                if (kind == "blocker")
+                {
+                    while (!CanQueue() && _pendingReports.FirstOrDefault(item => item.Kind == "finding") is { } finding)
+                    {
+                        _pendingReports.Remove(finding);
+                        _pendingReportChars -= finding.Message.Length;
+                        _overflowReportCount++;
+                    }
+                }
+                bool queued = CanQueue();
+                if (queued)
+                {
+                    _pendingReports.Add(report);
+                    _pendingReportChars += message.Length;
+                }
+                else
+                {
+                    _overflowReportCount++;
+                }
+                _eventAvailable.TrySetResult();
+                return queued ? "Update queued for the orchestrator." : "Update archived for the orchestrator.";
+            }
+        }
+
+        private static string FormatReportPreview(WorkerReport report) =>
+            $"{Describe(report.Turn)} · {report.Kind} (resultId {report.Id})\n{TakeText(report.Message, 0, ProgressPreviewLength)}";
+
+        private string ListReports(JsonElement arguments)
+        {
+            string agentId = GetStringArgument(arguments, "agentId").Trim();
+            lock (_eventGate)
+            {
+                WorkerReport[] reports = _reports.Values.Where(report => agentId.Length == 0 || report.Turn.Worker.Id == agentId).ToArray();
+                if (!ReadPageInteger(arguments, "offset", 0, 0, reports.Length, out int offset))
+                {
+                    return "Tool failed: invalid report offset.";
+                }
+                WorkerReport[] page = reports.Skip(offset).Take(MaxEventsPerBatch).ToArray();
+                int end = offset + page.Length;
+                string next = end < reports.Length ? $"\nnextOffset={end}" : "\nend of reports";
+                return string.Join("\n", page.Select(report => $"{report.Id} · {Describe(report.Turn)} · {report.Kind}: " +
+                    FormatProgressLine(TakeText(report.Message, 0, 120)))) + next;
             }
         }
 
@@ -430,25 +540,29 @@ namespace TxtAIEditor.Controls
         private string ReadResult(JsonElement arguments)
         {
             string id = GetStringArgument(arguments, "resultId").Trim();
-            WorkerResult? result = _turns.FirstOrDefault(turn => turn.ResultId == id)?.Result;
-            if (result == null)
+            string? text;
+            lock (_eventGate)
             {
-                return "Tool failed: unknown completed subagent result ID.";
+                text = _reports.GetValueOrDefault(id)?.Message ?? _turns.FirstOrDefault(turn => turn.ResultId == id)?.Result?.Text;
             }
-            if (!ReadPageInteger(arguments, "offset", 0, 0, result.Text.Length, out int offset) ||
+            if (text == null)
+            {
+                return "Tool failed: unknown subagent result or report ID.";
+            }
+            if (!ReadPageInteger(arguments, "offset", 0, 0, text.Length, out int offset) ||
                 !ReadPageInteger(arguments, "limit", ResultPageLength, 2, ResultPageLength, out int limit))
             {
-                return $"Tool failed: offset must be between 0 and {result.Text.Length}; limit must be between 2 and {ResultPageLength}.";
+                return $"Tool failed: offset must be between 0 and {text.Length}; limit must be between 2 and {ResultPageLength}.";
             }
-            if (offset > 0 && offset < result.Text.Length && char.IsLowSurrogate(result.Text[offset]) &&
-                char.IsHighSurrogate(result.Text[offset - 1]))
+            if (offset > 0 && offset < text.Length && char.IsLowSurrogate(text[offset]) &&
+                char.IsHighSurrogate(text[offset - 1]))
             {
                 offset--;
             }
 
-            string page = TakeText(result.Text, offset, limit);
+            string page = TakeText(text, offset, limit);
             int end = offset + page.Length;
-            string next = end < result.Text.Length ? $"nextOffset={end}" : "end of result";
+            string next = end < text.Length ? $"nextOffset={end}" : "end of result";
             return $"Subagent result {id}, offset={offset}, {next}\n" + page;
         }
 
@@ -514,11 +628,35 @@ namespace TxtAIEditor.Controls
                 Environment.NewLine + string.Join(Environment.NewLine, messages) + Environment.NewLine;
         }
 
-        public async Task StopAsync()
+        public async Task<string[]> StopAsync()
         {
-            await CancelBestEffortAsync(_cancellation);
-            await Task.WhenAll(_turns.Select(turn => turn.Run));
+            if (_shutdown == null)
+            {
+                foreach (WorkerTurn turn in _turns.Where(turn => !turn.Run.IsCompleted))
+                {
+                    RequestCancellation(turn);
+                }
+                _shutdown = Task.WhenAll(_turns.SelectMany(turn => new Task[] { turn.Run, turn.CancelTask ?? Task.CompletedTask })
+                    .Append(CancelBestEffortAsync(_cancellation)));
+            }
+            try
+            {
+                await _shutdown.WaitAsync(_stopTimeout);
+                return [];
+            }
+            catch (TimeoutException)
+            {
+                var delayed = _turns.Where(turn => !turn.Run.IsCompleted).Select(turn => turn.Worker).Distinct().ToArray();
+                foreach (Worker worker in delayed)
+                {
+                    PublishResource("AgentSubagentShutdownDelayedFormat", "서브에이전트 종료 지연 · {0}", worker.Title);
+                }
+                return delayed.Select(worker => worker.Id).ToArray();
+            }
         }
+
+        private static void RequestCancellation(WorkerTurn turn) =>
+            turn.CancelTask ??= CancelBestEffortAsync(turn.Cancellation);
 
         private static async Task CancelBestEffortAsync(CancellationTokenSource cancellation)
         {
@@ -534,6 +672,23 @@ namespace TxtAIEditor.Controls
 
         public void Dispose()
         {
+            if (_shutdown is { IsCompleted: false })
+            {
+                _ = DisposeAfterShutdownAsync(_shutdown);
+                return;
+            }
+            DisposeCancellation();
+        }
+
+        private async Task DisposeAfterShutdownAsync(Task shutdown)
+        {
+            try { await shutdown; }
+            catch (Exception ex) { Debug.WriteLine(ex); }
+            finally { DisposeCancellation(); }
+        }
+
+        private void DisposeCancellation()
+        {
             foreach (WorkerTurn turn in _turns)
             {
                 turn.Cancellation.Dispose();
@@ -547,7 +702,7 @@ namespace TxtAIEditor.Controls
             new() { Name = name, Description = description, Parameters = new { type = "object", properties, required } };
 
         private sealed record WorkerResult(AgentRunStatus Status, string Text);
-        private sealed record WorkerEvent(WorkerTurn Turn, string Text, bool IsCompletion);
+        private sealed record WorkerReport(string Id, WorkerTurn Turn, string Kind, string Message);
 
         private sealed class Worker(string id, string title)
         {
@@ -563,6 +718,8 @@ namespace TxtAIEditor.Controls
             public AgentFollowUpQueue Inbox { get; } = new();
             public string ResultId { get; } = Guid.NewGuid().ToString("N");
             public volatile WorkerResult? Result;
+            public volatile bool WaitingForPreviousTurn;
+            public Task? CancelTask { get; set; }
             public bool Delivered { get; set; }
             public Task<WorkerResult> Run { get; set; } = null!;
         }

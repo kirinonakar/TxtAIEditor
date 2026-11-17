@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Controls
@@ -19,12 +20,12 @@ namespace TxtAIEditor.Controls
         internal const int MaximumProcessTimeoutMs = 300000;
 
         private readonly AgentWorkspaceFileResolver _workspace;
-        private readonly Func<string, int, Task<string>> _searchTextFallbackAsync;
+        private readonly Func<string, int, CancellationToken, Task<string>> _searchTextFallbackAsync;
         private readonly Func<string, Task<bool>> _confirmPowerShellAsync;
 
         public AgentProcessToolService(
             AgentWorkspaceFileResolver workspace,
-            Func<string, int, Task<string>> searchTextFallbackAsync,
+            Func<string, int, CancellationToken, Task<string>> searchTextFallbackAsync,
             Func<string, Task<bool>> confirmPowerShellAsync)
         {
             _workspace = workspace;
@@ -55,7 +56,7 @@ namespace TxtAIEditor.Controls
                 string query = ExtractQueryFromRgArguments(arguments);
                 if (!string.IsNullOrWhiteSpace(query))
                 {
-                    string fallbackResult = await _searchTextFallbackAsync(query, 80);
+                    string fallbackResult = await _searchTextFallbackAsync(query, 80, cancellationToken);
                     return $"[run_rg unavailable: fell back to search_text for query \"{query}\"]\n{fallbackResult}";
                 }
             }
@@ -92,7 +93,6 @@ namespace TxtAIEditor.Controls
             try
             {
                 plan = RgCommandPlan.Parse(arguments, true, includeNotebooks, includeArchives);
-                plan.ValidateExplicitPaths(workspaceRoot);
             }
             catch (ArgumentException ex) { return "run_rga failed: " + ex.Message; }
             string result = await RunProcessAsync(resolvedRga, string.Empty, workspaceRoot, effectiveTimeoutMs,
@@ -153,6 +153,17 @@ namespace TxtAIEditor.Controls
 
         [DllImport("kernel32.dll")]
         private static extern uint GetACP();
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+        private static extern SafeFileHandle CreateJobObjectW(IntPtr attributes, string? name);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool AssignProcessToJobObject(SafeFileHandle job, SafeProcessHandle process);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool TerminateJobObject(SafeFileHandle job, uint exitCode);
 
         private static Encoding GetSystemAnsiEncoding()
         {
@@ -283,7 +294,13 @@ namespace TxtAIEditor.Controls
             return decoded;
         }
 
-        private static async Task<string> RunProcessAsync(
+        private static async Task ObserveProcessCompletionAsync(Task completion)
+        {
+            try { await completion; }
+            catch (Exception ex) { Debug.WriteLine(ex); }
+        }
+
+        private async Task<string> RunProcessAsync(
             string fileName,
             string arguments,
             string workingDirectory,
@@ -295,6 +312,7 @@ namespace TxtAIEditor.Controls
             RgCommandPlan? rgPlan = null)
         {
             using var process = new Process();
+            using SafeFileHandle job = CreateJobObjectW(IntPtr.Zero, null);
             var encoding = outputEncoding ?? Encoding.UTF8;
             var startInfo = new ProcessStartInfo
             {
@@ -326,6 +344,8 @@ namespace TxtAIEditor.Controls
 
             process.StartInfo = startInfo;
 
+            AgentWorkspaceFileResolver.VerifyPinnedWorkspace(workingDirectory);
+            rgPlan?.ValidateExplicitPaths(workingDirectory, path => _workspace.ResolveInsideWorkspace(path));
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -338,6 +358,12 @@ namespace TxtAIEditor.Controls
             catch (Exception ex)
             {
                 return $"{fileName} failed to start: {ex.Message}";
+            }
+            bool jobAttached = false;
+            if (!job.IsInvalid)
+            {
+                try { jobAttached = AssignProcessToJobObject(job, process.SafeHandle); }
+                catch (InvalidOperationException) { /* A short-lived command may already have exited. */ }
             }
 
             using var captureCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -355,17 +381,24 @@ namespace TxtAIEditor.Controls
             {
                 try
                 {
-                    if (!process.HasExited)
+                    // The job can still terminate descendants after the launcher exits.
+                    if ((!jobAttached || !TerminateJobObject(job, 1)) && !process.HasExited)
                     {
                         process.Kill(entireProcessTree: true);
                     }
                 }
-                catch
+                catch (Exception killError)
                 {
+                    Debug.WriteLine(killError);
                 }
 
                 captureCancellation.Cancel();
-                try { await completion; } catch { /* Observe pipe/exit cancellation. */ }
+                process.StandardOutput.Dispose();
+                process.StandardError.Dispose();
+                Task shutdown = Task.WhenAll(process.WaitForExitAsync(), ObserveProcessCompletionAsync(completion));
+                try { await shutdown.WaitAsync(TimeSpan.FromSeconds(2)); }
+                catch (TimeoutException) { _ = ObserveProcessCompletionAsync(shutdown); }
+                catch (Exception shutdownError) { Debug.WriteLine(shutdownError); }
                 cancellationToken.ThrowIfCancellationRequested();
                 return $"{fileName} timed out after {Math.Clamp(timeoutMs, MinimumProcessTimeoutMs, MaximumProcessTimeoutMs)}ms.";
             }

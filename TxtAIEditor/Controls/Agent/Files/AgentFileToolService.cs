@@ -136,16 +136,18 @@ namespace TxtAIEditor.Controls
                 _workspace,
                 _getString,
                 NotifyFileModifiedAsync,
-                () => ActivityReporter);
+                () => ActivityReporter,
+                () => RunCancellationTokenProvider?.Invoke() ?? default);
             _processes = new AgentProcessToolService(
                 _workspace,
-                (query, maxResults) => _workspaceFiles.SearchTextAsync(query, null, maxResults),
+                (query, maxResults, token) => _workspaceFiles.SearchTextAsync(query, null, maxResults, token),
                 ConfirmPowerShellCommandAsync);
             _edits = new AgentFileEditToolService(
                 _workspace,
                 ConfirmEditAsync,
                 NotifyFileModifiedAsync,
-                NotifyFileEditCommittedAsync);
+                NotifyFileEditCommittedAsync,
+                () => RunCancellationTokenProvider?.Invoke() ?? default);
         }
 
         public Func<AgentFileEditPreview, Task<bool>>? ConfirmFileEditAsync { get; set; }
@@ -155,8 +157,12 @@ namespace TxtAIEditor.Controls
         public Func<string, string?>? FileDisplayPathProvider { get; set; }
         public Action<string>? ActivityReporter { get; set; }
         public Func<string?>? WorkspaceRootOverrideProvider { get; set; }
+        internal Func<CancellationToken>? RunCancellationTokenProvider { get; set; }
 
         public string WorkspaceRoot => _workspace.WorkspaceRoot;
+        internal string ResolveToolPath(string path, bool allowOutside = false) => _workspace.ResolveInsideWorkspace(path, allowOutside);
+        internal void VerifyToolPath(string fullPath) => _workspace.VerifyResolvedPath(fullPath);
+        internal void VerifyWorkspaceWritePath(string fullPath) => _workspace.VerifyWritablePath(fullPath, allowSkills: false);
 
         public string GetDisplayPath(string fullPath, string fallbackPath)
         {
@@ -168,18 +174,8 @@ namespace TxtAIEditor.Controls
 
         private string ResolveWorkspaceRoot()
         {
-            if (_backgroundWorkspaceRoot.Value is string capturedRoot)
-            {
-                return capturedRoot;
-            }
-
             string? overrideRoot = WorkspaceRootOverrideProvider?.Invoke();
-            if (!string.IsNullOrWhiteSpace(overrideRoot) && Directory.Exists(overrideRoot))
-            {
-                return overrideRoot;
-            }
-
-            return _workspaceRootProvider();
+            return overrideRoot ?? _backgroundWorkspaceRoot.Value ?? _workspaceRootProvider();
         }
 
         private Task<T> RunInBackgroundAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken = default)

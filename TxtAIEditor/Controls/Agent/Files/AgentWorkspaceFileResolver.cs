@@ -23,32 +23,40 @@ namespace TxtAIEditor.Controls
 
         public string WorkspaceRoot => ResolveWorkspaceRoot();
 
-        public string ResolveWorkspaceRoot()
+        public string ResolveWorkspaceRoot() => ResolveWorkspaceDirectory(_workspaceRootProvider());
+
+        internal static string ResolveWorkspaceDirectory(string root)
         {
-            string root = _workspaceRootProvider();
-            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+            if (string.IsNullOrWhiteSpace(root))
             {
                 root = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             }
 
-            string fullPath = Path.GetFullPath(root);
-            try
+            string fullPath = ResolvePhysicalPath(Path.GetFullPath(root));
+            if (!Directory.Exists(fullPath))
             {
-                var dirInfo = new DirectoryInfo(fullPath);
-                if (dirInfo.Exists)
-                {
-                    var target = dirInfo.ResolveLinkTarget(returnFinalTarget: true);
-                    if (target != null)
-                    {
-                        fullPath = target.FullName;
-                    }
-                }
+                throw new DirectoryNotFoundException($"Workspace directory is unavailable: {root}");
             }
-            catch
-            {
-            }
+            return Path.TrimEndingDirectorySeparator(fullPath);
+        }
 
-            return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        internal static void VerifyPinnedWorkspace(string root, string? expectedPhysicalRoot = null)
+        {
+            string expected = expectedPhysicalRoot ?? root;
+            if (string.Equals(root, expected, StringComparison.Ordinal))
+            {
+                VerifyPhysicalPath(root);
+                if (!Directory.Exists(root))
+                {
+                    throw new DirectoryNotFoundException($"Workspace directory is unavailable: {root}");
+                }
+                return;
+            }
+            string current = ResolveWorkspaceDirectory(root);
+            if (!SamePhysicalPath(expected, current))
+            {
+                throw new IOException($"Workspace directory changed during the run: {root}");
+            }
         }
 
         public string ResolveInsideWorkspace(string path, bool allowOutside = false)
@@ -58,46 +66,143 @@ namespace TxtAIEditor.Controls
                 throw new InvalidOperationException("Path is empty.");
             }
 
-            string root = ResolveWorkspaceRoot();
-            string candidate = Path.IsPathRooted(path)
-                ? Path.GetFullPath(path)
-                : Path.GetFullPath(Path.Combine(root, path));
+            string configuredRoot = _workspaceRootProvider();
+            string root = ResolveWorkspaceDirectory(configuredRoot);
+            if (Path.IsPathRooted(path) && !Path.IsPathFullyQualified(path))
+            {
+                throw new InvalidOperationException($"Use a workspace-relative or fully qualified path: {path}");
+            }
+            string candidate = Path.GetFullPath(path, root);
 
             if (IsInsideRoot(root, candidate))
             {
-                return candidate;
+                RequirePhysicalContainment(root, candidate);
+                return ResolvePhysicalPath(candidate, confinedTo: root);
             }
-
+            if (!string.IsNullOrWhiteSpace(configuredRoot) && IsInsideRoot(configuredRoot, candidate))
+            {
+                RequirePhysicalContainment(configuredRoot, candidate);
+                return ResolvePhysicalPath(Path.GetFullPath(Path.GetRelativePath(configuredRoot, candidate), root), confinedTo: root);
+            }
             if (AgentSkillDirectories.IsInsideUserSkillsDirectory(candidate))
             {
-                return candidate;
+                string configuredSkills = AgentSkillDirectories.UserSkillsDirectory;
+                string skillsRoot = ResolvePhysicalPath(Path.GetFullPath(configuredSkills));
+                RequirePhysicalContainment(configuredSkills, candidate);
+                return ResolvePhysicalPath(Path.GetFullPath(Path.GetRelativePath(configuredSkills, candidate), skillsRoot), confinedTo: skillsRoot);
             }
-
-            if (allowOutside && Path.IsPathRooted(path) && File.Exists(candidate))
+            if (allowOutside && Path.IsPathFullyQualified(path) &&
+                string.Equals(path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar), candidate, StringComparison.OrdinalIgnoreCase))
             {
-                return candidate;
+                string resolved = ResolvePhysicalPath(candidate);
+                if (File.Exists(resolved))
+                {
+                    return resolved;
+                }
             }
 
             throw new InvalidOperationException($"Path escapes workspace root: {path}");
         }
 
-        public string ResolveEditLockPath(string path, bool allowOutside = false)
+        public string ResolveEditLockPath(string path, bool allowOutside = false) => ResolveInsideWorkspace(path, allowOutside);
+
+        public void VerifyResolvedPath(string fullPath)
         {
-            string fullPath = ResolveInsideWorkspace(path, allowOutside);
+            // The original path may have used a link. The path returned to the caller is
+            // physical and must still identify that same location when used.
+            ResolveWorkspaceRoot();
+            VerifyPhysicalPath(fullPath);
+        }
+
+        public void VerifyWritablePath(string fullPath, bool allowSkills = true)
+        {
+            string root = ResolveWorkspaceRoot();
+            if (IsInsideRoot(root, fullPath))
+            {
+                RequirePhysicalContainment(root, fullPath);
+            }
+            else if (allowSkills)
+            {
+                string skills = ResolvePhysicalPath(Path.GetFullPath(AgentSkillDirectories.UserSkillsDirectory));
+                RequirePhysicalContainment(skills, fullPath);
+            }
+            else
+            {
+                throw new IOException($"Write target escapes workspace root: {fullPath}");
+            }
+            VerifyPhysicalPath(fullPath);
+            if (Directory.Exists(fullPath))
+            {
+                throw new IOException($"Expected a file, found a directory: {fullPath}");
+            }
+        }
+
+        internal static void VerifyPhysicalPath(string fullPath)
+        {
+            _ = ResolvePhysicalPath(fullPath, followLinks: false);
+        }
+
+        internal static string ResolvePhysicalPath(string fullPath, string? confinedTo = null, bool followLinks = true, int remainingLinks = 63)
+        {
+            if (remainingLinks == 0 || !Path.IsPathFullyQualified(fullPath) || fullPath.StartsWith(@"\\?\", StringComparison.Ordinal) ||
+                fullPath.StartsWith(@"\\.\", StringComparison.Ordinal))
+            {
+                throw new IOException($"Unsupported device path or link chain: {fullPath}");
+            }
             string current = Path.GetPathRoot(fullPath)!;
             string[] parts = fullPath[current.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < parts.Length; i++)
+            foreach (string part in parts)
             {
-                current = Path.Combine(current, parts[i]);
-                FileSystemInfo entry = i == parts.Length - 1 && !Directory.Exists(current)
-                    ? new FileInfo(current)
-                    : new DirectoryInfo(current);
-                if (entry.Exists && entry.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                if (part.Contains(':') || part.TrimEnd(' ', '.') != part)
                 {
-                    current = entry.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? current;
+                    throw new IOException($"Unsupported path component: {part}");
+                }
+                current = Path.Combine(current, part);
+                FileAttributes attributes;
+                try
+                {
+                    attributes = File.GetAttributes(current);
+                }
+                catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+                {
+                    continue;
+                }
+                if ((attributes & FileAttributes.ReparsePoint) != 0 && !AgentWindowsFileMetadata.IsCloudPlaceholder(current))
+                {
+                    if (!followLinks)
+                    {
+                        throw new IOException($"Resolved path changed before use: {fullPath}");
+                    }
+                    FileSystemInfo entry = (attributes & FileAttributes.Directory) != 0
+                        ? new DirectoryInfo(current) : new FileInfo(current);
+                    FileSystemInfo target = entry.ResolveLinkTarget(returnFinalTarget: false)
+                        ?? throw new IOException($"Unsupported reparse point: {current}");
+                    if (confinedTo != null)
+                    {
+                        RequirePhysicalContainment(confinedTo, target.FullName);
+                    }
+                    current = ResolvePhysicalPath(target.FullName, confinedTo, followLinks, --remainingLinks);
                 }
             }
             return current;
+        }
+
+        internal static bool SamePhysicalPath(string first, string second) =>
+            first.Equals(second, StringComparison.Ordinal) ||
+            (first.Equals(second, StringComparison.OrdinalIgnoreCase) && AgentWindowsFileMetadata.AreSameDirectory(first, second));
+
+        internal static bool IsInsidePhysicalRoot(string root, string path)
+        {
+            root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+            return IsInsideRoot(root, path) && path.Length >= root.Length && SamePhysicalPath(root, path[..root.Length]);
+        }
+
+        private static void RequirePhysicalContainment(string root, string path)
+        {
+            if (!IsInsidePhysicalRoot(root, path))
+            {
+                throw new IOException($"Path escapes workspace root: {path}");
+            }
         }
 
         public IEnumerable<string> EnumerateWorkspaceFiles()
@@ -122,49 +227,47 @@ namespace TxtAIEditor.Controls
 
         private IEnumerable<string> EnumerateWorkspacePaths(string root, bool includeDirectories)
         {
-            var gitIgnore = GitIgnoreMatcher.Load(root);
+            var gitIgnore = GitIgnoreMatcher.Load(this, root);
             var pending = new Stack<string>();
             pending.Push(root);
 
             while (pending.Count > 0)
             {
                 string dir = pending.Pop();
-                IEnumerable<string> subdirs;
-                IEnumerable<string> files;
+                FileSystemInfo[] entries;
 
                 try
                 {
-                    subdirs = Directory.EnumerateDirectories(dir);
-                    files = Directory.EnumerateFiles(dir);
+                    VerifyResolvedPath(dir);
+                    entries = new DirectoryInfo(dir).GetFileSystemInfos();
                 }
                 catch
                 {
+                    ResolveWorkspaceRoot();
                     continue;
                 }
 
-                foreach (string file in files)
+                foreach (FileSystemInfo entry in entries)
                 {
-                    if (gitIgnore.IsIgnored(RelativePath(root, file), isDirectory: false))
+                    // Recursive scans do not follow links, including junctions and cycles.
+                    if ((entry.Attributes & FileAttributes.ReparsePoint) != 0 && !AgentWindowsFileMetadata.IsCloudPlaceholder(entry.FullName))
                     {
                         continue;
                     }
 
-                    yield return file;
-                }
-
-                foreach (string subdir in subdirs)
-                {
-                    string name = Path.GetFileName(subdir);
-                    string relativeSubdir = RelativePath(root, subdir);
-                    if (!ExcludedDirectoryNames.Contains(name) &&
-                        !gitIgnore.IsIgnored(relativeSubdir, isDirectory: true))
+                    bool isDirectory = (entry.Attributes & FileAttributes.Directory) != 0;
+                    if (gitIgnore.IsIgnored(RelativePath(root, entry.FullName), isDirectory) ||
+                        (isDirectory && ExcludedDirectoryNames.Contains(entry.Name)))
                     {
-                        if (includeDirectories)
-                        {
-                            yield return subdir;
-                        }
-
-                        pending.Push(subdir);
+                        continue;
+                    }
+                    if (!isDirectory || includeDirectories)
+                    {
+                        yield return entry.FullName;
+                    }
+                    if (isDirectory)
+                    {
+                        pending.Push(entry.FullName);
                     }
                 }
             }
@@ -266,7 +369,7 @@ namespace TxtAIEditor.Controls
                 _rules = rules;
             }
 
-            public static GitIgnoreMatcher Load(string root)
+            public static GitIgnoreMatcher Load(AgentWorkspaceFileResolver workspace, string root)
             {
                 string ignorePath = Path.Combine(root, ".gitignore");
                 if (!File.Exists(ignorePath))
@@ -277,6 +380,7 @@ namespace TxtAIEditor.Controls
                 var rules = new List<GitIgnoreRule>();
                 try
                 {
+                    workspace.VerifyResolvedPath(ignorePath);
                     foreach (string rawLine in File.ReadLines(ignorePath))
                     {
                         var rule = GitIgnoreRule.TryParse(rawLine);

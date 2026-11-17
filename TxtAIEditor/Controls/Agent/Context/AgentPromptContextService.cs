@@ -270,9 +270,18 @@ namespace TxtAIEditor.Controls
                 return string.Empty;
             }
 
-            return BuildAgentsMdSection(
-                Path.Combine(workspaceRoot, "AGENTS.md"),
-                "[Workspace agent rules]");
+            try
+            {
+                AgentWorkspaceFileResolver.VerifyPhysicalPath(workspaceRoot);
+                var workspace = new AgentWorkspaceFileResolver(() => workspaceRoot);
+                string path = workspace.ResolveInsideWorkspace("AGENTS.md");
+                workspace.VerifyResolvedPath(path);
+                return BuildAgentsMdSection(path, "[Workspace agent rules]");
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+            {
+                return string.Empty;
+            }
         }
 
         private static string BuildAgentsMdSection(string agentsMdPath, string header)

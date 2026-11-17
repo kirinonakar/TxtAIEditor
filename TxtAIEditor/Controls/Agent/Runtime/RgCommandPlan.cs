@@ -20,7 +20,7 @@ namespace TxtAIEditor.Controls
             "--no-filename", "--only-matching", "--invert-match", "--word-regexp", "--line-regexp",
             "--count", "--count-matches", "--files-with-matches", "--files-without-match", "--quiet",
             "--json", "--vimgrep", "--heading", "--no-heading", "--trim", "--stats", "--no-messages",
-            "--text", "--binary", "--follow", "--multiline", "--multiline-dotall", "--pcre2",
+            "--text", "--binary", "--multiline", "--multiline-dotall", "--pcre2",
             "--crlf", "--null", "--null-data", "--byte-offset", "--column", "--passthru",
             "--line-buffered", "--block-buffered", "--no-unicode", "--unicode", "--type-list",
             "--help", "--version", "--no-require-git", "--glob-case-insensitive", "--ignore-file-case-insensitive",
@@ -34,16 +34,21 @@ namespace TxtAIEditor.Controls
             "--color", "--colors", "--encoding", "--engine", "--threads", "--sort", "--sortr",
             "--replace", "--ignore-file", "--path-separator", "--regex-size-limit", "--dfa-size-limit"
         };
-        private const string ShortSwitches = "nNiIsSFwxcClLqovHh0aUbupP.";
+        private const string ShortSwitches = "nNiIsSFwxcClqovHh0aUbupP.";
         private const string ShortValues = "egtfmABCjMTr";
         private readonly List<Func<IEnumerable<string>, IEnumerable<string>>> _filters = new();
         internal bool HasFilters => _filters.Count > 0;
         internal List<string> Arguments { get; } = new() { "--no-config" };
         internal string? ScopeNote { get; private set; }
         private readonly List<string> _excludedExplicitPaths = new();
+        private readonly List<string> _workspacePaths = new();
 
-        internal void ValidateExplicitPaths(string workspaceRoot)
+        internal void ValidateExplicitPaths(string workspaceRoot, Action<string> validatePath)
         {
+            foreach (string path in _workspacePaths)
+            {
+                validatePath(path);
+            }
             foreach (string path in _excludedExplicitPaths)
             {
                 // ripgrep bypasses glob exclusions for explicit file operands.
@@ -93,6 +98,9 @@ namespace TxtAIEditor.Controls
                 }
                 bool takesValue = false;
                 bool inlineValue = false;
+                string? pathValue = null;
+                bool readsPath = false;
+                bool acceptsStdin = false;
                 if (arg.StartsWith("--", StringComparison.Ordinal))
                 {
                     int equal = arg.IndexOf('=');
@@ -101,6 +109,9 @@ namespace TxtAIEditor.Controls
                     listsFiles |= name == "--files";
                     takesValue = ValueOptions.Contains(name);
                     inlineValue = equal >= 0;
+                    readsPath = name is "--file" or "--ignore-file";
+                    acceptsStdin = name == "--file";
+                    if (readsPath && inlineValue) pathValue = arg[(equal + 1)..];
                     if (!takesValue && (!Switches.Contains(name) || inlineValue))
                         throw new ArgumentException($"Option is not allowed: {name}");
                 }
@@ -113,6 +124,9 @@ namespace TxtAIEditor.Controls
                             hasExplicitPattern |= arg[j] is 'e' or 'f';
                             takesValue = true;
                             inlineValue = j + 1 < arg.Length;
+                            readsPath = arg[j] == 'f';
+                            acceptsStdin = readsPath;
+                            if (readsPath && inlineValue) pathValue = arg[(arg[j + 1] == '=' ? j + 2 : j + 1)..];
                             break;
                         }
                         if (!ShortSwitches.Contains(arg[j]))
@@ -124,8 +138,11 @@ namespace TxtAIEditor.Controls
                 {
                     if (++i == arguments.Count) throw new ArgumentException($"Missing value for {arg}.");
                     plan.Arguments.Add(arguments[i]);
+                    if (readsPath) pathValue = arguments[i];
                 }
+                if (pathValue != null && (!acceptsStdin || pathValue != "-")) plan._workspacePaths.Add(pathValue);
             }
+            plan._workspacePaths.AddRange(positionalArguments.Skip(hasExplicitPattern || listsFiles ? 0 : 1).Where(path => path != "-"));
             if (rga)
             {
                 var scopeOptions = new List<string>();

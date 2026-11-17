@@ -37,6 +37,7 @@ namespace TxtAIEditor.Controls
         public string ModelSessionHistoryText { get; set; } = string.Empty;
         public string LastAnswerText { get; set; } = string.Empty;
         public string WorkspaceRoot { get; set; } = string.Empty;
+        public string? ApprovedPlanWorkspacePin { get; set; }
         // Saved plan awaiting approval; cleared when the plan is approved.
         public string PendingPlanPath { get; set; } = string.Empty;
         public double SessionHistoryTokenCount { get; set; }
@@ -64,6 +65,7 @@ namespace TxtAIEditor.Controls
         public AgentRequestTokenCalibration RequestTokenCalibration { get; } = new();
         public string SessionId { get; set; } = string.Empty;
         public CancellationTokenSource? Cancellation { get; set; }
+        public CancellationToken CancellationToken { get; set; }
         public StringBuilder SessionHistory { get; } = new();
         public StringBuilder ModelSessionHistory { get; } = new();
         public StringBuilder RetryDebugHistory { get; } = new();
@@ -88,6 +90,7 @@ namespace TxtAIEditor.Controls
         public string? StreamToTabTargetTabId { get; set; }
         public string LastAnswerText { get; set; } = string.Empty;
         public string WorkspaceRoot { get; set; } = string.Empty;
+        public string? PinnedWorkspaceRoot { get; set; }
         public EditorSettings LlmSettings { get; set; } = new();
         public string ApiType { get; set; } = string.Empty;
         public string StreamingResponseText { get; set; } = string.Empty;
@@ -101,7 +104,7 @@ namespace TxtAIEditor.Controls
         public double InFlightResponseTokens { get; set; }
         public bool IsPlanningMode { get; set; }
         public bool IsPlanResearch { get; set; }
-        public Func<string, string, Task>? ReportToOrchestrator { get; set; }
+        public Func<string, string, Task<string>>? ReportToOrchestrator { get; set; }
         public string FailureReason { get; set; } = string.Empty;
         public bool HasEnabledSkills { get; set; }
         public bool HasEnabledMcp { get; set; }

@@ -659,6 +659,12 @@
   <data name="AgentSubagentCompletedFormat" xml:space="preserve">
     <value>Subagent finished · {0}</value>
   </data>
+  <data name="AgentSubagentShutdownDelayedFormat" xml:space="preserve">
+    <value>Subagent shutdown delayed · {0}</value>
+  </data>
+  <data name="AgentSubagentShutdownDelayed" xml:space="preserve">
+    <value>The task is still shutting down after cancellation.</value>
+  </data>
   <data name="AgentSubagentStoppedFormat" xml:space="preserve">
     <value>Subagent stopped · {0}</value>
   </data>

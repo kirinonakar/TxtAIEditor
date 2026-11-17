@@ -165,11 +165,9 @@ namespace TxtAIEditor.Controls
                 if (!string.IsNullOrEmpty(path))
                 {
                     string root = _fileTools.WorkspaceRoot;
-                    resolvedPath = Path.IsPathRooted(path)
-                        ? Path.GetFullPath(path)
-                        : Path.GetFullPath(Path.Combine(root, path));
+                    resolvedPath = _fileTools.ResolveToolPath(path);
 
-                    if (!resolvedPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                    if (!AgentWorkspaceFileResolver.IsInsideRoot(root, resolvedPath))
                     {
                         return $"save_tab failed: path '{path}' escapes workspace root.";
                     }
@@ -179,7 +177,17 @@ namespace TxtAIEditor.Controls
                     return "save_tab failed: the tab is unsaved (has no file path) and no destination path was specified. Provide a 'path' argument.";
                 }
 
-                bool success = await _runOnUIThreadForBoolAsync(async () => await _saveTabAsync(tab, resolvedPath));
+                string savePath = resolvedPath ?? originalFilePath!;
+                _fileTools.VerifyWorkspaceWritePath(savePath);
+                bool success = await _runOnUIThreadForBoolAsync(async () =>
+                {
+                    if (resolvedPath == null && !string.Equals(tab.FilePath, savePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+                    AgentWorkspaceFileResolver.VerifyPhysicalPath(savePath);
+                    return await _saveTabAsync(tab, resolvedPath);
+                });
                 if (!success)
                 {
                     return "save_tab failed: save operation failed or was cancelled.";

@@ -122,9 +122,11 @@ namespace TxtAIEditor.Controls
         public string? GetActiveRunWorkspaceRoot()
         {
             AgentRunContext? context = _activeToolRunContext.Value ?? _activeWorkspaceRunContext.Value;
-            return string.IsNullOrWhiteSpace(context?.WorkspaceRoot)
-                ? null
-                : context.WorkspaceRoot;
+            if (context?.PinnedWorkspaceRoot is string pinned)
+            {
+                AgentWorkspaceFileResolver.VerifyPinnedWorkspace(context.WorkspaceRoot, pinned);
+            }
+            return context?.WorkspaceRoot;
         }
 
         public AgentRunContext? GetActiveRunContext()
@@ -258,6 +260,10 @@ namespace TxtAIEditor.Controls
                 activeOpenSession.WorkspaceRoot,
                 userInstruction);
             var runContext = CreateRunContext(activeOpenSession, runSettings, userInstruction);
+            if (AgentRunWorkspaceResolver.IsApprovedPlanExecutionPrompt(userInstruction))
+            {
+                runContext.PinnedWorkspaceRoot = activeOpenSession.ApprovedPlanWorkspacePin;
+            }
             runContext.RewindSnapshot = rewindSnapshot;
             runContext.StreamToTab = _agentPane.StreamToTab;
             runContext.IsPlanningMode = requestedPlanningMode;
@@ -299,13 +305,14 @@ namespace TxtAIEditor.Controls
             AgentOpenSessionState session,
             string instruction,
             AgentFollowUpQueue inbox,
-            Func<string, string, Task> reportProgress,
+            Func<string, string, Task<string>> reportProgress,
             CancellationToken cancellationToken)
         {
             session.WorkspaceRoot = parent.WorkspaceRoot;
             session.LlmSettings = workerSettings;
             session.Attachments = parent.Attachments.ToList();
             var context = CreateRunContext(session, workerSettings, instruction);
+            context.PinnedWorkspaceRoot = parent.PinnedWorkspaceRoot;
             context.IsPlanResearch = parent.IsPlanningMode;
             context.FollowUps = inbox;
             context.ReportToOrchestrator = reportProgress;
@@ -328,6 +335,7 @@ namespace TxtAIEditor.Controls
             using var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(parentCancellation);
             runContext.Cancellation = cancellationSource;
             CancellationToken cancellationToken = cancellationSource.Token;
+            runContext.CancellationToken = cancellationToken;
             activeOpenSession.IsRunning = true;
             activeOpenSession.UpdatedAt = DateTime.Now;
             _runningSessions[activeOpenSession.Id] = runContext;
@@ -375,6 +383,8 @@ namespace TxtAIEditor.Controls
                     isSubagent ? userInstruction : _promptContextService.BuildInstructionDisplay(userInstruction), isSubagent));
                 await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityCollectingContext", "맥락 수집 중"));
                 cancellationToken.ThrowIfCancellationRequested();
+                runContext.PinnedWorkspaceRoot ??= AgentWorkspaceFileResolver.ResolveWorkspaceDirectory(runContext.WorkspaceRoot);
+                _ = GetActiveRunWorkspaceRoot();
 
                 string globalAgentsMdLogSection = _promptContextService.BuildGlobalAgentsMdLogSection();
                 if (!string.IsNullOrWhiteSpace(globalAgentsMdLogSection))
@@ -422,7 +432,7 @@ namespace TxtAIEditor.Controls
                     currentRunActiveTab,
                     currentRunSelectionSnapshot,
                     runContext.Attachments,
-                    runContext.WorkspaceRoot,
+                    runContext.PinnedWorkspaceRoot,
                     cancellationToken);
                 string runSelectionContext = _selectionContextController.BuildSelectionContext(currentRunSelectionSnapshot);
                 runContext.PlanWorkspaceContext = currentWorkspaceContext;
@@ -452,6 +462,7 @@ namespace TxtAIEditor.Controls
                 for (int step = 0; step < maxToolSteps; step++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    _ = GetActiveRunWorkspaceRoot();
                     if (orchestration != null)
                     {
                         transcript += orchestration.DrainProgressLog();
@@ -459,10 +470,11 @@ namespace TxtAIEditor.Controls
                     string fixedPromptContext = await _uiDispatcher.RunAsync<string>(async () =>
                     {
                         await _mcpController.ApplyPendingPluginChangesAsync(cancellationToken);
+                        AgentWorkspaceFileResolver.VerifyPinnedWorkspace(runContext.WorkspaceRoot, runContext.PinnedWorkspaceRoot);
                         runContext.HasEnabledSkills = _skillController.HasSelectedSkills();
                         runContext.HasEnabledMcp = !runContext.IsPlanResearch && _mcpController.HasSelectedMcpServers();
                         return _promptContextService.BuildFixedPromptContextForRun(
-                            runContext.WorkspaceRoot, includeMcp: !runContext.IsPlanResearch);
+                            runContext.PinnedWorkspaceRoot, includeMcp: !runContext.IsPlanResearch);
                     });
                     if (orchestration != null)
                     {
@@ -612,6 +624,8 @@ namespace TxtAIEditor.Controls
                         continue;
                     }
 
+                    cancellationToken.ThrowIfCancellationRequested();
+                    _ = GetActiveRunWorkspaceRoot();
                     responseStreamInProgress = true;
                     bool awaitingSubagents = orchestration?.NeedsModelReview == true;
                     bool deferAnswer = awaitingSubagents || isSubagent;
@@ -627,6 +641,8 @@ namespace TxtAIEditor.Controls
                         cancellationToken,
                         deferAnswer: deferAnswer);
                     responseStreamInProgress = false;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    _ = GetActiveRunWorkspaceRoot();
 
                     if (!string.IsNullOrWhiteSpace(runContext.PendingVisionFallbackContext))
                     {
@@ -1058,19 +1074,32 @@ namespace TxtAIEditor.Controls
                             using IDisposable lease = lockPaths.Length > 0
                                 ? await _toolExecutionSessionGate.EnterFilesAsync(lockPaths, cancellationToken)
                                 : await _toolExecutionSessionGate.EnterExclusiveAsync(cancellationToken);
+                            cancellationToken.ThrowIfCancellationRequested();
+                            _ = GetActiveRunWorkspaceRoot();
                             _activeToolRunContext.Value = runContext;
                             try
                             {
                                 await _uiDispatcher.RunAsync(() => _sessionEditController.BeginToolRecording(runContext.SessionId));
                                 try
                                 {
-                                    toolResult = isSubagent && followUpRequested.IsCompleted
-                                        ? SupersededToolResult
-                                        : await _toolExecutionController.ExecuteAsync(
+                                    if (isSubagent && followUpRequested.IsCompleted)
+                                    {
+                                        toolResult = SupersededToolResult;
+                                    }
+                                    else if (planningMode && IsMutatingTool(normalizedToolName) &&
+                                        normalizedToolName != "make_plan" &&
+                                        !IsAllowedPlanRevisionEdit(runContext, normalizedToolName, currentArguments))
+                                    {
+                                        toolResult = BuildPlanningMutationBlockedMessage(runContext);
+                                    }
+                                    else
+                                    {
+                                        toolResult = await _toolExecutionController.ExecuteAsync(
                                             currentToolName,
                                             currentArguments,
                                             runContext.LlmSettings.LlmAgentVerbose,
                                             cancellationToken);
+                                    }
                                 }
                                 finally
                                 {
@@ -1131,7 +1160,7 @@ namespace TxtAIEditor.Controls
                             currentRunActiveTab,
                             currentRunSelectionSnapshot,
                             runContext.Attachments,
-                            runContext.WorkspaceRoot,
+                            runContext.PinnedWorkspaceRoot,
                             cancellationToken));
                     var transcriptUpdate = await Task.Run(() =>
                     {
@@ -1328,7 +1357,15 @@ namespace TxtAIEditor.Controls
                 {
                     using (orchestration)
                     {
-                        await orchestration.StopAsync();
+                        string[] delayedWorkers = await orchestration.StopAsync();
+                        foreach (string id in delayedWorkers)
+                        {
+                            if (_runningSessions.TryGetValue(id, out AgentRunContext? delayed))
+                            {
+                                _ = ShowSubagentProgressAsync(delayed, _getString("AgentSubagentShutdownDelayed",
+                                    "종료 요청 후에도 작업이 정리 중입니다."));
+                            }
+                        }
                         string progressLog = orchestration.DrainProgressLog();
                         if (progressLog.Length > 0)
                         {
@@ -1406,7 +1443,8 @@ namespace TxtAIEditor.Controls
 
             if (!string.IsNullOrWhiteSpace(approvedPlanExecutionPrompt))
             {
-                await StartApprovedPlanSessionAsync(approvedPlanExecutionPrompt, approvedPlanWorkspaceRoot, useSubagents);
+                await StartApprovedPlanSessionAsync(approvedPlanExecutionPrompt, approvedPlanWorkspaceRoot,
+                    runContext.PinnedWorkspaceRoot, useSubagents);
             }
 
             string? pendingFollowUp = runContext.FollowUps.Take(out _);
@@ -1465,6 +1503,8 @@ namespace TxtAIEditor.Controls
                 ? await _toolExecutionSessionGate.EnterWebAsync(token)
                 : await _toolExecutionSessionGate.EnterFileReadAsync(
                     _toolExecutionController.GetFileReadLockPath(normalizedName, arguments), token);
+            token.ThrowIfCancellationRequested();
+            _ = GetActiveRunWorkspaceRoot();
             if (isSubagent && followUpRequested.IsCompleted)
             {
                 return SupersededToolResult;
@@ -1641,7 +1681,7 @@ namespace TxtAIEditor.Controls
             return foundHunk ? highestStartLine : null;
         }
 
-        private static bool IsAllowedPlanRevisionEdit(
+        private bool IsAllowedPlanRevisionEdit(
             AgentRunContext runContext,
             string normalizedToolName,
             JsonElement arguments)
@@ -1653,8 +1693,19 @@ namespace TxtAIEditor.Controls
             }
 
             string targetPath = GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path");
-            return !string.IsNullOrWhiteSpace(targetPath) &&
-                AreSameFile(targetPath, runContext.PendingPlanPath, runContext.WorkspaceRoot);
+            try
+            {
+                _fileTools.VerifyWorkspaceWritePath(runContext.PendingPlanPath);
+                string[] actualTargets = normalizedToolName == "apply_patch"
+                    ? AgentFileEditToolService.GetPatchPaths(targetPath, GetFirstStringArgument(arguments, "patch", "patchText", "diff", "content"))
+                    : [targetPath];
+                return actualTargets.Length > 0 && actualTargets.All(path =>
+                    AgentWorkspaceFileResolver.SamePhysicalPath(_fileTools.ResolveToolPath(path), runContext.PendingPlanPath));
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException or UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         private static string BuildPlanningMutationBlockedMessage(AgentRunContext runContext)
@@ -1748,9 +1799,9 @@ namespace TxtAIEditor.Controls
                 return "Tool failed: kind must be progress, finding, or blocker.";
             }
 
-            await context.ReportToOrchestrator(message, kind);
+            string outcome = await context.ReportToOrchestrator(message, kind);
             _ = ShowSubagentProgressAsync(context, message);
-            return kind == "progress" ? "Progress recorded in the UI." : "Update queued for the orchestrator.";
+            return outcome;
         }
 
         private async Task ShowSubagentProgressAsync(AgentRunContext context, string message)
@@ -1765,7 +1816,8 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async Task StartApprovedPlanSessionAsync(string executionPrompt, string workspaceRoot, bool useSubagents)
+        private async Task StartApprovedPlanSessionAsync(string executionPrompt, string workspaceRoot,
+            string? workspacePin, bool useSubagents)
         {
             await _uiDispatcher.RunAsync(() =>
             {
@@ -1785,6 +1837,7 @@ namespace TxtAIEditor.Controls
                 session.SessionEdits.Clear();
                 session.RewindSnapshots.Clear();
                 session.WorkspaceRoot = string.IsNullOrWhiteSpace(workspaceRoot) ? _fileTools.WorkspaceRoot : workspaceRoot;
+                session.ApprovedPlanWorkspacePin = workspacePin;
                 session.LlmSettings = _openSessionController.CreateSessionSettingsSnapshot();
                 session.UseSubagents = useSubagents;
                 session.UpdatedAt = DateTime.Now;
@@ -1845,8 +1898,17 @@ namespace TxtAIEditor.Controls
 
             _ = _runOutputController.AppendRunActivityAsync(context, _getString("AgentActivityStopRequested", "중단 요청됨"));
 
-            context.Cancellation?.Cancel();
+            if (context.Cancellation is { } source)
+            {
+                _ = RequestRunCancellationAsync(source);
+            }
             _confirmationController.CancelPending(sessionId);
+        }
+
+        private static async Task RequestRunCancellationAsync(CancellationTokenSource source)
+        {
+            try { await source.CancelAsync(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex); }
         }
 
         public void AddCurrentRunImageToolAttachment(LlmMessageAttachment attachment)

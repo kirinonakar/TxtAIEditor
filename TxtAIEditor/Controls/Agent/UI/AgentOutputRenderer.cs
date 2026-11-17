@@ -301,8 +301,11 @@ namespace TxtAIEditor.Controls
                 }
                 else
                 {
-                    Block lineBlock = RenderRegularLine(line);
-                    _outputText.Blocks.Add(lineBlock);
+                    if (!trackGroups || !IsExtraBlankAfterSubagentCompletion(lines, i))
+                    {
+                        Block lineBlock = RenderRegularLine(line);
+                        _outputText.Blocks.Add(lineBlock);
+                    }
                     i++;
                 }
 
@@ -311,6 +314,28 @@ namespace TxtAIEditor.Controls
                     _renderedGroups.Add(new RenderedGroup(i, _outputText.Blocks.Count, isOpen));
                 }
             }
+        }
+
+        private bool IsExtraBlankAfterSubagentCompletion(List<string> lines, int index)
+        {
+            if (index < 2 || !string.IsNullOrWhiteSpace(lines[index]) || !string.IsNullOrWhiteSpace(lines[index - 1]))
+            {
+                return false;
+            }
+
+            int previous = index - 2;
+            while (previous >= 0 && string.IsNullOrWhiteSpace(lines[previous]))
+            {
+                previous--;
+            }
+            if (previous < 0)
+            {
+                return false;
+            }
+
+            string line = lines[previous];
+            string message = TryGetActivityMessage(line, out string activity) ? activity : line;
+            return StartsWithLocalizedActivityFormat(message, "AgentSubagentCompletedFormat", "서브에이전트 작업 완료 · {0}");
         }
 
         private Block RenderCodeBlock(List<string> codeLines, string language)

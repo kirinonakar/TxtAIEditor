@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Services;
 using static TxtAIEditor.Controls.AgentTextContentUtilities;
@@ -16,17 +17,20 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Func<string, Task> _notifyFileModifiedAsync;
         private readonly Func<Action<string>?> _activityReporterProvider;
+        private readonly Func<CancellationToken> _cancellationToken;
 
         public AgentDocumentExtractionToolService(
             AgentWorkspaceFileResolver workspace,
             Func<string, string, string> getString,
             Func<string, Task> notifyFileModifiedAsync,
-            Func<Action<string>?> activityReporterProvider)
+            Func<Action<string>?> activityReporterProvider,
+            Func<CancellationToken> cancellationToken)
         {
             _workspace = workspace;
             _getString = getString;
             _notifyFileModifiedAsync = notifyFileModifiedAsync;
             _activityReporterProvider = activityReporterProvider;
+            _cancellationToken = cancellationToken;
         }
 
         public async Task<string> ExtractDocumentAsync(string path, string outputPath, int maxChars)
@@ -84,6 +88,7 @@ namespace TxtAIEditor.Controls
             {
                 try
                 {
+                    _workspace.VerifyResolvedPath(fullPath);
                     if (extension == ".doc")
                     {
                         tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(fullPath).ConfigureAwait(false);
@@ -119,6 +124,7 @@ namespace TxtAIEditor.Controls
                 string text;
                 try
                 {
+                    _workspace.VerifyResolvedPath(targetPathForExtraction);
                     text = await _documentTextExtractionService.ExtractTextAsync(targetPathForExtraction, limit, progress).ConfigureAwait(false);
                 }
                 catch (Exception ex)
@@ -153,6 +159,7 @@ namespace TxtAIEditor.Controls
                 {
                     targetFullPath += defaultOutputExtension;
                 }
+                _workspace.VerifyWritablePath(targetFullPath);
 
                 string newContent = NormalizeNewlines(text);
                 bool targetAlreadyExists = File.Exists(targetFullPath);
@@ -170,13 +177,7 @@ namespace TxtAIEditor.Controls
                     targetFullPath = _workspace.GetAvailableSiblingPath(targetFullPath);
                 }
 
-                string? targetDirectory = Path.GetDirectoryName(targetFullPath);
-                if (!string.IsNullOrWhiteSpace(targetDirectory))
-                {
-                    Directory.CreateDirectory(targetDirectory);
-                }
-
-                await File.WriteAllTextAsync(targetFullPath, newContent, Encoding.UTF8);
+                await AgentFileEditToolService.WriteNewWorkspaceFileAsync(_workspace, targetFullPath, newContent, Encoding.UTF8, _cancellationToken());
                 await _notifyFileModifiedAsync(targetFullPath);
 
                 string targetRelativePath = _workspace.RelativePath(targetFullPath);
@@ -218,6 +219,7 @@ namespace TxtAIEditor.Controls
             IReadOnlyList<ExtractedSpreadsheetSheet> sheets;
             try
             {
+                _workspace.VerifyResolvedPath(fullPath);
                 sheets = await DocumentTextExtractionService.ExtractXlsxSheetsAsync(fullPath, maxChars, progress);
             }
             catch (Exception ex)
@@ -261,6 +263,7 @@ namespace TxtAIEditor.Controls
                 string targetFullPath = splitSheets
                     ? AddSheetSuffix(baseTargetFullPath, sheet.Index)
                     : baseTargetFullPath;
+                _workspace.VerifyWritablePath(targetFullPath);
                 string newContent = NormalizeNewlines(sheet.CsvContent);
                 bool targetAlreadyExists = File.Exists(targetFullPath);
 
@@ -276,13 +279,7 @@ namespace TxtAIEditor.Controls
                     targetFullPath = _workspace.GetAvailableSiblingPath(targetFullPath);
                 }
 
-                string? targetDirectory = Path.GetDirectoryName(targetFullPath);
-                if (!string.IsNullOrWhiteSpace(targetDirectory))
-                {
-                    Directory.CreateDirectory(targetDirectory);
-                }
-
-                await File.WriteAllTextAsync(targetFullPath, newContent, Encoding.UTF8);
+                await AgentFileEditToolService.WriteNewWorkspaceFileAsync(_workspace, targetFullPath, newContent, Encoding.UTF8, _cancellationToken());
                 await _notifyFileModifiedAsync(targetFullPath);
 
                 string targetRelativePath = _workspace.RelativePath(targetFullPath);

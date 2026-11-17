@@ -659,6 +659,12 @@
   <data name="AgentSubagentCompletedFormat" xml:space="preserve">
     <value>サブエージェントの作業が完了 · {0}</value>
   </data>
+  <data name="AgentSubagentShutdownDelayedFormat" xml:space="preserve">
+    <value>サブエージェントの終了が遅れています · {0}</value>
+  </data>
+  <data name="AgentSubagentShutdownDelayed" xml:space="preserve">
+    <value>キャンセル後も終了処理が続いています。</value>
+  </data>
   <data name="AgentSubagentStoppedFormat" xml:space="preserve">
     <value>サブエージェントの作業が停止 · {0}</value>
   </data>

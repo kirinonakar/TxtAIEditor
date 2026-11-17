@@ -265,8 +265,12 @@ namespace TxtAIEditor.Controls
                 IEnumerable<string> subdirs;
                 try
                 {
-                    files = Directory.GetFiles(dir);
-                    subdirs = Directory.GetDirectories(dir);
+                    AgentWorkspaceFileResolver.VerifyPhysicalPath(dir);
+                    var entries = new DirectoryInfo(dir).GetFileSystemInfos().Where(entry =>
+                        (entry.Attributes & FileAttributes.ReparsePoint) == 0 ||
+                        AgentWindowsFileMetadata.IsCloudPlaceholder(entry.FullName)).ToArray();
+                    files = entries.OfType<FileInfo>().Select(entry => entry.FullName);
+                    subdirs = entries.OfType<DirectoryInfo>().Select(entry => entry.FullName);
                 }
                 catch
                 {

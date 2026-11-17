@@ -80,6 +80,7 @@ namespace TxtAIEditor.Controls
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
+                    _workspace.VerifyResolvedPath(filePath);
                     using var stream = OpenReadSnapshot(filePath);
                     Encoding encoding = await DetectFileEncodingAsync(stream, cancellationToken);
                     using var reader = new StreamReader(stream, encoding);
@@ -136,6 +137,7 @@ namespace TxtAIEditor.Controls
             int currentLine = 0;
             int endLine = start + count - 1;
 
+            _workspace.VerifyResolvedPath(fullPath);
             using var stream = OpenReadSnapshot(fullPath);
             Encoding encoding = await DetectFileEncodingAsync(stream, cancellationToken);
             using (var reader = new StreamReader(stream, encoding))

@@ -18,7 +18,7 @@ namespace TxtAIEditor.Controls
             string userInstruction)
         {
             if (IsApprovedPlanExecutionPrompt(userInstruction) &&
-                IsExistingDirectory(preservedWorkspaceRoot))
+                !string.IsNullOrWhiteSpace(preservedWorkspaceRoot))
             {
                 return NormalizeDirectoryPath(preservedWorkspaceRoot);
             }
@@ -36,7 +36,7 @@ namespace TxtAIEditor.Controls
             return _fallbackWorkspaceRootProvider();
         }
 
-        private static bool IsApprovedPlanExecutionPrompt(string userInstruction)
+        internal static bool IsApprovedPlanExecutionPrompt(string userInstruction)
         {
             return (userInstruction ?? string.Empty)
                 .TrimStart()
@@ -50,7 +50,7 @@ namespace TxtAIEditor.Controls
 
         private static string NormalizeDirectoryPath(string path)
         {
-            return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
         }
     }
 }

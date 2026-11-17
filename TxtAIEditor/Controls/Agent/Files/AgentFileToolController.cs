@@ -305,15 +305,7 @@ namespace TxtAIEditor.Controls
 
         private async Task<string> OpenFileByPathAsync(string path)
         {
-            string fullPath = path;
-            if (!Path.IsPathRooted(path))
-            {
-                string root = _fileTools.WorkspaceRoot;
-                if (!string.IsNullOrEmpty(root))
-                {
-                    fullPath = Path.GetFullPath(Path.Combine(root, path));
-                }
-            }
+            string fullPath = _fileTools.ResolveToolPath(path, allowOutside: true);
 
             if (!File.Exists(fullPath))
             {
@@ -322,6 +314,7 @@ namespace TxtAIEditor.Controls
 
             if (_openFileInEditorAsync != null)
             {
+                _fileTools.VerifyToolPath(fullPath);
                 AgentOpenFileResult openResult = await _openFileInEditorAsync(fullPath);
                 if (!openResult.Success)
                 {

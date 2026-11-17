@@ -15,7 +15,6 @@ namespace TxtAIEditor.Controls
     internal sealed class AgentPlanController
     {
         private const string PlanFolderName = "tmp";
-        private const string FallbackPlanFolderName = "plan";
 
         private readonly Func<AgentRunContext?> _activeRunContextProvider;
         private readonly AgentConfirmationController _confirmationController;
@@ -116,11 +115,12 @@ namespace TxtAIEditor.Controls
             string workspaceRoot = runContext.WorkspaceRoot;
             try
             {
+                var workspace = CreatePlanWorkspace(runContext);
                 string planPath;
                 bool resubmitted = !string.IsNullOrWhiteSpace(requestedPlanPath);
                 if (resubmitted)
                 {
-                    string validationError = ValidateResubmittedPlanPath(runContext, requestedPlanPath, workspaceRoot, out planPath);
+                    string validationError = ValidateResubmittedPlanPath(runContext, workspace, requestedPlanPath, out planPath);
                     if (!string.IsNullOrEmpty(validationError))
                     {
                         return validationError;
@@ -128,12 +128,14 @@ namespace TxtAIEditor.Controls
 
                     if (!string.IsNullOrWhiteSpace(planMarkdown))
                     {
-                        await UpdatePlanFileBodyAsync(planPath, planMarkdown, cancellationToken);
+                        await AgentFileEditToolService.UpdateWorkspaceFileAsync(workspace, planPath,
+                            existing => BuildUpdatedPlanFileBody(existing, planMarkdown), Encoding.UTF8, cancellationToken);
                     }
                 }
                 else
                 {
                     planPath = await SavePlanFileAsync(
+                        workspace,
                         runContext.OriginalUserInstruction,
                         planMarkdown,
                         workspaceRoot,
@@ -145,6 +147,7 @@ namespace TxtAIEditor.Controls
                 runContext.GeneratedPlanPath = planPath;
                 runContext.PendingPlanPath = planPath;
                 runContext.PlanResubmittedForApproval = resubmitted;
+                workspace.VerifyResolvedPath(planPath);
                 await OpenPlanFileForReviewAsync(runContext, planPath);
                 return resubmitted
                     ? $"make_plan resubmitted: {planPath}\nworkspace_root: {workspaceRoot}"
@@ -216,6 +219,7 @@ namespace TxtAIEditor.Controls
                 return string.Empty;
             }
 
+            CreatePlanWorkspace(runContext).VerifyResolvedPath(planPath);
             string approvedPlan = await File.ReadAllTextAsync(planPath, cancellationToken);
             string workspaceRoot = runContext.WorkspaceRoot;
             return BuildApprovedPlanExecutionPrompt(
@@ -226,6 +230,7 @@ namespace TxtAIEditor.Controls
         }
 
         private async Task<string> SavePlanFileAsync(
+            AgentWorkspaceFileResolver workspace,
             string originalUserInstruction,
             string planMarkdown,
             string workspaceRoot,
@@ -233,11 +238,10 @@ namespace TxtAIEditor.Controls
             string selectionContext,
             CancellationToken cancellationToken)
         {
-            string planDirectory = ResolvePlanDirectory(workspaceRoot);
-            Directory.CreateDirectory(planDirectory);
+            string planDirectory = workspace.ResolveInsideWorkspace(PlanFolderName);
 
             DateTime createdAt = DateTime.Now;
-            string planPath = GetNextPlanFilePath(planDirectory, createdAt);
+            string planPath = workspace.ResolveInsideWorkspace(GetNextPlanFilePath(planDirectory, createdAt));
             string content = BuildPlanFileContent(
                 originalUserInstruction,
                 planMarkdown,
@@ -246,17 +250,17 @@ namespace TxtAIEditor.Controls
                 selectionContext,
                 createdAt);
 
-            await File.WriteAllTextAsync(planPath, content, Encoding.UTF8, cancellationToken);
+            await AgentFileEditToolService.WriteNewWorkspaceFileAsync(workspace, planPath, content, Encoding.UTF8, cancellationToken);
             return planPath;
         }
 
         private static string ValidateResubmittedPlanPath(
             AgentRunContext runContext,
+            AgentWorkspaceFileResolver workspace,
             string requestedPlanPath,
-            string workspaceRoot,
             out string fullPlanPath)
         {
-            fullPlanPath = ResolveFullPath(requestedPlanPath, workspaceRoot);
+            fullPlanPath = workspace.ResolveInsideWorkspace(requestedPlanPath);
             if (string.IsNullOrWhiteSpace(fullPlanPath) || !File.Exists(fullPlanPath))
             {
                 return $"make_plan failed: plan file not found: {requestedPlanPath}";
@@ -264,15 +268,14 @@ namespace TxtAIEditor.Controls
 
             if (!string.IsNullOrWhiteSpace(runContext.PendingPlanPath))
             {
-                return AreSameFile(fullPlanPath, runContext.PendingPlanPath, workspaceRoot)
+                workspace.VerifyWritablePath(runContext.PendingPlanPath, allowSkills: false);
+                return AgentWorkspaceFileResolver.SamePhysicalPath(fullPlanPath, runContext.PendingPlanPath)
                     ? string.Empty
                     : $"make_plan failed: path must be the plan file awaiting approval: {runContext.PendingPlanPath}";
             }
 
-            string planDirectory = ResolveFullPath(ResolvePlanDirectory(workspaceRoot), workspaceRoot);
-            string directoryPrefix = planDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            if (string.IsNullOrWhiteSpace(planDirectory) ||
-                !fullPlanPath.StartsWith(directoryPrefix, StringComparison.OrdinalIgnoreCase))
+            string planDirectory = workspace.ResolveInsideWorkspace(PlanFolderName);
+            if (!AgentWorkspaceFileResolver.IsInsidePhysicalRoot(planDirectory, fullPlanPath))
             {
                 return "make_plan failed: path must point to a plan file saved under the workspace plan folder.";
             }
@@ -280,9 +283,8 @@ namespace TxtAIEditor.Controls
             return string.Empty;
         }
 
-        private static async Task UpdatePlanFileBodyAsync(string planPath, string planMarkdown, CancellationToken cancellationToken)
+        private static string BuildUpdatedPlanFileBody(string existingContent, string planMarkdown)
         {
-            string existingContent = await File.ReadAllTextAsync(planPath, cancellationToken);
             int planHeadingIndex = FindPlanHeadingIndex(existingContent);
             string updatedContent;
             if (planHeadingIndex >= 0)
@@ -298,7 +300,7 @@ namespace TxtAIEditor.Controls
                 updatedContent = planMarkdown.TrimEnd() + Environment.NewLine;
             }
 
-            await File.WriteAllTextAsync(planPath, updatedContent, Encoding.UTF8, cancellationToken);
+            return updatedContent;
         }
 
         private static int FindPlanHeadingIndex(string content)
@@ -443,24 +445,16 @@ namespace TxtAIEditor.Controls
             builder.AppendLine(fence);
         }
 
-        private static string ResolvePlanDirectory(string workspaceRoot)
+        private static AgentWorkspaceFileResolver CreatePlanWorkspace(AgentRunContext context)
         {
-            if (!string.IsNullOrWhiteSpace(workspaceRoot))
+            return new AgentWorkspaceFileResolver(() =>
             {
-                try
+                if (context.PinnedWorkspaceRoot is string pinned)
                 {
-                    string root = Path.GetFullPath(workspaceRoot);
-                    if (Directory.Exists(root))
-                    {
-                        return Path.Combine(root, PlanFolderName);
-                    }
+                    AgentWorkspaceFileResolver.VerifyPinnedWorkspace(context.WorkspaceRoot, pinned);
                 }
-                catch
-                {
-                }
-            }
-
-            return Path.Combine(AgentSkillDirectories.UserSettingsDirectory, FallbackPlanFolderName);
+                return context.WorkspaceRoot;
+            });
         }
 
         private static string GetNextPlanFilePath(string planDirectory, DateTime createdAt)
