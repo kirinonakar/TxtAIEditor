@@ -20,6 +20,12 @@ namespace TxtAIEditor.Controls
 
     internal sealed class AgentPaneSessionMenuCoordinator
     {
+        private const int OpenSessionButtonHeight = 28;
+        private const int OpenSessionRowHeight = 36;
+        private const int SubagentIndent = 20;
+
+        private enum SessionTreeBranch { None, Parent, Child, LastChild }
+
         private readonly FrameworkElement _resourceOwner;
         private readonly StackPanel _historyListPanel;
         private readonly Flyout _historyFlyout;
@@ -145,18 +151,26 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            foreach (var item in _openSessionItems)
+            Style? treeLineStyle = _resourceOwner.Resources["AgentSessionTreeLineStyle"] as Style;
+            foreach (var (item, branch) in GetOpenSessionTreeRows())
             {
-                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
+                bool isChild = branch is SessionTreeBranch.Child or SessionTreeBranch.LastChild;
+                var rowGrid = new Grid
+                {
+                    ColumnSpacing = 4,
+                    Height = OpenSessionRowHeight,
+                    Margin = new Thickness(0, 0, 10, 0)
+                };
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                AddSessionTreeLines(rowGrid, branch, treeLineStyle);
 
-                var titlePanel = new StackPanel
+                var titlePanel = new Grid
                 {
-                    Orientation = Orientation.Horizontal,
-                    Spacing = 6,
+                    ColumnSpacing = 6,
                     VerticalAlignment = VerticalAlignment.Center
                 };
+                titlePanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 titlePanel.Children.Add(new Ellipse
                 {
                     Width = 7,
@@ -171,31 +185,40 @@ namespace TxtAIEditor.Controls
 
                 if (item.IsSelected)
                 {
-                    titlePanel.Children.Add(new FontIcon
+                    titlePanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    var selectedIcon = new FontIcon
                     {
                         Glyph = "\uE73E",
                         FontSize = 10,
                         VerticalAlignment = VerticalAlignment.Center
-                    });
+                    };
+                    Grid.SetColumn(selectedIcon, 1);
+                    titlePanel.Children.Add(selectedIcon);
                 }
 
-                titlePanel.Children.Add(new TextBlock
+                var titleText = new TextBlock
                 {
                     Text = item.Title,
                     FontSize = 11,
                     MaxWidth = 190,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     TextWrapping = TextWrapping.NoWrap,
+                    HorizontalAlignment = HorizontalAlignment.Left,
                     VerticalAlignment = VerticalAlignment.Center
-                });
+                };
+                Grid.SetColumn(titleText, titlePanel.ColumnDefinitions.Count);
+                titlePanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                titlePanel.Children.Add(titleText);
 
                 string currentId = item.Id;
                 var selectButton = new Button
                 {
                     Content = titlePanel,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
-                    HorizontalContentAlignment = HorizontalAlignment.Left,
-                    Height = 28,
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Height = OpenSessionButtonHeight,
+                    Margin = new Thickness(isChild ? SubagentIndent : 0, 0, 0, 0),
                     Padding = new Thickness(8, 0, 8, 0),
                     Style = buttonStyle,
                     IsEnabled = item.CanSelect
@@ -216,7 +239,8 @@ namespace TxtAIEditor.Controls
                 {
                     Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
                     Width = 28,
-                    Height = 28,
+                    Height = OpenSessionButtonHeight,
+                    VerticalAlignment = VerticalAlignment.Center,
                     Padding = new Thickness(0),
                     Style = buttonStyle,
                     IsEnabled = item.CanClose
@@ -232,6 +256,74 @@ namespace TxtAIEditor.Controls
                 rowGrid.Children.Add(closeButton);
                 _openSessionsListPanel.Children.Add(rowGrid);
             }
+        }
+
+        private IEnumerable<(AgentOpenSessionItemViewModel Item, SessionTreeBranch Branch)> GetOpenSessionTreeRows()
+        {
+            var parentIds = _openSessionItems
+                .Where(item => string.IsNullOrEmpty(item.OrchestratorSessionId))
+                .Select(item => item.Id)
+                .ToHashSet(StringComparer.Ordinal);
+            var childrenByParent = _openSessionItems
+                .Where(item => item.OrchestratorSessionId is string parentId && parentIds.Contains(parentId))
+                .ToLookup(item => item.OrchestratorSessionId!, StringComparer.Ordinal);
+
+            foreach (var item in _openSessionItems)
+            {
+                if (item.OrchestratorSessionId is string parentId && parentIds.Contains(parentId))
+                {
+                    continue;
+                }
+
+                var children = childrenByParent[item.Id].ToArray();
+                yield return (item, children.Length == 0 ? SessionTreeBranch.None : SessionTreeBranch.Parent);
+                for (int i = 0; i < children.Length; i++)
+                {
+                    yield return (children[i], i == children.Length - 1 ? SessionTreeBranch.LastChild : SessionTreeBranch.Child);
+                }
+            }
+        }
+
+        private static void AddSessionTreeLines(Grid row, SessionTreeBranch branch, Style? lineStyle)
+        {
+            if (branch == SessionTreeBranch.None)
+            {
+                return;
+            }
+
+            const int stemLeft = 12;
+            const int rowCenter = OpenSessionRowHeight / 2;
+            var stem = new Rectangle
+            {
+                Style = lineStyle,
+                Width = 1,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(stemLeft, 0, 0, 0)
+            };
+            if (branch == SessionTreeBranch.Parent)
+            {
+                stem.Height = (OpenSessionRowHeight - OpenSessionButtonHeight) / 2;
+                stem.VerticalAlignment = VerticalAlignment.Bottom;
+                row.Children.Add(stem);
+                return;
+            }
+
+            if (branch == SessionTreeBranch.LastChild)
+            {
+                stem.Height = rowCenter + 1;
+                stem.VerticalAlignment = VerticalAlignment.Top;
+            }
+
+            row.Children.Add(stem);
+            row.Children.Add(new Rectangle
+            {
+                Style = lineStyle,
+                Width = SubagentIndent - stemLeft,
+                Height = 1,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(stemLeft, rowCenter, 0, 0)
+            });
         }
 
         public void RebuildHistoryMenu()

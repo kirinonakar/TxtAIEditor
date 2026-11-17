@@ -423,6 +423,7 @@ namespace TxtAIEditor.Controls
                     return new AgentOpenSessionItemViewModel
                     {
                         Id = session.Id,
+                        OrchestratorSessionId = session.Role == AgentSessionRole.Subagent ? session.OrchestratorSessionId : null,
                         Title = BuildDisplayTitle(prefix, session),
                         IsSelected = isSelected,
                         IsRunning = isRunning,

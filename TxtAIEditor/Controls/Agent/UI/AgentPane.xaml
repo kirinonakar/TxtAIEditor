@@ -29,6 +29,10 @@
                 <Setter Property="HorizontalContentAlignment" Value="Center"/>
                 <Setter Property="VerticalContentAlignment" Value="Center"/>
             </Style>
+            <Style x:Key="AgentSessionTreeLineStyle" TargetType="Rectangle">
+                <Setter Property="Fill" Value="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                <Setter Property="IsHitTestVisible" Value="False"/>
+            </Style>
             <Style x:Key="AgentToggleButtonStyle" TargetType="ToggleButton">
                 <Setter Property="Background" Value="{ThemeResource AgentButtonBackground}"/>
                 <Setter Property="BorderBrush" Value="{ThemeResource AgentButtonBorderBrush}"/>
@@ -189,7 +193,7 @@
                                            FontSize="12"/>
                                 <MenuFlyoutSeparator Grid.Row="1"/>
                                 <ScrollViewer Grid.Row="2" MaxHeight="300" VerticalScrollBarVisibility="Auto">
-                                    <StackPanel x:Name="AgentOpenSessionsListPanel" Spacing="4"/>
+                                    <StackPanel x:Name="AgentOpenSessionsListPanel"/>
                                 </ScrollViewer>
                             </Grid>
                         </Flyout>

@@ -44,6 +44,7 @@ namespace TxtAIEditor.Controls
     public sealed class AgentOpenSessionItemViewModel
     {
         public string Id { get; set; } = string.Empty;
+        public string? OrchestratorSessionId { get; set; }
         public string Title { get; set; } = string.Empty;
         public bool IsSelected { get; set; }
         public bool IsRunning { get; set; }
