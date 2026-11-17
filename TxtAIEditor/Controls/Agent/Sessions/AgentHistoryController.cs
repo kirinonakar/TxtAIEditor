@@ -314,7 +314,7 @@ namespace TxtAIEditor.Controls
 
             if (verbose)
             {
-                return historyText;
+                return NormalizeSubagentSpacing(historyText, getString);
             }
 
             var lines = historyText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -738,7 +738,79 @@ namespace TxtAIEditor.Controls
                 FlushPendingToolResult(IsPendingToolResultFailed());
             }
 
-            return result.ToString().TrimEnd();
+            return NormalizeSubagentSpacing(result.ToString().TrimEnd(), getString);
+        }
+
+        private static string NormalizeSubagentSpacing(string text, Func<string, string, string>? getString)
+        {
+            const string koreanPrefix = "서브에이전트 작업 완료 · ";
+            const string englishPrefix = "Subagent finished · ";
+            string format = getString?.Invoke("AgentSubagentCompletedFormat", koreanPrefix + "{0}") ?? koreanPrefix;
+            int placeholder = format.IndexOf("{0}", StringComparison.Ordinal);
+            string prefix = placeholder >= 0 ? format[..placeholder] : format;
+            var result = new StringBuilder(text.Length);
+            bool afterCompletion = false;
+            bool wroteBlank = false;
+            char fenceCharacter = '\0';
+            int fenceWidth = 0;
+
+            int start = 0;
+            while (start < text.Length)
+            {
+                int lineEnd = text.IndexOf('\n', start);
+                int next = lineEnd >= 0 ? lineEnd + 1 : text.Length;
+                ReadOnlySpan<char> line = text.AsSpan(start, (lineEnd >= 0 ? lineEnd : next) - start).Trim();
+                if (line.StartsWith("```", StringComparison.Ordinal) || line.StartsWith("~~~", StringComparison.Ordinal))
+                {
+                    int width = 3;
+                    while (width < line.Length && line[width] == line[0])
+                    {
+                        width++;
+                    }
+                    if (fenceWidth == 0)
+                    {
+                        fenceCharacter = line[0];
+                        fenceWidth = width;
+                    }
+                    else if (line[0] == fenceCharacter && width >= fenceWidth && line.Length == width)
+                    {
+                        fenceWidth = 0;
+                    }
+                    afterCompletion = false;
+                }
+                else if (fenceWidth == 0 && line.Length > 0)
+                {
+                    ReadOnlySpan<char> message = line.StartsWith(AgentSubagentCoordinator.ProgressMarker, StringComparison.Ordinal)
+                        ? line[AgentSubagentCoordinator.ProgressMarker.Length..]
+                        : line;
+                    if ((prefix.Length > 0 && message.StartsWith(prefix, StringComparison.Ordinal)) ||
+                        message.StartsWith(koreanPrefix, StringComparison.Ordinal) ||
+                        message.StartsWith(englishPrefix, StringComparison.Ordinal))
+                    {
+                        afterCompletion = true;
+                        wroteBlank = false;
+                    }
+                    else if (!line.Equals("[Agent Response]:", StringComparison.OrdinalIgnoreCase) &&
+                        !line.Equals("[assistant: final answer]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        afterCompletion = false;
+                    }
+                }
+                else if (line.Length == 0 && afterCompletion)
+                {
+                    if (wroteBlank)
+                    {
+                        start = next;
+                        continue;
+                    }
+                    wroteBlank = true;
+                }
+
+                result.Append(text, start, next - start);
+                start = next;
+            }
+
+            return result.ToString();
         }
 
         private static string[] NormalizeStructuredUserTurns(

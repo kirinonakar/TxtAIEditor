@@ -185,7 +185,8 @@ namespace TxtAIEditor.Controls
 
                 string fileName = BuildVerboseHistoryFileName(session);
                 string filePath = Path.Combine(currentFolder, fileName);
-                await File.WriteAllTextAsync(filePath, verboseHistory, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                string formattedHistory = AgentHistoryFormatter.Format(verboseHistory, verbose: true, getString: _getString);
+                await File.WriteAllTextAsync(filePath, formattedHistory, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
                 _agentPane.ClearActivity(string.Format(
                     _getString("AgentActivityHistorySavedFormat", "verbose 히스토리 저장됨: {0}"),
                     fileName));
