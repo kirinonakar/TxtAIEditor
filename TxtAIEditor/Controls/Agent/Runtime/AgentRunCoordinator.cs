@@ -44,7 +44,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentResponseStreamService _responseStreamService;
         private readonly AgentSessionHistoryCoordinator _sessionHistoryCoordinator;
         private readonly Dictionary<string, AgentRunContext> _runningSessions;
-        private readonly SemaphoreSlim _toolExecutionSessionGate;
+        private readonly AgentToolExecutionGate _toolExecutionSessionGate;
         private readonly AsyncLocal<AgentRunContext?> _activeToolRunContext = new();
         private readonly AsyncLocal<AgentRunContext?> _activeWorkspaceRunContext = new();
         private readonly Func<string> _currentSessionIdProvider;
@@ -81,7 +81,7 @@ namespace TxtAIEditor.Controls
             AgentResponseStreamService responseStreamService,
             AgentSessionHistoryCoordinator sessionHistoryCoordinator,
             Dictionary<string, AgentRunContext> runningSessions,
-            SemaphoreSlim toolExecutionSessionGate,
+            AgentToolExecutionGate toolExecutionSessionGate,
             Func<string> currentSessionIdProvider,
             Action<string, double, double> restoreSessionHistoryState,
             Action<bool> updateContextStatsImmediate)
@@ -185,7 +185,7 @@ namespace TxtAIEditor.Controls
         {
             string sessionId = _currentSessionIdProvider();
             var activeOpenSession = _openSessionController.EnsureSession(sessionId);
-            if (_runningSessions.ContainsKey(sessionId) || activeOpenSession.Role == AgentSessionRole.Subagent)
+            if (_runningSessions.ContainsKey(sessionId) || activeOpenSession.IsRewinding || activeOpenSession.Role == AgentSessionRole.Subagent)
             {
                 return;
             }
@@ -205,7 +205,7 @@ namespace TxtAIEditor.Controls
 
             await _mcpController.ApplyPendingPluginChangesAsync(CancellationToken.None);
             await _mcpController.EnsureActiveToolsAsync(CancellationToken.None);
-            if (!_openSessionController.IsSessionVisible(sessionId) || _runningSessions.ContainsKey(sessionId))
+            if (!_openSessionController.IsSessionVisible(sessionId) || activeOpenSession.IsRewinding || _runningSessions.ContainsKey(sessionId))
             {
                 return;
             }
@@ -234,9 +234,16 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            EditorSettings runSettings = await _openSessionController.ResolveRunSessionSettingsAsync(activeOpenSession);
+            if (!_openSessionController.IsSessionVisible(sessionId) || activeOpenSession.IsRewinding || _runningSessions.ContainsKey(sessionId))
+            {
+                return;
+            }
+
             string preservedWorkspaceRoot = activeOpenSession.WorkspaceRoot;
             _openSessionController.SaveActiveFromUI();
-            activeOpenSession.RewindSnapshots.Add(AgentSessionRewindSnapshot.Capture(activeOpenSession));
+            var rewindSnapshot = AgentSessionRewindSnapshot.Capture(activeOpenSession);
+            activeOpenSession.RewindSnapshots.Add(rewindSnapshot);
             if (useSubagents)
             {
                 activeOpenSession.Role = AgentSessionRole.Orchestrator;
@@ -249,9 +256,8 @@ namespace TxtAIEditor.Controls
                 preservedWorkspaceRoot,
                 activeOpenSession.WorkspaceRoot,
                 userInstruction);
-            EditorSettings runSettings = await _openSessionController.ResolveRunSessionSettingsAsync(activeOpenSession);
-
             var runContext = CreateRunContext(activeOpenSession, runSettings, userInstruction);
+            runContext.RewindSnapshot = rewindSnapshot;
             runContext.StreamToTab = _agentPane.StreamToTab;
             runContext.IsPlanningMode = requestedPlanningMode;
             runContext.PendingPlanPath = pendingPlanPath;
@@ -266,6 +272,7 @@ namespace TxtAIEditor.Controls
                 SessionHistoryTokenCount = session.SessionHistoryTokenCount,
                 Attachments = session.Attachments.ToList(),
                 SessionEdits = session.SessionEdits.ToList(),
+                InitialEditCount = session.SessionEdits.Count,
                 LastAnswerText = session.Role == AgentSessionRole.Subagent ? string.Empty : session.LastAnswerText,
                 WorkspaceRoot = session.WorkspaceRoot,
                 LlmSettings = settings,
@@ -290,6 +297,7 @@ namespace TxtAIEditor.Controls
             AgentSelectionSnapshot selection,
             AgentOpenSessionState session,
             string instruction,
+            AgentFollowUpQueue inbox,
             Func<string, Task> reportProgress,
             CancellationToken cancellationToken)
         {
@@ -298,6 +306,7 @@ namespace TxtAIEditor.Controls
             session.Attachments = parent.Attachments.ToList();
             var context = CreateRunContext(session, workerSettings, instruction);
             context.IsPlanResearch = parent.IsPlanningMode;
+            context.FollowUps = inbox;
             context.ReportToOrchestrator = reportProgress;
             string turn = $"[user]\n{AgentSessionLabels.OrchestratorPrompt}\n{instruction}";
             await ExecuteRunAsync(session, context, turn, false, activeTab, selection, cancellationToken);
@@ -342,6 +351,19 @@ namespace TxtAIEditor.Controls
             bool responseStreamInProgress = false;
             bool sessionClosed = false;
             AgentSubagentCoordinator? orchestration = null;
+            bool AppendSubagentEvents()
+            {
+                string events = orchestration?.DrainModelEvents() ?? string.Empty;
+                if (events.Length == 0)
+                {
+                    return false;
+                }
+
+                modelTranscript += events;
+                runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(events);
+                return true;
+            }
+
             void FinishRun(string? responseLine, AgentRunStatus status = AgentRunStatus.Completed)
             {
                 if (string.IsNullOrEmpty(transcript))
@@ -384,7 +406,7 @@ namespace TxtAIEditor.Controls
                     var workerSessions = new Dictionary<string, AgentOpenSessionState>();
                     orchestration = new AgentSubagentCoordinator(
                         Math.Clamp(config.LlmMaxSubagents, 1, EditorSettings.MaxSubagentLimit),
-                        (id, title, instruction, progress, token) =>
+                        (id, title, instruction, inbox, progress, token) =>
                         {
                             token.ThrowIfCancellationRequested();
                             workerSessions.TryGetValue(id, out AgentOpenSessionState? previousState);
@@ -393,8 +415,12 @@ namespace TxtAIEditor.Controls
                             workerSession.OrchestratorSessionId = runContext.SessionId;
                             workerSession.Title = title;
                             workerSessions[id] = workerSession;
+                            if (previousState == null)
+                            {
+                                runContext.RewindSnapshot?.SubagentSessionIds.Add(id);
+                            }
                             return RunSubagentAsync(runContext, workerSettings, currentRunActiveTab, currentRunSelectionSnapshot,
-                                workerSession, instruction, progress, token);
+                                workerSession, instruction, inbox, progress, token);
                         },
                         message => _runOutputController.AppendRunActivityAsync(runContext, message),
                         _getString,
@@ -431,6 +457,7 @@ namespace TxtAIEditor.Controls
                 bool completed = false;
                 var retries = new AgentStepRetryPolicy();
                 bool planningMode = runContext.IsPlanningMode;
+                const string supersededToolResult = "Tool failed: this call was skipped because a new orchestrator instruction arrived.";
                 int maxToolSteps = runContext.LlmSettings.LlmMaxToolCalls >= 50 ? runContext.LlmSettings.LlmMaxToolCalls : 100;
                 var toolInvocationCounts = new Dictionary<string, int>(StringComparer.Ordinal);
                 int currentTaskStartEditIndex = runContext.SessionEdits.Count;
@@ -458,10 +485,12 @@ namespace TxtAIEditor.Controls
                     {
                         fixedPromptContext += "\n\n" + AgentSubagentCoordinator.BuildWorkerInstructions(runContext.IsPlanResearch);
                     }
-                    string? queuedFollowUpPrompt = runContext.TakeQueuedFollowUpPrompt();
+                    string? queuedFollowUpPrompt = runContext.FollowUps.Take(out Task followUpRequested);
                     if (!string.IsNullOrWhiteSpace(queuedFollowUpPrompt))
                     {
-                        string followUpTurn = _promptContextService.BuildConversationTurn(queuedFollowUpPrompt);
+                        string followUpTurn = isSubagent
+                            ? $"[user]\n{AgentSessionLabels.OrchestratorPrompt}\n{queuedFollowUpPrompt}"
+                            : _promptContextService.BuildConversationTurn(queuedFollowUpPrompt);
                         if (!string.IsNullOrWhiteSpace(followUpTurn))
                         {
                             string followUpPart = Environment.NewLine + Environment.NewLine + followUpTurn.Trim();
@@ -473,10 +502,10 @@ namespace TxtAIEditor.Controls
                         }
 
                         string followUpHeader = _runTextFormatter.BuildRunHeader(
-                            _promptContextService.BuildInstructionDisplay(queuedFollowUpPrompt));
+                            isSubagent ? queuedFollowUpPrompt : _promptContextService.BuildInstructionDisplay(queuedFollowUpPrompt), isSubagent);
                         await _runOutputController.AppendRunOutputLineAsync(runContext, followUpHeader);
                     }
-                    Task followUpRequested = runContext.FollowUpRequested;
+                    AppendSubagentEvents();
                     string currentTranscript = _runTranscriptService.BuildWithEditLedger(
                         modelTranscript,
                         currentTaskStartEditIndex,
@@ -550,8 +579,19 @@ namespace TxtAIEditor.Controls
                         await _uiDispatcher.RunAsync(() => _updateContextStatsImmediate(true));
                     }
 
+                    if (AppendSubagentEvents())
+                    {
+                        currentTranscript = _runTranscriptService.BuildWithEditLedger(
+                            modelTranscript, currentTaskStartEditIndex, runContext.SessionEdits);
+                    }
+                    if (isSubagent && followUpRequested.IsCompleted)
+                    {
+                        continue;
+                    }
+
                     responseStreamInProgress = true;
                     bool awaitingSubagents = orchestration?.HasUncollectedResults == true;
+                    bool deferAnswer = awaitingSubagents || isSubagent;
                     AgentResponseStreamResult streamResult = await _responseStreamService.RunAsync(
                         runContext,
                         fixedPromptContext,
@@ -562,7 +602,7 @@ namespace TxtAIEditor.Controls
                         agentTools,
                         imageAttachments,
                         cancellationToken,
-                        deferAnswer: awaitingSubagents);
+                        deferAnswer: deferAnswer);
                     responseStreamInProgress = false;
 
                     if (!string.IsNullOrWhiteSpace(runContext.PendingVisionFallbackContext))
@@ -574,6 +614,12 @@ namespace TxtAIEditor.Controls
                         runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(fallbackTranscriptPart);
                         runContext.PendingVisionFallbackContext = string.Empty;
                         await _uiDispatcher.RunAsync(() => _updateContextStatsImmediate(true));
+                    }
+
+                    if (isSubagent && followUpRequested.IsCompleted)
+                    {
+                        await _runOutputController.StopRunThinkingActivityAsync(runContext);
+                        continue;
                     }
 
                     response = streamResult.Response;
@@ -689,7 +735,7 @@ namespace TxtAIEditor.Controls
                         }
                     }
 
-                    if ((planningMode || awaitingSubagents) && responseHasToolSyntax && !responseLooksLikeToolResultReplay)
+                    if ((planningMode || deferAnswer) && responseHasToolSyntax && !responseLooksLikeToolResultReplay)
                     {
                         int toolCallIndex = AgentToolCallParser.FindToolCallIndex(cleanResponse);
                         if (toolCallIndex > 0)
@@ -720,12 +766,12 @@ namespace TxtAIEditor.Controls
                             }
                         }
                     }
-                    else if (!planningMode && !awaitingSubagents && !responseRequiresToolHandling && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(cleanResponse))
+                    else if (!planningMode && !deferAnswer && !responseRequiresToolHandling && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(cleanResponse))
                     {
                         visibleTextFlushed = true;
                         await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, cleanResponse);
                     }
-                    else if (!planningMode && !awaitingSubagents && printedLength < endLength)
+                    else if (!planningMode && !deferAnswer && printedLength < endLength)
                     {
                         string remainingText = cleanResponse.Substring(printedLength, endLength - printedLength);
                         visibleTextFlushed = true;
@@ -790,13 +836,12 @@ namespace TxtAIEditor.Controls
 
                         if (orchestration?.HasUncollectedResults == true)
                         {
-                            string result = await orchestration.CollectNextAsync(followUpRequested);
-                            string resultText = result == AgentSubagentCoordinator.WaitInterruptedResult
-                                ? "\n\n[Subagent wait interrupted]\n" + result
-                                : "\n\n[Subagent result]\n" + result +
-                                    "\nReview this result now. Use report_progress to share useful findings with the user, then decide whether to send a follow-up or wait again.";
-                            modelTranscript += resultText;
-                            runContext.CurrentRunTranscriptTokens += AgentTokenEstimator.Estimate(resultText);
+                            await orchestration.WaitForEventAsync(followUpRequested);
+                            continue;
+                        }
+
+                        if (isSubagent && !runContext.FollowUps.TryCloseIfEmpty())
+                        {
                             continue;
                         }
 
@@ -903,7 +948,12 @@ namespace TxtAIEditor.Controls
                         bool interruptedSubagentWait = false;
                         retries.Reset(AgentRetryReason.ToolCallFormat);
 
-                        if (AgentSubagentCoordinator.IsCoordinationTool(normalizedToolName))
+                        if (isSubagent && followUpRequested.IsCompleted)
+                        {
+                            toolResult = supersededToolResult;
+                            toolResultForTranscript = toolResult;
+                        }
+                        else if (AgentSubagentCoordinator.IsCoordinationTool(normalizedToolName))
                         {
                             bool isWait = normalizedToolName == AgentSubagentCoordinator.WaitTool;
                             if (isWait && waitedForSubagentInBatch)
@@ -912,11 +962,10 @@ namespace TxtAIEditor.Controls
                             }
                             else
                             {
-                                int outstandingBeforeWait = isWait ? orchestration?.OutstandingResultCount ?? 0 : 0;
                                 toolResult = orchestration != null
                                     ? await orchestration.ExecuteAsync(normalizedToolName, currentArguments, followUpRequested)
                                     : await ExecuteSubagentProgressAsync(runContext, normalizedToolName, currentArguments);
-                                waitedForSubagentInBatch |= (orchestration?.OutstandingResultCount ?? 0) < outstandingBeforeWait;
+                                waitedForSubagentInBatch |= isWait;
                                 interruptedSubagentWait = isWait && toolResult == AgentSubagentCoordinator.WaitInterruptedResult;
                             }
                             toolResultForTranscript = toolResult;
@@ -929,13 +978,11 @@ namespace TxtAIEditor.Controls
                         else if (planningMode && normalizedToolName == "make_plan" && orchestration != null &&
                             (waitedForSubagentInBatch || orchestration.HasUncollectedResults))
                         {
-                            toolResult = "make_plan failed: review the subagent result now and collect any remaining results before submitting the revised plan.";
+                            toolResult = "make_plan failed: review the subagent events before submitting the revised plan.";
                             if (!waitedForSubagentInBatch)
                             {
-                                string result = await orchestration.CollectNextAsync(followUpRequested);
-                                interruptedSubagentWait = result == AgentSubagentCoordinator.WaitInterruptedResult;
-                                toolResult += "\n" + result;
-                                waitedForSubagentInBatch = true;
+                                await orchestration.WaitForEventAsync(followUpRequested);
+                                interruptedSubagentWait = followUpRequested.IsCompleted;
                             }
                             toolResultForTranscript = toolResult;
                         }
@@ -953,34 +1000,46 @@ namespace TxtAIEditor.Controls
                         }
                         else
                         {
-                            await _toolExecutionSessionGate.WaitAsync(cancellationToken);
+                            bool parallelRead = _toolExecutionController.IsParallelRead(normalizedToolName);
+                            string[] lockPaths = parallelRead ? [] :
+                                _toolExecutionController.GetFileMutationLockPaths(normalizedToolName, ref currentArguments);
+                            using IDisposable lease = parallelRead
+                                ? await _toolExecutionSessionGate.EnterReadAsync(cancellationToken)
+                                : lockPaths.Length > 0
+                                    ? await _toolExecutionSessionGate.EnterFilesAsync(lockPaths, cancellationToken)
+                                    : await _toolExecutionSessionGate.EnterExclusiveAsync(cancellationToken);
+                            _activeToolRunContext.Value = runContext;
                             try
                             {
-                                _activeToolRunContext.Value = runContext;
-                                await _uiDispatcher.RunAsync(() => _sessionEditController.BeginToolRecording(runContext.SessionId));
+                                if (!parallelRead)
+                                {
+                                    await _uiDispatcher.RunAsync(() => _sessionEditController.BeginToolRecording(runContext.SessionId));
+                                }
                                 try
                                 {
-                                    toolResult = await _toolExecutionController.ExecuteAsync(
-                                        currentToolName,
-                                        currentArguments,
-                                        runContext.LlmSettings.LlmAgentVerbose,
-                                        cancellationToken);
+                                    toolResult = isSubagent && followUpRequested.IsCompleted
+                                        ? supersededToolResult
+                                        : await _toolExecutionController.ExecuteAsync(
+                                            currentToolName,
+                                            currentArguments,
+                                            runContext.LlmSettings.LlmAgentVerbose,
+                                            cancellationToken);
                                 }
                                 finally
                                 {
-                                    // Edits committed by this tool call belong to the session
-                                    // that executed it, even when another session is visible.
-                                    runContext.SessionEdits = await _uiDispatcher.RunAsync(() =>
+                                    if (!parallelRead)
                                     {
-                                        return _sessionEditController.EndToolRecording(runContext.SessionId);
-                                    });
-                                    _openSessionController.EnsureSession(runContext.SessionId).SessionEdits = runContext.SessionEdits.ToList();
+                                        await _uiDispatcher.RunAsync(() =>
+                                        {
+                                            runContext.SessionEdits = _sessionEditController.EndToolRecording(runContext.SessionId);
+                                            activeOpenSession.SessionEdits = runContext.SessionEdits.ToList();
+                                        });
+                                    }
                                 }
                             }
                             finally
                             {
                                 _activeToolRunContext.Value = null;
-                                _toolExecutionSessionGate.Release();
                             }
                             toolResultForTranscript = toolResult;
                             if (IsSuccessfulToolResult(toolResult))
@@ -1296,7 +1355,7 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            if (sessionClosed)
+            if (sessionClosed || isSubagent)
             {
                 return;
             }
@@ -1306,7 +1365,7 @@ namespace TxtAIEditor.Controls
                 await StartApprovedPlanSessionAsync(approvedPlanExecutionPrompt, approvedPlanWorkspaceRoot, useSubagents);
             }
 
-            string? pendingFollowUp = runContext.TakeQueuedFollowUpPrompt();
+            string? pendingFollowUp = runContext.FollowUps.Take(out _);
             if (!string.IsNullOrWhiteSpace(pendingFollowUp))
             {
                 await _uiDispatcher.RunAsync(async () =>
@@ -1583,9 +1642,20 @@ namespace TxtAIEditor.Controls
             }
 
             await context.ReportToOrchestrator(message);
-            string line = AgentSubagentCoordinator.FormatProgressLine(message);
-            await _runOutputController.AppendRunActivityAsync(context, line);
+            _ = ShowSubagentProgressAsync(context, message);
             return "Progress shared with the orchestrator.";
+        }
+
+        private async Task ShowSubagentProgressAsync(AgentRunContext context, string message)
+        {
+            try
+            {
+                await _runOutputController.AppendRunActivityAsync(context, AgentSubagentCoordinator.FormatProgressLine(message));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
         }
 
         private async Task StartApprovedPlanSessionAsync(string executionPrompt, string workspaceRoot, bool useSubagents)
@@ -1642,7 +1712,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            context.QueueFollowUpPrompt(trimmedPrompt);
+            context.FollowUps.TryQueue(trimmedPrompt);
             string queuedNotice = _getString(
                 "AgentFollowUpQueued",
                 "추가 지시가 대기 중입니다. 다음 도구 호출이 끝나면 전송됩니다.");

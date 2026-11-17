@@ -46,6 +46,7 @@ namespace TxtAIEditor.Controls
         public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
         public List<AgentSessionRewindSnapshot> RewindSnapshots { get; set; } = new();
         public bool IsRunning { get; set; }
+        public bool IsRewinding { get; set; }
         public int CompletedNotificationCount { get; set; }
         public bool ThinkingLineActive { get; set; }
         public int ThinkingLineStart { get; set; }
@@ -59,10 +60,6 @@ namespace TxtAIEditor.Controls
 
     internal sealed class AgentRunContext
     {
-        private readonly object _followUpGate = new();
-        private TaskCompletionSource _followUpRequested = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private string? _queuedFollowUpPrompt;
-
         public AgentRunStatus Status { get; set; } = AgentRunStatus.Running;
         public AgentRequestTokenCalibration RequestTokenCalibration { get; } = new();
         public string SessionId { get; set; } = string.Empty;
@@ -84,6 +81,8 @@ namespace TxtAIEditor.Controls
         public bool VisionFallbackPending { get; set; }
         public string PendingVisionFallbackContext { get; set; } = string.Empty;
         public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
+        public int InitialEditCount { get; init; }
+        public AgentSessionRewindSnapshot? RewindSnapshot { get; set; }
         public bool StreamToTabActive { get; set; }
         public bool StreamToTab { get; set; }
         public string? StreamToTabTargetTabId { get; set; }
@@ -113,45 +112,73 @@ namespace TxtAIEditor.Controls
         // Plan file that may be revised in this run (session pending plan at run start).
         public string PendingPlanPath { get; set; } = string.Empty;
         public bool PlanResubmittedForApproval { get; set; }
-        public Task FollowUpRequested
+        public AgentFollowUpQueue FollowUps { get; set; } = new();
+    }
+
+    internal sealed class AgentFollowUpQueue
+    {
+        private readonly object _gate = new();
+        private TaskCompletionSource _requested = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private string? _prompt;
+        private bool _closed;
+
+        public bool TryQueue(string prompt)
         {
-            get
+            lock (_gate)
             {
-                lock (_followUpGate)
+                if (_closed)
                 {
-                    return _followUpRequested.Task;
+                    return false;
                 }
-            }
-        }
-
-        public void QueueFollowUpPrompt(string prompt)
-        {
-            lock (_followUpGate)
-            {
-                _queuedFollowUpPrompt = _queuedFollowUpPrompt == null
+                _prompt = _prompt == null
                     ? prompt
-                    : _queuedFollowUpPrompt + Environment.NewLine + Environment.NewLine + prompt;
-                _followUpRequested.TrySetResult();
+                    : _prompt + Environment.NewLine + Environment.NewLine + prompt;
+                _requested.TrySetResult();
+                return true;
             }
         }
 
-        public string? TakeQueuedFollowUpPrompt()
+        public string? Take(out Task requested)
         {
-            lock (_followUpGate)
+            lock (_gate)
             {
-                string? prompt = _queuedFollowUpPrompt;
+                string? prompt = _prompt;
                 if (prompt != null)
                 {
-                    _queuedFollowUpPrompt = null;
-                    _followUpRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    _prompt = null;
+                    _requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 }
+                requested = _requested.Task;
                 return prompt;
+            }
+        }
+
+        public bool TryCloseIfEmpty()
+        {
+            lock (_gate)
+            {
+                if (_prompt != null)
+                {
+                    return false;
+                }
+                _closed = true;
+                return true;
+            }
+        }
+
+        public string? Close()
+        {
+            lock (_gate)
+            {
+                _closed = true;
+                return _prompt;
             }
         }
     }
 
     internal sealed class AgentSessionRewindSnapshot
     {
+        public List<string> SubagentSessionIds { get; } = new();
         public string Title { get; set; } = string.Empty;
         public string PromptText { get; set; } = string.Empty;
         public string OutputText { get; set; } = string.Empty;
@@ -189,11 +216,6 @@ namespace TxtAIEditor.Controls
         public List<AgentAttachmentState> CloneAttachments()
         {
             return CloneAttachments(Attachments);
-        }
-
-        public List<AgentFileEditPreview> CloneSessionEdits()
-        {
-            return CloneEdits(SessionEdits);
         }
 
         public static List<AgentAttachmentState> CloneAttachments(IEnumerable<AgentAttachmentState>? attachments)
@@ -250,6 +272,7 @@ namespace TxtAIEditor.Controls
                 OldContent = preview.OldContent,
                 NewContent = preview.NewContent,
                 IsNewFile = preview.IsNewFile,
+                CommitOrder = preview.CommitOrder,
                 ModificationNumber = preview.ModificationNumber,
                 TotalModifications = preview.TotalModifications
             };

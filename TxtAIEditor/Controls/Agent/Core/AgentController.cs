@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using TxtAIEditor.Core.Interfaces;
@@ -71,7 +70,7 @@ namespace TxtAIEditor.Controls
             _agentPane = agentPane;
             _settingsService = settingsService;
             var runningSessions = new Dictionary<string, AgentRunContext>(StringComparer.Ordinal);
-            var toolExecutionSessionGate = new SemaphoreSlim(1, 1);
+            var toolExecutionSessionGate = new AgentToolExecutionGate();
 
             var composition = AgentControllerComposition.Create(
                 llmService,

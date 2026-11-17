@@ -1,16 +1,11 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-using TxtAIEditor.Core.Models;
 
 namespace TxtAIEditor.Controls
 {
     internal sealed class AgentSessionRewindController
     {
-        private readonly Func<bool> _isCurrentSessionRunning;
-        private readonly SemaphoreSlim _toolExecutionSessionGate;
+        private readonly AgentToolExecutionGate _toolExecutionSessionGate;
         private readonly Func<string> _currentSessionIdProvider;
         private readonly Action _saveActiveOpenSessionFromUI;
         private readonly Func<string, AgentOpenSessionState> _ensureOpenSession;
@@ -23,8 +18,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
 
         public AgentSessionRewindController(
-            Func<bool> isCurrentSessionRunning,
-            SemaphoreSlim toolExecutionSessionGate,
+            AgentToolExecutionGate toolExecutionSessionGate,
             Func<string> currentSessionIdProvider,
             Action saveActiveOpenSessionFromUI,
             Func<string, AgentOpenSessionState> ensureOpenSession,
@@ -36,7 +30,6 @@ namespace TxtAIEditor.Controls
             Action<string, string> showError,
             Func<string, string, string> getString)
         {
-            _isCurrentSessionRunning = isCurrentSessionRunning;
             _toolExecutionSessionGate = toolExecutionSessionGate;
             _currentSessionIdProvider = currentSessionIdProvider;
             _saveActiveOpenSessionFromUI = saveActiveOpenSessionFromUI;
@@ -52,32 +45,41 @@ namespace TxtAIEditor.Controls
 
         public async Task RewindCurrentSessionAsync()
         {
-            if (_isCurrentSessionRunning())
+            string sessionId = _currentSessionIdProvider();
+            if (_sessionEditController.IsReviewSessionRunning(sessionId))
             {
                 return;
             }
 
-            await _toolExecutionSessionGate.WaitAsync();
             try
             {
-                if (_isCurrentSessionRunning())
+                using IDisposable lease = await _toolExecutionSessionGate.EnterExclusiveAsync();
+                if (_currentSessionIdProvider() != sessionId || _sessionEditController.IsReviewSessionRunning(sessionId))
                 {
                     return;
                 }
 
                 _saveActiveOpenSessionFromUI();
 
-                var session = _ensureOpenSession(_currentSessionIdProvider());
+                var session = _ensureOpenSession(sessionId);
                 if (session.RewindSnapshots.Count == 0)
                 {
                     return;
                 }
 
-                AgentSessionRewindSnapshot snapshot = session.RewindSnapshots[^1];
-                await RevertSessionEditsToSnapshotAsync(snapshot);
-                session.RewindSnapshots.RemoveAt(session.RewindSnapshots.Count - 1);
-                RestoreOpenSessionFromSnapshot(session, snapshot);
-                await PersistRewoundSessionHistoryAsync(session);
+                session.IsRewinding = true;
+                try
+                {
+                    AgentSessionRewindSnapshot snapshot = session.RewindSnapshots[^1];
+                    await _sessionEditController.RevertRunAsync(sessionId, snapshot);
+                    session.RewindSnapshots.RemoveAt(session.RewindSnapshots.Count - 1);
+                    RestoreOpenSessionFromSnapshot(session, snapshot);
+                    await PersistRewoundSessionHistoryAsync(session);
+                }
+                finally
+                {
+                    session.IsRewinding = false;
+                }
             }
             catch (Exception ex)
             {
@@ -85,24 +87,6 @@ namespace TxtAIEditor.Controls
                     _getString("AgentSessionRewindErrorTitle", "세션 되감기 오류"),
                     string.Format(_getString("AgentSessionRewindErrorFormat", "세션을 되감는 중 오류가 발생했습니다: {0}"), ex.Message));
             }
-            finally
-            {
-                _toolExecutionSessionGate.Release();
-            }
-        }
-
-        private async Task RevertSessionEditsToSnapshotAsync(AgentSessionRewindSnapshot snapshot)
-        {
-            var currentEdits = _sessionEditController.SessionEdits.ToList();
-            var targetEdits = snapshot.CloneSessionEdits();
-            int commonPrefixLength = CountCommonEditPrefix(currentEdits, targetEdits);
-
-            for (int i = currentEdits.Count - 1; i >= commonPrefixLength; i--)
-            {
-                await _sessionEditController.RevertAsync(currentEdits[i]);
-            }
-
-            _sessionEditController.Replace(targetEdits, _currentSessionIdProvider());
         }
 
         private void RestoreOpenSessionFromSnapshot(
@@ -125,13 +109,15 @@ namespace TxtAIEditor.Controls
             session.SessionHistoryTokenCount = snapshot.SessionHistoryTokenCount;
             session.CurrentRunTranscriptTokens = snapshot.CurrentRunTranscriptTokens;
             session.Attachments = snapshot.CloneAttachments();
-            session.SessionEdits = snapshot.CloneSessionEdits();
             session.WorkspaceRoot = snapshot.WorkspaceRoot;
             session.PendingPlanPath = snapshot.PendingPlanPath;
             session.IsRunning = false;
             session.UpdatedAt = DateTime.Now;
             _clearThinkingState(session);
-            _restoreOpenSession(session);
+            if (_currentSessionIdProvider() == session.Id)
+            {
+                _restoreOpenSession(session);
+            }
         }
 
         private async Task PersistRewoundSessionHistoryAsync(AgentOpenSessionState session)
@@ -159,32 +145,6 @@ namespace TxtAIEditor.Controls
             };
 
             await _historyController.SaveSessionAsync(item, currentSessionId);
-        }
-
-        private static int CountCommonEditPrefix(
-            IReadOnlyList<AgentFileEditPreview> currentEdits,
-            IReadOnlyList<AgentFileEditPreview> targetEdits)
-        {
-            int count = Math.Min(currentEdits.Count, targetEdits.Count);
-            for (int i = 0; i < count; i++)
-            {
-                if (!AreSameEdit(currentEdits[i], targetEdits[i]))
-                {
-                    return i;
-                }
-            }
-
-            return count;
-        }
-
-        private static bool AreSameEdit(AgentFileEditPreview left, AgentFileEditPreview right)
-        {
-            return string.Equals(left.ActionName, right.ActionName, StringComparison.Ordinal) &&
-                string.Equals(left.RelativePath, right.RelativePath, StringComparison.Ordinal) &&
-                string.Equals(left.FullPath, right.FullPath, StringComparison.Ordinal) &&
-                string.Equals(left.OldContent, right.OldContent, StringComparison.Ordinal) &&
-                string.Equals(left.NewContent, right.NewContent, StringComparison.Ordinal) &&
-                left.IsNewFile == right.IsNewFile;
         }
     }
 }

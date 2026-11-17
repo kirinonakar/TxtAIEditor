@@ -81,6 +81,25 @@ namespace TxtAIEditor.Controls
             throw new InvalidOperationException($"Path escapes workspace root: {path}");
         }
 
+        public string ResolveEditLockPath(string path)
+        {
+            string fullPath = ResolveInsideWorkspace(path);
+            string current = Path.GetPathRoot(fullPath)!;
+            string[] parts = fullPath[current.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < parts.Length; i++)
+            {
+                current = Path.Combine(current, parts[i]);
+                FileSystemInfo entry = i == parts.Length - 1 && !Directory.Exists(current)
+                    ? new FileInfo(current)
+                    : new DirectoryInfo(current);
+                if (entry.Exists && entry.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                {
+                    current = entry.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? current;
+                }
+            }
+            return current;
+        }
+
         public IEnumerable<string> EnumerateWorkspaceFiles()
         {
             return EnumerateWorkspacePaths(ResolveWorkspaceRoot(), includeDirectories: false);

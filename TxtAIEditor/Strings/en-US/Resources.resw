@@ -2757,6 +2757,9 @@ Plan: {0}</value>
   <data name="AgentSessionRewindErrorTitle" xml:space="preserve">
     <value>Session Rewind Error</value>
   </data>
+  <data name="AgentRevertFileChangedFormat" xml:space="preserve">
+    <value>The file changed and could not be reverted: {0}</value>
+  </data>
   <data name="AgentSessionRewindErrorFormat" xml:space="preserve">
     <value>An error occurred while rewinding the session: {0}</value>
   </data>

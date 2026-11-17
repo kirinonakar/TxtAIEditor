@@ -105,7 +105,7 @@ namespace TxtAIEditor.Controls
 
             var session = _openSessions.FirstOrDefault(item =>
                 string.Equals(item.Id, sessionId, StringComparison.Ordinal));
-            return session?.IsRunning == true;
+            return session is { IsRunning: true } or { IsRewinding: true };
         }
 
         public bool IsSessionVisible(string sessionId)
@@ -138,8 +138,11 @@ namespace TxtAIEditor.Controls
             return session;
         }
 
-        private AgentOpenSessionState? FindOpenSession(string sessionId) =>
+        public AgentOpenSessionState? FindOpenSession(string sessionId) =>
             _openSessions.FirstOrDefault(item => string.Equals(item.Id, sessionId, StringComparison.Ordinal));
+
+        public IEnumerable<string> GetOpenSubagentSessionIds(string parentId) =>
+            _openSessions.Where(item => item.OrchestratorSessionId == parentId).Select(item => item.Id);
 
         public AgentOpenSessionState CreateBlankSession(string? sessionId = null)
         {
@@ -353,7 +356,7 @@ namespace TxtAIEditor.Controls
         public void CloseSession(string sessionId)
         {
             var session = FindOpenSession(sessionId);
-            if (session == null)
+            if (session == null || session.IsRewinding)
             {
                 return;
             }

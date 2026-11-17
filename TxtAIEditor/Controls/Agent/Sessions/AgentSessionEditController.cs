@@ -17,12 +17,13 @@ namespace TxtAIEditor.Controls
         private readonly Action<string> _appendActivity;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
-        // Edits are tracked per session so the review list can never show another
-        // session's changed files. The panel always displays the visible session's
-        // list; Track() records into the session whose tool call is executing.
+        private readonly AgentHistoryController _history;
+        private readonly AgentToolExecutionGate _toolGate;
+        private AgentOpenSessionController _openSessions = null!;
         private readonly Dictionary<string, List<AgentFileEditPreview>> _sessionEditsBySession = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _recordingSessions = new(StringComparer.Ordinal);
         private readonly Func<string> _currentSessionIdProvider;
-        private string? _recordingSessionId;
+        private long _lastCommitOrder;
 
         public AgentSessionEditController(
             AgentPane agentPane,
@@ -33,7 +34,9 @@ namespace TxtAIEditor.Controls
             Action<string> appendActivity,
             Action<string, string> showError,
             Func<string, string, string> getString,
-            Func<string> currentSessionIdProvider)
+            Func<string> currentSessionIdProvider,
+            AgentHistoryController history,
+            AgentToolExecutionGate toolGate)
         {
             _agentPane = agentPane;
             _runOnUIThreadAsync = runOnUIThreadAsync;
@@ -44,23 +47,28 @@ namespace TxtAIEditor.Controls
             _showError = showError;
             _getString = getString;
             _currentSessionIdProvider = currentSessionIdProvider;
+            _history = history;
+            _toolGate = toolGate;
         }
 
-        public IReadOnlyList<AgentFileEditPreview> SessionEdits => GetVisibleSessionEdits();
-        public int EditCount => GetVisibleSessionEdits().Count;
+        public void BindOpenSessions(AgentOpenSessionController openSessions) => _openSessions = openSessions;
 
-        public void Track(AgentFileEditPreview preview)
+        public IReadOnlyList<AgentFileEditPreview> SessionEdits =>
+            GetReviewEdits(_currentSessionIdProvider()).Select(edit => edit.Preview).ToList();
+
+        public void Track(AgentFileEditPreview preview, string? recordingSessionId)
         {
             // Keep every accepted edit as a chronological undo stack.
             // Do not merge by file here: if A -> B -> C is collapsed into a single
             // entry and the original IsNewFile flag is kept, restore can jump to the
             // wrong state, especially for files created and then edited in the same
             // agent session.
-            string sessionId = ResolveRecordingSessionId();
+            string sessionId = recordingSessionId ?? _currentSessionIdProvider();
             var sessionEdits = GetOrCreateSessionEdits(sessionId);
-            sessionEdits.Add(Clone(preview));
+            _lastCommitOrder = Math.Max(DateTime.UtcNow.Ticks, _lastCommitOrder + 1);
+            sessionEdits.Add(Clone(preview, _lastCommitOrder));
             UpdateModificationNumbers(sessionEdits);
-            if (IsVisibleSession(sessionId))
+            if (IsVisibleSession(sessionId) || _openSessions.FindOpenSession(sessionId)?.OrchestratorSessionId == _currentSessionIdProvider())
             {
                 UpdateModifiedFilesList();
             }
@@ -79,16 +87,12 @@ namespace TxtAIEditor.Controls
         // visible session's list so the review panel never mixes sessions.
         public void BeginToolRecording(string sessionId)
         {
-            _recordingSessionId = sessionId;
+            _recordingSessions.Add(sessionId);
         }
 
         public List<AgentFileEditPreview> EndToolRecording(string sessionId)
         {
-            if (string.Equals(_recordingSessionId, sessionId, StringComparison.Ordinal))
-            {
-                _recordingSessionId = null;
-            }
-
+            _recordingSessions.Remove(sessionId);
             return GetOrCreateSessionEdits(sessionId).ToList();
         }
 
@@ -99,11 +103,11 @@ namespace TxtAIEditor.Controls
 
         public void Replace(IEnumerable<AgentFileEditPreview>? edits, string sessionId)
         {
-            var replacementEdits = edits?.Select(Clone).ToList() ?? new List<AgentFileEditPreview>();
+            var replacementEdits = edits?.Select(edit => Clone(edit)).ToList() ?? new List<AgentFileEditPreview>();
 
             // While a tool call for this session is in flight the live list already
             // holds the newest edits; do not overwrite it with a stale snapshot.
-            if (!string.Equals(_recordingSessionId, sessionId, StringComparison.Ordinal))
+            if (!_recordingSessions.Contains(sessionId))
             {
                 var sessionEdits = GetOrCreateSessionEdits(sessionId);
                 if (!AreEquivalent(sessionEdits, replacementEdits))
@@ -119,64 +123,39 @@ namespace TxtAIEditor.Controls
 
         public async Task RevertAsync(AgentFileEditPreview preview)
         {
+            string sessionId = _currentSessionIdProvider();
             try
             {
-                string sessionId = _currentSessionIdProvider() ?? string.Empty;
-                var sessionEdits = GetOrCreateSessionEdits(sessionId);
-                int editIndex = FindLatestEditIndex(sessionEdits, preview.FullPath, preview.RelativePath);
-                if (editIndex < 0)
+                using IDisposable lease = await _toolGate.EnterExclusiveAsync();
+                if (!IsVisibleSession(sessionId) || IsReviewSessionRunning(sessionId))
                 {
                     return;
                 }
 
-                AgentFileEditPreview editToRevert = sessionEdits[editIndex];
-                bool isFileBackedPath = IsFileBackedSessionPath(editToRevert.FullPath);
-
-                // Make the durable source match the restored state before notifying
-                // the editor/file refresh pipeline.
-                if (editToRevert.IsNewFile)
+                RecordedEdit? latest = GetReviewEdits(sessionId).LastOrDefault(edit => string.Equals(
+                    GetSessionEditKey(edit.Preview.FullPath, edit.Preview.RelativePath),
+                    GetSessionEditKey(preview.FullPath, preview.RelativePath), StringComparison.OrdinalIgnoreCase));
+                if (latest != null && latest.Preview.CommitOrder == preview.CommitOrder &&
+                    latest.Preview.NewContent == preview.NewContent && latest.Preview.OldContent == preview.OldContent)
                 {
-                    if (isFileBackedPath && File.Exists(editToRevert.FullPath))
+                    string rootId = _openSessions.FindOpenSession(sessionId)?.OrchestratorSessionId ?? sessionId;
+                    AgentOpenSessionState? root = _openSessions.FindOpenSession(rootId);
+                    if (root != null)
                     {
-                        File.Delete(editToRevert.FullPath);
+                        root.IsRewinding = true;
+                    }
+                    try
+                    {
+                        await RevertEditsAsync(new[] { latest });
+                    }
+                    finally
+                    {
+                        if (root != null)
+                        {
+                            root.IsRewinding = false;
+                        }
                     }
                 }
-                else if (isFileBackedPath)
-                {
-                    await File.WriteAllTextAsync(editToRevert.FullPath, editToRevert.OldContent);
-                }
-
-                if (_fileModifiedAsync != null && isFileBackedPath)
-                {
-                    await _fileModifiedAsync(editToRevert.FullPath);
-                }
-
-                if (_revertTabOrFileAsync != null)
-                {
-                    await _runOnUIThreadAsync(async () =>
-                    {
-                        await _revertTabOrFileAsync(editToRevert.FullPath, editToRevert.OldContent, editToRevert.IsNewFile);
-                    });
-                }
-                else if (editToRevert.IsNewFile && !isFileBackedPath && _closeTabById != null)
-                {
-                    await _runOnUIThreadAsync(() =>
-                    {
-                        _closeTabById(editToRevert.FullPath);
-                        return Task.CompletedTask;
-                    });
-                }
-
-                sessionEdits.RemoveAt(editIndex);
-                UpdateModificationNumbers(sessionEdits);
-                if (IsVisibleSession(sessionId))
-                {
-                    UpdateModifiedFilesList();
-                }
-
-                _appendActivity(string.Format(
-                    _getString("AgentActivityFileReverted", "파일 변경 취소 완료: {0}"),
-                    editToRevert.RelativePath));
             }
             catch (Exception ex)
             {
@@ -184,6 +163,109 @@ namespace TxtAIEditor.Controls
                     _getString("AgentRevertErrorTitle", "변경 취소 오류"),
                     string.Format(_getString("AgentRevertErrorFormat", "파일을 되돌리는 중 오류가 발생했습니다: {0}"), ex.Message));
             }
+        }
+
+        public bool IsReviewSessionRunning(string sessionId)
+        {
+            string root = _openSessions.FindOpenSession(sessionId)?.OrchestratorSessionId ?? sessionId;
+            return _openSessions.IsSessionRunning(sessionId) || _openSessions.IsSessionRunning(root) ||
+                GetSubagentIds(root).Any(_openSessions.IsSessionRunning);
+        }
+
+        public Task RevertRunAsync(string sessionId, AgentSessionRewindSnapshot snapshot)
+        {
+            var priorEdits = snapshot.SessionEdits.Select(edit => edit.CommitOrder).ToHashSet();
+            var currentRunOwners = snapshot.SubagentSessionIds.Append(sessionId);
+            return RevertEditsAsync(GetOrderedEdits(currentRunOwners).Where(edit =>
+                edit.SessionId != sessionId || (edit.Preview.CommitOrder != 0 && !priorEdits.Contains(edit.Preview.CommitOrder))).Reverse());
+        }
+
+        private async Task RevertEditsAsync(IEnumerable<RecordedEdit> edits)
+        {
+            var changedSessions = new HashSet<string>(StringComparer.Ordinal);
+            try
+            {
+                foreach (RecordedEdit edit in edits)
+                {
+                    AgentFileEditPreview preview = edit.Preview;
+                    bool fileBacked = IsFileBackedSessionPath(preview.FullPath);
+                    bool fileTool = fileBacked && preview.ActionName is not ("insert_text" or "edit_tab" or "save_tab" or "create_tab");
+                    if (fileTool)
+                    {
+                        if (!await AgentFileEditToolService.RevertCommittedFileAsync(preview))
+                        {
+                            throw new IOException(string.Format(_getString("AgentRevertFileChangedFormat",
+                                "파일이 변경되어 되돌릴 수 없습니다: {0}"), preview.RelativePath));
+                        }
+                    }
+                    else if (fileBacked && !preview.IsNewFile)
+                    {
+                        await File.WriteAllTextAsync(preview.FullPath, preview.OldContent);
+                    }
+                    else if (fileBacked && File.Exists(preview.FullPath))
+                    {
+                        File.Delete(preview.FullPath);
+                    }
+
+                    if (!fileBacked)
+                    {
+                        await RestoreTabAsync(preview);
+                    }
+
+                    var sessionEdits = GetOrCreateSessionEdits(edit.SessionId);
+                    sessionEdits.Remove(preview);
+                    UpdateModificationNumbers(sessionEdits);
+                    changedSessions.Add(edit.SessionId);
+
+                    if (fileBacked)
+                    {
+                        if (_fileModifiedAsync != null)
+                        {
+                            await _fileModifiedAsync(preview.FullPath);
+                        }
+                        if (preview.IsNewFile || !fileTool)
+                        {
+                            await RestoreTabAsync(preview);
+                        }
+                    }
+
+                    _appendActivity(string.Format(
+                        _getString("AgentActivityFileReverted", "파일 변경 취소 완료: {0}"), preview.RelativePath));
+                }
+            }
+            finally
+            {
+                if (changedSessions.Count > 0)
+                {
+                    var updates = changedSessions.ToDictionary(id => id, id => GetOrCreateSessionEdits(id).ToList());
+                    foreach (var (id, sessionEdits) in updates)
+                    {
+                        if (_openSessions.FindOpenSession(id) is { } session)
+                        {
+                            session.SessionEdits = sessionEdits;
+                        }
+                    }
+                    UpdateModifiedFilesList();
+                    await _history.UpdateSessionEditsAsync(updates, _currentSessionIdProvider());
+                }
+            }
+        }
+
+        private Task RestoreTabAsync(AgentFileEditPreview preview)
+        {
+            if (_revertTabOrFileAsync != null)
+            {
+                return _runOnUIThreadAsync(() => _revertTabOrFileAsync(preview.FullPath, preview.OldContent, preview.IsNewFile));
+            }
+            if (preview.IsNewFile && _closeTabById != null && !IsFileBackedSessionPath(preview.FullPath))
+            {
+                return _runOnUIThreadAsync(() =>
+                {
+                    _closeTabById(preview.FullPath);
+                    return Task.CompletedTask;
+                });
+            }
+            return Task.CompletedTask;
         }
 
         public string BuildDiffLog()
@@ -254,24 +336,6 @@ namespace TxtAIEditor.Controls
             return count;
         }
 
-        private static int FindLatestEditIndex(
-            IReadOnlyList<AgentFileEditPreview> sessionEdits,
-            string fullPath,
-            string relativePath)
-        {
-            string targetKey = GetSessionEditKey(fullPath, relativePath);
-            for (int i = sessionEdits.Count - 1; i >= 0; i--)
-            {
-                AgentFileEditPreview edit = sessionEdits[i];
-                if (string.Equals(GetSessionEditKey(edit.FullPath, edit.RelativePath), targetKey, StringComparison.OrdinalIgnoreCase))
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
-
         private static void UpdateModificationNumbers(IReadOnlyList<AgentFileEditPreview> sessionEdits)
         {
             var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -305,15 +369,28 @@ namespace TxtAIEditor.Controls
             return latestByPath.Values.ToList();
         }
 
-        private string ResolveRecordingSessionId()
+        private IEnumerable<string> GetSubagentIds(string sessionId)
         {
-            if (!string.IsNullOrEmpty(_recordingSessionId))
-            {
-                return _recordingSessionId;
-            }
-
-            return _currentSessionIdProvider() ?? string.Empty;
+            var snapshotIds = _openSessions.FindOpenSession(sessionId)?.RewindSnapshots
+                .SelectMany(snapshot => snapshot.SubagentSessionIds) ?? Enumerable.Empty<string>();
+            return _openSessions.GetOpenSubagentSessionIds(sessionId)
+                .Concat(_history.GetSubagentSessionIds(sessionId)).Concat(snapshotIds).Distinct(StringComparer.Ordinal);
         }
+
+        private IEnumerable<RecordedEdit> GetReviewEdits(string sessionId) =>
+            GetOrderedEdits(GetSubagentIds(sessionId).Prepend(sessionId));
+
+        private IEnumerable<RecordedEdit> GetOrderedEdits(IEnumerable<string> sessionIds)
+        {
+            return sessionIds.SelectMany(id =>
+            {
+                long legacyOrder = _history.GetSession(id)?.Timestamp.ToUniversalTime().Ticks ?? 0;
+                return GetOrCreateSessionEdits(id).Select(preview => new RecordedEdit(id, preview,
+                    preview.CommitOrder > 0 ? preview.CommitOrder : legacyOrder));
+            }).OrderBy(edit => edit.Order);
+        }
+
+        private sealed record RecordedEdit(string SessionId, AgentFileEditPreview Preview, long Order);
 
         private bool IsVisibleSession(string sessionId)
         {
@@ -330,7 +407,7 @@ namespace TxtAIEditor.Controls
             string key = sessionId ?? string.Empty;
             if (!_sessionEditsBySession.TryGetValue(key, out List<AgentFileEditPreview>? sessionEdits))
             {
-                sessionEdits = new List<AgentFileEditPreview>();
+                sessionEdits = _history.GetSession(key)?.SessionEdits.Select(edit => Clone(edit)).ToList() ?? new();
                 _sessionEditsBySession[key] = sessionEdits;
             }
 
@@ -340,7 +417,9 @@ namespace TxtAIEditor.Controls
         private void UpdateModifiedFilesList()
         {
             string sessionId = _currentSessionIdProvider() ?? string.Empty;
-            var displayEdits = GetLatestEditsForDisplay(GetOrCreateSessionEdits(sessionId));
+            var reviewEdits = GetReviewEdits(sessionId).Select(edit => Clone(edit.Preview)).ToList();
+            UpdateModificationNumbers(reviewEdits);
+            var displayEdits = GetLatestEditsForDisplay(reviewEdits);
             _agentPane.DispatcherQueue.TryEnqueue(() =>
             {
                 // The callback can run after the user switches sessions. Do not let
@@ -354,7 +433,7 @@ namespace TxtAIEditor.Controls
             });
         }
 
-        private static AgentFileEditPreview Clone(AgentFileEditPreview preview)
+        private static AgentFileEditPreview Clone(AgentFileEditPreview preview, long? commitOrder = null)
         {
             return new AgentFileEditPreview
             {
@@ -365,6 +444,7 @@ namespace TxtAIEditor.Controls
                 OldContent = preview.OldContent,
                 NewContent = preview.NewContent,
                 IsNewFile = preview.IsNewFile,
+                CommitOrder = commitOrder ?? preview.CommitOrder,
                 ModificationNumber = preview.ModificationNumber,
                 TotalModifications = preview.TotalModifications
             };
@@ -390,6 +470,7 @@ namespace TxtAIEditor.Controls
                     !string.Equals(current.OldContent, replacement.OldContent, StringComparison.Ordinal) ||
                     !string.Equals(current.NewContent, replacement.NewContent, StringComparison.Ordinal) ||
                     current.IsNewFile != replacement.IsNewFile ||
+                    current.CommitOrder != replacement.CommitOrder ||
                     current.ModificationNumber != replacement.ModificationNumber ||
                     current.TotalModifications != replacement.TotalModifications)
                 {

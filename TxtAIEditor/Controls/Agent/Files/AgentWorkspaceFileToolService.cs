@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Services;
 
@@ -18,23 +19,26 @@ namespace TxtAIEditor.Controls
             _workspace = workspace;
         }
 
-        public async Task<string> ListFilesAsync(string? glob, int maxResults)
+        public Task<string> ListFilesAsync(string? glob, int maxResults, CancellationToken cancellationToken)
         {
             string root = _workspace.ResolveWorkspaceRoot();
             int limit = Math.Clamp(maxResults <= 0 ? 80 : maxResults, 1, 300);
             var matches = _workspace.EnumerateWorkspaceEntries(root)
-                .Where(path => AgentWorkspaceFileResolver.GlobMatches(AgentWorkspaceFileResolver.RelativePath(root, path), glob))
+                .Where(path =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return AgentWorkspaceFileResolver.GlobMatches(AgentWorkspaceFileResolver.RelativePath(root, path), glob);
+                })
                 .Take(limit)
                 .Select(path => FormatWorkspaceEntry(root, path))
                 .ToList();
 
-            await Task.CompletedTask;
-            return matches.Count == 0
+            return Task.FromResult(matches.Count == 0
                 ? "No files or folders matched."
-                : string.Join(Environment.NewLine, matches);
+                : string.Join(Environment.NewLine, matches));
         }
 
-        public async Task<string> SearchTextAsync(string query, string? glob, int maxResults)
+        public async Task<string> SearchTextAsync(string query, string? glob, int maxResults, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(query))
             {
@@ -47,9 +51,14 @@ namespace TxtAIEditor.Controls
             var results = new List<string>();
             var contentSearchFiles = new List<string>();
 
-            foreach (string filePath in _workspace.EnumerateWorkspaceFiles(root).Where(path => AgentWorkspaceFileResolver.GlobMatches(AgentWorkspaceFileResolver.RelativePath(root, path), glob)))
+            foreach (string filePath in _workspace.EnumerateWorkspaceFiles(root))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string relativePath = AgentWorkspaceFileResolver.RelativePath(root, filePath);
+                if (!AgentWorkspaceFileResolver.GlobMatches(relativePath, glob))
+                {
+                    continue;
+                }
                 if (MatchesSearchQuery(relativePath, query, queryRegex) ||
                     MatchesSearchQuery(Path.GetFileName(filePath), query, queryRegex))
                 {
@@ -68,33 +77,37 @@ namespace TxtAIEditor.Controls
 
             foreach (string filePath in contentSearchFiles)
             {
-                string[] lines;
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    Encoding encoding = await DetectFileEncodingAsync(filePath);
-                    lines = await File.ReadAllLinesAsync(filePath, encoding);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                for (int i = 0; i < lines.Length; i++)
-                {
-                    if (MatchesSearchQuery(lines[i], query, queryRegex))
+                    using var stream = OpenReadSnapshot(filePath);
+                    Encoding encoding = await DetectFileEncodingAsync(stream, cancellationToken);
+                    using var reader = new StreamReader(stream, encoding);
+                    int lineNumber = 0;
+                    while (await reader.ReadLineAsync(cancellationToken) is { } line)
                     {
-                        string preview = lines[i].Trim();
+                        lineNumber++;
+                        if (!MatchesSearchQuery(line, query, queryRegex))
+                        {
+                            continue;
+                        }
+
+                        string preview = line.Trim();
                         if (preview.Length > 220)
                         {
                             preview = preview.Substring(0, 220) + "...";
                         }
 
-                        results.Add($"{AgentWorkspaceFileResolver.RelativePath(root, filePath)}:{i + 1}: {preview}");
+                        results.Add($"{AgentWorkspaceFileResolver.RelativePath(root, filePath)}:{lineNumber}: {preview}");
                         if (results.Count >= limit)
                         {
                             return string.Join(Environment.NewLine, results);
                         }
                     }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    continue;
                 }
             }
 
@@ -103,7 +116,7 @@ namespace TxtAIEditor.Controls
                 : string.Join(Environment.NewLine, results);
         }
 
-        public async Task<string> ReadFileAsync(string path, int startLine, int lineCount)
+        public async Task<string> ReadFileAsync(string path, int startLine, int lineCount, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -123,11 +136,12 @@ namespace TxtAIEditor.Controls
             int currentLine = 0;
             int endLine = start + count - 1;
 
-            Encoding encoding = await DetectFileEncodingAsync(fullPath);
-            using (var reader = new StreamReader(fullPath, encoding, detectEncodingFromByteOrderMarks: true))
+            using var stream = OpenReadSnapshot(fullPath);
+            Encoding encoding = await DetectFileEncodingAsync(stream, cancellationToken);
+            using (var reader = new StreamReader(stream, encoding))
             {
                 string? line;
-                while ((line = await reader.ReadLineAsync()) != null)
+                while ((line = await reader.ReadLineAsync(cancellationToken)) != null)
                 {
                     currentLine++;
                     if (currentLine >= start && currentLine <= endLine)
@@ -207,23 +221,19 @@ namespace TxtAIEditor.Controls
             return true;
         }
 
-        private static async Task<Encoding> DetectFileEncodingAsync(string filePath)
+        private static FileStream OpenReadSnapshot(string path) =>
+            new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete,
+                bufferSize: 4096, options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+        private static async Task<Encoding> DetectFileEncodingAsync(FileStream stream, CancellationToken cancellationToken)
         {
             const int sampleSize = 128 * 1024;
-            using var stream = new FileStream(
-                filePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.ReadWrite,
-                sampleSize,
-                useAsync: true);
-
             int length = (int)Math.Min(stream.Length, sampleSize);
             byte[] sample = new byte[length];
             int totalRead = 0;
             while (totalRead < length)
             {
-                int read = await stream.ReadAsync(sample.AsMemory(totalRead, length - totalRead));
+                int read = await stream.ReadAsync(sample.AsMemory(totalRead, length - totalRead), cancellationToken);
                 if (read == 0)
                 {
                     break;
@@ -237,6 +247,7 @@ namespace TxtAIEditor.Controls
                 Array.Resize(ref sample, totalRead);
             }
 
+            stream.Position = 0;
             return TextEncodingService.GetTextEncoding(sample, "Auto");
         }
 

@@ -16,6 +16,7 @@ namespace TxtAIEditor.Controls
         public string OldContent { get; init; } = string.Empty;
         public string NewContent { get; init; } = string.Empty;
         public bool IsNewFile { get; init; }
+        public long CommitOrder { get; init; }
 
         public int ModificationNumber { get; set; }
         public int TotalModifications { get; set; }
@@ -201,19 +202,19 @@ namespace TxtAIEditor.Controls
             }, cancellationToken);
         }
 
-        public Task<string> ListFilesAsync(string? glob, int maxResults)
+        public Task<string> ListFilesAsync(string? glob, int maxResults, CancellationToken cancellationToken = default)
         {
-            return RunInBackgroundAsync(() => _workspaceFiles.ListFilesAsync(glob, maxResults));
+            return RunInBackgroundAsync(() => _workspaceFiles.ListFilesAsync(glob, maxResults, cancellationToken), cancellationToken);
         }
 
-        public Task<string> SearchTextAsync(string query, string? glob, int maxResults)
+        public Task<string> SearchTextAsync(string query, string? glob, int maxResults, CancellationToken cancellationToken = default)
         {
-            return RunInBackgroundAsync(() => _workspaceFiles.SearchTextAsync(query, glob, maxResults));
+            return RunInBackgroundAsync(() => _workspaceFiles.SearchTextAsync(query, glob, maxResults, cancellationToken), cancellationToken);
         }
 
-        public Task<string> ReadFileAsync(string path, int startLine, int lineCount)
+        public Task<string> ReadFileAsync(string path, int startLine, int lineCount, CancellationToken cancellationToken = default)
         {
-            return RunInBackgroundAsync(() => _workspaceFiles.ReadFileAsync(path, startLine, lineCount));
+            return RunInBackgroundAsync(() => _workspaceFiles.ReadFileAsync(path, startLine, lineCount, cancellationToken), cancellationToken);
         }
 
         public Task<AgentReadImageResult> ReadImageAsync(string path, bool original = false)
@@ -295,6 +296,8 @@ namespace TxtAIEditor.Controls
                 allowedStartLine,
                 allowedEndLine));
         }
+
+        public string ResolveEditLockPath(string path) => _workspace.ResolveEditLockPath(path);
 
         public Task<string> ApplyPatchAsync(string? path, string patchText)
         {

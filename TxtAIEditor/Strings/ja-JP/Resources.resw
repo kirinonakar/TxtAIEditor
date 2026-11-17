@@ -2757,6 +2757,9 @@
   <data name="AgentSessionRewindErrorTitle" xml:space="preserve">
     <value>セッション巻き戻しエラー</value>
   </data>
+  <data name="AgentRevertFileChangedFormat" xml:space="preserve">
+    <value>ファイルが変更されたため、元に戻せませんでした: {0}</value>
+  </data>
   <data name="AgentSessionRewindErrorFormat" xml:space="preserve">
     <value>セッションの巻き戻し中にエラーが発生しました: {0}</value>
   </data>

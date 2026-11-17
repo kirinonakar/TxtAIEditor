@@ -73,6 +73,26 @@ namespace TxtAIEditor.Controls
             return _history.FirstOrDefault(h => h.Id == historyId);
         }
 
+        public IEnumerable<string> GetSubagentSessionIds(string parentId) =>
+            _history.Where(item => item.OrchestratorSessionId == parentId).Select(item => item.Id);
+
+        public async Task UpdateSessionEditsAsync(IReadOnlyDictionary<string, List<AgentFileEditPreview>> updates, string currentSessionId)
+        {
+            bool changed = false;
+            foreach (AgentHistoryItem item in _history)
+            {
+                if (updates.TryGetValue(item.Id, out List<AgentFileEditPreview>? edits))
+                {
+                    item.SessionEdits = edits;
+                    changed = true;
+                }
+            }
+            if (changed)
+            {
+                await SaveAsync(currentSessionId);
+            }
+        }
+
         private void RestoreLegacySubagentLinks()
         {
             var unlinked = _history.Where(item =>

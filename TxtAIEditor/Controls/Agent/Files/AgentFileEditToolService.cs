@@ -533,6 +533,11 @@ namespace TxtAIEditor.Controls
                 StringComparison.Ordinal);
         }
 
+        public static string[] GetPatchPaths(string? path, string patchText) =>
+            TryParseFilePatchSections(path, AgentToolHelpers.SanitizeApplyPatchText(patchText), out List<FilePatchSection> sections, out _)
+                ? sections.Select(section => section.Path).ToArray()
+                : [];
+
         public async Task<string> ApplyPatchAsync(string? path, string patchText)
         {
             if (string.IsNullOrWhiteSpace(patchText))
@@ -1492,6 +1497,32 @@ namespace TxtAIEditor.Controls
             }
             builder.Append(AgentToolHelpers.EditFailureContextEndMarker);
             return builder.ToString();
+        }
+
+        internal static async Task<bool> RevertCommittedFileAsync(AgentFileEditPreview edit)
+        {
+            if (!File.Exists(edit.FullPath))
+            {
+                return edit.IsNewFile;
+            }
+
+            TextFileSnapshot current = await ReadTextFileAsync(edit.FullPath);
+            if (!string.Equals(NormalizeNewlines(current.Content), NormalizeNewlines(edit.NewContent), StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (edit.IsNewFile)
+            {
+                File.Delete(edit.FullPath);
+            }
+            else
+            {
+                await WriteTextFileAsync(edit.FullPath,
+                    RestoreLineEndings(NormalizeNewlines(edit.OldContent), DetectLineEnding(current.Content)),
+                    current.Encoding);
+            }
+            return true;
         }
 
         private static async Task<TextFileSnapshot> ReadTextFileAsync(string fullPath)

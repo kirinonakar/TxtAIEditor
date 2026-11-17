@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
@@ -74,7 +73,7 @@ namespace TxtAIEditor.Controls
             Action<object> initializePickerWindow,
             Func<string, bool> isGitRepoProvider,
             Dictionary<string, AgentRunContext> runningSessions,
-            SemaphoreSlim toolExecutionSessionGate,
+            AgentToolExecutionGate toolExecutionSessionGate,
             Func<string> currentSessionIdProvider,
             Action<string> setCurrentSessionId,
             Func<string> sessionHistoryTextProvider,
@@ -168,7 +167,9 @@ namespace TxtAIEditor.Controls
                 callbacks.AppendActivity,
                 showError,
                 getString,
-                currentSessionIdProvider);
+                currentSessionIdProvider,
+                historyController,
+                toolExecutionSessionGate);
             var openSessionController = new AgentOpenSessionController(
                 settingsService,
                 agentPane,
@@ -189,6 +190,7 @@ namespace TxtAIEditor.Controls
                 AppBadgeNotificationService.UpdateBadge,
                 getString,
                 navigateToFolderAsync);
+            sessionEditController.BindOpenSessions(openSessionController);
             var sessionHistoryCoordinator = new AgentSessionHistoryCoordinator(
                 agentPane,
                 settingsService,
@@ -215,7 +217,6 @@ namespace TxtAIEditor.Controls
                 callbacks.UpdateContextStatsImmediate,
                 getString);
             var sessionRewindController = new AgentSessionRewindController(
-                callbacks.IsCurrentSessionRunning,
                 toolExecutionSessionGate,
                 currentSessionIdProvider,
                 openSessionController.SaveActiveFromUI,
@@ -281,6 +282,12 @@ namespace TxtAIEditor.Controls
                 getString,
                 displayText.IsOutputPlaceholder,
                 () => uiDispatcher.RunAsync(() => { }));
+            Task TrackFileEditAsync(AgentFileEditPreview preview)
+            {
+                string? sessionId = callbacks.GetActiveRunContext()?.SessionId;
+                return uiDispatcher.RunAsync(() => sessionEditController.Track(preview, sessionId));
+            }
+
             var tabToolController = new AgentTabToolController(
                 callbacks.GetActiveTabForContext,
                 activeTabProvider,
@@ -291,8 +298,7 @@ namespace TxtAIEditor.Controls
                 saveTabAsync,
                 editTabAsync,
                 fileTools,
-                sessionEditController,
-                action => uiDispatcher.RunAsync(action),
+                TrackFileEditAsync,
                 action => uiDispatcher.RunAsync(action),
                 action => uiDispatcher.RunAsync(action));
             var confirmationController = new AgentConfirmationController(
@@ -331,7 +337,7 @@ namespace TxtAIEditor.Controls
 
             fileTools.ConfirmFileEditAsync = confirmationController.ConfirmFileEditAsync;
             fileTools.ConfirmPowerShellAsync = confirmationController.ConfirmPowerShellAsync;
-            fileTools.FileEditCommittedAsync = preview => uiDispatcher.RunAsync(() => sessionEditController.Track(preview));
+            fileTools.FileEditCommittedAsync = TrackFileEditAsync;
             fileTools.ActivityReporter = callbacks.AppendActivity;
             if (fileModifiedAsync != null)
             {

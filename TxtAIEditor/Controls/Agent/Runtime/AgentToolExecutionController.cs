@@ -51,6 +51,60 @@ namespace TxtAIEditor.Controls
             _getString = getString;
         }
 
+        public bool IsParallelRead(string name) =>
+            !_mcpController.TryGetToolAlias(name, out _) &&
+            name is "list_files" or "search_text" or "run_rg" or "run_rga" or "read_file" or "read_image"
+                or "skill_use" or "web_search" or "web_fetch" or "web_fetch_exa";
+
+        public string[] GetFileMutationLockPaths(string name, ref JsonElement arguments)
+        {
+            try
+            {
+                return ResolveFileMutationLockPaths(name, ref arguments);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or NotSupportedException or JsonException)
+            {
+                // The tool itself reports invalid paths or arguments in its normal result format.
+                return [];
+            }
+        }
+
+        private string[] ResolveFileMutationLockPaths(string name, ref JsonElement arguments)
+        {
+            if (_mcpController.TryGetToolAlias(name, out _))
+            {
+                return [];
+            }
+
+            string[] paths;
+            if (name == "merge_files")
+            {
+                paths = _fileToolController.GetMergeFilePaths(arguments, out string target).Append(target).ToArray();
+            }
+            else if (name is "search_replace" or "replace_range" or "insert_to_file" or "overwrite_file" or "append_to_file" or "apply_patch")
+            {
+                string path = _fileToolController.GetEditPathArgument(arguments);
+                if (!string.IsNullOrWhiteSpace(path) && _fileToolController.GetPathArgument(arguments).Length == 0)
+                {
+                    // Pin the inferred target before waiting for its lock.
+                    var pinned = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(arguments.GetRawText())!;
+                    pinned["path"] = JsonSerializer.SerializeToElement(path);
+                    arguments = JsonSerializer.SerializeToElement(pinned);
+                }
+
+                paths = name == "apply_patch"
+                    ? AgentFileEditToolService.GetPatchPaths(path, GetFirstStringArgument(arguments, "patch", "patchText", "diff", "content"))
+                    : [path];
+            }
+            else
+            {
+                // UI, shell, MCP and operations with calculated output paths need exclusive mutation access.
+                return [];
+            }
+
+            return paths.Select(_fileTools.ResolveEditLockPath).ToArray();
+        }
+
         public async Task<string> ExecuteAsync(
             string toolName,
             JsonElement arguments,
@@ -80,11 +134,13 @@ namespace TxtAIEditor.Controls
                     {
                         "list_files" => await _fileTools.ListFilesAsync(
                             GetStringArgument(arguments, "glob"),
-                            GetIntArgument(arguments, "maxResults", 80)),
+                            GetIntArgument(arguments, "maxResults", 80),
+                            cancellationToken),
                         "search_text" => await _fileTools.SearchTextAsync(
                             GetStringArgument(arguments, "query"),
                             GetStringArgument(arguments, "glob"),
-                            GetIntArgument(arguments, "maxResults", 80)),
+                            GetIntArgument(arguments, "maxResults", 80),
+                            cancellationToken),
                         "run_rg" => await _fileTools.RunRgAsync(
                             GetStringArgument(arguments, "arguments"),
                             GetIntArgument(arguments, "timeoutMs", 10000),
@@ -102,7 +158,8 @@ namespace TxtAIEditor.Controls
                         "read_file" => await _fileTools.ReadFileAsync(
                             GetStringArgument(arguments, "path"),
                             GetIntArgument(arguments, "startLine", 1),
-                            GetIntArgument(arguments, "lineCount", 160)),
+                            GetIntArgument(arguments, "lineCount", 160),
+                            cancellationToken),
                         "skill_use" => await _skillController.UseSkillAsync(
                             GetFirstStringArgument(arguments, "name", "skill", "skillName", "skill_name", "path", "filePath", "file_path")),
                         "read_image" => await ReadImageToolAsync(arguments),

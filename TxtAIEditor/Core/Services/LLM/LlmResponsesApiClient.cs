@@ -23,6 +23,7 @@ namespace TxtAIEditor.Core.Services.LLM
             "[Agent tool call]",
             "[Tool result:",
             "[tool:",
+            "[Subagent events]",
             "[Agent Response]:",
             "[Previous Tool Call]:",
             "[Previous Response]:",

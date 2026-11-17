@@ -2757,6 +2757,9 @@
   <data name="AgentSessionRewindErrorTitle" xml:space="preserve">
     <value>會話倒帶錯誤</value>
   </data>
+  <data name="AgentRevertFileChangedFormat" xml:space="preserve">
+    <value>檔案已變更，無法還原: {0}</value>
+  </data>
   <data name="AgentSessionRewindErrorFormat" xml:space="preserve">
     <value>回滾會話時發生錯誤：{0}</value>
   </data>

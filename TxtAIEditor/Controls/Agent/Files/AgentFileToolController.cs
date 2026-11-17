@@ -392,12 +392,18 @@ namespace TxtAIEditor.Controls
 
         public async Task<string> MergeFilesAsync(JsonElement arguments)
         {
-            string targetPath = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
+            string[] paths = GetMergeFilePaths(arguments, out string targetPath);
             if (string.IsNullOrWhiteSpace(targetPath))
             {
                 return "merge_files failed: targetPath is empty.";
             }
 
+            return await _fileTools.MergeFilesAsync(paths, targetPath);
+        }
+
+        public string[] GetMergeFilePaths(JsonElement arguments, out string targetPath)
+        {
+            targetPath = GetFirstStringArgument(arguments, "targetPath", "target_path", "path", "target");
             var pathsList = new List<string>();
             if (arguments.TryGetProperty("paths", out var pathsProp))
             {
@@ -450,7 +456,7 @@ namespace TxtAIEditor.Controls
                 }
             }
 
-            return await _fileTools.MergeFilesAsync(pathsList.ToArray(), targetPath);
+            return pathsList.ToArray();
         }
 
         public async Task<string> SplitFileAsync(JsonElement arguments)

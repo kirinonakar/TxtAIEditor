@@ -20,8 +20,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<OpenedTab, string?, Task<bool>>? _saveTabAsync;
         private readonly Func<OpenedTab, string, Task<bool>>? _editTabAsync;
         private readonly AgentFileToolService _fileTools;
-        private readonly AgentSessionEditController _sessionEditController;
-        private readonly Func<Action, Task> _runOnUIThreadAsync;
+        private readonly Func<AgentFileEditPreview, Task> _trackEditAsync;
         private readonly Func<Func<OpenedTab>, Task<OpenedTab>> _runOnUIThreadForTabAsync;
         private readonly Func<Func<Task<bool>>, Task<bool>> _runOnUIThreadForBoolAsync;
 
@@ -35,8 +34,7 @@ namespace TxtAIEditor.Controls
             Func<OpenedTab, string?, Task<bool>>? saveTabAsync,
             Func<OpenedTab, string, Task<bool>>? editTabAsync,
             AgentFileToolService fileTools,
-            AgentSessionEditController sessionEditController,
-            Func<Action, Task> runOnUIThreadAsync,
+            Func<AgentFileEditPreview, Task> trackEditAsync,
             Func<Func<OpenedTab>, Task<OpenedTab>> runOnUIThreadForTabAsync,
             Func<Func<Task<bool>>, Task<bool>> runOnUIThreadForBoolAsync)
         {
@@ -49,8 +47,7 @@ namespace TxtAIEditor.Controls
             _saveTabAsync = saveTabAsync;
             _editTabAsync = editTabAsync;
             _fileTools = fileTools;
-            _sessionEditController = sessionEditController;
-            _runOnUIThreadAsync = runOnUIThreadAsync;
+            _trackEditAsync = trackEditAsync;
             _runOnUIThreadForTabAsync = runOnUIThreadForTabAsync;
             _runOnUIThreadForBoolAsync = runOnUIThreadForBoolAsync;
         }
@@ -96,7 +93,7 @@ namespace TxtAIEditor.Controls
                 IsNewFile = false
             };
 
-            await _runOnUIThreadAsync(() => _sessionEditController.Track(preview));
+            await _trackEditAsync(preview);
 
             return $"inserted into active editor: {content.Length:N0} chars";
         }
@@ -128,7 +125,7 @@ namespace TxtAIEditor.Controls
                     IsNewFile = true
                 };
 
-                await _runOnUIThreadAsync(() => _sessionEditController.Track(preview));
+                await _trackEditAsync(preview);
 
                 return $"created new tab: {displayTitle} ({content.Length:N0} chars)";
             }
@@ -200,7 +197,7 @@ namespace TxtAIEditor.Controls
                     NewContent = tab.ContentPreview,
                     IsNewFile = string.IsNullOrEmpty(originalFilePath)
                 };
-                await _runOnUIThreadAsync(() => _sessionEditController.Track(preview));
+                await _trackEditAsync(preview);
 
                 return $"successfully saved tab to: {relativePath}";
             }
@@ -267,7 +264,7 @@ namespace TxtAIEditor.Controls
                     NewContent = content,
                     IsNewFile = false
                 };
-                await _runOnUIThreadAsync(() => _sessionEditController.Track(preview));
+                await _trackEditAsync(preview);
 
                 return $"successfully edited tab: {relativePath}";
             }

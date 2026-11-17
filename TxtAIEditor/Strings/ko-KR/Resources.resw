@@ -2757,6 +2757,9 @@
   <data name="AgentSessionRewindErrorTitle" xml:space="preserve">
     <value>세션 되감기 오류</value>
   </data>
+  <data name="AgentRevertFileChangedFormat" xml:space="preserve">
+    <value>파일이 변경되어 되돌릴 수 없습니다: {0}</value>
+  </data>
   <data name="AgentSessionRewindErrorFormat" xml:space="preserve">
     <value>세션을 되감는 중 오류가 발생했습니다: {0}</value>
   </data>
