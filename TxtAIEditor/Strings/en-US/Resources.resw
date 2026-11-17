@@ -3847,6 +3847,9 @@ Plan: {0}</value>
   <data name="ExplorerMoreActions" xml:space="preserve">
     <value>More actions</value>
   </data>
+  <data name="AgentOrchestratorContextBudgetExceeded" xml:space="preserve">
+    <value>The orchestrator input still exceeds the model's context limit after compression.</value>
+  </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>Context compression was performed.</value>
   </data>

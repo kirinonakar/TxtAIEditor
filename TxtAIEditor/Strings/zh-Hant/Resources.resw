@@ -3805,6 +3805,9 @@
   <data name="ExplorerMoreActions" xml:space="preserve">
     <value>更多操作</value>
   </data>
+  <data name="AgentOrchestratorContextBudgetExceeded" xml:space="preserve">
+    <value>壓縮後，協調代理的輸入仍超出模型的上下文限制。</value>
+  </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>已執行上下文壓縮。</value>
   </data>

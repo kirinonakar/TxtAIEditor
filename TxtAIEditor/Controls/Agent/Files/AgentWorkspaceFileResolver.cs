@@ -81,9 +81,9 @@ namespace TxtAIEditor.Controls
             throw new InvalidOperationException($"Path escapes workspace root: {path}");
         }
 
-        public string ResolveEditLockPath(string path)
+        public string ResolveEditLockPath(string path, bool allowOutside = false)
         {
-            string fullPath = ResolveInsideWorkspace(path);
+            string fullPath = ResolveInsideWorkspace(path, allowOutside);
             string current = Path.GetPathRoot(fullPath)!;
             string[] parts = fullPath[current.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
             for (int i = 0; i < parts.Length; i++)

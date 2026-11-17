@@ -17,7 +17,6 @@ namespace TxtAIEditor.Controls
         private const int MaximumSummaryTargetTokens = 4096;
         private const double DefaultOutputReserveRatio = 0.25;
         private const int MaximumOutputReserveTokens = 65536;
-        private const int MinimumInputBudgetTokens = 4096;
 
         private readonly ILLMService _llmService;
         private readonly AgentModelContextLimitProvider _modelContextLimits;
@@ -50,14 +49,11 @@ namespace TxtAIEditor.Controls
                 return AgentContextCompressionResult.Unchanged(modelTranscript);
             }
 
-            int contextLimit = _modelContextLimits.GetContextLimit(settings, () => { });
-            if (contextLimit <= 0)
+            int? inputBudget = GetInputBudget(settings);
+            if (inputBudget == null)
             {
                 return AgentContextCompressionResult.Unchanged(modelTranscript);
             }
-
-            int outputLimit = ResolveOutputLimit(settings, contextLimit);
-            int inputBudget = Math.Max(MinimumInputBudgetTokens, contextLimit - outputLimit);
 
             int requestTokens = EstimateModelRequestTokens(
                 settings,
@@ -70,13 +66,12 @@ namespace TxtAIEditor.Controls
                 hasEnabledMcp,
                 tools,
                 attachments);
-            requestTokens = tokenCalibration?.Estimate(requestTokens) ?? requestTokens;
 
             // The provider counts the requested completion budget against the context
             // window, and the character based estimate runs below the real tokenizer, so
             // compare a padded estimate against the padded input budget.
-            int budgetedRequestTokens = LlmTokenBudget.ApplyEstimationSafetyMargin(requestTokens);
-            if (budgetedRequestTokens <= Math.Floor(inputBudget * CompressionThresholdRatio))
+            int budgetedRequestTokens = BudgetRequestTokens(requestTokens, tokenCalibration);
+            if (budgetedRequestTokens <= Math.Floor(inputBudget.Value * CompressionThresholdRatio))
             {
                 return AgentContextCompressionResult.Unchanged(modelTranscript);
             }
@@ -119,6 +114,23 @@ namespace TxtAIEditor.Controls
             tokenCalibration?.Reset();
             return new AgentContextCompressionResult(compressedPrefix + tail, true);
         }
+
+        public bool ExceedsInputBudget(EditorSettings settings, int requestTokens, AgentRequestTokenCalibration tokenCalibration) =>
+            GetInputBudget(settings) is int budget && BudgetRequestTokens(requestTokens, tokenCalibration) > budget;
+
+        private int? GetInputBudget(EditorSettings settings)
+        {
+            int contextLimit = _modelContextLimits.GetContextLimit(settings, () => { });
+            int configuredLimit = LlmRequestTuning.ParseMaxContextTokens(settings.LlmMaxContextLength);
+            if (configuredLimit > 0)
+            {
+                contextLimit = contextLimit > 0 ? Math.Min(contextLimit, configuredLimit) : configuredLimit;
+            }
+            return contextLimit > 0 ? contextLimit - ResolveOutputLimit(settings, contextLimit) : null;
+        }
+
+        private static int BudgetRequestTokens(int estimatedTokens, AgentRequestTokenCalibration? calibration) =>
+            LlmTokenBudget.ApplyEstimationSafetyMargin(calibration?.Estimate(estimatedTokens) ?? estimatedTokens);
 
         /// <summary>
         /// Estimates the tokens of the request that is actually sent to the model: the system

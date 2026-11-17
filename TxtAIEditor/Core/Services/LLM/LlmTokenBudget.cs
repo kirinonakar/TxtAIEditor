@@ -27,7 +27,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 return estimatedTokens;
             }
 
-            return (int)Math.Ceiling(estimatedTokens * EstimationSafetyMultiplier);
+            return (int)Math.Min(int.MaxValue, Math.Ceiling(estimatedTokens * EstimationSafetyMultiplier));
         }
 
         public static int GetSafeMaxOutputTokens(

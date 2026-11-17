@@ -8,88 +8,62 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentToolExecutionGate
     {
-        private const int ParallelLimit = 4;
+        public const int ParallelLimit = 4;
         private readonly SemaphoreSlim _reads = new(ParallelLimit, ParallelLimit);
-        private readonly SemaphoreSlim _mutationAdmission = new(1, 1);
-        private readonly SemaphoreSlim _mutationSlots = new(ParallelLimit, ParallelLimit);
+        private readonly SemaphoreSlim _writes = new(ParallelLimit, ParallelLimit);
+        private readonly SemaphoreSlim _web = new(ParallelLimit, ParallelLimit);
+        private readonly AccessGate _workspace = new();
         private readonly Dictionary<string, FileGate> _files = new(StringComparer.OrdinalIgnoreCase);
 
-        public async Task<IDisposable> EnterReadAsync(CancellationToken token)
-        {
-            await _reads.WaitAsync(token);
-            return new Lease(() => _reads.Release());
-        }
+        public Task<IDisposable> EnterWebAsync(CancellationToken token) => EnterSlotAsync(_web, token);
 
-        public async Task<IDisposable> EnterFilesAsync(IEnumerable<string> paths, CancellationToken token)
+        public Task<IDisposable> EnterFileReadAsync(string? path, CancellationToken token) =>
+            EnterWorkspaceAsync(path is null ? Array.Empty<string>() : new[] { path }, path is null ? Access.Scan : Access.Read, _reads, token);
+
+        public Task<IDisposable> EnterFilesAsync(IEnumerable<string> paths, CancellationToken token) =>
+            EnterWorkspaceAsync(paths, Access.Write, _writes, token);
+
+        public Task<IDisposable> EnterExclusiveAsync(CancellationToken token = default) =>
+            _workspace.EnterAsync(Access.Exclusive, token);
+
+        private async Task<IDisposable> EnterWorkspaceAsync(
+            IEnumerable<string> paths, Access access, SemaphoreSlim slots, CancellationToken token)
         {
             var leases = new List<IDisposable>();
+            void Release()
+            {
+                for (int index = leases.Count - 1; index >= 0; index--)
+                {
+                    leases[index].Dispose();
+                }
+            }
+
             try
             {
-                // Acquire in the same order even when two patches list their files differently.
+                // Take path locks in the same order across calls, before entering the workspace gate.
                 foreach (string path in paths.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
                 {
-                    leases.Add(await EnterFileAsync(path, token));
+                    leases.Add(await EnterFileAsync(path, access == Access.Read ? Access.Read : Access.Exclusive, token));
                 }
 
-                await _mutationAdmission.WaitAsync(token);
-                try
-                {
-                    await _mutationSlots.WaitAsync(token);
-                }
-                finally
-                {
-                    _mutationAdmission.Release();
-                }
-
-                return new Lease(() =>
-                {
-                    _mutationSlots.Release();
-                    foreach (IDisposable lease in leases)
-                    {
-                        lease.Dispose();
-                    }
-                });
+                leases.Add(await EnterSlotAsync(slots, token));
+                leases.Add(await _workspace.EnterAsync(access, token));
+                return new Lease(Release);
             }
             catch
             {
-                foreach (IDisposable lease in leases)
-                {
-                    lease.Dispose();
-                }
+                Release();
                 throw;
             }
         }
 
-        public async Task<IDisposable> EnterExclusiveAsync(CancellationToken token = default)
+        private static async Task<IDisposable> EnterSlotAsync(SemaphoreSlim slots, CancellationToken token)
         {
-            await _mutationAdmission.WaitAsync(token);
-            int acquired = 0;
-            try
-            {
-                while (acquired < ParallelLimit)
-                {
-                    await _mutationSlots.WaitAsync(token);
-                    acquired++;
-                }
-
-                return new Lease(() =>
-                {
-                    _mutationSlots.Release(ParallelLimit);
-                    _mutationAdmission.Release();
-                });
-            }
-            catch
-            {
-                if (acquired > 0)
-                {
-                    _mutationSlots.Release(acquired);
-                }
-                _mutationAdmission.Release();
-                throw;
-            }
+            await slots.WaitAsync(token);
+            return new Lease(() => slots.Release());
         }
 
-        private async Task<IDisposable> EnterFileAsync(string path, CancellationToken token)
+        private async Task<IDisposable> EnterFileAsync(string path, Access access, CancellationToken token)
         {
             FileGate file;
             lock (_files)
@@ -103,36 +77,99 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                await file.Semaphore.WaitAsync(token);
-                return new Lease(() => ReleaseFile(path, file, acquired: true));
+                IDisposable lease = await file.Gate.EnterAsync(access, token);
+                return new Lease(() =>
+                {
+                    lease.Dispose();
+                    ReleaseFile(path, file);
+                });
             }
             catch
             {
-                ReleaseFile(path, file, acquired: false);
+                ReleaseFile(path, file);
                 throw;
             }
         }
 
-        private void ReleaseFile(string path, FileGate file, bool acquired)
+        private void ReleaseFile(string path, FileGate file)
         {
             lock (_files)
             {
-                if (acquired)
-                {
-                    file.Semaphore.Release();
-                }
                 if (--file.References == 0)
                 {
                     _files.Remove(path);
-                    file.Semaphore.Dispose();
+                    file.Gate.Dispose();
                 }
             }
         }
 
+        private enum Access { Read, Write, Scan, Exclusive }
+
         private sealed class FileGate
         {
-            public SemaphoreSlim Semaphore { get; } = new(1, 1);
+            public AccessGate Gate { get; } = new();
             public int References { get; set; }
+        }
+
+        private sealed class AccessGate : IDisposable
+        {
+            private readonly SemaphoreSlim _admission = new(1, 1);
+            private readonly int[] _active = new int[4];
+            private TaskCompletionSource _changed = NewSignal();
+
+            public async Task<IDisposable> EnterAsync(Access access, CancellationToken token)
+            {
+                // Once an incompatible caller is waiting, later callers cannot keep it waiting
+                // by continuously joining the currently active group.
+                await _admission.WaitAsync(token);
+                try
+                {
+                    while (true)
+                    {
+                        Task changed;
+                        lock (_active)
+                        {
+                            token.ThrowIfCancellationRequested();
+                            if (CanEnter(access))
+                            {
+                                _active[(int)access]++;
+                                return new Lease(() => Release(access));
+                            }
+                            changed = _changed.Task;
+                        }
+                        await changed.WaitAsync(token);
+                    }
+                }
+                finally
+                {
+                    _admission.Release();
+                }
+            }
+
+            private bool CanEnter(Access access) =>
+                _active[(int)Access.Exclusive] == 0 && access switch
+                {
+                    Access.Read => true,
+                    Access.Write => _active[(int)Access.Scan] == 0,
+                    Access.Scan => _active[(int)Access.Write] == 0,
+                    _ => _active.All(count => count == 0)
+                };
+
+            private void Release(Access access)
+            {
+                lock (_active)
+                {
+                    if (--_active[(int)access] == 0)
+                    {
+                        _changed.TrySetResult();
+                        _changed = NewSignal();
+                    }
+                }
+            }
+
+            private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public void Dispose() => _admission.Dispose();
         }
 
         private sealed class Lease(Action release) : IDisposable

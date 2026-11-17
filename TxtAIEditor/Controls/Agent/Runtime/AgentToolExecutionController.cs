@@ -51,10 +51,37 @@ namespace TxtAIEditor.Controls
             _getString = getString;
         }
 
-        public bool IsParallelRead(string name) =>
+        public bool IsFileRead(string name) =>
             !_mcpController.TryGetToolAlias(name, out _) &&
             name is "list_files" or "search_text" or "run_rg" or "run_rga" or "read_file" or "read_image"
-                or "skill_use" or "web_search" or "web_fetch" or "web_fetch_exa";
+                or "skill_use";
+
+        public bool IsWebRead(string name) =>
+            !_mcpController.TryGetToolAlias(name, out _) && name is "web_search" or "web_fetch" or "web_fetch_exa";
+
+        public bool CanRunInReadBatch(string name) => name is not ("read_image" or "skill_use") && IsFileRead(name);
+
+        public string? GetFileReadLockPath(string name, JsonElement arguments)
+        {
+            if (name is not ("read_file" or "read_image"))
+            {
+                return null;
+            }
+
+            string path = name == "read_file" ? GetStringArgument(arguments, "path") : GetImagePath(arguments);
+            try
+            {
+                return _fileTools.ResolveReadLockPath(path);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or NotSupportedException)
+            {
+                // An unresolved target uses the workspace read scope. The tool reports the path error.
+                return null;
+            }
+        }
+
+        public void TrackFileToolPath(string name, JsonElement arguments, string result) =>
+            _fileToolController.TrackSuccessfulFileToolPath(name, arguments, result);
 
         public string[] GetFileMutationLockPaths(string name, ref JsonElement arguments)
         {
@@ -109,7 +136,8 @@ namespace TxtAIEditor.Controls
             string toolName,
             JsonElement arguments,
             bool verbose,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool trackFilePath = true)
         {
             try
             {
@@ -198,7 +226,10 @@ namespace TxtAIEditor.Controls
                     };
                 }
                 cancellationToken.ThrowIfCancellationRequested();
-                _fileToolController.TrackSuccessfulFileToolPath(normalizedToolName, arguments, result);
+                if (trackFilePath)
+                {
+                    TrackFileToolPath(normalizedToolName, arguments, result);
+                }
 
                 return result;
             }
@@ -335,10 +366,13 @@ namespace TxtAIEditor.Controls
                 string.Format(_getString("AgentWebSearchFallbackFormat", "대체 웹 검색에 {0} 사용"), provider));
         }
 
+        private static string GetImagePath(JsonElement arguments) =>
+            GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path");
+
         private async Task<string> ReadImageToolAsync(JsonElement arguments)
         {
             AgentReadImageResult imageResult = await _fileTools.ReadImageAsync(
-                GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path"),
+                GetImagePath(arguments),
                 GetBoolArgument(arguments, "original", false));
 
             if (imageResult.Attachment != null)

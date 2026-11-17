@@ -3847,6 +3847,9 @@
   <data name="ExplorerMoreActions" xml:space="preserve">
     <value>더 보기</value>
   </data>
+  <data name="AgentOrchestratorContextBudgetExceeded" xml:space="preserve">
+    <value>압축 후에도 오케스트레이터의 입력이 모델 컨텍스트 한도를 초과합니다.</value>
+  </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>context 압축이 시행되었습니다.</value>
   </data>

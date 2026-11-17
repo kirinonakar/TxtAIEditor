@@ -3805,6 +3805,9 @@
   <data name="ExplorerMoreActions" xml:space="preserve">
     <value>その他の操作</value>
   </data>
+  <data name="AgentOrchestratorContextBudgetExceeded" xml:space="preserve">
+    <value>圧縮後もオーケストレーターの入力がモデルのコンテキスト上限を超えています。</value>
+  </data>
   <data name="AgentContextCompressedNotice" xml:space="preserve">
     <value>コンテキストの圧縮が実行されました。</value>
   </data>

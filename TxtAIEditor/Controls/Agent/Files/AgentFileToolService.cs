@@ -298,6 +298,7 @@ namespace TxtAIEditor.Controls
         }
 
         public string ResolveEditLockPath(string path) => _workspace.ResolveEditLockPath(path);
+        public string ResolveReadLockPath(string path) => _workspace.ResolveEditLockPath(path, allowOutside: true);
 
         public Task<string> ApplyPatchAsync(string? path, string patchText)
         {

@@ -16,6 +16,12 @@ namespace TxtAIEditor.Controls
         public const string ProgressMarker = "[Orchestrator progress] ";
         public const string ReportProgressTool = "report_progress";
         public const string WaitTool = "wait_subagent";
+        private const int ResultPreviewLength = 1200;
+        private const int ProgressPreviewLength = 600;
+        private const int ResultPageLength = 1600;
+        private const int MaxEventBatchLength = 4800;
+        private const int MaxEventsPerBatch = 8;
+        private static readonly TimeSpan ProgressBatchInterval = TimeSpan.FromMilliseconds(350);
         public const string WaitInterruptedResult =
             "Subagent wait interrupted by new user instructions. Running subagents continue. Consider the new instructions before waiting again.";
 
@@ -26,21 +32,32 @@ namespace TxtAIEditor.Controls
             CreateTool("send_subagent_message", "Queue a message for a running subagent or start a follow-up in its conversation.",
                 new { agentId = Text("ID returned by spawn_subagent"), instruction = Text("Question or follow-up task") }, "agentId", "instruction"),
             CreateTool("cancel_subagent", "Request cancellation of one subagent.", new { agentId = Text("ID returned by spawn_subagent") }, "agentId"),
-            CreateTool("subagent_status", "Get the status and latest progress of every subagent without waiting.", new { }),
+            CreateTool("subagent_status", "Get the status of every subagent without waiting.", new { }),
             CreateTool(WaitTool, "Wait for one completion when work depends on it. Omit agentId to wait for the next completion.",
                 new
                 {
                     agentId = Text("Optional subagent ID"),
                     timeoutSeconds = new { type = "integer", minimum = 1, maximum = 86400, description = "Optional wait limit in seconds. The subagent keeps running on timeout." }
                 }),
-            CreateTool(ReportProgressTool, "Report a concise milestone, finding, or blocker.",
-                new { message = Text("Progress update in the user's language") }, "message")
+            CreateTool("read_subagent_result", "Read a bounded page of a stored subagent result from this run.",
+                new
+                {
+                    resultId = Text("Result ID from a subagent completion"),
+                    offset = new { type = "integer", minimum = 0, description = "Start offset. Use nextOffset to continue." },
+                    limit = new { type = "integer", minimum = 2, maximum = ResultPageLength }
+                }, "resultId"),
+            CreateTool(ReportProgressTool, "Report progress or flag a finding or blocker that needs the orchestrator.",
+                new
+                {
+                    message = Text("Concise update in the user's language"),
+                    kind = new { type = "string", @enum = new[] { "progress", "finding", "blocker" }, description = "Defaults to UI progress. Use finding or blocker for information the orchestrator can act on." }
+                }, "message")
         ];
 
         public static LlmTool ProgressTool => Tools[^1];
 
         private readonly int _limit;
-        private readonly Func<string, string, string, AgentFollowUpQueue, Func<string, Task>, CancellationToken, Task<AgentRunContext>> _run;
+        private readonly Func<string, string, string, AgentFollowUpQueue, Func<string, string, Task>, CancellationToken, Task<AgentRunContext>> _run;
         private readonly Func<string, Task> _publishProgress;
         private readonly Func<string, string, string> _getString;
         private readonly CancellationTokenSource _cancellation;
@@ -49,10 +66,11 @@ namespace TxtAIEditor.Controls
         private readonly ConcurrentQueue<string> _progressLog = new();
         private readonly Queue<WorkerEvent> _events = new();
         private TaskCompletionSource _eventAvailable = NewSignal();
+        private TaskCompletionSource _completionAvailable = NewSignal();
 
         public AgentSubagentCoordinator(
             int limit,
-            Func<string, string, string, AgentFollowUpQueue, Func<string, Task>, CancellationToken, Task<AgentRunContext>> run,
+            Func<string, string, string, AgentFollowUpQueue, Func<string, string, Task>, CancellationToken, Task<AgentRunContext>> run,
             Func<string, Task> publishProgress,
             Func<string, string, string> getString,
             CancellationToken cancellationToken)
@@ -65,6 +83,16 @@ namespace TxtAIEditor.Controls
         }
 
         public bool HasUncollectedResults => _turns.Any(turn => !turn.Delivered);
+        public bool NeedsModelReview
+        {
+            get
+            {
+                lock (_events)
+                {
+                    return HasUncollectedResults || _events.Any(IsPendingEvent);
+                }
+            }
+        }
         public static bool IsCoordinationTool(string name) => Tools.Any(tool => tool.Name == name);
 
         public string BuildInstructions(bool planningMode) => $$"""
@@ -73,17 +101,18 @@ namespace TxtAIEditor.Controls
             You may create up to {{_limit}} subagent sessions for this run. Launch independent assignments before waiting so they can run concurrently.
             Give each subagent the needed context, expected result, and a distinct scope. Coordinate changes to shared files and check their results.
             Subagent findings, failures, and completed results arrive as [Subagent events] in your conversation. Act on them and continue any work that is ready.
+            Use read_subagent_result with the result ID when you need details beyond the completion preview.
             Use send_subagent_message to steer a running subagent or assign a follow-up. Use cancel_subagent to stop one subagent and subagent_status to inspect current work.
             If no work is ready, return a brief answer and the runtime will wait asynchronously for the next event. Use wait_subagent only when you specifically need a completion, optionally with a timeout.
             Consider new user instructions if they interrupt a wait. Review the delegated results before finalizing or submitting a plan. {{(planningMode ? "Delegate investigation and plan review only." : "")}}
             For text tool calls, use the normal tool_call syntax with these names and JSON keys:
-            spawn_subagent(title, instruction), send_subagent_message(agentId, instruction), cancel_subagent(agentId), subagent_status(), wait_subagent(optional agentId, optional timeoutSeconds), report_progress(message).
+            spawn_subagent(title, instruction), send_subagent_message(agentId, instruction), cancel_subagent(agentId), subagent_status(), wait_subagent(optional agentId, optional timeoutSeconds), read_subagent_result(resultId, optional offset, optional limit), report_progress(message).
             """;
 
         public static string BuildWorkerInstructions(bool planningMode) => """
             [Subagent]
             Your counterpart is the orchestrator. Treat each [Orchestrator]: message as an assignment or follow-up from that orchestrator.
-            Work within its assigned scope and use report_progress(message) for important findings, milestones, or blockers the orchestrator can act on.
+            Work within its assigned scope. Use report_progress(message, optional kind) for concise updates. Set kind to finding or blocker when the orchestrator can act on the report. Ordinary progress is shown in the UI.
             Return your answer to the orchestrator, including findings, changes, verified results, and remaining questions.
             Avoid unrelated changes and coordinate overlapping work through the orchestrator.
             """ + (planningMode ? "\nThis is plan research. Investigate and report findings without changing files, tabs, or external state." : "");
@@ -143,10 +172,11 @@ namespace TxtAIEditor.Controls
                         : string.Join("\n", _workers.Values.Select(item =>
                         {
                             WorkerTurn turn = item.Turn!;
-                            string status = turn.Run.IsCompletedSuccessfully
-                                ? turn.Run.Result.Status.ToString()
-                                : turn.Cancellation.IsCancellationRequested ? "Cancelling" : "Running";
-                            return $"{item.Id} ({item.Title}): {status}. {turn.LatestProgress}";
+                            WorkerResult? result = turn.Result;
+                            string status = result?.Status.ToString() ??
+                                (turn.Cancellation.IsCancellationRequested ? "Cancelling" : "Running");
+                            string resultReference = result != null ? $" Result ID: {turn.ResultId}." : string.Empty;
+                            return $"{item.Id} ({item.Title}): {status}.{resultReference}";
                         }));
 
                 case WaitTool:
@@ -165,6 +195,9 @@ namespace TxtAIEditor.Controls
                     }
                     return await CollectAsync(id, timeout, followUpRequested);
 
+                case "read_subagent_result":
+                    return ReadResult(arguments);
+
                 case ReportProgressTool:
                     string message = GetStringArgument(arguments, "message").Trim();
                     if (message.Length == 0)
@@ -181,21 +214,50 @@ namespace TxtAIEditor.Controls
 
         public async Task WaitForEventAsync(Task followUpRequested)
         {
-            Task signal;
+            Task? signal = null;
             lock (_events)
             {
-                if (_events.Any(item => !item.IsCompletion || !item.Turn.Delivered) || !HasUncollectedResults)
+                if (!_events.Any(IsPendingEvent))
                 {
-                    return;
+                    if (!HasUncollectedResults)
+                    {
+                        return;
+                    }
+                    if (_eventAvailable.Task.IsCompleted)
+                    {
+                        _eventAvailable = NewSignal();
+                    }
+                    signal = _eventAvailable.Task;
                 }
-                signal = _eventAvailable.Task;
             }
 
-            if (!followUpRequested.IsCompleted)
+            if (signal != null && !followUpRequested.IsCompleted)
             {
                 PublishResource("AgentSubagentWaiting", "서브에이전트 결과를 기다리는 중");
                 await Task.WhenAny(signal, followUpRequested).WaitAsync(_cancellation.Token);
             }
+
+            if (!followUpRequested.IsCompleted)
+            {
+                Task? completion = null;
+                lock (_events)
+                {
+                    if (!_events.Any(item => item.IsCompletion && IsPendingEvent(item)))
+                    {
+                        if (_completionAvailable.Task.IsCompleted)
+                        {
+                            _completionAvailable = NewSignal();
+                        }
+                        completion = _completionAvailable.Task;
+                    }
+                }
+                if (completion != null)
+                {
+                    await Task.WhenAny(completion, followUpRequested, Task.Delay(ProgressBatchInterval, _cancellation.Token))
+                        .WaitAsync(_cancellation.Token);
+                }
+            }
+
             if (followUpRequested.IsCompleted)
             {
                 PublishResource("AgentSubagentWaitInterrupted", "추가 지시를 받아 서브에이전트 대기를 해제했습니다.");
@@ -204,27 +266,38 @@ namespace TxtAIEditor.Controls
 
         public string DrainModelEvents()
         {
+            const string header = "\n\n[Subagent events]\n";
+            int length = header.Length;
             var messages = new List<string>();
             lock (_events)
             {
-                while (_events.TryDequeue(out WorkerEvent? item))
+                while (messages.Count < MaxEventsPerBatch && _events.TryPeek(out WorkerEvent? item))
                 {
+                    if (!IsPendingEvent(item))
+                    {
+                        _events.Dequeue();
+                        continue;
+                    }
+                    string text = "  " + item.Text.ReplaceLineEndings("\n").Replace("\n", "\n  ", StringComparison.Ordinal);
+                    int nextLength = length + text.Length + (messages.Count == 0 ? 0 : 2);
+                    if (nextLength > MaxEventBatchLength)
+                    {
+                        break;
+                    }
+                    _events.Dequeue();
                     if (item.IsCompletion)
                     {
-                        if (item.Turn.Delivered)
-                        {
-                            continue;
-                        }
                         item.Turn.Delivered = true;
                     }
-                    messages.Add(string.Join("\n", item.Text.ReplaceLineEndings("\n").Split('\n').Select(line => "  " + line)));
+                    messages.Add(text);
+                    length = nextLength;
                 }
-                _eventAvailable = NewSignal();
             }
 
-            return messages.Count == 0 ? string.Empty :
-                "\n\n[Subagent events]\n" + string.Join("\n\n", messages);
+            return messages.Count == 0 ? string.Empty : header + string.Join("\n\n", messages);
         }
+
+        private static bool IsPendingEvent(WorkerEvent item) => !item.IsCompletion || !item.Turn.Delivered;
 
         private async Task<string> CollectAsync(string id, TimeSpan timeout, Task followUpRequested)
         {
@@ -262,7 +335,7 @@ namespace TxtAIEditor.Controls
             WorkerTurn turn = pending.First(item => item.Run == completed);
             WorkerResult result = await turn.Run;
             turn.Delivered = true;
-            return FormatResult(turn, result);
+            return FormatResultPreview(turn, result);
         }
 
         private void Start(Worker worker, string instruction)
@@ -288,19 +361,22 @@ namespace TxtAIEditor.Controls
                 PublishResource(previous == null ? "AgentSubagentStartedFormat" : "AgentSubagentFollowUpFormat",
                     previous == null ? "서브에이전트 작업 시작 · {0}" : "서브에이전트 후속 작업 시작 · {0}", turn.Worker.Title);
 
-                AgentRunContext context = await _run(turn.Worker.Id, turn.Worker.Title, instruction, turn.Inbox, message =>
+                AgentRunContext context = await _run(turn.Worker.Id, turn.Worker.Title, instruction, turn.Inbox, (message, kind) =>
                 {
-                    turn.LatestProgress = message;
-                    EnqueueEvent(new WorkerEvent(turn, $"{Describe(turn)} · Progress\n{message}", IsCompletion: false));
+                    if (kind is "finding" or "blocker")
+                    {
+                        string preview = TakeText(message, 0, ProgressPreviewLength);
+                        EnqueueEvent(new WorkerEvent(turn, $"{Describe(turn)} · {kind}\n{preview}", IsCompletion: false));
+                    }
                     PublishResource("AgentSubagentProgressFormat", "{0} · {1}", turn.Worker.Title, message);
                     return Task.CompletedTask;
                 }, turn.Cancellation.Token);
 
                 string[] editedPaths = context.SessionEdits.Skip(context.InitialEditCount)
                     .Select(edit => edit.RelativePath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-                string changes = editedPaths.Length > 0 ? "\nChanged files: " + string.Join(", ", editedPaths) : string.Empty;
+                string changes = editedPaths.Length > 0 ? "Changed files: " + string.Join(", ", editedPaths) + "\n\n" : string.Empty;
                 string answer = context.Status == AgentRunStatus.Failed ? context.FailureReason : context.LastAnswerText;
-                result = new WorkerResult(context.Status, answer + changes);
+                result = new WorkerResult(context.Status, changes + answer);
             }
             catch (OperationCanceledException) when (turn.Cancellation.IsCancellationRequested)
             {
@@ -315,7 +391,8 @@ namespace TxtAIEditor.Controls
             {
                 result = result with { Text = result.Text + "\nFollow-up messages pending when this assignment ended:\n" + undelivered };
             }
-            EnqueueEvent(new WorkerEvent(turn, FormatResult(turn, result), IsCompletion: true));
+            turn.Result = result;
+            EnqueueEvent(new WorkerEvent(turn, FormatResultPreview(turn, result), IsCompletion: true));
 
             (string resource, string fallback) = result.Status switch
             {
@@ -333,12 +410,64 @@ namespace TxtAIEditor.Controls
             {
                 _events.Enqueue(item);
                 _eventAvailable.TrySetResult();
+                if (item.IsCompletion)
+                {
+                    _completionAvailable.TrySetResult();
+                }
             }
         }
 
         private static string Describe(WorkerTurn turn) => $"{turn.Worker.Id} ({turn.Worker.Title})";
-        private static string FormatResult(WorkerTurn turn, WorkerResult result) =>
-            $"{Describe(turn)} · {result.Status}\n{result.Text}";
+        private static string FormatResultPreview(WorkerTurn turn, WorkerResult result)
+        {
+            string preview = TakeText(result.Text, 0, ResultPreviewLength);
+            string reference = preview.Length < result.Text.Length
+                ? $"\nPreview ends at offset {preview.Length}. Use read_subagent_result with resultId {turn.ResultId} for more."
+                : string.Empty;
+            return $"{Describe(turn)} · {result.Status}\n{preview}{reference}";
+        }
+
+        private string ReadResult(JsonElement arguments)
+        {
+            string id = GetStringArgument(arguments, "resultId").Trim();
+            WorkerResult? result = _turns.FirstOrDefault(turn => turn.ResultId == id)?.Result;
+            if (result == null)
+            {
+                return "Tool failed: unknown completed subagent result ID.";
+            }
+            if (!ReadPageInteger(arguments, "offset", 0, 0, result.Text.Length, out int offset) ||
+                !ReadPageInteger(arguments, "limit", ResultPageLength, 2, ResultPageLength, out int limit))
+            {
+                return $"Tool failed: offset must be between 0 and {result.Text.Length}; limit must be between 2 and {ResultPageLength}.";
+            }
+            if (offset > 0 && offset < result.Text.Length && char.IsLowSurrogate(result.Text[offset]) &&
+                char.IsHighSurrogate(result.Text[offset - 1]))
+            {
+                offset--;
+            }
+
+            string page = TakeText(result.Text, offset, limit);
+            int end = offset + page.Length;
+            string next = end < result.Text.Length ? $"nextOffset={end}" : "end of result";
+            return $"Subagent result {id}, offset={offset}, {next}\n" + page;
+        }
+
+        private static bool ReadPageInteger(JsonElement arguments, string name, int fallback, int min, int max, out int value)
+        {
+            value = fallback;
+            return !arguments.TryGetProperty(name, out _) ||
+                (TryGetIntArgument(arguments, name, out value) && value >= min && value <= max);
+        }
+
+        private static string TakeText(string text, int offset, int limit)
+        {
+            int length = Math.Min(limit, text.Length - offset);
+            if (length > 0 && offset + length < text.Length && char.IsHighSurrogate(text[offset + length - 1]))
+            {
+                length--;
+            }
+            return text.Substring(offset, length);
+        }
 
         private void PublishResource(string resource, string fallback, params object[] arguments)
         {
@@ -432,7 +561,8 @@ namespace TxtAIEditor.Controls
             public Worker Worker { get; } = worker;
             public CancellationTokenSource Cancellation { get; } = cancellation;
             public AgentFollowUpQueue Inbox { get; } = new();
-            public volatile string LatestProgress = string.Empty;
+            public string ResultId { get; } = Guid.NewGuid().ToString("N");
+            public volatile WorkerResult? Result;
             public bool Delivered { get; set; }
             public Task<WorkerResult> Run { get; set; } = null!;
         }

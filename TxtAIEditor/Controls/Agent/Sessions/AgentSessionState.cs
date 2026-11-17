@@ -101,7 +101,7 @@ namespace TxtAIEditor.Controls
         public double InFlightResponseTokens { get; set; }
         public bool IsPlanningMode { get; set; }
         public bool IsPlanResearch { get; set; }
-        public Func<string, Task>? ReportToOrchestrator { get; set; }
+        public Func<string, string, Task>? ReportToOrchestrator { get; set; }
         public string FailureReason { get; set; } = string.Empty;
         public bool HasEnabledSkills { get; set; }
         public bool HasEnabledMcp { get; set; }
