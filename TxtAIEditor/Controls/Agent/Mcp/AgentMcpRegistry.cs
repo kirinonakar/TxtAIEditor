@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using static TxtAIEditor.Controls.AgentMcpAuthTypes;
 
@@ -14,6 +15,8 @@ namespace TxtAIEditor.Controls
         private readonly string _mcpFilePath;
         private readonly string _agentPluginsFilePath;
         private readonly string _legacyAgentPluginsFilePath;
+        private readonly SemaphoreSlim _saveGate = new(1, 1);
+        private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
 
         public List<AgentMcpServer> Servers { get; } = new();
         public List<AgentPluginPackage> Plugins { get; } = new();
@@ -183,29 +186,44 @@ namespace TxtAIEditor.Controls
                 migratedPluginRegistry;
         }
 
-        public async Task SaveAsync()
+        public async Task SaveAsync(bool throwOnError = false, bool serversOnly = false)
         {
+            await _saveGate.WaitAsync();
             try
             {
-                string? dir = Path.GetDirectoryName(_mcpFilePath);
-                if (dir != null && !Directory.Exists(dir))
+                string serversJson = JsonSerializer.Serialize(Servers, IndentedJson);
+                string? pluginsJson = serversOnly ? null : JsonSerializer.Serialize(Plugins, IndentedJson);
+                await WriteRegistryAsync(_mcpFilePath, serversJson);
+                if (pluginsJson != null)
                 {
-                    Directory.CreateDirectory(dir);
+                    await WriteRegistryAsync(_agentPluginsFilePath, pluginsJson);
                 }
-
-                string json = JsonSerializer.Serialize(Servers, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(_mcpFilePath, json);
-                string? pluginsDirectory = Path.GetDirectoryName(_agentPluginsFilePath);
-                if (pluginsDirectory != null)
-                {
-                    Directory.CreateDirectory(pluginsDirectory);
-                }
-                string pluginsJson = JsonSerializer.Serialize(Plugins, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(_agentPluginsFilePath, pluginsJson);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!throwOnError)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to save MCP servers: {ex.Message}");
+            }
+            finally
+            {
+                _saveGate.Release();
+            }
+        }
+
+        private static async Task WriteRegistryAsync(string path, string json)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            string temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                await File.WriteAllTextAsync(temporaryPath, json);
+                File.Move(temporaryPath, path, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
             }
         }
 

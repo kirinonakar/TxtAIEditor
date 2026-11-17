@@ -2,10 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Windows.Storage.Pickers;
 using static TxtAIEditor.Controls.AgentMcpAuthTypes;
+using static TxtAIEditor.Controls.AgentMcpPluginManagerTool;
 
 namespace TxtAIEditor.Controls
 {
@@ -16,6 +20,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentMcpCredentialStore _credentialStore;
         private readonly ISet<string> _selectedServerIds;
         private readonly HashSet<string> _selectedAgentPluginIds = new(StringComparer.OrdinalIgnoreCase);
+        private readonly SemaphoreSlim _installGate = new(1, 1);
         private readonly AgentMcpDialogService _dialogService;
         private readonly Action<object> _initializePickerWindow;
         private readonly Action<string, string> _showError;
@@ -62,6 +67,19 @@ namespace TxtAIEditor.Controls
         {
             _selectedAgentPluginIds.RemoveWhere(id =>
                 _registry.Plugins.All(plugin => !plugin.Id.Equals(id, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        public async Task<bool> ReloadRegistryAsync()
+        {
+            await _installGate.WaitAsync();
+            try
+            {
+                return await _registry.LoadAsync();
+            }
+            finally
+            {
+                _installGate.Release();
+            }
         }
 
         public void ClearSelection()
@@ -202,41 +220,27 @@ namespace TxtAIEditor.Controls
 
             try
             {
-                AgentPluginGitHubInstallResult installed = await AgentPluginGitHubInstaller.InstallAsync(
-                    sourceUrl,
-                    Path.Combine(_registry.PluginsInstallDirectory, "github"),
-                    StopPluginServersBySource,
-                    CancellationToken.None);
-
-                var installedPackageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var warnings = new List<string>();
-                int mcpServerCount = 0;
-                int skillCount = 0;
-                foreach (string pluginRoot in installed.PluginRoots)
+                AgentPluginGitHubSource source = AgentPluginGitHubInstaller.ParseSource(sourceUrl);
+                string installBase = Path.Combine(_registry.PluginsInstallDirectory, "github");
+                List<AgentPluginPackage> packages;
+                List<string> warnings;
+                await _installGate.WaitAsync();
+                try
                 {
-                    AgentPluginLoadResult loaded = AgentPluginLoader.Load(pluginRoot, _registry.PluginDataDirectory);
-                    AgentPluginPackage package = ApplyAgentPluginResult(loaded, installed.SourceKey);
-                    installedPackageIds.Add(package.Id);
-                    warnings.AddRange(loaded.Warnings);
-                    mcpServerCount += loaded.Servers.Count;
-                    skillCount += loaded.Skills.Count;
+                    (packages, warnings) = await InstallGitHubPackagesAsync(
+                        source, installBase, source.SourceKey, CancellationToken.None);
+                    await _saveAsync();
+                }
+                finally
+                {
+                    _installGate.Release();
                 }
 
-                foreach (AgentPluginPackage stalePackage in _registry.Plugins
-                    .Where(plugin => plugin.Source.Equals(installed.SourceKey, StringComparison.OrdinalIgnoreCase) &&
-                        !installedPackageIds.Contains(plugin.Id))
-                    .ToList())
-                {
-                    RemoveAgentPluginPackage(stalePackage);
-                }
-
-                NotifyActivePluginSkills();
-                await _saveAsync();
                 await _dialogService.ShowAgentPluginInstallResultAsync(
-                    installed.DisplayName,
-                    installedPackageIds.Count,
-                    mcpServerCount,
-                    skillCount,
+                    source.DisplayName,
+                    packages.Count,
+                    packages.Sum(package => GetPluginServers(package).Count),
+                    packages.Sum(package => package.Skills.Count),
                     warnings);
             }
             catch (Exception ex)
@@ -248,6 +252,228 @@ namespace TxtAIEditor.Controls
                         ex.Message));
             }
         }
+
+        public async Task<AgentPluginInstallResult> InstallFromAgentAsync(
+            string type, JsonElement arguments, CancellationToken cancellationToken)
+        {
+            await _installGate.WaitAsync(cancellationToken);
+            try
+            {
+                if (type == "mcp")
+                {
+                    return await RegisterMcpAsync(arguments, cancellationToken);
+                }
+
+                string sourceUrl = GetString(arguments, "source").Trim();
+                if (type == "skill")
+                {
+                    string name = await AgentPluginGitHubInstaller.InstallSkillAsync(
+                        sourceUrl, GetString(arguments, "name").Trim(), AgentSkillDirectories.UserSkillsDirectory,
+                        cancellationToken);
+                    await _skillController.LoadAsync();
+                    IReadOnlyList<AgentPluginEntry> skills = await _skillController.GetPluginManagerEntriesAsync();
+                    return new AgentPluginInstallResult(
+                        skills.Where(skill => skill.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).ToArray(), []);
+                }
+
+                AgentPluginGitHubSource source = AgentPluginGitHubInstaller.ParseSource(sourceUrl);
+                string installBase = Path.Combine(_registry.PluginsInstallDirectory, "github");
+                string sourceKey = source.SourceKey;
+                if (source.Subdirectory.Length > 0)
+                {
+                    sourceKey += "/" + source.Subdirectory.Replace(Path.DirectorySeparatorChar, '/').ToLowerInvariant();
+                }
+                if (source.Reference.Length > 0)
+                {
+                    sourceKey += "#" + source.Reference.ToLowerInvariant();
+                }
+                if (sourceKey != source.SourceKey)
+                {
+                    // Keep explicitly selected folders and revisions in separate checkouts.
+                    string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sourceKey)));
+                    installBase = Path.Combine(_registry.PluginsInstallDirectory, "github-sources", hash);
+                }
+
+                var packages = _registry.Plugins
+                    .Where(package => package.Source.Equals(sourceKey, StringComparison.OrdinalIgnoreCase) &&
+                        File.Exists(Path.Combine(package.Root, "plugin.json")))
+                    .ToList();
+                bool alreadyInstalled = packages.Count > 0;
+                List<string> warnings = [];
+                if (!alreadyInstalled)
+                {
+                    (packages, warnings) = await InstallGitHubPackagesAsync(
+                        source, installBase, sourceKey, cancellationToken);
+                }
+
+                await _registry.SaveAsync(throwOnError: true);
+                _rebuildAliases();
+                _updateUI();
+                return new AgentPluginInstallResult(packages.Select(GetPluginEntry).ToArray(), warnings, alreadyInstalled);
+            }
+            finally
+            {
+                _installGate.Release();
+            }
+        }
+
+        private async Task<AgentPluginInstallResult> RegisterMcpAsync(
+            JsonElement arguments, CancellationToken cancellationToken)
+        {
+            string name = GetString(arguments, "name").Trim();
+            string endpoint = GetString(arguments, "url").Trim();
+            string command = GetString(arguments, "command").Trim();
+            string directory = GetString(arguments, "workingDirectory").Trim();
+            bool stateless = GetBoolean(arguments, "stateless", false);
+            if (name.Length == 0 || name.Any(char.IsControl) || (endpoint.Length == 0) == (command.Length == 0))
+            {
+                throw new ArgumentException("Provide an MCP name and exactly one of url (HTTP) or command (stdio).");
+            }
+
+            if (IsServerName(name) || _registry.Plugins.Any(plugin =>
+                GetAgentPluginMenuName(plugin).Equals(name, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new ArgumentException("That MCP name is already in use. Choose another name.");
+            }
+
+            var server = new AgentMcpServer
+            {
+                Name = name,
+                Description = GetString(arguments, "description").Trim(),
+                Transport = command.Length > 0 ? AgentMcpTransportTypes.Stdio : AgentMcpTransportTypes.Http,
+                Endpoint = endpoint,
+                Command = command,
+                WorkingDirectory = directory,
+                Stateless = stateless,
+                AuthType = AuthTypeNone
+            };
+            if (command.Length == 0)
+            {
+                if (!AgentMcpConfigurationService.HasValidConnectionSettings(server) ||
+                    !Uri.TryCreate(endpoint, UriKind.Absolute, out Uri? uri) ||
+                    uri.UserInfo.Length > 0 || uri.Fragment.Length > 0 ||
+                    arguments.TryGetProperty("args", out _) || arguments.TryGetProperty("env", out _) || directory.Length > 0)
+                {
+                    throw new ArgumentException("Use a valid HTTP(S) MCP endpoint without embedded credentials or stdio options.");
+                }
+            }
+            else
+            {
+                if (command.Contains('"') || command.Any(char.IsControl) ||
+                    (!Path.IsPathFullyQualified(command) &&
+                        (command.Any(char.IsWhiteSpace) || command.IndexOfAny(['/', '\\']) >= 0)) || stateless)
+                {
+                    throw new ArgumentException("Use a command name or absolute executable path, and pass each stdio argument in args.");
+                }
+                if (Path.IsPathFullyQualified(command) && !File.Exists(command))
+                {
+                    throw new ArgumentException("The MCP executable was not found at command. Verify its local path.");
+                }
+                if (directory.Length > 0 && (!Path.IsPathFullyQualified(directory) || !Directory.Exists(directory)))
+                {
+                    throw new ArgumentException("workingDirectory must be an existing absolute path.");
+                }
+                if (arguments.TryGetProperty("args", out JsonElement args))
+                {
+                    if (args.ValueKind != JsonValueKind.Array || args.EnumerateArray().Any(arg =>
+                        arg.ValueKind != JsonValueKind.String || arg.GetString()!.Contains('\0')))
+                    {
+                        throw new ArgumentException("args must be an array of strings.");
+                    }
+                    server.Arguments = args.EnumerateArray().Select(arg => arg.GetString()!).ToList();
+                }
+            }
+
+            var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (arguments.TryGetProperty("env", out JsonElement env))
+            {
+                if (env.ValueKind != JsonValueKind.Object || env.EnumerateObject().Any(variable =>
+                    string.IsNullOrWhiteSpace(variable.Name) || variable.Name.Contains('=') || variable.Name.Any(char.IsControl) ||
+                    variable.Value.ValueKind != JsonValueKind.String || variable.Value.GetString()!.Contains('\0')))
+                {
+                    throw new ArgumentException("env must be an object of environment variable names and string values.");
+                }
+                foreach (var variable in env.EnumerateObject())
+                {
+                    environment[variable.Name] = variable.Value.GetString()!;
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            AgentMcpServer? existing = _registry.FindServer(name);
+            if (existing != null)
+            {
+                if (!existing.Endpoint.Equals(endpoint, StringComparison.Ordinal) ||
+                    !existing.Command.Equals(command, StringComparison.OrdinalIgnoreCase) ||
+                    !existing.WorkingDirectory.Equals(directory, StringComparison.OrdinalIgnoreCase) ||
+                    existing.Stateless != stateless || !existing.Arguments.SequenceEqual(server.Arguments) ||
+                    environment.Any(variable => !existing.Environment.TryGetValue(variable.Key, out string? value) ||
+                        _credentialStore.GetEnvironmentSecret(existing, variable.Key, value) != variable.Value))
+                {
+                    throw new ArgumentException($"An MCP named '{name}' already exists with different settings. Edit it in the MCP menu or choose a different name.");
+                }
+                return new AgentPluginInstallResult(new[] { GetMcpEntry(existing) }, [], AlreadyInstalled: true);
+            }
+
+            // Populate the keys before saving credentials so a partially failed write can be cleaned up.
+            server.Environment = environment.ToDictionary(variable => variable.Key, _ => string.Empty,
+                StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                server.Environment = _credentialStore.StoreEnvironmentSecrets(server, environment);
+                _registry.Servers.Add(server);
+                await _registry.SaveAsync(throwOnError: true, serversOnly: true);
+            }
+            catch
+            {
+                _registry.Servers.Remove(server);
+                _credentialStore.DeleteAllCredentials(server);
+                throw;
+            }
+
+            _rebuildAliases();
+            _updateUI();
+            return new AgentPluginInstallResult(new[] { GetMcpEntry(server) }, []);
+        }
+
+        private async Task<(List<AgentPluginPackage> Packages, List<string> Warnings)> InstallGitHubPackagesAsync(
+            AgentPluginGitHubSource source, string installBase, string sourceKey, CancellationToken cancellationToken)
+        {
+            IReadOnlyList<string> pluginRoots = await AgentPluginGitHubInstaller.InstallAsync(
+                source, installBase, () => StopPluginServersBySource(sourceKey), cancellationToken);
+            var packages = new List<AgentPluginPackage>();
+            var warnings = new List<string>();
+            foreach (string pluginRoot in pluginRoots)
+            {
+                AgentPluginLoadResult loaded = AgentPluginLoader.Load(pluginRoot, _registry.PluginDataDirectory);
+                packages.Add(ApplyAgentPluginResult(loaded, sourceKey));
+                warnings.AddRange(loaded.Warnings);
+            }
+
+            foreach (AgentPluginPackage stalePackage in _registry.Plugins
+                .Where(package => package.Source.Equals(sourceKey, StringComparison.OrdinalIgnoreCase) && !packages.Contains(package))
+                .ToList())
+            {
+                RemoveAgentPluginPackage(stalePackage);
+            }
+            return (packages, warnings);
+        }
+
+        public AgentPluginEntry GetMcpEntry(AgentMcpServer server)
+        {
+            string status = _credentialStore.RedactServerSecrets(server, _connections.GetStatus(server.Id));
+            if (status.Length > 1200)
+            {
+                status = status[..1200] + "…";
+            }
+            return new AgentPluginEntry("mcp:" + server.Id, "mcp", server.Name,
+                string.IsNullOrWhiteSpace(server.Description) ? server.AgentPluginName : server.Description,
+                _selectedServerIds.Contains(server.Id), status, _connections.GetTools(server.Id).Count);
+        }
+
+        public AgentPluginEntry GetPluginEntry(AgentPluginPackage package) =>
+            new("plugin:" + package.Id, "plugin", GetAgentPluginMenuName(package), package.Source,
+                IsPluginMcpSelectionComplete(package));
 
         private AgentPluginPackage ApplyAgentPluginResult(AgentPluginLoadResult result, string source)
         {
@@ -337,19 +563,22 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            _selectedAgentPluginIds.Add(plugin.Id);
-            List<AgentMcpServer> servers = GetPluginServers(plugin);
-            foreach (AgentMcpServer server in servers)
-            {
-                _selectedServerIds.Add(server.Id);
-            }
-
-            NotifyActivePluginSkills();
+            ActivateAgentPlugin(plugin);
             _updateUI();
-            foreach (AgentMcpServer server in servers)
+            foreach (AgentMcpServer server in GetPluginServers(plugin))
             {
                 await _connections.StartAsync(server, CancellationToken.None);
             }
+        }
+
+        public void ActivateAgentPlugin(AgentPluginPackage plugin)
+        {
+            _selectedAgentPluginIds.Add(plugin.Id);
+            foreach (AgentMcpServer server in GetPluginServers(plugin))
+            {
+                _selectedServerIds.Add(server.Id);
+            }
+            NotifyActivePluginSkills();
         }
 
         public void DeactivateAgentPlugin(AgentPluginPackage plugin)

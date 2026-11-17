@@ -133,9 +133,16 @@ namespace TxtAIEditor.Controls
             return builder.ToString().Trim();
         }
 
-        public string BuildFixedPromptContext(string? workspaceRoot = null, bool includeMcp = true)
+        private string BuildFixedPromptContext(
+            string? workspaceRoot, bool includeMcp, EditorSettings settings, bool planningMode)
         {
-            string mcpSection = includeMcp ? _mcpController.BuildSelectedMcpSection() : string.Empty;
+            // A vision fallback reuses this prompt with its own provider.
+            bool includePluginManagerTextTools = !SupportsNativeToolCatalog(settings) ||
+                (!string.IsNullOrWhiteSpace(settings.LlmVisionFallbackModel) &&
+                    UsesTextToolCalls(settings.LlmVisionFallbackProvider));
+            string mcpSection = includeMcp
+                ? _mcpController.BuildSelectedMcpSection(includePluginManagerTextTools, planningMode)
+                : string.Empty;
             string globalAgentsMdSection = BuildGlobalAgentsMdSection();
             string agentsMdSection = BuildWorkspaceAgentsMdSection(workspaceRoot);
             if (string.IsNullOrWhiteSpace(mcpSection) &&
@@ -178,12 +185,14 @@ namespace TxtAIEditor.Controls
             return section + Environment.NewLine + "[End global agent rules]";
         }
 
-        public string BuildFixedPromptContextForRun(string? workspaceRoot = null, bool includeMcp = true)
+        public string BuildFixedPromptContextForRun(
+            string? workspaceRoot = null, bool includeMcp = true, EditorSettings? settings = null, bool? planningMode = null)
         {
             string skills = _skillController.BuildSelectedSkillSection();
-            return BuildFixedPromptContext(workspaceRoot, includeMcp) + Environment.NewLine + Environment.NewLine +
+            return BuildFixedPromptContext(workspaceRoot, includeMcp, settings ?? _settingsProvider(), planningMode ?? _agentPane.PlanningMode) +
+                Environment.NewLine + Environment.NewLine +
                 "[Current plugin selection for this model turn]" + Environment.NewLine +
-                "The enabled MCP catalog above and skill list below are authoritative for this turn. They supersede older plugin selections in conversation history. Read a relevant enabled skill with skill_use before applying it." + Environment.NewLine +
+                "This turn's MCP tools and enabled skills override past selections. Use skill_use before applying a relevant skill." + Environment.NewLine +
                 (string.IsNullOrWhiteSpace(skills) ? "No agent skills are currently enabled." : skills);
         }
 
@@ -334,6 +343,11 @@ namespace TxtAIEditor.Controls
             var mcpAliases = _mcpController.GetActiveToolAliases();
             foreach (AgentMcpToolAlias alias in mcpAliases)
             {
+                if (planningMode && AgentMcpPluginManagerTool.IsInstallAlias(alias.Alias))
+                {
+                    continue;
+                }
+
                 tokens += 12;
                 tokens += AgentTokenEstimator.Estimate(alias.Alias);
                 tokens += AgentTokenEstimator.Estimate(string.IsNullOrEmpty(alias.Description)
@@ -394,32 +408,12 @@ namespace TxtAIEditor.Controls
             return tokens;
         }
 
-        internal static bool SupportsNativeToolCatalog(EditorSettings? settings)
-        {
-            string provider = NormalizeProviderName(settings?.LlmProvider);
-            string model = settings?.LlmModel ?? string.Empty;
+        internal static bool SupportsNativeToolCatalog(EditorSettings? settings) =>
+            !UsesTextToolCalls(settings?.LlmProvider);
 
-            // Gemini uses its own function declaration path here; LM Studio and Ollama
-            // receive the catalog through their OpenAI-compatible tools field.
-            if (provider is "gemini" or "google")
-            {
-                return false;
-            }
-
-            if (provider is "opencodego" or "go" or "opencodezen" or "zen")
-            {
-                return !model.StartsWith("claude-", StringComparison.OrdinalIgnoreCase);
-            }
-
-            return true;
-        }
-
-        private static string NormalizeProviderName(string? provider)
-        {
-            return (provider ?? string.Empty)
-                .Replace(" ", string.Empty, StringComparison.Ordinal)
-                .ToLowerInvariant();
-        }
+        // GeminiProvider currently omits function declarations from its request.
+        private static bool UsesTextToolCalls(string? provider) =>
+            provider?.Trim().ToLowerInvariant() is "gemini" or "google";
 
     }
 }

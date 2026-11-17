@@ -23,13 +23,6 @@ namespace TxtAIEditor.Controls
         public string DisplayName => $"{Owner}/{Repository}";
     }
 
-    internal sealed record AgentPluginGitHubInstallResult(
-        string SourceKey,
-        string DisplayName,
-        string RepositoryRoot,
-        IReadOnlyList<string> PluginRoots,
-        int SkillCount);
-
     internal static partial class AgentPluginGitHubInstaller
     {
         private const long MaxArchiveBytes = 128L * 1024 * 1024;
@@ -52,7 +45,7 @@ namespace TxtAIEditor.Controls
             Timeout = TimeSpan.FromMinutes(5)
         };
 
-        public static AgentPluginGitHubSource ParseSource(string input)
+        public static AgentPluginGitHubSource ParseSource(string input, bool allowSkillFile = false)
         {
             input = input?.Trim() ?? string.Empty;
             if (!Uri.TryCreate(input, UriKind.Absolute, out Uri? uri) ||
@@ -76,7 +69,8 @@ namespace TxtAIEditor.Controls
             string repository = segments[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase)
                 ? segments[1].Substring(0, segments[1].Length - 4)
                 : segments[1];
-            if (!GitHubNameRegex().IsMatch(owner) || !GitHubNameRegex().IsMatch(repository))
+            if (!GitHubNameRegex().IsMatch(owner) || !GitHubNameRegex().IsMatch(repository) ||
+                !IsWindowsPathComponent(owner) || !IsWindowsPathComponent(repository))
             {
                 throw new InvalidDataException("The GitHub owner or repository name is invalid.");
             }
@@ -85,13 +79,23 @@ namespace TxtAIEditor.Controls
             string subdirectory = string.Empty;
             if (segments.Length > 2)
             {
-                if (!segments[2].Equals("tree", StringComparison.OrdinalIgnoreCase) || segments.Length < 4)
+                bool isSkillFile = allowSkillFile && segments.Length >= 5 &&
+                    segments[2].Equals("blob", StringComparison.OrdinalIgnoreCase) &&
+                    segments[^1].Equals("SKILL.md", StringComparison.OrdinalIgnoreCase);
+                if (segments.Length < 4 || (!segments[2].Equals("tree", StringComparison.OrdinalIgnoreCase) && !isSkillFile))
                 {
-                    throw new InvalidDataException("Use a repository URL or a GitHub '/tree/<ref>/<path>' URL.");
+                    throw new InvalidDataException(allowSkillFile
+                        ? "Use a GitHub repository, skill folder, or SKILL.md URL."
+                        : "Use a repository URL or a GitHub '/tree/<ref>/<path>' URL.");
                 }
 
                 reference = segments[3];
-                subdirectory = string.Join(Path.DirectorySeparatorChar, segments.Skip(4));
+                string[] path = segments[4..(isSkillFile ? ^1 : ^0)];
+                if (path.Any(segment => !IsWindowsPathComponent(segment)))
+                {
+                    throw new InvalidDataException("The GitHub directory path contains an invalid Windows path component.");
+                }
+                subdirectory = string.Join(Path.DirectorySeparatorChar, path);
             }
 
             if (reference.Contains('/') || reference.Contains('\\') || reference.Contains("..", StringComparison.Ordinal))
@@ -102,30 +106,27 @@ namespace TxtAIEditor.Controls
             return new AgentPluginGitHubSource(owner, repository, reference, subdirectory);
         }
 
-        public static async Task<AgentPluginGitHubInstallResult> InstallAsync(
-            string input,
+        private static bool IsWindowsPathComponent(string value) =>
+            value.Length > 0 && !value.EndsWith('.') && !value.EndsWith(' ') &&
+            value.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+
+        public static async Task<IReadOnlyList<string>> InstallAsync(
+            AgentPluginGitHubSource source,
             string installBaseDirectory,
-            Action<string>? beforeReplace,
+            Action beforeReplace,
             CancellationToken cancellationToken)
         {
-            AgentPluginGitHubSource source = ParseSource(input);
             string installBase = Path.GetFullPath(installBaseDirectory);
             Directory.CreateDirectory(installBase);
 
             string stagingDirectory = Path.Combine(
                 installBase,
                 $".{source.Repository}.staging-{Guid.NewGuid():N}");
+            EnsureContained(installBase, stagingDirectory, "install staging directory");
             Directory.CreateDirectory(stagingDirectory);
             try
             {
-                string archivePath = Path.Combine(stagingDirectory, "repository.zip");
-                await DownloadArchiveAsync(source, archivePath, cancellationToken);
-
-                string extractionDirectory = Path.Combine(stagingDirectory, "extracted");
-                Directory.CreateDirectory(extractionDirectory);
-                await ExtractArchiveAsync(archivePath, extractionDirectory, cancellationToken);
-
-                string extractedRepositoryRoot = FindExtractedRepositoryRoot(extractionDirectory);
+                string extractedRepositoryRoot = await DownloadRepositoryAsync(source, stagingDirectory, cancellationToken);
                 string targetRoot = ResolveTargetRoot(extractedRepositoryRoot, source.Subdirectory);
                 IReadOnlyList<string> pluginRoots = DiscoverPluginRoots(extractedRepositoryRoot, targetRoot);
                 if (pluginRoots.Count == 0)
@@ -142,8 +143,6 @@ namespace TxtAIEditor.Controls
                 var pluginRelativePaths = pluginRoots
                     .Select(path => Path.GetRelativePath(extractedRepositoryRoot, path))
                     .ToList();
-                int skillCount = CountSkills(pluginRoots);
-
                 string ownerDirectory = Path.Combine(installBase, source.Owner);
                 Directory.CreateDirectory(ownerDirectory);
                 string destination = Path.Combine(ownerDirectory, source.Repository);
@@ -151,7 +150,8 @@ namespace TxtAIEditor.Controls
                 EnsureContained(installBase, destination, "install destination");
                 EnsureContained(installBase, backup, "install backup");
 
-                beforeReplace?.Invoke(source.SourceKey);
+                cancellationToken.ThrowIfCancellationRequested();
+                beforeReplace();
                 bool movedExisting = false;
                 try
                 {
@@ -178,15 +178,9 @@ namespace TxtAIEditor.Controls
                     Directory.Delete(backup, recursive: true);
                 }
 
-                var installedPluginRoots = pluginRelativePaths
+                return pluginRelativePaths
                     .Select(relative => Path.GetFullPath(Path.Combine(destination, relative)))
                     .ToList();
-                return new AgentPluginGitHubInstallResult(
-                    source.SourceKey,
-                    source.DisplayName,
-                    destination,
-                    installedPluginRoots,
-                    skillCount);
             }
             finally
             {
@@ -195,6 +189,77 @@ namespace TxtAIEditor.Controls
                     Directory.Delete(stagingDirectory, recursive: true);
                 }
             }
+        }
+
+        public static async Task<string> InstallSkillAsync(
+            string sourceUrl,
+            string name,
+            string skillsDirectory,
+            CancellationToken cancellationToken)
+        {
+            AgentPluginGitHubSource source = ParseSource(sourceUrl, allowSkillFile: true);
+            string installBase = Path.GetFullPath(skillsDirectory);
+            string stagingDirectory = Path.Combine(installBase, $".install-{Guid.NewGuid():N}");
+            EnsureContained(installBase, stagingDirectory, "skill staging directory");
+            Directory.CreateDirectory(stagingDirectory);
+            try
+            {
+                string repository = await DownloadRepositoryAsync(source, stagingDirectory, cancellationToken);
+                string target = ResolveTargetRoot(repository, source.Subdirectory);
+                string GetName(string folder) => folder == repository ? source.Repository : Path.GetFileName(folder);
+
+                string skillDirectory = target;
+                if (!File.Exists(Path.Combine(target, "SKILL.md")))
+                {
+                    string[] candidates = Directory.EnumerateFiles(target, "SKILL.md", SearchOption.AllDirectories)
+                        .Select(file => Path.GetDirectoryName(file)!)
+                        .Where(folder => name.Length == 0 || GetName(folder).Equals(name, StringComparison.OrdinalIgnoreCase))
+                        .Take(2)
+                        .ToArray();
+                    skillDirectory = candidates.Length switch
+                    {
+                        1 => candidates[0],
+                        0 => throw new InvalidDataException("No matching SKILL.md was found. Provide the exact skill folder URL."),
+                        _ => throw new InvalidDataException("Multiple skill folders match. Provide the exact skill folder URL.")
+                    };
+                }
+
+                string installedName = GetName(skillDirectory);
+                string skillFile = Path.Combine(skillDirectory, "SKILL.md");
+                if (!IsWindowsPathComponent(installedName) || new FileInfo(skillFile).Length > 1024 * 1024 ||
+                    string.IsNullOrWhiteSpace(await File.ReadAllTextAsync(skillFile, cancellationToken)))
+                {
+                    throw new InvalidDataException("The skill must have a valid folder name and a non-empty SKILL.md of at most 1 MiB.");
+                }
+
+                string destination = Path.Combine(installBase, installedName);
+                EnsureContained(installBase, destination, "skill install destination");
+                if (Directory.Exists(destination) || File.Exists(destination) || File.Exists(destination + ".md"))
+                {
+                    throw new InvalidDataException($"A user skill named '{installedName}' already exists. Use list_plugin to check it.");
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                Directory.Move(skillDirectory, destination);
+                return installedName;
+            }
+            finally
+            {
+                Directory.Delete(stagingDirectory, recursive: true);
+            }
+        }
+
+        private static async Task<string> DownloadRepositoryAsync(
+            AgentPluginGitHubSource source,
+            string stagingDirectory,
+            CancellationToken cancellationToken)
+        {
+            string archivePath = Path.Combine(stagingDirectory, "repository.zip");
+            await DownloadArchiveAsync(source, archivePath, cancellationToken);
+            string extractionDirectory = Path.Combine(stagingDirectory, "extracted");
+            Directory.CreateDirectory(extractionDirectory);
+            await ExtractArchiveAsync(archivePath, extractionDirectory, cancellationToken);
+            return FindExtractedRepositoryRoot(extractionDirectory);
         }
 
         private static async Task DownloadArchiveAsync(
@@ -430,30 +495,6 @@ namespace TxtAIEditor.Controls
             }
 
             return roots.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        }
-
-        private static int CountSkills(IEnumerable<string> pluginRoots)
-        {
-            var skillFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string pluginRoot in pluginRoots)
-            {
-                string skillsDirectory = Path.Combine(pluginRoot, "skills");
-                if (!Directory.Exists(skillsDirectory))
-                {
-                    continue;
-                }
-
-                foreach (string skillDirectory in Directory.EnumerateDirectories(skillsDirectory))
-                {
-                    string skillFile = Path.Combine(skillDirectory, "SKILL.md");
-                    if (File.Exists(skillFile))
-                    {
-                        skillFiles.Add(Path.GetFullPath(skillFile));
-                    }
-                }
-            }
-
-            return skillFiles.Count;
         }
 
         private static async Task CopyWithLimitAsync(

@@ -46,7 +46,7 @@ namespace TxtAIEditor.Controls
             _addImageAttachment = addImageAttachment;
         }
 
-        public string BuildSelectedMcpSection()
+        public string BuildSelectedMcpSection(bool includePluginManagerTextTools, bool planningMode)
         {
             var selectedServers = GetSelectedServers();
             bool hasPluginManager = _selectedServerIds.Contains(AgentMcpPluginManagerTool.ServerId);
@@ -64,9 +64,7 @@ namespace TxtAIEditor.Controls
 
             if (hasPluginManager)
             {
-                AppendMcpAliasSection(builder, AgentMcpPluginManagerTool.ServerName, AgentMcpPluginManagerTool.ServerId);
-                builder.AppendLine("Activation changes take effect on the next model turn. Wait for its updated catalog before using newly enabled tools or skills.");
-                builder.AppendLine();
+                AgentMcpPluginManagerTool.AppendPromptContext(builder, includePluginManagerTextTools, planningMode);
             }
 
             if (hasComfyUi)

@@ -551,6 +551,25 @@ namespace TxtAIEditor.Controls
                 StandardErrorEncoding = Encoding.UTF8
             };
 
+            // Node's Windows npm distribution exposes npx as a batch shim. Use
+            // its Node entry point directly to preserve stdio and argument boundaries.
+            if (Path.GetExtension(startInfo.FileName).Equals(".cmd", StringComparison.OrdinalIgnoreCase) &&
+                Path.GetFileNameWithoutExtension(startInfo.FileName).Equals("npx", StringComparison.OrdinalIgnoreCase) &&
+                Path.GetDirectoryName(startInfo.FileName) is { Length: > 0 } npmDirectory)
+            {
+                string script = Path.Combine(npmDirectory, "node_modules", "npm", "bin", "npx-cli.js");
+                string node = Path.Combine(npmDirectory, "node.exe");
+                if (!File.Exists(node))
+                {
+                    node = ResolveCommand("node.exe");
+                }
+                if (File.Exists(script) && File.Exists(node))
+                {
+                    startInfo.FileName = node;
+                    startInfo.ArgumentList.Add(script);
+                }
+            }
+
             foreach (string argument in server.Arguments)
             {
                 startInfo.ArgumentList.Add(AgentPluginLoader.ExpandRuntimeVariables(server, argument));

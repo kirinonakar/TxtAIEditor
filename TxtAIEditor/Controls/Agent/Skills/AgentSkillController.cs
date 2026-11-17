@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TxtAIEditor.Controls
@@ -28,8 +29,8 @@ namespace TxtAIEditor.Controls
         private readonly Dictionary<string, HashSet<string>> _builtInRelatedSkills = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _removedBuiltInRelatedSkills = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _selectedSkillNames = new(StringComparer.OrdinalIgnoreCase);
+        private readonly SemaphoreSlim _loadGate = new(1, 1);
         private Task? _loadTask;
-        private bool _hasLoaded;
 
         public AgentSkillController(
             AgentPane agentPane,
@@ -48,18 +49,22 @@ namespace TxtAIEditor.Controls
             return _loadTask;
         }
 
-        public Task LoadIfNeededAsync()
-        {
-            if (_hasLoaded)
-            {
-                return Task.CompletedTask;
-            }
-
-            _loadTask ??= LoadCoreAsync();
-            return _loadTask;
-        }
+        public Task LoadIfNeededAsync() => _loadTask ??= LoadCoreAsync();
 
         private async Task LoadCoreAsync()
+        {
+            await _loadGate.WaitAsync();
+            try
+            {
+                await ScanSkillsAsync();
+            }
+            finally
+            {
+                _loadGate.Release();
+            }
+        }
+
+        private async Task ScanSkillsAsync()
         {
             var loadedByName = new Dictionary<string, AgentSkill>(StringComparer.OrdinalIgnoreCase);
             foreach (string skillsDirectory in _skillDirectories)
@@ -107,7 +112,6 @@ namespace TxtAIEditor.Controls
                 .OrderBy(skill => skill.Name, StringComparer.CurrentCultureIgnoreCase));
 
             _selectedSkillNames.RemoveWhere(name => FindSkill(name) == null);
-            _hasLoaded = true;
             UpdateUI();
         }
 

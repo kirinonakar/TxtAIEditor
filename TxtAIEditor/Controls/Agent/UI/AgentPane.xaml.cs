@@ -68,6 +68,8 @@ namespace TxtAIEditor.Controls
         private readonly AgentPaneSessionMenuCoordinator _sessionMenuCoordinator;
         private readonly AgentPaneReviewController _reviewController;
         private Func<string, string, string>? _getString;
+        private string? _installedMcpToReveal;
+        private string? _installedSkillToReveal;
 
         public string RawOutputText => GetRawOutputText();
         public string SelectedOutputText => _outputController.SelectedOutputText;
@@ -716,6 +718,7 @@ private Style? _accentRunButtonStyle;
         {
             AgentMcpFlyoutOpened?.Invoke(this, EventArgs.Empty);
             _menuCoordinator.RebuildAgentMcpMenu();
+            RevealInstalledRow(AgentMcpFlyout, AgentMcpListPanel, AgentMcpFilterTextBox, ref _installedMcpToReveal);
         }
 
         private void OnAgentMcpFilterTextChanged(object sender, TextChangedEventArgs e)
@@ -732,6 +735,7 @@ private Style? _accentRunButtonStyle;
         {
             AgentSkillFlyoutOpened?.Invoke(this, EventArgs.Empty);
             _menuCoordinator.RebuildAgentSkillMenu();
+            RevealInstalledRow(AgentSkillFlyout, AgentSkillListPanel, AgentSkillFilterTextBox, ref _installedSkillToReveal);
         }
 
         private void OnAgentSkillFilterTextChanged(object sender, TextChangedEventArgs e)
@@ -848,6 +852,55 @@ private Style? _accentRunButtonStyle;
             Func<string, string, string> getString)
         {
             _menuCoordinator.UpdateAgentMcpMenu(mcpItems, selectedMcpNames, getString);
+        }
+
+        internal void RevealInstalledAgentItem(AgentPluginEntry entry)
+        {
+            if (entry.Type == "skill")
+            {
+                _installedSkillToReveal = entry.Name;
+                RevealInstalledRow(AgentSkillFlyout, AgentSkillListPanel, AgentSkillFilterTextBox, ref _installedSkillToReveal);
+            }
+            else
+            {
+                _installedMcpToReveal = entry.Name;
+                RevealInstalledRow(AgentMcpFlyout, AgentMcpListPanel, AgentMcpFilterTextBox, ref _installedMcpToReveal);
+            }
+        }
+
+        private void RevealInstalledRow(Flyout flyout, StackPanel list, TextBox filter, ref string? pendingName)
+        {
+            if (!flyout.IsOpen || pendingName is not string name)
+            {
+                return;
+            }
+
+            pendingName = null;
+            if (FindInstalledRow(list, name) == null && !string.IsNullOrWhiteSpace(filter.Text))
+            {
+                filter.Text = string.Empty;
+            }
+
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                if (flyout.IsOpen)
+                {
+                    FindInstalledRow(list, name)?.StartBringIntoView();
+                }
+            });
+        }
+
+        private static FrameworkElement? FindInstalledRow(StackPanel list, string name)
+        {
+            foreach (UIElement child in list.Children)
+            {
+                if (child is FrameworkElement { Tag: string itemName } row &&
+                    itemName.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return row;
+                }
+            }
+            return null;
         }
 
         private void OnSelectedPresetScrollViewerViewChanged(object sender, ScrollViewerViewChangedEventArgs e)

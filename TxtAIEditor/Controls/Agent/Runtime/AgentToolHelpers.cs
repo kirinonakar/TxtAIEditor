@@ -240,7 +240,7 @@ namespace TxtAIEditor.Controls
 
         public static bool IsMutatingTool(string normalizedToolName)
         {
-            return normalizedToolName is "create_file"
+            return AgentMcpPluginManagerTool.IsInstallAlias(normalizedToolName) || normalizedToolName is "create_file"
                 or "extract_document"
                 or "overwrite_file"
                 or "search_replace"

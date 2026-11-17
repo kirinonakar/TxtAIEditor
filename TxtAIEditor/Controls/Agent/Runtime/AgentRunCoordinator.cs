@@ -475,7 +475,8 @@ namespace TxtAIEditor.Controls
                         runContext.HasEnabledSkills = _skillController.HasSelectedSkills();
                         runContext.HasEnabledMcp = !runContext.IsPlanResearch && _mcpController.HasSelectedMcpServers();
                         return _promptContextService.BuildFixedPromptContextForRun(
-                            runContext.PinnedWorkspaceRoot, includeMcp: !runContext.IsPlanResearch);
+                            runContext.PinnedWorkspaceRoot, includeMcp: !runContext.IsPlanResearch,
+                            settings: runContext.LlmSettings, planningMode: planningMode);
                     });
                     if (orchestration != null)
                     {

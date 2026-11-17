@@ -180,13 +180,14 @@ namespace TxtAIEditor.Controls
             {
                 if (_agentMcpFilter.Length > 0 &&
                     !item.Name.Contains(_agentMcpFilter, StringComparison.OrdinalIgnoreCase) &&
-                    !item.Detail.Contains(_agentMcpFilter, StringComparison.OrdinalIgnoreCase))
+                    !item.Detail.Contains(_agentMcpFilter, StringComparison.OrdinalIgnoreCase) &&
+                    !item.Endpoint.Contains(_agentMcpFilter, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
 
                 visibleMcpCount++;
-                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
+                var rowGrid = new Grid { Tag = item.Name, ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -340,7 +341,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 visibleSkillCount++;
-                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
+                var rowGrid = new Grid { Tag = skill.Name, ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 

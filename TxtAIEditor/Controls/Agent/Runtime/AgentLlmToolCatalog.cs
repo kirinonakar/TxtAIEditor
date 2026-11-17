@@ -461,6 +461,11 @@ namespace TxtAIEditor.Controls
 
             foreach (var alias in mcpAliases.OrderBy(item => item.Alias, System.StringComparer.Ordinal))
             {
+                if (planningMode && AgentMcpPluginManagerTool.IsInstallAlias(alias.Alias))
+                {
+                    continue;
+                }
+
                 object parametersObj = new { type = "object", properties = new { } };
                 try
                 {

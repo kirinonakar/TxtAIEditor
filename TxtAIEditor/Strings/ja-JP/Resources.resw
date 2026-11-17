@@ -4243,7 +4243,7 @@
   <data name="ExplorerModifiedDateLabel" xml:space="preserve"><value>更新日時</value></data>
   <data name="ExplorerImageDimensionsLabel" xml:space="preserve"><value>画像サイズ</value></data>
   <data name="AgentTruncatedRetryLimit" xml:space="preserve"><value>応答の途切れが繰り返されたため、エージェントを停止しました。もう一度実行してください。</value></data>
-  <data name="AgentMcpPluginManagerDetail" xml:space="preserve"><value>内蔵プラグイン - MCP・Skill の一覧、検索、有効化の管理</value></data>
+  <data name="AgentMcpPluginManagerDetail" xml:space="preserve"><value>内蔵プラグイン · Agent Plugin、MCP、Skill のインストールと管理</value></data>
   <data name="FileNotFoundMessage" xml:space="preserve"><value>ファイルが見つかりません。</value></data>
   <data name="FileSaveErrorFormat" xml:space="preserve"><value>ファイルの保存に失敗しました: {0}</value></data>
   <data name="LargeReplaceErrorFormat" xml:space="preserve"><value>大容量ファイルの置換に失敗しました: {0}</value></data>
