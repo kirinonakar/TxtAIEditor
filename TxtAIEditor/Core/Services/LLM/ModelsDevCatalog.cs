@@ -54,6 +54,8 @@ namespace TxtAIEditor.Core.Services.LLM
                 { ("opencode", "mimo-v2.5-free"), (200000, 32000) },
                 { ("opencode", "north-mini-code-free"), (256000, 64000) },
 
+                { ("openai", "gpt-6.2-sol"), (1050000, 128000) },
+                { ("openai", "gpt-6.2-astra"), (1050000, 128000) },
                 { ("openai", "gpt-6-astra"), (1050000, 128000) },
                 { ("openai", "gpt-6.1-sol"), (1050000, 128000) },
                 { ("openai", "gpt-6.1-terra"), (1050000, 128000) },
