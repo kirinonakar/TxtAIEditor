@@ -19,6 +19,8 @@ namespace TxtAIEditor.Core.Services
         private const uint ImageIcon = 1;
         private const uint LoadFromFile = 0x00000010;
         private const uint LoadDefaultSize = 0x00000040;
+        private const uint WsPopup = 0x80000000;
+        private const uint WsExToolWindow = 0x00000080;
         private const uint WmContextMenu = 0x007B;
         private const uint WmLButtonDoubleClick = 0x0203;
         private const uint WmRButtonUp = 0x0205;
@@ -37,7 +39,8 @@ namespace TxtAIEditor.Core.Services
         private const uint LastMenuCommand = ushort.MaxValue - 1;
         private const nuint SubclassId = 0x54524159;
 
-        private readonly IntPtr _windowHandle;
+        private readonly IntPtr _dpiWindowHandle;
+        private readonly IntPtr _trayWindowHandle;
         private readonly string _toolTip;
         private readonly string _openText;
         private readonly string _closeText;
@@ -62,7 +65,7 @@ namespace TxtAIEditor.Core.Services
             Action closeRequested,
             TrayQuickNotesMenu quickNotes)
         {
-            _windowHandle = windowHandle;
+            _dpiWindowHandle = windowHandle;
             _toolTip = toolTip;
             _openText = openText;
             _closeText = closeText;
@@ -73,25 +76,28 @@ namespace TxtAIEditor.Core.Services
             _subclassProc = WindowSubclassProc;
             _taskbarCreatedMessage = RegisterWindowMessage("TaskbarCreated");
 
-            if (!SetWindowSubclass(_windowHandle, _subclassProc, SubclassId, 0))
+            // Give the tray menu its own foreground window without raising an editor window.
+            _trayWindowHandle = CreateWindowEx(
+                WsExToolWindow, "Static", null, WsPopup, 0, 0, 0, 0,
+                IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+            if (_trayWindowHandle == IntPtr.Zero)
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error());
             }
 
             try
             {
+                if (!SetWindowSubclass(_trayWindowHandle, _subclassProc, SubclassId, 0))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+
                 _iconHandle = LoadTrayIcon();
                 AddTrayIcon();
             }
             catch
             {
-                RemoveWindowSubclass(_windowHandle, _subclassProc, SubclassId);
-                if (_iconHandle != IntPtr.Zero)
-                {
-                    DestroyIcon(_iconHandle);
-                    _iconHandle = IntPtr.Zero;
-                }
-
+                Dispose();
                 throw;
             }
         }
@@ -106,7 +112,8 @@ namespace TxtAIEditor.Core.Services
             _disposed = true;
             NotifyIconData data = CreateNotifyIconData();
             ShellNotifyIcon(NimDelete, ref data);
-            RemoveWindowSubclass(_windowHandle, _subclassProc, SubclassId);
+            RemoveWindowSubclass(_trayWindowHandle, _subclassProc, SubclassId);
+            DestroyWindow(_trayWindowHandle);
 
             if (_iconHandle != IntPtr.Zero)
             {
@@ -129,7 +136,7 @@ namespace TxtAIEditor.Core.Services
             return new NotifyIconData
             {
                 Size = (uint)Marshal.SizeOf<NotifyIconData>(),
-                WindowHandle = _windowHandle,
+                WindowHandle = _trayWindowHandle,
                 Id = TrayIconId,
                 Flags = NifMessage | NifIcon | NifTip,
                 CallbackMessage = TrayCallbackMessage,
@@ -237,7 +244,7 @@ namespace TxtAIEditor.Core.Services
                 AppendMenu(menu, MfString, CloseMenuCommand, _closeText);
                 GetCursorPos(out Point cursorPosition);
                 IntPtr previousForegroundWindow = GetForegroundWindow();
-                SetForegroundWindow(_windowHandle);
+                SetForegroundWindow(_trayWindowHandle);
 
                 uint command;
                 try
@@ -248,19 +255,20 @@ namespace TxtAIEditor.Core.Services
                         cursorPosition.X,
                         cursorPosition.Y,
                         0,
-                        _windowHandle,
+                        _trayWindowHandle,
                         IntPtr.Zero);
                 }
                 finally
                 {
-                    // TrackPopupMenu requires the owner window to be foreground,
-                    // but opening the tray menu must not leave an editor window
-                    // activated after the menu is dismissed.
-                    PostMessage(_windowHandle, WmNull, IntPtr.Zero, IntPtr.Zero);
-                    if (previousForegroundWindow != IntPtr.Zero &&
-                        previousForegroundWindow != _windowHandle)
+                    if (!_disposed)
                     {
-                        SetForegroundWindow(previousForegroundWindow);
+                        PostMessage(_trayWindowHandle, WmNull, IntPtr.Zero, IntPtr.Zero);
+                        if (GetForegroundWindow() == _trayWindowHandle &&
+                            previousForegroundWindow != IntPtr.Zero &&
+                            previousForegroundWindow != _trayWindowHandle)
+                        {
+                            SetForegroundWindow(previousForegroundWindow);
+                        }
                     }
                 }
 
@@ -321,7 +329,7 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            _noteRows = new TrayQuickNoteRows(_windowHandle, submenu, _quickNotes.DeleteText);
+            _noteRows = new TrayQuickNoteRows(_dpiWindowHandle, submenu, _quickNotes.DeleteText);
             foreach (TrayQuickNoteItem note in notes.Items)
             {
                 if (commandId >= LastMenuCommand)
@@ -409,6 +417,25 @@ namespace TxtAIEditor.Core.Services
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool DestroyIcon(IntPtr iconHandle);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CreateWindowExW")]
+        private static extern IntPtr CreateWindowEx(
+            uint extendedStyle,
+            string className,
+            string? windowName,
+            uint style,
+            int x,
+            int y,
+            int width,
+            int height,
+            IntPtr parent,
+            IntPtr menu,
+            IntPtr instance,
+            IntPtr parameter);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DestroyWindow(IntPtr windowHandle);
 
         [DllImport("comctl32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
