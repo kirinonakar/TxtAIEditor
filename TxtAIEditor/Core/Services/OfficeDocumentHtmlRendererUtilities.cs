@@ -4,13 +4,13 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
+using static TxtAIEditor.Core.Services.OfficeHtmlEncoder;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -433,7 +433,7 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
                 .Select(e => new
                 {
                     Id = e.Attribute("Id")?.Value ?? string.Empty,
-                    Target = NormalizeZipPath(basePath, e.Attribute("Target")?.Value ?? string.Empty)
+                    Target = OfficePackagePath.NormalizeLocalZipPath(basePath, e.Attribute("Target")?.Value ?? string.Empty)
                 })
                 .Where(x => !string.IsNullOrWhiteSpace(x.Id) && !string.IsNullOrWhiteSpace(x.Target))
                 .ToDictionary(x => x.Id, x => x.Target, StringComparer.OrdinalIgnoreCase);
@@ -446,41 +446,6 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
             return string.IsNullOrEmpty(directory)
                 ? "_rels/" + fileName + ".rels"
                 : directory + "/_rels/" + fileName + ".rels";
-        }
-
-        internal static string NormalizeZipPath(string basePath, string target)
-        {
-            if (string.IsNullOrWhiteSpace(target) ||
-                target.StartsWith("http:", StringComparison.OrdinalIgnoreCase) ||
-                target.StartsWith("https:", StringComparison.OrdinalIgnoreCase))
-            {
-                return string.Empty;
-            }
-
-            string combined = target.StartsWith("/", StringComparison.Ordinal)
-                ? target.TrimStart('/')
-                : $"{basePath.TrimEnd('/')}/{target}";
-            var parts = new List<string>();
-            foreach (string part in combined.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                if (part == ".")
-                {
-                    continue;
-                }
-
-                if (part == "..")
-                {
-                    if (parts.Count > 0)
-                    {
-                        parts.RemoveAt(parts.Count - 1);
-                    }
-                    continue;
-                }
-
-                parts.Add(part);
-            }
-
-            return string.Join("/", parts);
         }
 
         internal static async Task<ZipArchive> OpenArchiveAsync(string filePath)
@@ -519,11 +484,6 @@ body { display: grid; place-items: center; background: Canvas; color: CanvasText
 <body><div class="message">{{Html(message)}}</div></body>
 </html>
 """;
-        }
-
-        internal static string Html(string value)
-        {
-            return WebUtility.HtmlEncode(value ?? string.Empty);
         }
 
     }

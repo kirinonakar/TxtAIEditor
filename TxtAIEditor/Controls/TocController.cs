@@ -13,7 +13,7 @@ using TxtAIEditor.ViewModels;
 
 namespace TxtAIEditor.Controls
 {
-    public sealed class TocController
+    public sealed partial class TocController
     {
         private const long MaximumTocFileSizeBytes = 20L * 1024 * 1024;
 
@@ -321,7 +321,8 @@ namespace TxtAIEditor.Controls
 
         private void ParseMarkdown(IReadOnlyList<string> lines, List<TocItem> newItems)
         {
-            var headingRegex = new Regex(@"^\s*(#{1,6})\s+(.+)$", RegexOptions.Compiled);
+            Regex headingRegex = MarkdownHeadingRegex();
+
             for (int i = 0; i < lines.Count; i++)
             {
                 string line = lines[i];
@@ -347,17 +348,10 @@ namespace TxtAIEditor.Controls
 
         private void ParseAozora(IReadOnlyList<string> lines, List<TocItem> newItems)
         {
-            // 1. Regex for inline headings: ［＃「...」は (大/中/小)見出し］
-            var inlineHeadingRegex = new Regex(@"［＃「([^」]+)」は\s*(大|中|小)見出し］", RegexOptions.Compiled);
-
-            // 2. Regex for same-line wrapped headings: ［＃(大/中/小)見出し］...［＃(大/中/小)見出し終わり］
-            var wrappedHeadingRegex = new Regex(@"［＃(大|中|小)見出し］(.*?)［＃(?:大|中|小)見出し終わり］", RegexOptions.Compiled);
-
-            // 3. Regex for block heading start: ［＃여기서부터(大/中/小)見出し］
-            var blockStartRegex = new Regex(@"［＃ここから(大|中|小)見出し］", RegexOptions.Compiled);
-
-            // 4. Regex for block header opening tag on its own line: ［＃(大/中/小)見出し］
-            var openHeadingTagRegex = new Regex(@"^［＃(大|中|小)見出し］$", RegexOptions.Compiled);
+            Regex inlineHeadingRegex = AozoraInlineHeadingRegex();
+            Regex wrappedHeadingRegex = AozoraWrappedHeadingRegex();
+            Regex blockStartRegex = AozoraBlockStartRegex();
+            Regex openHeadingTagRegex = AozoraOpenHeadingTagRegex();
 
             bool titleAdded = false;
             for (int i = 0; i < lines.Count; i++)
@@ -522,8 +516,8 @@ namespace TxtAIEditor.Controls
 
         private void ParseCsharp(IReadOnlyList<string> lines, List<TocItem> newItems)
         {
-            var classRegex = new Regex(@"^\s*(public|private|protected|internal|static|sealed|abstract|partial)?\s*class\s+(\w+)", RegexOptions.Compiled);
-            var methodRegex = new Regex(@"^\s*(public|private|protected|internal|static|async|virtual|override|sealed|abstract)?\s+(async|static|virtual|override|sealed|abstract)?\s*([\w\d_<>\[\]]+)\s+([\w_]+)\s*\((.*?)\)", RegexOptions.Compiled);
+            Regex classRegex = CsharpClassRegex();
+            Regex methodRegex = CsharpMethodRegex();
             var keywords = new HashSet<string> { "if", "while", "for", "foreach", "switch", "using", "return", "throw", "catch", "lock", "new", "typeof" };
 
             for (int i = 0; i < lines.Count; i++)
@@ -564,8 +558,8 @@ namespace TxtAIEditor.Controls
 
         private void ParsePython(IReadOnlyList<string> lines, List<TocItem> newItems)
         {
-            var classRegex = new Regex(@"^\s*class\s+(\w+)\b", RegexOptions.Compiled);
-            var funcRegex = new Regex(@"^\s*def\s+([\w_]+)\s*\((.*?)\):", RegexOptions.Compiled);
+            Regex classRegex = PythonClassRegex();
+            Regex funcRegex = PythonFunctionRegex();
 
             for (int i = 0; i < lines.Count; i++)
             {
@@ -600,10 +594,10 @@ namespace TxtAIEditor.Controls
 
         private void ParseJavascript(IReadOnlyList<string> lines, List<TocItem> newItems)
         {
-            var classRegex = new Regex(@"\bclass\s+([\w_]+)\b", RegexOptions.Compiled);
-            var funcRegex = new Regex(@"\bfunction\s+([\w_]+)\s*\((.*?)\)", RegexOptions.Compiled);
-            var arrowRegex = new Regex(@"const\s+([\w_]+)\s*=\s*(async\s*)?\((.*?)\)\s*=>", RegexOptions.Compiled);
-            var methodRegex = new Regex(@"^\s*(async|static|get|set|public|private|protected)?\s*([\w_]+)\s*\((.*?)\)\s*\{", RegexOptions.Compiled);
+            Regex classRegex = JavascriptClassRegex();
+            Regex funcRegex = JavascriptFunctionRegex();
+            Regex arrowRegex = JavascriptArrowFunctionRegex();
+            Regex methodRegex = JavascriptMethodRegex();
             var keywords = new HashSet<string> { "if", "while", "for", "switch", "catch", "return", "throw", "class", "function", "const", "let", "var" };
 
             for (int i = 0; i < lines.Count; i++)
@@ -667,8 +661,8 @@ namespace TxtAIEditor.Controls
 
         private void ParseGo(IReadOnlyList<string> lines, List<TocItem> newItems)
         {
-            var funcRegex = new Regex(@"^func\s+(?:\([^)]+\)\s+)?([\w_]+)\s*\(", RegexOptions.Compiled);
-            var structRegex = new Regex(@"^type\s+([\w_]+)\s+struct\b", RegexOptions.Compiled);
+            Regex funcRegex = GoFunctionRegex();
+            Regex structRegex = GoStructRegex();
 
             for (int i = 0; i < lines.Count; i++)
             {
@@ -702,8 +696,9 @@ namespace TxtAIEditor.Controls
 
         private void ParseGeneralCode(IReadOnlyList<string> lines, List<TocItem> newItems)
         {
+            Regex funcRegex = GeneralCodeSignatureRegex();
+
             // Simple generic parser that scans for standard declarations
-            var funcRegex = new Regex(@"\b(function|def|func|class)\s+([\w_]+)\b|^\s*(public|private|protected)?\s*[\w\d_<>\[\]]+\s+([\w_]+)\s*\((.*?)\)", RegexOptions.Compiled);
             var keywords = new HashSet<string> { "if", "while", "for", "foreach", "switch", "using", "return", "throw", "catch", "lock", "new", "typeof" };
 
             for (int i = 0; i < lines.Count; i++)
@@ -746,5 +741,53 @@ namespace TxtAIEditor.Controls
 
             await _revealLineAsync(item.LineNumber);
         }
+
+        [GeneratedRegex(@"^\s*(#{1,6})\s+(.+)$")]
+        private static partial Regex MarkdownHeadingRegex();
+
+        [GeneratedRegex(@"［＃「([^」]+)」は\s*(大|中|小)見出し］")]
+        private static partial Regex AozoraInlineHeadingRegex();
+
+        [GeneratedRegex(@"［＃(大|中|小)見出し］(.*?)［＃(?:大|中|小)見出し終わり］")]
+        private static partial Regex AozoraWrappedHeadingRegex();
+
+        [GeneratedRegex(@"［＃ここから(大|中|小)見出し］")]
+        private static partial Regex AozoraBlockStartRegex();
+
+        [GeneratedRegex(@"^［＃(大|中|小)見出し］$")]
+        private static partial Regex AozoraOpenHeadingTagRegex();
+
+        [GeneratedRegex(@"^\s*(public|private|protected|internal|static|sealed|abstract|partial)?\s*class\s+(\w+)")]
+        private static partial Regex CsharpClassRegex();
+
+        [GeneratedRegex(@"^\s*(public|private|protected|internal|static|async|virtual|override|sealed|abstract)?\s+(async|static|virtual|override|sealed|abstract)?\s*([\w\d_<>\[\]]+)\s+([\w_]+)\s*\((.*?)\)")]
+        private static partial Regex CsharpMethodRegex();
+
+        [GeneratedRegex(@"^\s*class\s+(\w+)\b")]
+        private static partial Regex PythonClassRegex();
+
+        [GeneratedRegex(@"^\s*def\s+([\w_]+)\s*\((.*?)\):")]
+        private static partial Regex PythonFunctionRegex();
+
+        [GeneratedRegex(@"\bclass\s+([\w_]+)\b")]
+        private static partial Regex JavascriptClassRegex();
+
+        [GeneratedRegex(@"\bfunction\s+([\w_]+)\s*\((.*?)\)")]
+        private static partial Regex JavascriptFunctionRegex();
+
+        [GeneratedRegex(@"const\s+([\w_]+)\s*=\s*(async\s*)?\((.*?)\)\s*=>")]
+        private static partial Regex JavascriptArrowFunctionRegex();
+
+        [GeneratedRegex(@"^\s*(async|static|get|set|public|private|protected)?\s*([\w_]+)\s*\((.*?)\)\s*\{")]
+        private static partial Regex JavascriptMethodRegex();
+
+        [GeneratedRegex(@"^func\s+(?:\([^)]+\)\s+)?([\w_]+)\s*\(")]
+        private static partial Regex GoFunctionRegex();
+
+        [GeneratedRegex(@"^type\s+([\w_]+)\s+struct\b")]
+        private static partial Regex GoStructRegex();
+
+        [GeneratedRegex(@"\b(function|def|func|class)\s+([\w_]+)\b|^\s*(public|private|protected)?\s*[\w\d_<>\[\]]+\s+([\w_]+)\s*\((.*?)\)")]
+        private static partial Regex GeneralCodeSignatureRegex();
     }
 }

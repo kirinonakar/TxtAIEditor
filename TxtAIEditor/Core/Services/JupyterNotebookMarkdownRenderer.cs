@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -168,7 +169,7 @@ namespace TxtAIEditor.Core.Services
 
         private static string InlineMd(string text)
         {
-            text = NotebookHtmlEncoder.Encode(text);
+            text = WebUtility.HtmlEncode(text);
             text = UnescapeSafeHtmlTags(text);
             text = Regex.Replace(text, @"!\[([^\]]*)\]\(([^)]+)\)", @"<img src=""$2"" alt=""$1"" style=""max-width:100%;height:auto;display:inline-block;vertical-align:middle;margin:4px 0;"" />");
             text = Regex.Replace(text, @"\[([^\]]+)\]\(([^)]+)\)", @"<a href=""$2"" target=""_blank"">$1</a>");

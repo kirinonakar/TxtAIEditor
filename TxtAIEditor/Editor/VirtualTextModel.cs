@@ -333,7 +333,7 @@ namespace TxtAIEditor.Editor
                 return;
             }
 
-            string normalized = NormalizeSingleLine(text);
+            string normalized = EditorTextNormalization.NormalizeSingleLine(text);
             string previous = _lines[lineNumber - 1];
             _lines[lineNumber - 1] = normalized;
             _lineLengthIndex.UpdateLineLength(lineNumber, previous.Length, normalized.Length);
@@ -349,7 +349,7 @@ namespace TxtAIEditor.Editor
                     continue;
                 }
 
-                string normalized = NormalizeSingleLine(patch.Text);
+                string normalized = EditorTextNormalization.NormalizeSingleLine(patch.Text);
                 string previous = _lines[lineNumber - 1];
                 if (string.Equals(previous, normalized, StringComparison.Ordinal))
                 {
@@ -364,7 +364,7 @@ namespace TxtAIEditor.Editor
         public void InsertLine(int lineNumber, string text)
         {
             int index = Math.Clamp(lineNumber - 1, 0, _lines.Count);
-            _lines.Insert(index, NormalizeSingleLine(text));
+            _lines.Insert(index, EditorTextNormalization.NormalizeSingleLine(text));
             RebuildLineLengthIndex();
         }
 
@@ -387,8 +387,8 @@ namespace TxtAIEditor.Editor
                 return;
             }
 
-            _lines[lineNumber - 1] = NormalizeSingleLine(before);
-            _lines.Insert(lineNumber, NormalizeSingleLine(after));
+            _lines[lineNumber - 1] = EditorTextNormalization.NormalizeSingleLine(before);
+            _lines.Insert(lineNumber, EditorTextNormalization.NormalizeSingleLine(after));
             RebuildLineLengthIndex();
         }
 
@@ -768,11 +768,6 @@ namespace TxtAIEditor.Editor
         private static int ClampColumn(string line, int column)
         {
             return Math.Clamp(column, 1, line.Length + 1);
-        }
-
-        private static string NormalizeSingleLine(string text)
-        {
-            return (text ?? string.Empty).Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ');
         }
 
         private void NormalizeRange(ref int startLine, ref int startColumn, ref int endLine, ref int endColumn)
@@ -1320,7 +1315,7 @@ namespace TxtAIEditor.Editor
             }
 
             string before = Model.GetLine(lineNumber);
-            string after = NormalizeSingleLine(text);
+            string after = EditorTextNormalization.NormalizeSingleLine(text);
 
             if (string.Equals(before, after, StringComparison.Ordinal)) return;
 
@@ -1344,8 +1339,8 @@ namespace TxtAIEditor.Editor
             _document.UndoManager.AddEdit(new SplitLineEdit(
                 lineNumber,
                 original,
-                NormalizeSingleLine(before),
-                NormalizeSingleLine(after)));
+                EditorTextNormalization.NormalizeSingleLine(before),
+                EditorTextNormalization.NormalizeSingleLine(after)));
             Model.SplitLine(lineNumber, before, after);
             CommitViewChange(lineNumber, oldLineCount: 1, newLineCount: 2);
             return Model.LineCount;
@@ -1354,7 +1349,7 @@ namespace TxtAIEditor.Editor
         public int InsertLine(int lineNumber, string text)
         {
             int safeLineNumber = Math.Clamp(lineNumber, 1, Model.LineCount + 1);
-            string inserted = NormalizeSingleLine(text);
+            string inserted = EditorTextNormalization.NormalizeSingleLine(text);
             _document.UndoManager.AddEdit(new InsertLineEdit(safeLineNumber, inserted));
             Model.InsertLine(safeLineNumber, inserted);
             CommitViewChange(safeLineNumber, oldLineCount: 0, newLineCount: 1);
@@ -1887,11 +1882,6 @@ namespace TxtAIEditor.Editor
         public void RefreshTabContentPreview()
         {
             Tab.ContentPreview = Model is HexDumpTextModel ? string.Empty : Model.GetText(120_000);
-        }
-
-        private static string NormalizeSingleLine(string text)
-        {
-            return (text ?? string.Empty).Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ');
         }
 
         private void CommitViewChange(int startLine, int oldLineCount, int newLineCount)

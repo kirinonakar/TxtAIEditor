@@ -10,6 +10,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using static TxtAIEditor.Core.Services.OfficeHtmlEncoder;
 
 using static TxtAIEditor.Core.Services.OfficeWorkbookCellFormatter;
 using static TxtAIEditor.Core.Services.OfficeWorkbookPackageUtilities;

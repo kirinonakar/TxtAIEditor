@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
-using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
 
 namespace TxtAIEditor.Controls
@@ -183,7 +182,7 @@ namespace TxtAIEditor.Controls
             _presets.Add(new AgentPreset
             {
                 Name = presetName,
-                Content = NormalizePresetContent(contentBox.Text)
+                Content = PresetTextBox.NormalizePresetContent(contentBox.Text)
             });
             await SaveAsync();
         }
@@ -245,7 +244,7 @@ namespace TxtAIEditor.Controls
                 foreach (var item in imported.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
                 {
                     string name = item.Name.Trim();
-                    string content = NormalizePresetContent(item.Content);
+                    string content = PresetTextBox.NormalizePresetContent(item.Content);
                     var existing = FindPreset(name);
                     if (existing != null)
                     {
@@ -330,7 +329,7 @@ namespace TxtAIEditor.Controls
 
             bool wasSelected = _selectedPresetNames.Remove(preset.Name);
             preset.Name = newName;
-            preset.Content = NormalizePresetContent(contentBox.Text);
+            preset.Content = PresetTextBox.NormalizePresetContent(contentBox.Text);
             if (wasSelected)
             {
                 _selectedPresetNames.Add(preset.Name);
@@ -475,13 +474,13 @@ namespace TxtAIEditor.Controls
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 FontFamily = new FontFamily("Consolas, Segoe UI, Malgun Gothic")
             };
-            contentBox.Text = NormalizeTextBoxLineEndings(text);
+            contentBox.Text = PresetTextBox.NormalizeTextBoxLineEndings(text);
             ScrollViewer.SetVerticalScrollMode(contentBox, ScrollMode.Enabled);
             ScrollViewer.SetVerticalScrollBarVisibility(contentBox, ScrollBarVisibility.Auto);
             contentBox.Paste += async (_, e) =>
             {
                 e.Handled = true;
-                await PasteClipboardTextAsync(contentBox);
+                await PresetTextBox.PasteClipboardTextAsync(contentBox, "agent");
             };
             return contentBox;
         }
@@ -523,58 +522,6 @@ namespace TxtAIEditor.Controls
             {
                 _afterDialog?.Invoke();
             }
-        }
-
-        private static string NormalizePresetContent(string value)
-        {
-            return (value ?? string.Empty)
-                .Replace("\r\n", "\n", StringComparison.Ordinal)
-                .Replace("\r", "\n", StringComparison.Ordinal);
-        }
-
-        private static async Task PasteClipboardTextAsync(TextBox textBox)
-        {
-            try
-            {
-                var content = Clipboard.GetContent();
-                if (!content.Contains(StandardDataFormats.Text))
-                {
-                    return;
-                }
-
-                string clipboardText = await content.GetTextAsync();
-                InsertTextAtSelection(textBox, NormalizeTextBoxLineEndings(clipboardText));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to paste agent preset content: {ex.Message}");
-            }
-        }
-
-        private static void InsertTextAtSelection(TextBox textBox, string text)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-
-            string current = textBox.Text ?? string.Empty;
-            int selectionStart = Math.Max(0, Math.Min(textBox.SelectionStart, current.Length));
-            int selectionLength = Math.Max(0, Math.Min(textBox.SelectionLength, current.Length - selectionStart));
-
-            textBox.Text = current.Substring(0, selectionStart) +
-                text +
-                current.Substring(selectionStart + selectionLength);
-            textBox.SelectionStart = selectionStart + text.Length;
-            textBox.SelectionLength = 0;
-        }
-
-        private static string NormalizeTextBoxLineEndings(string value)
-        {
-            return (value ?? string.Empty)
-                .Replace("\r\n", "\n", StringComparison.Ordinal)
-                .Replace("\r", "\n", StringComparison.Ordinal)
-                .Replace("\n", "\r\n", StringComparison.Ordinal);
         }
     }
 }

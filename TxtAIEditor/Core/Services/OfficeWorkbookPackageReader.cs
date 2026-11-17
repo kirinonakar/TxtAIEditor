@@ -488,7 +488,7 @@ namespace TxtAIEditor.Core.Services
                 .Select(e => new
                 {
                     Id = e.Attribute("Id")?.Value ?? string.Empty,
-                    Target = NormalizeZipPath("xl", e.Attribute("Target")?.Value ?? string.Empty)
+                    Target = OfficePackagePath.NormalizeLocalZipPath("xl", e.Attribute("Target")?.Value ?? string.Empty)
                 })
                 .Where(x => !string.IsNullOrWhiteSpace(x.Id) && !string.IsNullOrWhiteSpace(x.Target))
                 .ToDictionary(x => x.Id, x => x.Target, StringComparer.OrdinalIgnoreCase);

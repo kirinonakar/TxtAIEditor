@@ -20,7 +20,19 @@
                     <SolidColorBrush x:Key="SplitterBackgroundBrush" Color="#E0E2E6"/>
                     <SolidColorBrush x:Key="SplitterHoverBackgroundBrush" Color="#C8CCD0"/>
                     <SolidColorBrush x:Key="EditorSurfaceBackgroundBrush" Color="#FFFFFF"/>
-                    <SolidColorBrush x:Key="TabBarBackgroundBrush" Color="#FFFFFF"/>
+
+                    <!-- TabView and TabViewItem brushes (Light Theme) -->
+                    <SolidColorBrush x:Key="TabViewBackground" Color="#F3F4F6"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderBackground" Color="#F3F4F6"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderForeground" Color="#4B5563"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="#E9EBEE"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderForegroundPointerOver" Color="#1F2937"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPressed" Color="#D2D6DB"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderForegroundPressed" Color="#1F2937"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="#FFFFFF"/>
+                    <SolidColorBrush x:Key="TabViewItemHeaderForegroundSelected" Color="#1F2937"/>
+                    <SolidColorBrush x:Key="TabViewItemBorderBrush" Color="Transparent"/>
+                    <SolidColorBrush x:Key="TabViewBorderBrush" Color="#E5E7EB"/>
 
                     <!-- AI Assistant & Agent panel brushes (Light Theme) -->
                     <SolidColorBrush x:Key="ButtonBackground" Color="#FCFCFC"/>
@@ -59,8 +71,8 @@
                     <SolidColorBrush x:Key="SplitterHoverBackgroundBrush" Color="#4B4E54"/>
                     <SolidColorBrush x:Key="EditorSurfaceBackgroundBrush" Color="#1E1E1E"/>
 
-                    <!-- TabView & TabViewItem lightweight style overrides for Dark Theme -->
-                    <SolidColorBrush x:Key="TabViewTabStripBackground" Color="#181818"/>
+                    <!-- TabView and TabViewItem brushes (Dark Theme) -->
+                    <SolidColorBrush x:Key="TabViewBackground" Color="#181818"/>
                     
                     <!-- Inactive Tab Background & Foreground -->
                     <SolidColorBrush x:Key="TabViewItemHeaderBackground" Color="#141517"/>
@@ -78,14 +90,9 @@
                     <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="#1E1E1E"/>
                     <SolidColorBrush x:Key="TabViewItemHeaderForegroundSelected" Color="#FFFFFF"/>
                     
-                    <!-- Active Tab Hover / Pressed overrides -->
-                    <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelectedPointerOver" Color="#222327"/>
-                    <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelectedPressed" Color="#2B2C31"/>
-                    
                     <!-- Tab Borders -->
-                    <SolidColorBrush x:Key="TabViewItemHeaderBorderBrush" Color="Transparent"/>
+                    <SolidColorBrush x:Key="TabViewItemBorderBrush" Color="Transparent"/>
                     <SolidColorBrush x:Key="TabViewBorderBrush" Color="#2E3033"/>
-                    <SolidColorBrush x:Key="TabBarBackgroundBrush" Color="#181818"/>
 
                     <!-- AI Assistant & Agent panel brushes (Dark Theme) -->
                     <SolidColorBrush x:Key="ButtonBackground" Color="#2B2D31"/>

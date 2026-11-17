@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using TxtAIEditor.Core.Models;
@@ -28,7 +29,7 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<head>");
             sb.AppendLine("<meta charset=\"UTF-8\" />");
             sb.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />");
-            sb.AppendLine($"<title>{NotebookHtmlEncoder.Encode(fileName)}</title>");
+            sb.AppendLine($"<title>{WebUtility.HtmlEncode(fileName)}</title>");
             sb.AppendLine("<link rel=\"stylesheet\" href=\"http://txtaieditor.local/katex/katex.min.css\" />");
             sb.AppendLine("<style>");
             sb.AppendLine(JupyterNotebookViewerStyles.GetCss());
@@ -40,31 +41,31 @@ namespace TxtAIEditor.Core.Services
 
             sb.AppendLine("<div id=\"notebook-header\">");
             sb.AppendLine("<div class=\"notebook-header-top\">");
-            sb.AppendLine($"<span class=\"notebook-title\">{NotebookHtmlEncoder.Encode(fileName)}</span>");
+            sb.AppendLine($"<span class=\"notebook-title\">{WebUtility.HtmlEncode(fileName)}</span>");
             sb.AppendLine("<div id=\"notebook-toolbar\">");
-            sb.AppendLine($"<button id=\"btn-find\" class=\"nb-btn nb-btn-find\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterFindTooltip", "Find in notebook (Ctrl+F)"))}\">🔍</button>");
+            sb.AppendLine($"<button id=\"btn-find\" class=\"nb-btn nb-btn-find\" title=\"{WebUtility.HtmlEncode(_getString("JupyterFindTooltip", "Find in notebook (Ctrl+F)"))}\">🔍</button>");
             sb.AppendLine("<button id=\"btn-add-code\" class=\"nb-btn nb-btn-add\">+ Code</button>");
             sb.AppendLine("<button id=\"btn-add-markdown\" class=\"nb-btn nb-btn-add\">+ Markdown</button>");
             sb.AppendLine("<button id=\"btn-run-all\" class=\"nb-btn nb-btn-run\">Run All</button>");
-            sb.AppendLine($"<button id=\"btn-clear-outputs\" class=\"nb-btn nb-btn-clear\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterClearOutputsButton", "Clear Outputs"))}\">🧹 {NotebookHtmlEncoder.Encode(_getString("JupyterClearOutputsButton", "Clear Outputs"))}</button>");
+            sb.AppendLine($"<button id=\"btn-clear-outputs\" class=\"nb-btn nb-btn-clear\" title=\"{WebUtility.HtmlEncode(_getString("JupyterClearOutputsButton", "Clear Outputs"))}\">🧹 {WebUtility.HtmlEncode(_getString("JupyterClearOutputsButton", "Clear Outputs"))}</button>");
             sb.AppendLine("<button id=\"btn-export-py\" class=\"nb-btn nb-btn-export\" title=\"Save as Python Script (.py)\">🐍 Save as .py</button>");
-            sb.AppendLine($"<button id=\"btn-variables\" class=\"nb-btn nb-btn-vars\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterVariablesPanelTitle", "Variable Explorer"))}\">🔍 {NotebookHtmlEncoder.Encode(_getString("JupyterVariablesButton", "Variables"))}</button>");
+            sb.AppendLine($"<button id=\"btn-variables\" class=\"nb-btn nb-btn-vars\" title=\"{WebUtility.HtmlEncode(_getString("JupyterVariablesPanelTitle", "Variable Explorer"))}\">🔍 {WebUtility.HtmlEncode(_getString("JupyterVariablesButton", "Variables"))}</button>");
             sb.AppendLine("</div>");
             sb.AppendLine("</div>");
 
             sb.AppendLine("<div id=\"notebook-find-bar\" hidden>");
-            sb.AppendLine($"<input id=\"notebook-find-input\" type=\"search\" autocomplete=\"off\" spellcheck=\"false\" placeholder=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterFindPlaceholder", "Find in notebook..."))}\" />");
+            sb.AppendLine($"<input id=\"notebook-find-input\" type=\"search\" autocomplete=\"off\" spellcheck=\"false\" placeholder=\"{WebUtility.HtmlEncode(_getString("JupyterFindPlaceholder", "Find in notebook..."))}\" />");
             sb.AppendLine("<span id=\"notebook-find-count\" aria-live=\"polite\"></span>");
-            sb.AppendLine($"<button id=\"btn-find-previous\" class=\"nb-btn nb-btn-sm\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterFindPreviousTooltip", "Previous match (Shift+Enter)"))}\">↑</button>");
-            sb.AppendLine($"<button id=\"btn-find-next\" class=\"nb-btn nb-btn-sm\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterFindNextTooltip", "Next match (Enter)"))}\">↓</button>");
-            sb.AppendLine($"<button id=\"btn-find-close\" class=\"nb-btn nb-btn-sm\" title=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterFindCloseTooltip", "Close (Esc)"))}\">✕</button>");
+            sb.AppendLine($"<button id=\"btn-find-previous\" class=\"nb-btn nb-btn-sm\" title=\"{WebUtility.HtmlEncode(_getString("JupyterFindPreviousTooltip", "Previous match (Shift+Enter)"))}\">↑</button>");
+            sb.AppendLine($"<button id=\"btn-find-next\" class=\"nb-btn nb-btn-sm\" title=\"{WebUtility.HtmlEncode(_getString("JupyterFindNextTooltip", "Next match (Enter)"))}\">↓</button>");
+            sb.AppendLine($"<button id=\"btn-find-close\" class=\"nb-btn nb-btn-sm\" title=\"{WebUtility.HtmlEncode(_getString("JupyterFindCloseTooltip", "Close (Esc)"))}\">✕</button>");
             sb.AppendLine("</div>");
 
             sb.AppendLine("<div id=\"variables-panel\" style=\"display:none;\">");
             sb.AppendLine("<div class=\"vars-panel-header\">");
-            sb.AppendLine($"<span class=\"vars-panel-title\">🔍 {NotebookHtmlEncoder.Encode(_getString("JupyterVariablesPanelTitle", "Variable Explorer"))}</span>");
+            sb.AppendLine($"<span class=\"vars-panel-title\">🔍 {WebUtility.HtmlEncode(_getString("JupyterVariablesPanelTitle", "Variable Explorer"))}</span>");
             sb.AppendLine("<div class=\"vars-panel-controls\">");
-            sb.AppendLine($"<input type=\"text\" id=\"vars-filter-input\" placeholder=\"{NotebookHtmlEncoder.AttributeEncode(_getString("JupyterVariablesFilterPlaceholder", "Filter variables..."))}\" />");
+            sb.AppendLine($"<input type=\"text\" id=\"vars-filter-input\" placeholder=\"{WebUtility.HtmlEncode(_getString("JupyterVariablesFilterPlaceholder", "Filter variables..."))}\" />");
             sb.AppendLine("<button id=\"btn-refresh-vars\" class=\"nb-btn nb-btn-sm\" title=\"Refresh\">🔄</button>");
             sb.AppendLine("<button id=\"btn-close-vars\" class=\"nb-btn nb-btn-sm\" title=\"Close\">✕</button>");
             sb.AppendLine("</div>");
@@ -73,14 +74,14 @@ namespace TxtAIEditor.Core.Services
             sb.AppendLine("<table class=\"vars-table\">");
             sb.AppendLine("<thead>");
             sb.AppendLine("<tr>");
-            sb.AppendLine($"<th>{NotebookHtmlEncoder.Encode(_getString("JupyterVariablesName", "Name"))}</th>");
-            sb.AppendLine($"<th>{NotebookHtmlEncoder.Encode(_getString("JupyterVariablesType", "Type"))}</th>");
-            sb.AppendLine($"<th>{NotebookHtmlEncoder.Encode(_getString("JupyterVariablesSize", "Size"))}</th>");
-            sb.AppendLine($"<th>{NotebookHtmlEncoder.Encode(_getString("JupyterVariablesValue", "Value"))}</th>");
+            sb.AppendLine($"<th>{WebUtility.HtmlEncode(_getString("JupyterVariablesName", "Name"))}</th>");
+            sb.AppendLine($"<th>{WebUtility.HtmlEncode(_getString("JupyterVariablesType", "Type"))}</th>");
+            sb.AppendLine($"<th>{WebUtility.HtmlEncode(_getString("JupyterVariablesSize", "Size"))}</th>");
+            sb.AppendLine($"<th>{WebUtility.HtmlEncode(_getString("JupyterVariablesValue", "Value"))}</th>");
             sb.AppendLine("</tr>");
             sb.AppendLine("</thead>");
             sb.AppendLine("<tbody id=\"vars-table-body\">");
-            sb.AppendLine($"<tr><td colspan=\"4\" class=\"vars-empty\">{NotebookHtmlEncoder.Encode(_getString("JupyterVariablesEmpty", "No active variables."))}</td></tr>");
+            sb.AppendLine($"<tr><td colspan=\"4\" class=\"vars-empty\">{WebUtility.HtmlEncode(_getString("JupyterVariablesEmpty", "No active variables."))}</td></tr>");
             sb.AppendLine("</tbody>");
             sb.AppendLine("</table>");
             sb.AppendLine("</div>");
@@ -128,9 +129,9 @@ namespace TxtAIEditor.Core.Services
             if (cellType == "markdown")
             {
                 string html = JupyterNotebookMarkdownRenderer.Render(source);
-                sb.AppendLine($"<div class=\"cell-input markdown-cell\" data-source=\"{NotebookHtmlEncoder.AttributeEncode(source)}\">");
+                sb.AppendLine($"<div class=\"cell-input markdown-cell\" data-source=\"{WebUtility.HtmlEncode(source)}\">");
                 sb.AppendLine($"<div class=\"markdown-preview\">{html}</div>");
-                sb.AppendLine($"<div class=\"cell-input-area markdown-editor\" contenteditable=\"true\" spellcheck=\"false\" style=\"display:none;\"><pre>{NotebookHtmlEncoder.Encode(source)}</pre></div>");
+                sb.AppendLine($"<div class=\"cell-input-area markdown-editor\" contenteditable=\"true\" spellcheck=\"false\" style=\"display:none;\"><pre>{WebUtility.HtmlEncode(source)}</pre></div>");
                 sb.AppendLine("</div>");
                 sb.AppendLine("<div class=\"cell-toolbar\">");
                 sb.AppendLine($"<button class=\"cell-btn cell-run\" title=\"Render Markdown (Shift+Enter)\">▶ Render</button>");
@@ -145,8 +146,8 @@ namespace TxtAIEditor.Core.Services
             }
             else if (cellType == "raw")
             {
-                sb.AppendLine($"<div class=\"cell-input raw-cell\" data-source=\"{NotebookHtmlEncoder.AttributeEncode(source)}\">");
-                sb.AppendLine($"<div class=\"cell-input-area raw-editor\" contenteditable=\"true\" spellcheck=\"false\"><pre>{NotebookHtmlEncoder.Encode(source)}</pre></div>");
+                sb.AppendLine($"<div class=\"cell-input raw-cell\" data-source=\"{WebUtility.HtmlEncode(source)}\">");
+                sb.AppendLine($"<div class=\"cell-input-area raw-editor\" contenteditable=\"true\" spellcheck=\"false\"><pre>{WebUtility.HtmlEncode(source)}</pre></div>");
                 sb.AppendLine("</div>");
                 sb.AppendLine("<div class=\"cell-toolbar\">");
                 sb.AppendLine($"<button class=\"cell-btn cell-toggle-type\" title=\"Switch to Code\">Code</button>");
@@ -160,7 +161,7 @@ namespace TxtAIEditor.Core.Services
             else
             {
                 sb.AppendLine($"<div class=\"cell-input code-cell\">");
-                sb.AppendLine($"<div class=\"cell-input-area code-editor\" contenteditable=\"true\" spellcheck=\"false\" data-source=\"{NotebookHtmlEncoder.AttributeEncode(source)}\"><pre>{NotebookHtmlEncoder.Encode(source)}</pre></div>");
+                sb.AppendLine($"<div class=\"cell-input-area code-editor\" contenteditable=\"true\" spellcheck=\"false\" data-source=\"{WebUtility.HtmlEncode(source)}\"><pre>{WebUtility.HtmlEncode(source)}</pre></div>");
                 sb.AppendLine("<div class=\"cell-toolbar\">");
                 sb.AppendLine($"<button class=\"cell-btn cell-run\" title=\"Run (Shift+Enter)\">▶ Run</button>");
                 sb.AppendLine($"<button class=\"cell-btn cell-run-below\" title=\"Run Below\">▶|</button>");
@@ -183,7 +184,7 @@ namespace TxtAIEditor.Core.Services
 
         private string BuildShortcutTitle(string key, string fallback, string shortcut)
         {
-            return NotebookHtmlEncoder.AttributeEncode($"{_getString(key, fallback)} ({shortcut})");
+            return WebUtility.HtmlEncode($"{_getString(key, fallback)} ({shortcut})");
         }
 
         private string BuildNotebookStringsJson()
@@ -215,7 +216,7 @@ namespace TxtAIEditor.Core.Services
             foreach (var outElement in outputs)
             {
                 if (outElement.ValueKind != JsonValueKind.Object) continue;
-                string jsonAttr = NotebookHtmlEncoder.AttributeEncode(outElement.GetRawText());
+                string jsonAttr = WebUtility.HtmlEncode(outElement.GetRawText());
                 sb.Append($"<div class=\"output-entry\" data-output=\"{jsonAttr}\">");
 
                 string outputType = outElement.TryGetProperty("output_type", out var ot) ? ot.GetString() ?? "" : "";
@@ -232,7 +233,7 @@ namespace TxtAIEditor.Core.Services
                         }
                         else
                         {
-                            sb.Append($"<span class=\"{cls}\">{NotebookHtmlEncoder.Encode(text)}</span>");
+                            sb.Append($"<span class=\"{cls}\">{WebUtility.HtmlEncode(text)}</span>");
                         }
                     }
                 }
@@ -258,7 +259,7 @@ namespace TxtAIEditor.Core.Services
                         else if (data.TryGetProperty("text/plain", out var plainEl))
                         {
                             string plainText = GetTextOrArrayFromElement(plainEl);
-                            sb.Append($"<span class=\"output-result\">{NotebookHtmlEncoder.Encode(plainText)}</span>");
+                            sb.Append($"<span class=\"output-result\">{WebUtility.HtmlEncode(plainText)}</span>");
                         }
                     }
                 }
@@ -266,7 +267,7 @@ namespace TxtAIEditor.Core.Services
                 {
                     string ename = outElement.TryGetProperty("ename", out var en) ? en.GetString() ?? "" : "";
                     string evalue = outElement.TryGetProperty("evalue", out var ev) ? ev.GetString() ?? "" : "";
-                    sb.Append($"<span class=\"output-error\">{NotebookHtmlEncoder.Encode(ename)}: {NotebookHtmlEncoder.Encode(evalue)}</span>");
+                    sb.Append($"<span class=\"output-error\">{WebUtility.HtmlEncode(ename)}: {WebUtility.HtmlEncode(evalue)}</span>");
                 }
 
                 sb.Append("</div>");

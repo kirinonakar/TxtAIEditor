@@ -29,7 +29,6 @@
 
             <Grid x:Name="EditorPane1" Grid.Row="0" Grid.Column="0" Background="{ThemeResource EditorSurfaceBackgroundBrush}">
                 <TabView x:Name="EditorTabView"
-                         Background="{ThemeResource EditorSurfaceBackgroundBrush}"
                          VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                          CanDragTabs="True"
                          CanReorderTabs="False"
@@ -133,7 +132,6 @@
 
             <Grid x:Name="EditorPane2" Grid.Row="0" Grid.Column="2" Background="{ThemeResource EditorSurfaceBackgroundBrush}" Visibility="{Binding ElementName=EditorTabView2, Path=Visibility}">
                 <TabView x:Name="EditorTabView2"
-                         Background="{ThemeResource EditorSurfaceBackgroundBrush}"
                          VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                          Visibility="Collapsed"
                          CanDragTabs="True"

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using static TxtAIEditor.Core.Services.OfficeHtmlEncoder;
 using static TxtAIEditor.Core.Services.OfficePresentationRenderingUtilities;
 
 namespace TxtAIEditor.Core.Services

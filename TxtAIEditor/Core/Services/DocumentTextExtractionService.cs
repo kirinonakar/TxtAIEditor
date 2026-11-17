@@ -739,7 +739,7 @@ namespace TxtAIEditor.Core.Services
                 .Select(e => new
                 {
                     Id = e.Attribute("Id")?.Value ?? string.Empty,
-                    Target = NormalizeZipPath("xl", e.Attribute("Target")?.Value ?? string.Empty)
+                    Target = OfficePackagePath.NormalizeZipPath("xl", e.Attribute("Target")?.Value ?? string.Empty)
                 })
                 .Where(x => !string.IsNullOrWhiteSpace(x.Id) && !string.IsNullOrWhiteSpace(x.Target))
                 .ToDictionary(x => x.Id, x => x.Target, StringComparer.OrdinalIgnoreCase);
@@ -779,39 +779,6 @@ namespace TxtAIEditor.Core.Services
                 "b" => rawValue == "1" ? "TRUE" : "FALSE",
                 _ => rawValue
             };
-        }
-
-        private static string NormalizeZipPath(string basePath, string target)
-        {
-            if (string.IsNullOrWhiteSpace(target))
-            {
-                return string.Empty;
-            }
-
-            string combined = target.StartsWith("/", StringComparison.Ordinal)
-                ? target.TrimStart('/')
-                : $"{basePath.TrimEnd('/')}/{target}";
-            var parts = new List<string>();
-            foreach (string part in combined.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                if (part == ".")
-                {
-                    continue;
-                }
-
-                if (part == "..")
-                {
-                    if (parts.Count > 0)
-                    {
-                        parts.RemoveAt(parts.Count - 1);
-                    }
-                    continue;
-                }
-
-                parts.Add(part);
-            }
-
-            return string.Join("/", parts);
         }
 
         private static int GetTrailingNumber(string value)

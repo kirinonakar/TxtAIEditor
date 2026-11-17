@@ -1,8 +1,8 @@
 using System;
 using System.IO;
-using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
+using static TxtAIEditor.Core.Services.OfficeHtmlEncoder;
 
 namespace TxtAIEditor.Core.Services
 {
@@ -568,11 +568,6 @@ body { display: grid; place-items: center; background: Canvas; color: CanvasText
 <body><div class="message">{{Html(message)}}</div></body>
 </html>
 """;
-        }
-
-        private static string Html(string value)
-        {
-            return WebUtility.HtmlEncode(value ?? string.Empty);
         }
     }
 }

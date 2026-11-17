@@ -72,7 +72,7 @@ namespace TxtAIEditor.Core.Services
 
             items[id] = new HwpxBinaryItem
             {
-                Path = NormalizeZipPath(string.Empty, path),
+                Path = OfficePackagePath.NormalizeLocalZipPath(string.Empty, path),
                 MimeType = GetImageMimeType(path)
             };
         }
@@ -87,7 +87,7 @@ namespace TxtAIEditor.Core.Services
 
             if (path.Contains('/', StringComparison.Ordinal))
             {
-                return NormalizeZipPath(string.Empty, path);
+                return OfficePackagePath.NormalizeLocalZipPath(string.Empty, path);
             }
 
             return "BinData/" + path;

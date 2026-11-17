@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using static TxtAIEditor.Core.Services.OfficeDocumentHtmlRendererUtilities;
+using static TxtAIEditor.Core.Services.OfficeHtmlEncoder;
 
 namespace TxtAIEditor.Core.Services
 {

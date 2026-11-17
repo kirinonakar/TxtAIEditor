@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Xml.Linq;
-using static TxtAIEditor.Core.Services.OfficeDocumentHtmlRendererUtilities;
+using static TxtAIEditor.Core.Services.OfficeHtmlEncoder;
 
 namespace TxtAIEditor.Core.Services
 {

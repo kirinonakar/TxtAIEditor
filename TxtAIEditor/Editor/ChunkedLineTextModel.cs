@@ -66,7 +66,7 @@ namespace TxtAIEditor.Editor
             List<List<string>> leaves = _leaves ??
                 throw new InvalidOperationException("The builder has already created a model.");
             List<string> currentLeaf = _currentLeaf!;
-            currentLeaf.Add(NormalizeSingleLine(line));
+            currentLeaf.Add(EditorTextNormalization.NormalizeSingleLine(line));
             LineCount++;
             if (currentLeaf.Count < ChunkedLineTextModel.TargetLeafLineCount)
             {
@@ -90,9 +90,6 @@ namespace TxtAIEditor.Editor
             _currentLeaf = null;
             return new ChunkedLineTextModel(leaves, _lineEnding);
         }
-
-        private static string NormalizeSingleLine(string? text) =>
-            (text ?? string.Empty).Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ');
     }
 
     public sealed class ChunkedLineTextModel : ITextModel
@@ -110,7 +107,7 @@ namespace TxtAIEditor.Editor
         {
             _leaves = new List<List<string>>();
             _lineEnding = string.IsNullOrEmpty(lineEnding) ? "\n" : lineEnding;
-            AppendLeaves(lines?.Select(NormalizeSingleLine) ?? Array.Empty<string>());
+            AppendLeaves(lines?.Select(EditorTextNormalization.NormalizeSingleLine) ?? Array.Empty<string>());
             EnsureAtLeastOneLine();
             RebuildIndexes();
         }
@@ -272,7 +269,7 @@ namespace TxtAIEditor.Editor
         {
             if (lineNumber < 1 || lineNumber > LineCount) return;
             (int leafIndex, int innerIndex) = LocateLine(lineNumber);
-            string normalized = NormalizeSingleLine(text);
+            string normalized = EditorTextNormalization.NormalizeSingleLine(text);
             string previous = _leaves[leafIndex][innerIndex];
             if (string.Equals(previous, normalized, StringComparison.Ordinal)) return;
             _leaves[leafIndex][innerIndex] = normalized;
@@ -288,7 +285,7 @@ namespace TxtAIEditor.Editor
             {
                 if (patch.LineNumber < 1 || patch.LineNumber > LineCount) continue;
                 (int leafIndex, int innerIndex) = LocateLine(patch.LineNumber);
-                string normalized = NormalizeSingleLine(patch.Text);
+                string normalized = EditorTextNormalization.NormalizeSingleLine(patch.Text);
                 string previous = _leaves[leafIndex][innerIndex];
                 if (string.Equals(previous, normalized, StringComparison.Ordinal)) continue;
 
@@ -310,7 +307,7 @@ namespace TxtAIEditor.Editor
             if (target > LineCount)
             {
                 List<string> last = _leaves[^1];
-                string normalized = NormalizeSingleLine(text);
+                string normalized = EditorTextNormalization.NormalizeSingleLine(text);
                 last.Add(normalized);
                 int lastLeafIndex = _leaves.Count - 1;
                 long characterDelta = normalized.Length + LineEnding.Length;
@@ -321,7 +318,7 @@ namespace TxtAIEditor.Editor
                 return;
             }
             (int leafIndex, int innerIndex) = LocateLine(target);
-            string inserted = NormalizeSingleLine(text);
+            string inserted = EditorTextNormalization.NormalizeSingleLine(text);
             _leaves[leafIndex].Insert(innerIndex, inserted);
             long delta = inserted.Length + LineEnding.Length;
             _leafCharacterCounts[leafIndex] += delta;
@@ -360,7 +357,11 @@ namespace TxtAIEditor.Editor
         }
 
         public void SplitLine(int lineNumber, string before, string after) =>
-            ReplaceLineRange(lineNumber, lineNumber, new[] { NormalizeSingleLine(before), NormalizeSingleLine(after) });
+            ReplaceLineRange(lineNumber, lineNumber, new[]
+            {
+                EditorTextNormalization.NormalizeSingleLine(before),
+                EditorTextNormalization.NormalizeSingleLine(after)
+            });
 
         public void MergeLineWithPrevious(int lineNumber)
         {
@@ -480,7 +481,7 @@ namespace TxtAIEditor.Editor
             (int endLeaf, int endInner) = LocateLine(endLine);
             var merged = new List<string>();
             merged.AddRange(_leaves[startLeaf].Take(startInner));
-            merged.AddRange(replacement.Select(NormalizeSingleLine));
+            merged.AddRange(replacement.Select(EditorTextNormalization.NormalizeSingleLine));
             merged.AddRange(_leaves[endLeaf].Skip(endInner + 1));
             _leaves.RemoveRange(startLeaf, endLeaf - startLeaf + 1);
             _leafCharacterCounts.RemoveRange(startLeaf, endLeaf - startLeaf + 1);
@@ -620,8 +621,6 @@ namespace TxtAIEditor.Editor
         }
 
         private static int ClampColumn(string line, int column) => Math.Clamp(column, 1, line.Length + 1);
-        private static string NormalizeSingleLine(string text) =>
-            (text ?? string.Empty).Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ');
         private static void AppendBounded(StringBuilder builder, string value, int maxChars)
         {
             if (builder.Length >= maxChars) return;

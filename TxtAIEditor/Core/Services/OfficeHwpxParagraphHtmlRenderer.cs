@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Xml.Linq;
 using static TxtAIEditor.Core.Services.OfficeDocumentHtmlRendererUtilities;
+using static TxtAIEditor.Core.Services.OfficeHtmlEncoder;
 using static TxtAIEditor.Core.Services.OfficeHwpxPageLayout;
 using static TxtAIEditor.Core.Services.OfficeHwpxRenderUtilities;
 using static TxtAIEditor.Core.Services.OfficeHwpxStyleCatalog;

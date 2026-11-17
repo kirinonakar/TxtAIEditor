@@ -4,7 +4,6 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -140,42 +139,6 @@ namespace TxtAIEditor.Core.Services
                 : int.MaxValue;
         }
 
-        internal static string NormalizeZipPath(string basePath, string target)
-        {
-            if (string.IsNullOrWhiteSpace(target) ||
-                target.StartsWith("http:", StringComparison.OrdinalIgnoreCase) ||
-                target.StartsWith("https:", StringComparison.OrdinalIgnoreCase))
-            {
-                return string.Empty;
-            }
-
-            string combined = target.StartsWith("/", StringComparison.Ordinal)
-                ? target.TrimStart('/')
-                : $"{basePath.TrimEnd('/')}/{target}";
-            var parts = new List<string>();
-            foreach (string part in combined.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                if (part == ".")
-                {
-                    continue;
-                }
-
-                if (part == "..")
-                {
-                    if (parts.Count > 0)
-                    {
-                        parts.RemoveAt(parts.Count - 1);
-                    }
-                    continue;
-                }
-
-                parts.Add(part);
-            }
-
-            return string.Join("/", parts);
-        }
-
-
         internal static async Task<ZipArchive> OpenArchiveAsync(string filePath)
         {
             var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096, useAsync: true);
@@ -193,11 +156,6 @@ namespace TxtAIEditor.Core.Services
         {
             using Stream stream = entry.Open();
             return await Task.Run(() => XDocument.Load(stream)).ConfigureAwait(false);
-        }
-
-        internal static string Html(string value)
-        {
-            return WebUtility.HtmlEncode(value ?? string.Empty);
         }
     }
 }

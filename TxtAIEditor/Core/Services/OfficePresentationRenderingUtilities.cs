@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -11,11 +10,6 @@ namespace TxtAIEditor.Core.Services
 {
     internal static class OfficePresentationRenderingUtilities
     {
-        public static string Html(string value)
-        {
-            return WebUtility.HtmlEncode(value ?? string.Empty);
-        }
-
         public static string FormatInvariant(double value)
         {
             return value.ToString("0.####", CultureInfo.InvariantCulture);

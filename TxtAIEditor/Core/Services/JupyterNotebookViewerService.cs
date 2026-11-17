@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -51,7 +52,7 @@ namespace TxtAIEditor.Core.Services
 
         private string BuildErrorHtml(string message)
         {
-            return $"<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body><div style=\"padding:24px;color:#d33;font-family:sans-serif;\">{_getString("JupyterNotebookLoadError", "노트북을 불러올 수 없습니다.")}<br/><pre>{NotebookHtmlEncoder.Encode(message)}</pre></div></body></html>";
+            return $"<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body><div style=\"padding:24px;color:#d33;font-family:sans-serif;\">{_getString("JupyterNotebookLoadError", "노트북을 불러올 수 없습니다.")}<br/><pre>{WebUtility.HtmlEncode(message)}</pre></div></body></html>";
         }
     }
 }

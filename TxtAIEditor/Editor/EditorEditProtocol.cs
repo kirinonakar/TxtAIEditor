@@ -74,7 +74,7 @@ namespace TxtAIEditor.Editor
                                 1,
                                 requestedLine,
                                 1,
-                                NormalizeSingleLine(After) + "\n");
+                                EditorTextNormalization.NormalizeSingleLine(After) + "\n");
                         }
                         else
                         {
@@ -85,7 +85,7 @@ namespace TxtAIEditor.Editor
                                 lastColumn,
                                 lastLine,
                                 lastColumn,
-                                "\n" + NormalizeSingleLine(After));
+                                "\n" + EditorTextNormalization.NormalizeSingleLine(After));
                         }
                         break;
                     }
@@ -97,7 +97,7 @@ namespace TxtAIEditor.Editor
                         1,
                         LineNumber,
                         model.GetLine(LineNumber).Length + 1,
-                        NormalizeSingleLine(Before) + "\n" + NormalizeSingleLine(After));
+                        EditorTextNormalization.NormalizeSingleLine(Before) + "\n" + EditorTextNormalization.NormalizeSingleLine(After));
                     break;
 
                 case EditorEditRequestKind.MergeLineWithPrevious:
@@ -158,8 +158,5 @@ namespace TxtAIEditor.Editor
 
         private static bool IsValidLine(ITextModel model, int lineNumber) =>
             lineNumber >= 1 && lineNumber <= model.LineCount;
-
-        private static string NormalizeSingleLine(string text) =>
-            (text ?? string.Empty).Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ');
     }
 }

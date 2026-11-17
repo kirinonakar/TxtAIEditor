@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using static TxtAIEditor.Core.Services.OfficeDocumentHtmlRendererUtilities;
+using static TxtAIEditor.Core.Services.OfficeHtmlEncoder;
 using static TxtAIEditor.Core.Services.OfficeHwpxRenderUtilities;
 
 namespace TxtAIEditor.Core.Services

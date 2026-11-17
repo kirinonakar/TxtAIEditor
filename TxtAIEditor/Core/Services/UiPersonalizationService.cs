@@ -87,7 +87,6 @@ namespace TxtAIEditor.Core.Services
             SetBrush("SplitterBackgroundBrush", surface1Color);
             SetBrush("SplitterHoverBackgroundBrush", mauveColor);
             SetBrush("EditorSurfaceBackgroundBrush", baseColor);
-            SetBrush("TabBarBackgroundBrush", mantleColor);
 
             // AI Assistant & Agent panel brushes (Pastel Dark)
             SetBrush("LlmOutputBackground", crustColor);
@@ -107,7 +106,7 @@ namespace TxtAIEditor.Core.Services
             SetBrush("AgentCodeForeground", mauveColor);
 
             // TabView & TabViewItem overrides
-            SetBrush("TabViewTabStripBackground", mantleColor);
+            SetBrush("TabViewBackground", mantleColor);
             SetBrush("TabViewItemHeaderBackground", mantleColor);
             SetBrush("TabViewItemHeaderForeground", subtext0Color);
             SetBrush("TabViewItemHeaderBackgroundPointerOver", surface0Color);
@@ -116,9 +115,7 @@ namespace TxtAIEditor.Core.Services
             SetBrush("TabViewItemHeaderForegroundPressed", textColor);
             SetBrush("TabViewItemHeaderBackgroundSelected", baseColor);
             SetBrush("TabViewItemHeaderForegroundSelected", mauveColor);
-            SetBrush("TabViewItemHeaderBackgroundSelectedPointerOver", surface0Color);
-            SetBrush("TabViewItemHeaderBackgroundSelectedPressed", surface1Color);
-            SetBrush("TabViewItemHeaderBorderBrush", Microsoft.UI.Colors.Transparent);
+            SetBrush("TabViewItemBorderBrush", Microsoft.UI.Colors.Transparent);
             SetBrush("TabViewBorderBrush", surface0Color);
 
             // Popups, Menus & Dialogs overrides
@@ -230,11 +227,10 @@ namespace TxtAIEditor.Core.Services
                 "TitleBarBackgroundBrush", "TitleBarForegroundBrush", "ToolbarBackgroundBrush", "ToolbarBorderBrush",
                 "SidebarBackgroundBrush", "ActivityBarBackgroundBrush", "SidebarBorderBrush", "StatusBarBackgroundBrush",
                 "StatusBarForegroundBrush", "SplitterBackgroundBrush", "SplitterHoverBackgroundBrush", "EditorSurfaceBackgroundBrush",
-                "TabBarBackgroundBrush", "TabViewTabStripBackground", "TabViewItemHeaderBackground", "TabViewItemHeaderForeground",
+                "TabViewBackground", "TabViewItemHeaderBackground", "TabViewItemHeaderForeground",
                 "TabViewItemHeaderBackgroundPointerOver", "TabViewItemHeaderForegroundPointerOver", "TabViewItemHeaderBackgroundPressed",
                 "TabViewItemHeaderForegroundPressed", "TabViewItemHeaderBackgroundSelected", "TabViewItemHeaderForegroundSelected",
-                "TabViewItemHeaderBackgroundSelectedPointerOver", "TabViewItemHeaderBackgroundSelectedPressed",
-                "TabViewItemHeaderBorderBrush", "TabViewBorderBrush",
+                "TabViewItemBorderBrush", "TabViewBorderBrush",
                 "ContentDialogBackground", "ContentDialogBorderBrush", "ContentDialogForeground",
                 "FlyoutPresenterBackground", "FlyoutPresenterBorderBrush", "MenuFlyoutPresenterBackground", "MenuFlyoutPresenterBorderBrush",
                 "MenuFlyoutItemForeground", "MenuFlyoutItemForegroundPointerOver", "MenuFlyoutItemForegroundPressed",
