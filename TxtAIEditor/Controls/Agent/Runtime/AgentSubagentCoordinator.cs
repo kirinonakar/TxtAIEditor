@@ -33,32 +33,32 @@ namespace TxtAIEditor.Controls
 
         public static IReadOnlyList<LlmTool> Tools { get; } = (LlmTool[])
         [
-            CreateTool("spawn_subagent", "Start an independent task in the background and return its agent ID immediately.",
+            CreateTool("spawn_subagent", "Start a background task and return its agent ID.",
                 new { title = Text("Short session title"), instruction = Text("Task, scope, and expected result") }, "title", "instruction"),
-            CreateTool("send_subagent_message", "Queue a message for a running subagent or start a follow-up in its conversation.",
-                new { agentId = Text("ID returned by spawn_subagent"), instruction = Text("Question or follow-up task") }, "agentId", "instruction"),
-            CreateTool("cancel_subagent", "Request cancellation of one subagent.", new { agentId = Text("ID returned by spawn_subagent") }, "agentId"),
-            CreateTool("subagent_status", "Get the status of every subagent without waiting.", new { }),
-            CreateTool(WaitTool, "Wait for one completion when work depends on it. Omit agentId to wait for the next completion.",
+            CreateTool("send_subagent_message", "Message a running subagent or start a follow-up in its session.",
+                new { agentId = Text("Subagent ID"), instruction = Text("Message or follow-up task") }, "agentId", "instruction"),
+            CreateTool("cancel_subagent", "Request subagent cancellation.", new { agentId = Text("Subagent ID") }, "agentId"),
+            CreateTool("subagent_status", "List current subagent statuses.", new { }),
+            CreateTool(WaitTool, "Wait for a completion. Omit agentId for the next available result.",
                 new
                 {
-                    agentId = Text("Optional subagent ID"),
-                    timeoutSeconds = new { type = "integer", minimum = 1, maximum = 86400, description = "Optional wait limit in seconds. The subagent keeps running on timeout." }
+                    agentId = Text("Subagent ID"),
+                    timeoutSeconds = new { type = "integer", minimum = 1, maximum = 86400, description = "Timeout leaves the subagent running." }
                 }),
-            CreateTool("read_subagent_result", "Read a bounded page of a stored subagent result from this run.",
+            CreateTool("read_subagent_result", "Read a page of a result or report from this run.",
                 new
                 {
-                    resultId = Text("Result ID from a subagent completion"),
-                    offset = new { type = "integer", minimum = 0, description = "Start offset. Use nextOffset to continue." },
+                    resultId = Text("Result or report ID"),
+                    offset = new { type = "integer", minimum = 0, description = "Use nextOffset to continue." },
                     limit = new { type = "integer", minimum = 2, maximum = ResultPageLength }
                 }, "resultId"),
-            CreateTool("list_subagent_reports", "List archived finding and blocker IDs from this run, including reports omitted from automatic delivery.",
-                new { offset = new { type = "integer", minimum = 0 }, agentId = Text("Optional subagent ID") }),
-            CreateTool(ReportProgressTool, "Report progress or flag a finding or blocker that needs the orchestrator.",
+            CreateTool("list_subagent_reports", "List archived finding and blocker IDs, including undelivered reports.",
+                new { offset = new { type = "integer", minimum = 0 }, agentId = Text("Filter by subagent ID") }),
+            CreateTool(ReportProgressTool, "Report progress in the user's language.",
                 new
                 {
-                    message = Text("Concise update in the user's language"),
-                    kind = new { type = "string", @enum = new[] { "progress", "finding", "blocker" }, description = "Defaults to UI progress. Use finding or blocker for information the orchestrator can act on." }
+                    message = Text("Brief update"),
+                    kind = new { type = "string", @enum = new[] { "progress", "finding", "blocker" }, description = "Defaults to UI progress. Findings and blockers go to the orchestrator." }
                 }, "message")
         ];
 
@@ -113,26 +113,17 @@ namespace TxtAIEditor.Controls
 
         public string BuildInstructions(bool planningMode) => $$"""
             [Orchestrator]
-            You own the user's task, integration, verification, and final answer. Delegate tasks that benefit from independent work.
-            You may create up to {{_limit}} subagent sessions for this run. Launch independent assignments before waiting so they can run concurrently.
-            Give each subagent the needed context, expected result, and a distinct scope. Coordinate changes to shared files and check their results.
-            Subagent findings, failures, and completed results arrive as [Subagent events] in your conversation. Act on them and continue any work that is ready.
-            Use read_subagent_result with the result ID when you need details beyond the completion preview.
-            Use list_subagent_reports to find archived findings or blockers that could not be delivered automatically.
-            Use send_subagent_message to steer a running subagent or assign a follow-up. Use cancel_subagent to stop one subagent and subagent_status to inspect current work.
-            If no work is ready, return a brief answer and the runtime will wait asynchronously for the next event. Use wait_subagent only when you specifically need a completion, optionally with a timeout.
-            Consider new user instructions if they interrupt a wait. Review the delegated results before finalizing or submitting a plan. {{(planningMode ? "Delegate investigation and plan review only." : "")}}
-            For text tool calls, use the normal tool_call syntax with these names and JSON keys:
-            spawn_subagent(title, instruction), send_subagent_message(agentId, instruction), cancel_subagent(agentId), subagent_status(), wait_subagent(optional agentId, optional timeoutSeconds), read_subagent_result(resultId, optional offset, optional limit), list_subagent_reports(optional agentId, optional offset), report_progress(message).
-            """;
+            Own the task and verify delegated results before finalizing. Give up to {{_limit}} subagents distinct scopes, relevant context, and clear deliverables. Coordinate shared edits and launch independent tasks before waiting.
+            Act on [Subagent events] while continuing available work. When blocked on workers, yield a brief response to wait for an event or call wait_subagent for a completion. Address user updates that interrupt a wait.
+            Text calls ([arg] is optional): spawn_subagent(title, instruction), send_subagent_message(agentId, instruction), cancel_subagent(agentId), subagent_status(), wait_subagent([agentId], [timeoutSeconds]), read_subagent_result(resultId, [offset], [limit]), list_subagent_reports([agentId], [offset]), report_progress(message).
+            """ + (planningMode ? "\nDelegate only investigation and plan review." : "");
 
         public static string BuildWorkerInstructions(bool planningMode) => """
             [Subagent]
-            Your counterpart is the orchestrator. Treat each [Orchestrator]: message as an assignment or follow-up from that orchestrator.
-            Work within its assigned scope. Use report_progress(message, optional kind) for concise updates. Set kind to finding or blocker when the orchestrator can act on the report. Ordinary progress is shown in the UI.
-            Return your answer to the orchestrator, including findings, changes, verified results, and remaining questions.
-            Avoid unrelated changes and coordinate overlapping work through the orchestrator.
-            """ + (planningMode ? "\nThis is plan research. Investigate and report findings without changing files, tabs, or external state." : "");
+            Follow [Orchestrator]: assignments and stay within scope. Coordinate shared edits through the orchestrator.
+            Use report_progress(message, [kind]) for brief updates. Send actionable findings or blockers with kind=finding or kind=blocker.
+            Return concise findings, changes, verification, and open issues to the orchestrator.
+            """ + (planningMode ? "\nPlan research is read-only. Do not change files, tabs, or external state." : "");
 
         public async Task<string> ExecuteAsync(string name, JsonElement arguments, Task followUpRequested)
         {
