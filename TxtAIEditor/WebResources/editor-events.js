@@ -35,6 +35,8 @@ import { bindTextInputEvents } from './editor-text-input-events.js';
 import { hasCustomSelection } from './editor-selection.js';
 import { bindMarkdownTableEvents } from './editor-markdown-table-ui.js';
 
+const SCROLL_REPORT_INTERVAL_MS = 32;
+
 export function bindEditorEvents({
     findReplaceController,
     openFindPanel,
@@ -95,6 +97,32 @@ export function bindEditorEvents({
     let lastSetScrollTop = -1;
     let lastProgrammaticScrollTime = 0;
     let scrollWorkFrame = 0;
+    let scrollReportTimer = 0;
+    let lastScrollReportTime = -Infinity;
+    let lastScrollTop = scrollContainer.scrollTop;
+    let lastScrollLeft = scrollContainer.scrollLeft;
+
+    function reportScroll() {
+        scrollReportTimer = 0;
+        if (!state.scrollSyncEnabled || isSyncingScroll || Date.now() - lastProgrammaticScrollTime < 100) {
+            return;
+        }
+
+        const scrollTop = scrollContainer.scrollTop;
+        const firstLine = lineAt(scrollTop);
+        lastScrollReportTime = performance.now();
+        post({ type: 'editorScroll', firstLine, offset: scrollTop - lineTop(firstLine) });
+    }
+
+    function scheduleScrollReport() {
+        if (!state.scrollSyncEnabled || scrollReportTimer) return;
+        const delay = SCROLL_REPORT_INTERVAL_MS - (performance.now() - lastScrollReportTime);
+        if (delay > 0) {
+            scrollReportTimer = setTimeout(reportScroll, delay);
+        } else {
+            reportScroll();
+        }
+    }
 
     function handleCompressedWheel(event) {
         if (!usesCompressedScroll() || event.ctrlKey || event.deltaY === 0) return;
@@ -132,10 +160,11 @@ export function bindEditorEvents({
     syncWheelScrollMode();
 
     scrollContainer.addEventListener('scroll', () => {
-        const maximumScrollTop = maximumVirtualScrollTop();
-        if (scrollContainer.scrollTop > maximumScrollTop + 0.5) {
-            scrollContainer.scrollTop = maximumScrollTop;
-            return;
+        if (!usesFullDocumentRender()) {
+            const maximumScrollTop = maximumVirtualScrollTop();
+            if (scrollContainer.scrollTop > maximumScrollTop + 0.5) {
+                scrollContainer.scrollTop = maximumScrollTop;
+            }
         }
 
         hideContextMenu();
@@ -147,14 +176,21 @@ export function bindEditorEvents({
 
         scrollWorkFrame = requestAnimationFrame(() => {
             scrollWorkFrame = 0;
-            syncCsvHeaderScroll();
+            const scrollTop = scrollContainer.scrollTop;
+            const scrollLeft = scrollContainer.scrollLeft;
+            if (lastScrollLeft !== scrollLeft) {
+                lastScrollLeft = scrollLeft;
+                syncCsvHeaderScroll();
+            }
+            if (lastScrollTop === scrollTop) return;
+            lastScrollTop = scrollTop;
             // All rows of small documents are already loaded and in normal flow.
             // Scrolling them needs neither a cache scan nor another render frame.
             if (!usesFullDocumentRender()) {
-                prefetchAround(scrollContainer.scrollTop);
+                prefetchAround(scrollTop);
             }
 
-            if (lastSetScrollTop !== -1 && Math.abs(scrollContainer.scrollTop - lastSetScrollTop) <= 1) {
+            if (lastSetScrollTop !== -1 && Math.abs(scrollTop - lastSetScrollTop) <= 1) {
                 return;
             }
             lastSetScrollTop = -1;
@@ -163,15 +199,7 @@ export function bindEditorEvents({
                 return;
             }
 
-            if (state.scrollSyncEnabled && !isSyncingScroll) {
-                const firstVisible = lineAt(scrollContainer.scrollTop);
-                const offset = scrollContainer.scrollTop - lineTop(firstVisible);
-                post({
-                    type: 'editorScroll',
-                    firstLine: firstVisible,
-                    offset: offset
-                });
-            }
+            scheduleScrollReport();
         });
         // Prefetch and paint in the same frame, with visible-line requests first.
         // Queuing the render inside scrollWorkFrame adds an extra frame of delay.
@@ -189,6 +217,8 @@ export function bindEditorEvents({
 
     findReplaceController.bind();
     function beginProgrammaticScroll(targetScrollTop) {
+        clearTimeout(scrollReportTimer);
+        scrollReportTimer = 0;
         isSyncingScroll = true;
         lastProgrammaticScrollTime = Date.now();
         scrollContainer.scrollTop = targetScrollTop;

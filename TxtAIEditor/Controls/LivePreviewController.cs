@@ -50,6 +50,7 @@ namespace TxtAIEditor.Controls
         private int _renderAfterLayoutAttempts;
         private bool _updatingPreviewModeSelection;
         private bool _isPreviewReady;
+        private (string TabId, int FirstLine, double Offset)? _deferredEditorScroll;
         private DateTimeOffset _suppressEditorScrollToPreviewUntil = DateTimeOffset.MinValue;
 
         public LivePreviewController(
@@ -112,6 +113,8 @@ namespace TxtAIEditor.Controls
             ReferenceEquals(_previewPane.RightTabs.SelectedItem, _previewPane.LivePreviewTabItem);
 
         private OpenedTab? PreviewTargetTab => _activeTabForPreview ?? _activeTabProvider();
+
+        internal bool HasLoadedPreview => _isPreviewReady;
 
         public async Task InitializeAsync()
         {
@@ -362,6 +365,7 @@ namespace TxtAIEditor.Controls
                         csvEmptyMessage = _getString("PreviewCsvEmpty", "빈 CSV 파일입니다.")
                     };
                     coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(csvMsg));
+                    FlushDeferredEditorScroll(tab);
                     return;
                 }
 
@@ -378,6 +382,7 @@ namespace TxtAIEditor.Controls
                     };
 
                     coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(htmlMsg));
+                    FlushDeferredEditorScroll(tab);
                     return;
                 }
 
@@ -410,6 +415,7 @@ namespace TxtAIEditor.Controls
                 };
 
                 coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(renderMsg));
+                FlushDeferredEditorScroll(tab);
             }
             catch (Exception ex)
             {
@@ -597,9 +603,9 @@ namespace TxtAIEditor.Controls
             WebViewAppearanceService.ApplyPreferredColorScheme(PreviewWebViewIfCreated?.CoreWebView2, theme);
         }
 
-        public void PostScrollSync(int firstLine, double offset)
+        public void PostScrollSync(OpenedTab tab, int firstLine, double offset)
         {
-            if (!_isScrollSyncEnabled())
+            if (!_isPreviewReady || !_isScrollSyncEnabled() || PreviewTargetTab != tab)
             {
                 return;
             }
@@ -609,11 +615,13 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            if ((TabViewItem)_previewPane.RightTabs.SelectedItem != _previewPane.LivePreviewTabItem)
+            if (!IsLivePreviewVisible)
             {
+                _deferredEditorScroll = (tab.Id, firstLine, offset);
                 return;
             }
 
+            _deferredEditorScroll = null;
             try
             {
                 var coreWebView = PreviewWebViewIfCreated?.CoreWebView2;
@@ -636,8 +644,27 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private void FlushDeferredEditorScroll(OpenedTab tab)
+        {
+            if (_deferredEditorScroll is not { } scroll)
+            {
+                return;
+            }
+
+            _deferredEditorScroll = null;
+            if (scroll.TabId == tab.Id)
+            {
+                PostScrollSync(tab, scroll.FirstLine, scroll.Offset);
+            }
+        }
+
         public void PostScrollSyncState(bool enabled)
         {
+            if (!enabled)
+            {
+                _deferredEditorScroll = null;
+            }
+
             if ((TabViewItem)_previewPane.RightTabs.SelectedItem != _previewPane.LivePreviewTabItem)
             {
                 return;
@@ -678,6 +705,10 @@ namespace TxtAIEditor.Controls
                 _scheduledTabForPreview = null;
             }
 
+            if (_deferredEditorScroll?.TabId == tabId)
+            {
+                _deferredEditorScroll = null;
+            }
         }
 
         public void Close()
@@ -1178,7 +1209,7 @@ namespace TxtAIEditor.Controls
 
                 if (string.Equals(type, "previewScroll", StringComparison.Ordinal))
                 {
-                    if (!_isScrollSyncEnabled())
+                    if (!IsLivePreviewVisible || !_isScrollSyncEnabled())
                     {
                         return;
                     }

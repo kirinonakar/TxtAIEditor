@@ -192,6 +192,10 @@ export class FoldingController {
 }
 
 export function findFoldingRanges(cache, lineCount, language) {
+    if (!supportsFolding(language)) {
+        return { ranges: [], pendingLines: [] };
+    }
+
     const ranges = new Map();
     const pendingLines = new Set();
     const add = (start, end) => {
@@ -201,9 +205,6 @@ export function findFoldingRanges(cache, lineCount, language) {
     };
     const numbers = [...cache.keys()].filter(line => line > 0 && line <= lineCount).sort((a, b) => a - b);
     const markup = ['html', 'svg', 'xml'].includes(language);
-    if (!supportsFolding(language)) {
-        return { ranges: [], pendingLines: [] };
-    }
 
     // Scan each contiguous cache block independently; never invent a closing boundary
     // across missing source. Open blocks request the next batch until their end is known.

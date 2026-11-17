@@ -103,7 +103,9 @@ namespace TxtAIEditor.Controls
 
         public void HandleScrollChanged(OpenedTab tab, int firstLine, double offset)
         {
-            if (!_isScrollSyncEnabled())
+            if (!_isScrollSyncEnabled() ||
+                _activeTabProvider() != tab ||
+                (_editorWorkspace.CurrentSplitMode == EditorSplitMode.None && !_livePreviewController.HasLoadedPreview))
             {
                 return;
             }
@@ -119,7 +121,7 @@ namespace TxtAIEditor.Controls
                 _scrollSyncDispatchQueued = true;
             }
 
-            if (!_dispatcherQueue.TryEnqueue(ProcessPendingScrollSync))
+            if (!_dispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ProcessPendingScrollSync))
             {
                 lock (_scrollSyncGate)
                 {
@@ -146,7 +148,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            _livePreviewController.PostScrollSync(scroll.FirstLine, scroll.Offset);
+            _livePreviewController.PostScrollSync(scroll.Tab, scroll.FirstLine, scroll.Offset);
 
             if (_editorWorkspace.CurrentSplitMode == EditorSplitMode.None)
             {

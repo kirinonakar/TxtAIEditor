@@ -567,19 +567,12 @@ function setupModel(lineCount) {
 function receiveLineBlock(startLine, lines) {
     const start = Number(startLine || 1);
     const safeLines = Array.isArray(lines) ? lines : [];
-    let changed = false;
-    for (let i = 0; i < safeLines.length; i++) {
-        const lineNumber = start + i;
-        if ((imeController.isComposing && (!imeController.compositionLine || imeController.compositionLine === lineNumber)) ||
-            (imeController.isComposing && runtime.isLineInColumnComposition(lineNumber)) ||
-            (state.inlineLivePreviewEnabled && state.inlineLivePreviewSourceLine === lineNumber) ||
-            (document.hasFocus() && state.editingLine === lineNumber &&
-                document.activeElement?.closest?.('.line-text')?.dataset.line === String(lineNumber))) {
-            continue;
-        }
-        state.cache.set(lineNumber, safeLines[i] ?? '');
-        changed = true;
-    }
+    const changed = state.cache.setLineBlock(start, safeLines, lineNumber =>
+        (imeController.isComposing && (!imeController.compositionLine || imeController.compositionLine === lineNumber)) ||
+        (imeController.isComposing && runtime.isLineInColumnComposition(lineNumber)) ||
+        (state.inlineLivePreviewEnabled && state.inlineLivePreviewSourceLine === lineNumber) ||
+        (state.editingLine === lineNumber && document.hasFocus() &&
+            document.activeElement?.closest?.('.line-text')?.dataset.line === String(lineNumber)));
     if (changed) {
         state.cacheVersion++;
     }
@@ -1184,6 +1177,7 @@ function requestMissingLines(start, end) {
         }
         requestCount = Math.min(requestCount, sourceLineCount - missingStart + 1);
         requestLines(missingStart, requestCount);
+        return missingStart + requestCount - 1;
     };
 
     let missingStart = 0;
@@ -1197,7 +1191,8 @@ function requestMissingLines(start, end) {
                 missingCount++;
             }
         } else if (missingStart !== 0) {
-            requestMissingBlock(missingStart, missingCount);
+            // The minimum batch may already include later cache misses in this scan.
+            line = Math.max(line, requestMissingBlock(missingStart, missingCount));
             missingStart = 0;
             missingCount = 0;
         }

@@ -44,10 +44,26 @@ export class EditorDocumentCache {
     }
 
     set(lineNumber, text) {
-        if (this.#lines.get(lineNumber) !== text) this.revision++;
-        this.#lines.set(lineNumber, text);
+        this.#setLineText(lineNumber, text);
         this.#invalidateDerivedContexts(lineNumber);
         return this;
+    }
+
+    setLineBlock(startLine, lines, shouldPreserveLine) {
+        let firstChangedLine = null;
+        for (let index = 0; index < lines.length; index++) {
+            const line = startLine + index;
+            if (shouldPreserveLine(line)) continue;
+            if (this.#setLineText(line, lines[index] ?? '')) {
+                firstChangedLine ??= line;
+            }
+        }
+
+        // Context at and below the first changed line depends on the old text.
+        // Invalidate once for the entire block instead of scanning both maps per line.
+        if (firstChangedLine === null) return false;
+        this.#invalidateDerivedContexts(firstChangedLine);
+        return true;
     }
 
     values() {
@@ -115,6 +131,13 @@ export class EditorDocumentCache {
 
     clearLineRequests() {
         this.#pendingLineRequests.clear();
+    }
+
+    #setLineText(lineNumber, text) {
+        if (this.#lines.has(lineNumber) && this.#lines.get(lineNumber) === text) return false;
+        this.#lines.set(lineNumber, text);
+        this.revision++;
+        return true;
     }
 
     #invalidateDerivedContexts(startLine) {

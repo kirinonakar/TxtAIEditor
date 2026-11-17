@@ -57,24 +57,29 @@ namespace TxtAIEditor.Editor
         {
             try
             {
-                string json = NormalizeWebMessageJson(args);
-                using JsonDocument document = JsonDocument.Parse(json);
-                JsonElement root = document.RootElement;
-                if (!EditorProtocol.TryAcceptIncoming(
-                    root,
-                    _documentId,
-                    _viewId,
-                    ref _lastIncomingSequence,
-                    out string type))
+                using JsonDocument document = JsonDocument.Parse(args.WebMessageAsJson);
+                if (document.RootElement.ValueKind == JsonValueKind.String)
                 {
-                    return;
+                    // Also accept callers that post a JSON string instead of an object.
+                    using JsonDocument embeddedDocument = JsonDocument.Parse(document.RootElement.GetString() ?? "{}");
+                    AcceptMessage(embeddedDocument.RootElement);
                 }
-
-                RouteMessage(type, root);
+                else
+                {
+                    AcceptMessage(document.RootElement);
+                }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error receiving web message: {ex.Message}");
+            }
+        }
+
+        private void AcceptMessage(JsonElement root)
+        {
+            if (EditorProtocol.TryAcceptIncoming(root, _documentId, _viewId, ref _lastIncomingSequence, out string type))
+            {
+                RouteMessage(type, root);
             }
         }
 
@@ -497,29 +502,6 @@ namespace TxtAIEditor.Editor
                 before,
                 after,
                 isCompositionCommit);
-        }
-
-        private static string NormalizeWebMessageJson(CoreWebView2WebMessageReceivedEventArgs args)
-        {
-            string json = args.WebMessageAsJson;
-            try
-            {
-                using JsonDocument document = JsonDocument.Parse(json);
-                if (document.RootElement.ValueKind == JsonValueKind.String)
-                {
-                    return document.RootElement.GetString() ?? "{}";
-                }
-            }
-            catch
-            {
-                string? asString = args.TryGetWebMessageAsString();
-                if (!string.IsNullOrWhiteSpace(asString))
-                {
-                    return asString;
-                }
-            }
-
-            return json;
         }
 
         private static bool IsTrue(JsonElement root, string propertyName) =>
