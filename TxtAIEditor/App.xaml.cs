@@ -289,10 +289,9 @@ namespace TxtAIEditor
             var items = new List<TrayWindowItem>(_windows.Count);
             foreach (MainWindow window in _windows.ToArray())
             {
-                MainWindow target = window;
                 items.Add(new TrayWindowItem(
-                    target.GetWindowDisplayName(),
-                    () => target.DispatcherQueue.TryEnqueue(target.RestoreAndActivate)));
+                    window.GetWindowDisplayName(),
+                    () => RestoreTrayWindow(window)));
             }
 
             return items;
@@ -302,6 +301,14 @@ namespace TxtAIEditor
         {
             MainWindow? window = _windows.FirstOrDefault();
             window?.RestoreAndActivate();
+        }
+
+        private void RestoreTrayWindow(MainWindow window)
+        {
+            if (_windows.Contains(window))
+            {
+                window.RestoreAndActivate();
+            }
         }
 
         private async Task RequestCloseAllFromTrayAsync()

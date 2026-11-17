@@ -257,6 +257,24 @@ namespace TxtAIEditor.Core.Services
                         0,
                         _trayWindowHandle,
                         IntPtr.Zero);
+
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
+                    // Activate the selected editor while the tray window still owns the foreground.
+                    if (command == OpenMenuCommand)
+                    {
+                        _openRequested();
+                        return;
+                    }
+
+                    if (command >= WindowMenuCommandBase && command < commandId)
+                    {
+                        actions[command]();
+                        return;
+                    }
                 }
                 finally
                 {
@@ -272,11 +290,7 @@ namespace TxtAIEditor.Core.Services
                     }
                 }
 
-                if (command == OpenMenuCommand)
-                {
-                    selectedAction = _openRequested;
-                }
-                else if (command == CloseMenuCommand)
+                if (command == CloseMenuCommand)
                 {
                     selectedAction = _closeRequested;
                 }
