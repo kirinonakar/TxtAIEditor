@@ -141,7 +141,9 @@ namespace TxtAIEditor.Controls
             _processes = new AgentProcessToolService(
                 _workspace,
                 (query, maxResults, token) => _workspaceFiles.SearchTextAsync(query, null, maxResults, token),
-                ConfirmPowerShellCommandAsync);
+                ConfirmPowerShellCommandAsync,
+                message => ActivityReporter?.Invoke(message),
+                _getString);
             _edits = new AgentFileEditToolService(
                 _workspace,
                 ConfirmEditAsync,

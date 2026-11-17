@@ -662,6 +662,21 @@
   <data name="AgentSubagentShutdownDelayedFormat" xml:space="preserve">
     <value>子代理關閉延遲 · {0}</value>
   </data>
+  <data name="AgentSubagentShutdownPendingStatus" xml:space="preserve">
+    <value>關閉延遲</value>
+  </data>
+  <data name="AgentOrchestratorShutdownPendingFormat" xml:space="preserve">
+    <value>正在等待 {0} 個子代理結束</value>
+  </data>
+  <data name="AgentProcessJobFallbackFormat" xml:space="preserve">
+    <value>無法將 {0} 加入 Windows 工作物件。將嘗試清理其子孫程序。{1}</value>
+  </data>
+  <data name="AgentProcessCleanupIncompleteFormat" xml:space="preserve">
+    <value>無法確認 {0} 的所有子孫程序均已結束。</value>
+  </data>
+  <data name="AgentProcessCleanupFailedFormat" xml:space="preserve">
+    <value>清理 {0} 的程序失敗。{1}</value>
+  </data>
   <data name="AgentSubagentShutdownDelayed" xml:space="preserve">
     <value>取消後，工作仍在結束中。</value>
   </data>

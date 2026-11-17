@@ -35,6 +35,7 @@ namespace TxtAIEditor.Controls
         private readonly object _runOutputBufferGate = new();
         private readonly Dictionary<string, PendingRunOutputBuffer> _pendingRunOutputBuffers = new(StringComparer.Ordinal);
         private readonly HashSet<string> _pendingCloseSessionIds = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _pendingSubagentShutdowns = new(StringComparer.Ordinal);
         private bool _restoringOpenSession;
         private const int RunOutputFlushDelayMs = 75;
         private const int MaxRunOutputFlushChars = 8_000;
@@ -89,6 +90,21 @@ namespace TxtAIEditor.Controls
         public bool IsAnySessionRunning()
         {
             return _runningSessions.Count > 0;
+        }
+
+        public bool HasPendingSubagentShutdown(string sessionId) =>
+            _pendingSubagentShutdowns.ContainsKey(sessionId) || _pendingSubagentShutdowns.ContainsValue(sessionId);
+
+        public void MarkSubagentShutdownPending(string parentId, string subagentId) =>
+            _pendingSubagentShutdowns[subagentId] = parentId;
+
+        public void CompleteSubagentShutdown(string subagentId)
+        {
+            if (_pendingSubagentShutdowns.Remove(subagentId))
+            {
+                UpdateUI();
+                UpdateActiveSessionBusyState();
+            }
         }
 
         public bool IsSessionRunning(string sessionId)
@@ -502,6 +518,19 @@ namespace TxtAIEditor.Controls
 
         private string BuildDisplayTitle(string prefix, AgentOpenSessionState session)
         {
+            string status = _pendingSubagentShutdowns.ContainsKey(session.Id)
+                ? _getString("AgentSubagentShutdownPendingStatus", "종료 지연")
+                : string.Empty;
+            int pendingWorkers = _pendingSubagentShutdowns.Values.Count(parentId => parentId == session.Id);
+            if (pendingWorkers > 0)
+            {
+                status = string.Format(_getString("AgentOrchestratorShutdownPendingFormat", "서브에이전트 {0}개 종료 대기"), pendingWorkers);
+            }
+            if (!string.IsNullOrEmpty(status))
+            {
+                prefix = $"[{status}] {prefix}";
+            }
+
             if (!HasRealSessionTitle(session))
             {
                 // 아직 제목이 없는 새 세션: 워크스페이스만 표시한다.
@@ -551,7 +580,8 @@ namespace TxtAIEditor.Controls
             bool isCurrentSessionRunning = IsCurrentSessionRunning();
             var currentSession = EnsureSession(_currentSessionIdProvider());
             _agentPane.SetBusy(isCurrentSessionRunning, currentSession.Role == AgentSessionRole.Subagent);
-            _agentPane.SetCanRewindSession(!isCurrentSessionRunning && currentSession.RewindSnapshots.Count > 0);
+            _agentPane.SetCanRewindSession(!isCurrentSessionRunning && !HasPendingSubagentShutdown(currentSession.Id) &&
+                currentSession.RewindSnapshots.Count > 0);
         }
 
         public async Task BeginRunOutputBlockAsync(AgentRunContext context, string title)

@@ -169,7 +169,7 @@ namespace TxtAIEditor.Controls
         {
             string root = _openSessions.FindOpenSession(sessionId)?.OrchestratorSessionId ?? sessionId;
             return _openSessions.IsSessionRunning(sessionId) || _openSessions.IsSessionRunning(root) ||
-                GetSubagentIds(root).Any(_openSessions.IsSessionRunning);
+                _openSessions.HasPendingSubagentShutdown(root) || GetSubagentIds(root).Any(_openSessions.IsSessionRunning);
         }
 
         public Task RevertRunAsync(string sessionId, AgentSessionRewindSnapshot snapshot)

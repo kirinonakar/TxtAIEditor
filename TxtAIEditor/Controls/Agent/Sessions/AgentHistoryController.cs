@@ -302,6 +302,16 @@ namespace TxtAIEditor.Controls
 
     internal static class AgentHistoryFormatter
     {
+        private static readonly (string Key, string Korean, string English)[] SubagentActivityPrefixes =
+        {
+            ("AgentSubagentStartedFormat", "서브에이전트 작업 시작 · ", "Subagent started · "),
+            ("AgentSubagentFollowUpFormat", "서브에이전트 후속 작업 시작 · ", "Subagent follow-up started · "),
+            ("AgentSubagentCompletedFormat", "서브에이전트 작업 완료 · ", "Subagent finished · "),
+            ("AgentSubagentStoppedFormat", "서브에이전트 작업 중단 · ", "Subagent stopped · "),
+            ("AgentSubagentFailedFormat", "서브에이전트 작업 실패 · ", "Subagent failed · "),
+            ("AgentSubagentShutdownDelayedFormat", "서브에이전트 종료 지연 · ", "Subagent shutdown delayed · ")
+        };
+
         public static string Format(
             string historyText,
             bool verbose,
@@ -529,12 +539,9 @@ namespace TxtAIEditor.Controls
                     if (line.StartsWith(AgentSessionLabels.OrchestratorPrompt, StringComparison.OrdinalIgnoreCase))
                     {
                         StartUserTurn();
-                        result.AppendLine(line);
                     }
-                    else
-                    {
-                        result.AppendLine(line.Substring(AgentSubagentCoordinator.ProgressMarker.Length));
-                    }
+                    // The spacing pass can identify any recorded progress line before removing its marker.
+                    result.AppendLine(line);
                 }
                 else if (line.StartsWith("[user]", StringComparison.OrdinalIgnoreCase))
                 {
@@ -738,18 +745,40 @@ namespace TxtAIEditor.Controls
                 FlushPendingToolResult(IsPendingToolResultFailed());
             }
 
-            return NormalizeSubagentSpacing(result.ToString().TrimEnd(), getString);
+            return NormalizeSubagentSpacing(result.ToString().TrimEnd(), getString, stripProgressMarkers: true);
         }
 
-        private static string NormalizeSubagentSpacing(string text, Func<string, string, string>? getString)
+        private static string NormalizeSubagentSpacing(
+            string text, Func<string, string, string>? getString, bool stripProgressMarkers = false)
         {
-            const string koreanPrefix = "서브에이전트 작업 완료 · ";
-            const string englishPrefix = "Subagent finished · ";
-            string format = getString?.Invoke("AgentSubagentCompletedFormat", koreanPrefix + "{0}") ?? koreanPrefix;
-            int placeholder = format.IndexOf("{0}", StringComparison.Ordinal);
-            string prefix = placeholder >= 0 ? format[..placeholder] : format;
+            var prefixes = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var (key, korean, english) in SubagentActivityPrefixes)
+            {
+                prefixes.Add(korean);
+                prefixes.Add(english);
+                string format = getString?.Invoke(key, korean + "{0}") ?? korean;
+                int placeholder = format.IndexOf("{0}", StringComparison.Ordinal);
+                string prefix = placeholder >= 0 ? format[..placeholder] : format;
+                if (prefix.Length > 0)
+                {
+                    prefixes.Add(prefix);
+                }
+            }
+
+            bool StartsWithActivityPrefix(ReadOnlySpan<char> line)
+            {
+                foreach (string prefix in prefixes)
+                {
+                    if (line.StartsWith(prefix, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
             var result = new StringBuilder(text.Length);
-            bool afterCompletion = false;
+            bool afterActivity = false;
             bool wroteBlank = false;
             char fenceCharacter = '\0';
             int fenceWidth = 0;
@@ -759,7 +788,10 @@ namespace TxtAIEditor.Controls
             {
                 int lineEnd = text.IndexOf('\n', start);
                 int next = lineEnd >= 0 ? lineEnd + 1 : text.Length;
-                ReadOnlySpan<char> line = text.AsSpan(start, (lineEnd >= 0 ? lineEnd : next) - start).Trim();
+                ReadOnlySpan<char> rawLine = text.AsSpan(start, (lineEnd >= 0 ? lineEnd : next) - start);
+                ReadOnlySpan<char> line = rawLine.Trim();
+                bool progressLine = fenceWidth == 0 && rawLine.StartsWith(
+                    AgentSubagentCoordinator.ProgressMarker, StringComparison.Ordinal);
                 if (line.StartsWith("```", StringComparison.Ordinal) || line.StartsWith("~~~", StringComparison.Ordinal))
                 {
                     int width = 3;
@@ -776,27 +808,22 @@ namespace TxtAIEditor.Controls
                     {
                         fenceWidth = 0;
                     }
-                    afterCompletion = false;
+                    afterActivity = false;
                 }
                 else if (fenceWidth == 0 && line.Length > 0)
                 {
-                    ReadOnlySpan<char> message = line.StartsWith(AgentSubagentCoordinator.ProgressMarker, StringComparison.Ordinal)
-                        ? line[AgentSubagentCoordinator.ProgressMarker.Length..]
-                        : line;
-                    if ((prefix.Length > 0 && message.StartsWith(prefix, StringComparison.Ordinal)) ||
-                        message.StartsWith(koreanPrefix, StringComparison.Ordinal) ||
-                        message.StartsWith(englishPrefix, StringComparison.Ordinal))
+                    if (progressLine || StartsWithActivityPrefix(rawLine))
                     {
-                        afterCompletion = true;
+                        afterActivity = true;
                         wroteBlank = false;
                     }
                     else if (!line.Equals("[Agent Response]:", StringComparison.OrdinalIgnoreCase) &&
                         !line.Equals("[assistant: final answer]", StringComparison.OrdinalIgnoreCase))
                     {
-                        afterCompletion = false;
+                        afterActivity = false;
                     }
                 }
-                else if (line.Length == 0 && afterCompletion)
+                else if (line.Length == 0 && afterActivity)
                 {
                     if (wroteBlank)
                     {
@@ -806,7 +833,10 @@ namespace TxtAIEditor.Controls
                     wroteBlank = true;
                 }
 
-                result.Append(text, start, next - start);
+                int contentStart = progressLine && stripProgressMarkers
+                    ? start + AgentSubagentCoordinator.ProgressMarker.Length
+                    : start;
+                result.Append(text, contentStart, next - contentStart);
                 start = next;
             }
 

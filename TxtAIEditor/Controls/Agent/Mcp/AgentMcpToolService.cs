@@ -143,6 +143,7 @@ namespace TxtAIEditor.Controls
 
         public async Task<string> ExecuteToolAsync(string aliasName, JsonElement arguments, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!TryGetToolAlias(aliasName, out var alias))
             {
                 return $"MCP tool failed: unknown MCP tool alias: {aliasName}";
@@ -164,6 +165,7 @@ namespace TxtAIEditor.Controls
                 alias.ToolName,
                 arguments,
                 cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (AgentMcpRuntime.TryGetRpcError(response.RootElement, out string error))
             {

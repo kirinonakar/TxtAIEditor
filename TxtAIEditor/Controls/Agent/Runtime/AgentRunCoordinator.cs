@@ -336,6 +336,7 @@ namespace TxtAIEditor.Controls
             runContext.Cancellation = cancellationSource;
             CancellationToken cancellationToken = cancellationSource.Token;
             runContext.CancellationToken = cancellationToken;
+            runContext.ParentCancellationToken = parentCancellation;
             activeOpenSession.IsRunning = true;
             activeOpenSession.UpdatedAt = DateTime.Now;
             _runningSessions[activeOpenSession.Id] = runContext;
@@ -382,7 +383,7 @@ namespace TxtAIEditor.Controls
                 await _runOutputController.BeginRunOutputBlockAsync(runContext, _runTextFormatter.BuildRunHeader(
                     isSubagent ? userInstruction : _promptContextService.BuildInstructionDisplay(userInstruction), isSubagent));
                 await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityCollectingContext", "맥락 수집 중"));
-                cancellationToken.ThrowIfCancellationRequested();
+                runContext.ToolCancellationToken.ThrowIfCancellationRequested();
                 runContext.PinnedWorkspaceRoot ??= AgentWorkspaceFileResolver.ResolveWorkspaceDirectory(runContext.WorkspaceRoot);
                 _ = GetActiveRunWorkspaceRoot();
 
@@ -461,7 +462,7 @@ namespace TxtAIEditor.Controls
 
                 for (int step = 0; step < maxToolSteps; step++)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    runContext.ToolCancellationToken.ThrowIfCancellationRequested();
                     _ = GetActiveRunWorkspaceRoot();
                     if (orchestration != null)
                     {
@@ -624,7 +625,7 @@ namespace TxtAIEditor.Controls
                         continue;
                     }
 
-                    cancellationToken.ThrowIfCancellationRequested();
+                    runContext.ToolCancellationToken.ThrowIfCancellationRequested();
                     _ = GetActiveRunWorkspaceRoot();
                     responseStreamInProgress = true;
                     bool awaitingSubagents = orchestration?.NeedsModelReview == true;
@@ -641,7 +642,7 @@ namespace TxtAIEditor.Controls
                         cancellationToken,
                         deferAnswer: deferAnswer);
                     responseStreamInProgress = false;
-                    cancellationToken.ThrowIfCancellationRequested();
+                    runContext.ToolCancellationToken.ThrowIfCancellationRequested();
                     _ = GetActiveRunWorkspaceRoot();
 
                     if (!string.IsNullOrWhiteSpace(runContext.PendingVisionFallbackContext))
@@ -817,7 +818,7 @@ namespace TxtAIEditor.Controls
                         await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, remainingText);
                     }
 
-                    cancellationToken.ThrowIfCancellationRequested();
+                    runContext.ToolCancellationToken.ThrowIfCancellationRequested();
 
                     bool parsedToolCall = AgentToolCallParser.TryParseMulti(response, out List<AgentToolCallParser.ToolCallInfo> toolCalls);
                     if (responseLooksLikeToolResultReplay || !parsedToolCall || toolCalls.Count == 0)
@@ -959,7 +960,7 @@ namespace TxtAIEditor.Controls
                     string[] parallelResults = [];
                     for (int toolIndex = 0; toolIndex < toolCalls.Count; toolIndex++)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
+                        runContext.ToolCancellationToken.ThrowIfCancellationRequested();
 
                         if (toolIndex >= parallelStart + parallelResults.Length)
                         {
@@ -1074,7 +1075,7 @@ namespace TxtAIEditor.Controls
                             using IDisposable lease = lockPaths.Length > 0
                                 ? await _toolExecutionSessionGate.EnterFilesAsync(lockPaths, cancellationToken)
                                 : await _toolExecutionSessionGate.EnterExclusiveAsync(cancellationToken);
-                            cancellationToken.ThrowIfCancellationRequested();
+                            runContext.ToolCancellationToken.ThrowIfCancellationRequested();
                             _ = GetActiveRunWorkspaceRoot();
                             _activeToolRunContext.Value = runContext;
                             try
@@ -1098,7 +1099,7 @@ namespace TxtAIEditor.Controls
                                             currentToolName,
                                             currentArguments,
                                             runContext.LlmSettings.LlmAgentVerbose,
-                                            cancellationToken);
+                                            runContext.ToolCancellationToken);
                                     }
                                 }
                                 finally
@@ -1152,7 +1153,7 @@ namespace TxtAIEditor.Controls
                         }
                     }
 
-                    cancellationToken.ThrowIfCancellationRequested();
+                    runContext.ToolCancellationToken.ThrowIfCancellationRequested();
 
                     currentWorkspaceContext = await _uiDispatcher.RunAsync(() =>
                         _promptContextService.BuildWorkspaceContextAsync(
@@ -1357,14 +1358,20 @@ namespace TxtAIEditor.Controls
                 {
                     using (orchestration)
                     {
-                        string[] delayedWorkers = await orchestration.StopAsync();
-                        foreach (string id in delayedWorkers)
+                        var delayedWorkers = await orchestration.StopAsync();
+                        foreach (var worker in delayedWorkers)
                         {
-                            if (_runningSessions.TryGetValue(id, out AgentRunContext? delayed))
+                            _openSessionController.MarkSubagentShutdownPending(runContext.SessionId, worker.AgentId);
+                            if (_runningSessions.TryGetValue(worker.AgentId, out AgentRunContext? delayed))
                             {
+                                if (delayed.Cancellation is { IsCancellationRequested: false } source)
+                                {
+                                    _ = RequestRunCancellationAsync(source);
+                                }
                                 _ = ShowSubagentProgressAsync(delayed, _getString("AgentSubagentShutdownDelayed",
                                     "종료 요청 후에도 작업이 정리 중입니다."));
                             }
+                            _ = ObserveSubagentShutdownAsync(worker);
                         }
                         string progressLog = orchestration.DrainProgressLog();
                         if (progressLog.Length > 0)
@@ -1467,6 +1474,20 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        private async Task ObserveSubagentShutdownAsync(AgentSubagentCoordinator.PendingShutdown worker)
+        {
+            try { await worker.Completion; }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex); }
+            try
+            {
+                await _uiDispatcher.RunAsync(() => _openSessionController.CompleteSubagentShutdown(worker.AgentId));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+        }
+
         private List<AgentToolCallParser.ToolCallInfo> GetIndependentReads(
             IReadOnlyList<AgentToolCallParser.ToolCallInfo> calls, int start,
             Dictionary<string, int> invocationCounts)
@@ -1503,7 +1524,7 @@ namespace TxtAIEditor.Controls
                 ? await _toolExecutionSessionGate.EnterWebAsync(token)
                 : await _toolExecutionSessionGate.EnterFileReadAsync(
                     _toolExecutionController.GetFileReadLockPath(normalizedName, arguments), token);
-            token.ThrowIfCancellationRequested();
+            context.ToolCancellationToken.ThrowIfCancellationRequested();
             _ = GetActiveRunWorkspaceRoot();
             if (isSubagent && followUpRequested.IsCompleted)
             {
@@ -1514,7 +1535,7 @@ namespace TxtAIEditor.Controls
             try
             {
                 return await _toolExecutionController.ExecuteAsync(
-                    toolName, arguments, context.LlmSettings.LlmAgentVerbose, token, trackFilePath);
+                    toolName, arguments, context.LlmSettings.LlmAgentVerbose, context.ToolCancellationToken, trackFilePath);
             }
             finally
             {

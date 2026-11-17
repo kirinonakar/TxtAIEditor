@@ -75,7 +75,7 @@ namespace TxtAIEditor.Controls
         private readonly object _eventGate = new();
         private readonly List<WorkerReport> _pendingReports = new();
         private readonly Dictionary<string, WorkerReport> _reports = new(StringComparer.Ordinal);
-        private readonly HashSet<(string AgentId, string Kind, string Message)> _reportKeys = new();
+        private readonly HashSet<(string ResultId, string Kind, string Message)> _reportKeys = new();
         private int _pendingReportChars;
         private int _archivedReportChars;
         private int _overflowReportCount;
@@ -465,7 +465,7 @@ namespace TxtAIEditor.Controls
         {
             lock (_eventGate)
             {
-                var key = (turn.Worker.Id, kind, message);
+                var key = (turn.ResultId, kind, message);
                 if (_reportKeys.Contains(key))
                 {
                     return "Duplicate report already recorded.";
@@ -628,7 +628,7 @@ namespace TxtAIEditor.Controls
                 Environment.NewLine + string.Join(Environment.NewLine, messages) + Environment.NewLine;
         }
 
-        public async Task<string[]> StopAsync()
+        public async Task<PendingShutdown[]> StopAsync()
         {
             if (_shutdown == null)
             {
@@ -646,12 +646,16 @@ namespace TxtAIEditor.Controls
             }
             catch (TimeoutException)
             {
-                var delayed = _turns.Where(turn => !turn.Run.IsCompleted).Select(turn => turn.Worker).Distinct().ToArray();
-                foreach (Worker worker in delayed)
+                var delayed = _turns.Where(turn => !turn.Run.IsCompleted || turn.CancelTask is { IsCompleted: false })
+                    .GroupBy(turn => turn.Worker).ToArray();
+                var pending = new List<PendingShutdown>(delayed.Length);
+                foreach (var worker in delayed)
                 {
-                    PublishResource("AgentSubagentShutdownDelayedFormat", "서브에이전트 종료 지연 · {0}", worker.Title);
+                    Task completion = Task.WhenAll(worker.SelectMany(turn => new Task[] { turn.Run, turn.CancelTask ?? Task.CompletedTask }));
+                    pending.Add(new PendingShutdown(worker.Key.Id, completion));
+                    PublishResource("AgentSubagentShutdownDelayedFormat", "서브에이전트 종료 지연 · {0}", worker.Key.Title);
                 }
-                return delayed.Select(worker => worker.Id).ToArray();
+                return pending.ToArray();
             }
         }
 
@@ -703,6 +707,7 @@ namespace TxtAIEditor.Controls
 
         private sealed record WorkerResult(AgentRunStatus Status, string Text);
         private sealed record WorkerReport(string Id, WorkerTurn Turn, string Kind, string Message);
+        public sealed record PendingShutdown(string AgentId, Task Completion);
 
         private sealed class Worker(string id, string title)
         {

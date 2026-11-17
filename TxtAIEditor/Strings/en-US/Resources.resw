@@ -662,6 +662,21 @@
   <data name="AgentSubagentShutdownDelayedFormat" xml:space="preserve">
     <value>Subagent shutdown delayed · {0}</value>
   </data>
+  <data name="AgentSubagentShutdownPendingStatus" xml:space="preserve">
+    <value>Shutdown delayed</value>
+  </data>
+  <data name="AgentOrchestratorShutdownPendingFormat" xml:space="preserve">
+    <value>Waiting for {0} subagent(s) to exit</value>
+  </data>
+  <data name="AgentProcessJobFallbackFormat" xml:space="preserve">
+    <value>Could not contain {0} in a Job Object. Descendant cleanup will be attempted. {1}</value>
+  </data>
+  <data name="AgentProcessCleanupIncompleteFormat" xml:space="preserve">
+    <value>Could not confirm cleanup for all descendants of {0}.</value>
+  </data>
+  <data name="AgentProcessCleanupFailedFormat" xml:space="preserve">
+    <value>Process cleanup failed for {0}. {1}</value>
+  </data>
   <data name="AgentSubagentShutdownDelayed" xml:space="preserve">
     <value>The task is still shutting down after cancellation.</value>
   </data>

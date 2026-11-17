@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -22,15 +23,21 @@ namespace TxtAIEditor.Controls
         private readonly AgentWorkspaceFileResolver _workspace;
         private readonly Func<string, int, CancellationToken, Task<string>> _searchTextFallbackAsync;
         private readonly Func<string, Task<bool>> _confirmPowerShellAsync;
+        private readonly Action<string>? _reportActivity;
+        private readonly Func<string, string, string> _getString;
 
         public AgentProcessToolService(
             AgentWorkspaceFileResolver workspace,
             Func<string, int, CancellationToken, Task<string>> searchTextFallbackAsync,
-            Func<string, Task<bool>> confirmPowerShellAsync)
+            Func<string, Task<bool>> confirmPowerShellAsync,
+            Action<string>? reportActivity = null,
+            Func<string, string, string>? getString = null)
         {
             _workspace = workspace;
             _searchTextFallbackAsync = searchTextFallbackAsync;
             _confirmPowerShellAsync = confirmPowerShellAsync;
+            _reportActivity = reportActivity;
+            _getString = getString ?? ((_, fallback) => fallback);
         }
 
         public async Task<string> RunRgAsync(string arguments, int timeoutMs, CancellationToken cancellationToken = default)
@@ -300,6 +307,50 @@ namespace TxtAIEditor.Controls
             catch (Exception ex) { Debug.WriteLine(ex); }
         }
 
+        private static AgentProcessTreeFallback? TryTrackProcessTree(Process process)
+        {
+            try { return new AgentProcessTreeFallback(process); }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+            {
+                Trace.TraceWarning("Agent could not retain the launcher process handle: {0}", ex.Message);
+                return null;
+            }
+        }
+
+        private static async Task WaitForProcessAsync(
+            Task completion, TimeSpan timeout, AgentProcessTreeFallback? fallback, CancellationToken token)
+        {
+            if (fallback == null)
+            {
+                await completion.WaitAsync(timeout, token);
+                return;
+            }
+
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+            deadline.CancelAfter(timeout);
+            try
+            {
+                while (!completion.IsCompleted)
+                {
+                    deadline.Token.ThrowIfCancellationRequested();
+                    fallback.CaptureDescendants();
+                    await Task.WhenAny(completion, Task.Delay(100, deadline.Token));
+                }
+                await completion.WaitAsync(deadline.Token);
+            }
+            catch (OperationCanceledException) when (!token.IsCancellationRequested && deadline.IsCancellationRequested)
+            {
+                throw new TimeoutException();
+            }
+        }
+
+        private void ReportProcessWarning(string key, string fallback, params object[] arguments)
+        {
+            Trace.TraceWarning(fallback, arguments);
+            try { _reportActivity?.Invoke(string.Format(_getString(key, fallback), arguments)); }
+            catch (Exception ex) { Trace.TraceWarning("Agent could not report process warning: {0}", ex.Message); }
+        }
+
         private async Task<string> RunProcessAsync(
             string fileName,
             string arguments,
@@ -313,6 +364,7 @@ namespace TxtAIEditor.Controls
         {
             using var process = new Process();
             using SafeFileHandle job = CreateJobObjectW(IntPtr.Zero, null);
+            string? jobFailure = job.IsInvalid ? $"CreateJobObject (Win32 {Marshal.GetLastWin32Error()})" : null;
             var encoding = outputEncoding ?? Encoding.UTF8;
             var startInfo = new ProcessStartInfo
             {
@@ -359,11 +411,26 @@ namespace TxtAIEditor.Controls
             {
                 return $"{fileName} failed to start: {ex.Message}";
             }
-            bool jobAttached = false;
-            if (!job.IsInvalid)
+            if (jobFailure == null)
             {
-                try { jobAttached = AssignProcessToJobObject(job, process.SafeHandle); }
-                catch (InvalidOperationException) { /* A short-lived command may already have exited. */ }
+                try
+                {
+                    if (!AssignProcessToJobObject(job, process.SafeHandle))
+                    {
+                        jobFailure = $"AssignProcessToJobObject (Win32 {Marshal.GetLastWin32Error()})";
+                    }
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+                {
+                    jobFailure = $"AssignProcessToJobObject ({ex.Message})";
+                }
+            }
+            using AgentProcessTreeFallback? fallback = jobFailure != null ? TryTrackProcessTree(process) : null;
+            if (jobFailure != null)
+            {
+                ReportProcessWarning("AgentProcessJobFallbackFormat",
+                    "Could not contain {0} in a Job Object. Descendant cleanup will be attempted. {1}",
+                    Path.GetFileName(fileName), jobFailure);
             }
 
             using var captureCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -372,24 +439,38 @@ namespace TxtAIEditor.Controls
             Task exitTask = process.WaitForExitAsync(captureCancellation.Token);
             Task completion = Task.WhenAll(exitTask, stdoutTask, stderrTask);
 
+            int effectiveTimeoutMs = Math.Clamp(timeoutMs, MinimumProcessTimeoutMs, MaximumProcessTimeoutMs);
             try
             {
-                int effectiveTimeoutMs = Math.Clamp(timeoutMs, MinimumProcessTimeoutMs, MaximumProcessTimeoutMs);
-                await completion.WaitAsync(TimeSpan.FromMilliseconds(effectiveTimeoutMs), cancellationToken);
+                await WaitForProcessAsync(completion, TimeSpan.FromMilliseconds(effectiveTimeoutMs), fallback, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
             }
             catch (Exception ex) when (ex is OperationCanceledException or TimeoutException)
             {
                 try
                 {
-                    // The job can still terminate descendants after the launcher exits.
-                    if ((!jobAttached || !TerminateJobObject(job, 1)) && !process.HasExited)
+                    if (jobFailure != null || !TerminateJobObject(job, 1))
                     {
-                        process.Kill(entireProcessTree: true);
+                        if (jobFailure == null)
+                        {
+                            Trace.TraceWarning("Agent TerminateJobObject failed (Win32 {0}).", Marshal.GetLastWin32Error());
+                        }
+                        using AgentProcessTreeFallback? cleanupOnly = fallback == null ? TryTrackProcessTree(process) : null;
+                        if ((fallback ?? cleanupOnly)?.Terminate() != true)
+                        {
+                            if (!process.HasExited)
+                            {
+                                process.Kill(entireProcessTree: true);
+                            }
+                            ReportProcessWarning("AgentProcessCleanupIncompleteFormat",
+                                "Could not confirm cleanup for all descendants of {0}.", Path.GetFileName(fileName));
+                        }
                     }
                 }
                 catch (Exception killError)
                 {
-                    Debug.WriteLine(killError);
+                    ReportProcessWarning("AgentProcessCleanupFailedFormat",
+                        "Process cleanup failed for {0}. {1}", Path.GetFileName(fileName), killError.Message);
                 }
 
                 captureCancellation.Cancel();
@@ -397,10 +478,15 @@ namespace TxtAIEditor.Controls
                 process.StandardError.Dispose();
                 Task shutdown = Task.WhenAll(process.WaitForExitAsync(), ObserveProcessCompletionAsync(completion));
                 try { await shutdown.WaitAsync(TimeSpan.FromSeconds(2)); }
-                catch (TimeoutException) { _ = ObserveProcessCompletionAsync(shutdown); }
+                catch (TimeoutException)
+                {
+                    _ = ObserveProcessCompletionAsync(shutdown);
+                    ReportProcessWarning("AgentProcessCleanupIncompleteFormat",
+                        "Could not confirm cleanup for all descendants of {0}.", Path.GetFileName(fileName));
+                }
                 catch (Exception shutdownError) { Debug.WriteLine(shutdownError); }
                 cancellationToken.ThrowIfCancellationRequested();
-                return $"{fileName} timed out after {Math.Clamp(timeoutMs, MinimumProcessTimeoutMs, MaximumProcessTimeoutMs)}ms.";
+                return $"{fileName} timed out after {effectiveTimeoutMs}ms.";
             }
 
             string DecodeCapture((byte[] Head, byte[] Tail, bool Truncated) capture)

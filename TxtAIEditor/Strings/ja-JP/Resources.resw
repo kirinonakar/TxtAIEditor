@@ -662,6 +662,21 @@
   <data name="AgentSubagentShutdownDelayedFormat" xml:space="preserve">
     <value>サブエージェントの終了が遅れています · {0}</value>
   </data>
+  <data name="AgentSubagentShutdownPendingStatus" xml:space="preserve">
+    <value>終了遅延</value>
+  </data>
+  <data name="AgentOrchestratorShutdownPendingFormat" xml:space="preserve">
+    <value>{0} 件のサブエージェントの終了待ち</value>
+  </data>
+  <data name="AgentProcessJobFallbackFormat" xml:space="preserve">
+    <value>{0} を Windows ジョブオブジェクトに割り当てられませんでした。子孫プロセスの終了を試みます。{1}</value>
+  </data>
+  <data name="AgentProcessCleanupIncompleteFormat" xml:space="preserve">
+    <value>{0} のすべての子孫プロセスの終了を確認できませんでした。</value>
+  </data>
+  <data name="AgentProcessCleanupFailedFormat" xml:space="preserve">
+    <value>{0} のプロセス終了に失敗しました。{1}</value>
+  </data>
   <data name="AgentSubagentShutdownDelayed" xml:space="preserve">
     <value>キャンセル後も終了処理が続いています。</value>
   </data>

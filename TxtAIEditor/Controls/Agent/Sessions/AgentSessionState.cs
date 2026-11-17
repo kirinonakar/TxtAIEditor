@@ -66,6 +66,9 @@ namespace TxtAIEditor.Controls
         public string SessionId { get; set; } = string.Empty;
         public CancellationTokenSource? Cancellation { get; set; }
         public CancellationToken CancellationToken { get; set; }
+        public CancellationToken ParentCancellationToken { get; set; }
+        public CancellationToken ToolCancellationToken =>
+            ParentCancellationToken.IsCancellationRequested ? ParentCancellationToken : CancellationToken;
         public StringBuilder SessionHistory { get; } = new();
         public StringBuilder ModelSessionHistory { get; } = new();
         public StringBuilder RetryDebugHistory { get; } = new();
