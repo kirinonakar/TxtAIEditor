@@ -111,6 +111,17 @@ namespace TxtAIEditor.Controls
         }
         public static bool IsCoordinationTool(string name) => Tools.Any(tool => tool.Name == name);
 
+        public static bool IsWorkerToolAvailable(string toolName, bool isPlanResearch)
+        {
+            if (toolName is "make_plan" or "open_file" or "insert_text" or "create_tab" or "edit_tab" or "save_tab")
+            {
+                return false;
+            }
+
+            return !isPlanResearch || toolName is "list_files" or "search_text" or "run_rg" or "run_rga"
+                or "read_file" or "read_image" or "web_search" or "web_fetch" or "web_fetch_exa" or "skill_use";
+        }
+
         public string BuildInstructions(bool planningMode) => $$"""
             [Orchestrator]
             Own the task and verify delegated results before finalizing. Give up to {{_limit}} subagents distinct scopes, relevant context, and clear deliverables. Coordinate shared edits and launch independent tasks before waiting.

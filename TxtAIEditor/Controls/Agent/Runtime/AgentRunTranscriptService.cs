@@ -248,6 +248,36 @@ namespace TxtAIEditor.Controls
             return builder.ToString();
         }
 
+        public (string Text, double Tokens) BuildToolTurn(
+            AgentToolTurn turn, IReadOnlyList<AgentToolCallResult> results)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine();
+            builder.AppendLine();
+            if (!string.IsNullOrEmpty(turn.RetainedThinkingSection))
+            {
+                builder.AppendLine(turn.RetainedThinkingSection);
+                builder.AppendLine();
+            }
+            builder.AppendLine(turn.UsedNativeFunctionToolCall
+                ? "[assistant: tool call] (native function)"
+                : "[assistant: tool call] (text)");
+            builder.AppendLine(turn.ResponseForTranscript);
+
+            foreach (var result in results)
+            {
+                builder.AppendLine();
+                builder.AppendLine($"[tool: {result.Name} arguments]");
+                builder.AppendLine(result.Arguments.GetRawText());
+                builder.AppendLine();
+                builder.AppendLine($"[tool: {result.Name} result]");
+                builder.AppendLine(result.ResultForTranscript);
+            }
+
+            string text = builder.ToString();
+            return (text, AgentTokenEstimator.Estimate(text));
+        }
+
         public string AddToolTimingNote(
             string normalizedToolName,
             string toolResultForTranscript,

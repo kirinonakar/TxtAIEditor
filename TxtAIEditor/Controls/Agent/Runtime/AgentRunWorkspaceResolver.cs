@@ -36,6 +36,14 @@ namespace TxtAIEditor.Controls
             return _fallbackWorkspaceRootProvider();
         }
 
+        public static void VerifyPinnedWorkspace(AgentRunContext? context)
+        {
+            if (context?.PinnedWorkspaceRoot is string pinned)
+            {
+                AgentWorkspaceFileResolver.VerifyPinnedWorkspace(context.WorkspaceRoot, pinned);
+            }
+        }
+
         internal static bool IsApprovedPlanExecutionPrompt(string userInstruction)
         {
             return (userInstruction ?? string.Empty)

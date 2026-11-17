@@ -47,6 +47,18 @@ namespace TxtAIEditor.Controls
             return _openSessionController.AppendRunActivityAsync(context, message);
         }
 
+        public async Task AppendSubagentProgressAsync(AgentRunContext context, string message)
+        {
+            try
+            {
+                await AppendRunActivityAsync(context, AgentSubagentCoordinator.FormatProgressLine(message));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+        }
+
         public Task AppendRunOutputTextAsync(AgentRunContext context, string text)
         {
             return _openSessionController.AppendRunOutputTextAsync(context, text);

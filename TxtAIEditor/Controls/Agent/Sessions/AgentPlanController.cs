@@ -92,6 +92,22 @@ namespace TxtAIEditor.Controls
             return builder.ToString().Trim();
         }
 
+        public static string BuildMakePlanRequiredRetryNote(AgentRunContext runContext)
+        {
+            if (!string.IsNullOrWhiteSpace(runContext.PendingPlanPath))
+            {
+                string examplePlanPath = runContext.PendingPlanPath.Replace(Path.DirectorySeparatorChar, '/');
+                return
+                    "\n\n[Planning mode make_plan required]\n" +
+                    "Do not answer with the plan as plain text. Finish the revision and include exactly one make_plan tool_call with the revised plan file path:\n" +
+                    $"<tool_call>{{\"name\":\"make_plan\",\"arguments\":{{\"path\":\"{examplePlanPath}\"}}}}</tool_call>";
+            }
+
+            return
+                "\n\n[Planning mode make_plan required]\n" +
+                "Do not answer with the plan as plain text. Save it by including exactly one make_plan tool_call, using the Markdown plan as the markdown argument. Do not include a path or filename.";
+        }
+
         public async Task<string> MakePlanAsync(JsonElement arguments, CancellationToken cancellationToken)
         {
             AgentRunContext? runContext = _activeRunContextProvider();

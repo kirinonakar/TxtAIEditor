@@ -44,15 +44,16 @@ namespace TxtAIEditor.Controls
         AgentSelectionContextController SelectionContextController,
         AgentFileToolController FileToolController,
         AgentToolExecutionController ToolExecutionController,
+        AgentToolBatchExecutor ToolBatchExecutor,
+        AgentModelRequestBuilder ModelRequestBuilder,
+        AgentStepResponseHandler StepResponseHandler,
         AgentContextStatsController ContextStatsController,
         AgentPlanController PlanController,
         AgentSessionRewindController SessionRewindController,
         AgentRunOutputController RunOutputController,
+        AgentRunTranscriptService RunTranscriptService,
         AgentRunWorkspaceResolver RunWorkspaceResolver,
         AgentRunTextFormatter RunTextFormatter,
-        AgentModelContextLimitProvider ModelContextLimits,
-        AgentLlmToolCatalog LlmToolCatalog,
-        AgentResponseInspector ResponseInspector,
         AgentResponseStreamService ResponseStreamService,
         AgentSessionHistoryCoordinator SessionHistoryCoordinator)
     {
@@ -335,6 +336,17 @@ namespace TxtAIEditor.Controls
                 planController.MakePlanAsync,
                 callbacks.AppendActivity,
                 getString);
+            var runTranscriptService = new AgentRunTranscriptService();
+            var toolBatchExecutor = new AgentToolBatchExecutor(
+                fileTools, fileToolController, toolExecutionController, toolExecutionSessionGate,
+                sessionEditController, runOutputController, runTranscriptService, uiDispatcher);
+            var modelRequestBuilder = new AgentModelRequestBuilder(
+                uiDispatcher, mcpController, skillController, promptContextService, llmToolCatalog,
+                new AgentContextCompressionService(llmService, modelContextLimits), runTranscriptService,
+                runOutputController, getString, callbacks.UpdateContextStatsImmediate);
+            var stepResponseHandler = new AgentStepResponseHandler(
+                responseInspector, runTranscriptService, runOutputController, uiDispatcher,
+                getString, callbacks.UpdateContextStatsImmediate);
 
             fileTools.ConfirmFileEditAsync = confirmationController.ConfirmFileEditAsync;
             fileTools.ConfirmPowerShellAsync = confirmationController.ConfirmPowerShellAsync;
@@ -362,15 +374,16 @@ namespace TxtAIEditor.Controls
                 selectionContextController,
                 fileToolController,
                 toolExecutionController,
+                toolBatchExecutor,
+                modelRequestBuilder,
+                stepResponseHandler,
                 contextStatsController,
                 planController,
                 sessionRewindController,
                 runOutputController,
+                runTranscriptService,
                 runWorkspaceResolver,
                 runTextFormatter,
-                modelContextLimits,
-                llmToolCatalog,
-                responseInspector,
                 responseStreamService,
                 sessionHistoryCoordinator);
         }
