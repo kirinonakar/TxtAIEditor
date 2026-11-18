@@ -65,14 +65,50 @@ namespace TxtAIEditor.Controls
             openSession.UpdatedAt = DateTime.Now;
             _openSessionController.UpdateUI();
 
-            var item = new AgentHistoryItem
+            await _historyController.SaveSessionAsync(CreateHistoryItem(openSession, context, historyText), context.SessionId);
+        }
+
+        public Task EnsureOrchestratorHistoryAsync(AgentOpenSessionState session, AgentRunContext context,
+            string conversationTurn, AgentRunTranscript transcript, string initialTranscript)
+        {
+            if (_historyController.GetEntry(session.Id)?.Role == AgentSessionRole.Orchestrator)
             {
-                Id = context.SessionId,
+                return Task.CompletedTask;
+            }
+
+            return _historyController.SaveSessionAsync(
+                CreateOrchestratorCheckpoint(session, context, conversationTurn, transcript, initialTranscript),
+                _currentSessionIdProvider());
+        }
+
+        private static AgentHistoryItem CreateOrchestratorCheckpoint(AgentOpenSessionState session, AgentRunContext context,
+            string conversationTurn, AgentRunTranscript transcript, string initialTranscript)
+        {
+            // Save the initial user turn before workers can save their own histories. A later
+            // completed run replaces this checkpoint with the full conversation.
+            var checkpoint = new AgentRunContext
+            {
+                ApiType = context.ApiType,
+                SessionHistoryTokenCount = context.SessionHistoryTokenCount,
+                LastAnswerText = context.LastAnswerText,
+                SessionEdits = context.SessionEdits,
+                WorkspaceRoot = context.WorkspaceRoot
+            };
+            checkpoint.SessionHistory.Append(context.SessionHistory);
+            AgentRunTranscriptRecorder.AppendPromptTranscript(checkpoint, conversationTurn,
+                transcript.DisplayText, initialTranscript, transcript.ModelText);
+            return CreateHistoryItem(session, checkpoint, checkpoint.SessionHistory.ToString());
+        }
+
+        private static AgentHistoryItem CreateHistoryItem(AgentOpenSessionState session, AgentRunContext context, string historyText) =>
+            new()
+            {
+                Id = session.Id,
                 Timestamp = DateTime.Now,
-                Title = openSession.Title,
-                Role = openSession.Role,
-                Selections = openSession.Selections.Copy(),
-                OrchestratorSessionId = openSession.OrchestratorSessionId,
+                Title = session.Title,
+                Role = session.Role,
+                Selections = session.Selections.Copy(),
+                OrchestratorSessionId = session.OrchestratorSessionId,
                 SessionHistoryText = historyText,
                 ModelSessionHistoryText = context.ModelSessionHistory.ToString(),
                 LastAnswerText = context.LastAnswerText,
@@ -80,9 +116,6 @@ namespace TxtAIEditor.Controls
                 SessionEdits = context.SessionEdits.ToList(),
                 WorkspaceRoot = context.WorkspaceRoot
             };
-
-            await _historyController.SaveSessionAsync(item, context.SessionId);
-        }
 
         public void LoadHistorySession(string historyId)
         {
@@ -106,8 +139,16 @@ namespace TxtAIEditor.Controls
             try
             {
                 var item = await _historyController.ReadSessionAsync(historyId);
+                string? workerGroupId = item?.Role == AgentSessionRole.Orchestrator ? historyId : null;
+                if (item == null && _historyController.GetSubagentSessionIds(historyId).FirstOrDefault() is { } workerId)
+                {
+                    // Older saves may contain only the workers. Open the newest worker and
+                    // its siblings without constructing a replacement orchestrator transcript.
+                    workerGroupId = historyId;
+                    item = await _historyController.ReadSessionAsync(workerId);
+                }
                 if (item == null || request != _historyOpenRequest || previousId != _currentSessionIdProvider() ||
-                    _openSessionController.IsSessionRunning(historyId) || _historyController.GetEntry(historyId) == null)
+                    _openSessionController.IsSessionRunning(item.Id) || _historyController.GetEntry(item.Id) == null)
                 {
                     return;
                 }
@@ -117,9 +158,9 @@ namespace TxtAIEditor.Controls
                 var session = _openSessionController.EnsureSession(item.Id);
                 _openSessionController.ApplyHistoryItem(session, item, restoreSelections: !wasOpen);
                 Exception? workerLoadError = null;
-                if (item.Role == AgentSessionRole.Orchestrator)
+                if (workerGroupId != null)
                 {
-                    foreach (string id in _historyController.GetSubagentSessionIds(item.Id).Reverse())
+                    foreach (string id in _historyController.GetSubagentSessionIds(workerGroupId).Reverse())
                     {
                         // Preserve the live state and drafts for subagents already open.
                         if (_openSessionController.FindOpenSession(id) != null)

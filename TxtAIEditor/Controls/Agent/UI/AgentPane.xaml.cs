@@ -38,6 +38,7 @@ namespace TxtAIEditor.Controls
     {
         public string Id { get; set; } = string.Empty;
         public string? OrchestratorSessionId { get; set; }
+        public bool IsMissingOrchestrator { get; set; }
         public string Title { get; set; } = string.Empty;
         public string TimeText { get; set; } = string.Empty;
     }
@@ -214,6 +215,7 @@ namespace TxtAIEditor.Controls
         public event EventHandler? OpenSessionsFlyoutOpened;
         public event EventHandler<string>? OpenSessionSelected;
         public event EventHandler<string>? OpenSessionClosed;
+        public event EventHandler? AllOpenSessionsClosed;
         public event RoutedEventHandler? ModelNameClick;
 
         public AgentOutputWrapper Output => new AgentOutputWrapper(this);
@@ -304,6 +306,7 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(AgentRewindSessionButton, getString("AgentRewindSessionTooltip", "이전 프롬프트 입력 전으로 되감기"));
             ToolTipService.SetToolTip(AgentOpenSessionsButton, getString("AgentOpenSessionsTooltip", "열린 세션"));
             AgentOpenSessionsTitleText.Text = getString("AgentOpenSessionsTitle", "열린 세션");
+            AgentCloseAllOpenSessionsButton.Content = getString("AgentOpenSessionsCloseAllText", "모두 닫기");
             ToolTipService.SetToolTip(AgentHistoryButton, getString("AgentHistoryTooltip", "세션 히스토리"));
             AgentHistoryTitleText.Text = string.Format(getString("AgentHistoryTitle", "세션 히스토리 (최근 {0}개)"),
                 AgentHistoryStore.MaxGroups);
@@ -595,6 +598,12 @@ private Style? _accentRunButtonStyle;
         {
             OpenSessionsFlyoutOpened?.Invoke(this, EventArgs.Empty);
             _sessionMenuCoordinator.RebuildOpenSessionMenu();
+        }
+
+        private void OnAgentCloseAllOpenSessionsClick(object sender, RoutedEventArgs e)
+        {
+            AgentOpenSessionsFlyout.Hide();
+            AllOpenSessionsClosed?.Invoke(this, EventArgs.Empty);
         }
 
         private void OnDeleteHistoryClick(object sender, RoutedEventArgs e)

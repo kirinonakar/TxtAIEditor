@@ -572,10 +572,33 @@ namespace TxtAIEditor.Controls
                 item == session ||
                 (session.Role == AgentSessionRole.Orchestrator &&
                     string.Equals(item.OrchestratorSessionId, session.Id, StringComparison.Ordinal))).ToArray();
+            CloseSessions(sessionsToClose, closeAll: false);
+        }
+
+        public void CloseAllSessions() => CloseSessions(_openSessions.ToArray(), closeAll: true);
+
+        public void FinishRewinding(AgentOpenSessionState session)
+        {
+            session.IsRewinding = false;
+            if (ConsumePendingClose(session.Id))
+            {
+                CloseSession(session.Id);
+            }
+        }
+
+        private void CloseSessions(AgentOpenSessionState[] sessionsToClose, bool closeAll)
+        {
+            var closingIds = sessionsToClose.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
             var sessionsToStop = new List<string>();
             bool closedVisibleSession = false;
             foreach (var item in sessionsToClose)
             {
+                if (closeAll && (item.IsRewinding ||
+                    (item.OrchestratorSessionId is string parent && FindOpenSession(parent)?.IsRewinding == true)))
+                {
+                    _pendingCloseSessionIds.Add(item.Id);
+                    continue;
+                }
                 if (_runningSessions.ContainsKey(item.Id))
                 {
                     if (_pendingCloseSessionIds.Add(item.Id))
@@ -587,11 +610,12 @@ namespace TxtAIEditor.Controls
 
                 closedVisibleSession |= IsSessionVisible(item.Id);
                 _openSessions.Remove(item);
+                _pendingCloseSessionIds.Remove(item.Id);
                 _idleDeadlines.Remove(item);
                 _historyController.RememberSelections(item.Id, item.Selections);
                 _mcpController.ReleaseUnusedConnections(item.Selections.McpServers);
                 bool parentStillOpen = item.OrchestratorSessionId is string parentId &&
-                    FindOpenSession(parentId) != null && !sessionsToClose.Any(closing => closing.Id == parentId);
+                    FindOpenSession(parentId) != null && !closingIds.Contains(parentId);
                 if (parentStillOpen && item.UnloadedHistory == null)
                 {
                     _sessionEditController.TryParkSessionEdits(item.Id, item.SessionEdits);
@@ -622,7 +646,7 @@ namespace TxtAIEditor.Controls
                 _stopAgent(runningSessionId);
             }
 
-            if (closedVisibleSession)
+            if (closedVisibleSession || (closeAll && IsPendingClose(_currentSessionIdProvider())))
             {
                 var next = _openSessions.FirstOrDefault(item => !IsPendingClose(item.Id));
                 if (next == null)

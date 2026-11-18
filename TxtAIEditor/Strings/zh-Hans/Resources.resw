@@ -2956,6 +2956,7 @@
     <value>会话历史记录已加载</value>
   </data>
   <data name="AgentSessionLoadFailedFormat" xml:space="preserve"><value>无法加载会话：{0}</value></data>
+  <data name="AgentHistoryMissingOrchestrator" xml:space="preserve"><value>协调器 · 无对话记录</value></data>
   <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
     <value>新标签页</value>
   </data>
@@ -3623,6 +3624,7 @@
   <data name="AgentOpenSessionsTitle" xml:space="preserve">
     <value>公开会议</value>
   </data>
+  <data name="AgentOpenSessionsCloseAllText" xml:space="preserve"><value>全部关闭</value></data>
   <data name="AgentOpenSessionsEmptyText" xml:space="preserve">
     <value>没有公开会议</value>
   </data>

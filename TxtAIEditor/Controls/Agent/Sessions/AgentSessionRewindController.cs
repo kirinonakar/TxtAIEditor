@@ -11,6 +11,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, AgentOpenSessionState> _ensureOpenSession;
         private readonly Action<AgentOpenSessionState> _restoreOpenSession;
         private readonly Action<AgentOpenSessionState> _clearThinkingState;
+        private readonly Action<AgentOpenSessionState> _finishRewinding;
         private readonly AgentSessionEditController _sessionEditController;
         private readonly AgentHistoryController _historyController;
         private readonly AgentDisplayLocalizer _displayText;
@@ -24,6 +25,7 @@ namespace TxtAIEditor.Controls
             Func<string, AgentOpenSessionState> ensureOpenSession,
             Action<AgentOpenSessionState> restoreOpenSession,
             Action<AgentOpenSessionState> clearThinkingState,
+            Action<AgentOpenSessionState> finishRewinding,
             AgentSessionEditController sessionEditController,
             AgentHistoryController historyController,
             AgentDisplayLocalizer displayText,
@@ -36,6 +38,7 @@ namespace TxtAIEditor.Controls
             _ensureOpenSession = ensureOpenSession;
             _restoreOpenSession = restoreOpenSession;
             _clearThinkingState = clearThinkingState;
+            _finishRewinding = finishRewinding;
             _sessionEditController = sessionEditController;
             _historyController = historyController;
             _displayText = displayText;
@@ -78,7 +81,7 @@ namespace TxtAIEditor.Controls
                 }
                 finally
                 {
-                    session.IsRewinding = false;
+                    _finishRewinding(session);
                 }
             }
             catch (Exception ex)

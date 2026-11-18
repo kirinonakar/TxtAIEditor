@@ -140,9 +140,28 @@ namespace TxtAIEditor.Controls
 
         public void UpdateUI(string currentSessionId)
         {
-            var viewModels = AgentHistoryStore.GroupEntries(_store.Entries)
-                .SelectMany(group => group.OrderBy(item => item.Id != group.Key))
-                .Select(h =>
+            var viewModels = BuildHistoryItems(_store.Entries).ToList();
+            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            {
+                _agentPane.UpdateHistoryItems(viewModels, currentSessionId);
+            });
+        }
+
+        internal static IEnumerable<AgentHistoryItemViewModel> BuildHistoryItems(IEnumerable<AgentHistoryEntry> entries)
+        {
+            foreach (var group in AgentHistoryStore.GroupEntries(entries))
+            {
+                if (!group.Any(entry => entry.Id == group.Key))
+                {
+                    yield return new AgentHistoryItemViewModel
+                    {
+                        Id = group.Key,
+                        IsMissingOrchestrator = true,
+                        TimeText = group.First().Timestamp.ToString("MM-dd HH:mm")
+                    };
+                }
+
+                foreach (var h in group.OrderBy(item => item.Id != group.Key))
                 {
                     string prefix = string.Empty;
                     if (!string.IsNullOrWhiteSpace(h.WorkspaceRoot))
@@ -158,20 +177,15 @@ namespace TxtAIEditor.Controls
                         }
                         catch { }
                     }
-                    return new AgentHistoryItemViewModel
+                    yield return new AgentHistoryItemViewModel
                     {
                         Id = h.Id,
                         OrchestratorSessionId = h.Role == AgentSessionRole.Subagent ? h.OrchestratorSessionId : null,
                         Title = $"{AgentSessionLabels.Prefix(h.Role)}{prefix}{h.Title}",
                         TimeText = h.Timestamp.ToString("MM-dd HH:mm")
                     };
-                })
-                .ToList();
-
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
-            {
-                _agentPane.UpdateHistoryItems(viewModels, currentSessionId);
-            });
+                }
+            }
         }
 
         public static string ExtractLastAgentResponse(string historyText)

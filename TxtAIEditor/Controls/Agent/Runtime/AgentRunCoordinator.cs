@@ -447,6 +447,19 @@ namespace TxtAIEditor.Controls
                 transcript.DisplayText = initialTranscript + conversationTurn.Trim() + Environment.NewLine;
                 transcript.ModelText = transcript.DisplayText;
 
+                if (orchestration != null)
+                {
+                    try
+                    {
+                        await _sessionHistoryCoordinator.EnsureOrchestratorHistoryAsync(
+                            activeOpenSession, runContext, conversationTurn, transcript, initialTranscript);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to save orchestrator checkpoint: {ex.Message}");
+                    }
+                }
+
                 bool completed = false;
                 var retries = new AgentStepRetryPolicy();
                 bool planningMode = runContext.IsPlanningMode;
@@ -719,32 +732,38 @@ namespace TxtAIEditor.Controls
             {
                 if (orchestration != null)
                 {
-                    using (orchestration)
+                    try
                     {
-                        var delayedWorkers = await orchestration.StopAsync();
-                        foreach (var worker in delayedWorkers)
+                        using (orchestration)
                         {
-                            _openSessionController.MarkSubagentShutdownPending(runContext.SessionId, worker.AgentId);
-                            if (_runningSessions.TryGetValue(worker.AgentId, out AgentRunContext? delayed))
+                            var delayedWorkers = await orchestration.StopAsync();
+                            foreach (var worker in delayedWorkers)
                             {
-                                if (delayed.Cancellation is { IsCancellationRequested: false } source)
+                                _openSessionController.MarkSubagentShutdownPending(runContext.SessionId, worker.AgentId);
+                                if (_runningSessions.TryGetValue(worker.AgentId, out AgentRunContext? delayed))
                                 {
-                                    _ = RequestRunCancellationAsync(source);
+                                    if (delayed.Cancellation is { IsCancellationRequested: false } source)
+                                    {
+                                        _ = RequestRunCancellationAsync(source);
+                                    }
+                                    _ = _runOutputController.AppendSubagentProgressAsync(delayed, _getString("AgentSubagentShutdownDelayed",
+                                        "종료 요청 후에도 작업이 정리 중입니다."));
                                 }
-                                _ = _runOutputController.AppendSubagentProgressAsync(delayed, _getString("AgentSubagentShutdownDelayed",
-                                    "종료 요청 후에도 작업이 정리 중입니다."));
+                                _ = ObserveSubagentShutdownAsync(worker);
                             }
-                            _ = ObserveSubagentShutdownAsync(worker);
                         }
-                        string progressLog = orchestration.DrainProgressLog();
-                        if (progressLog.Length > 0)
-                        {
-                            AgentRunTranscriptRecorder.AppendLine(runContext, progressLog);
-                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to finish subagent shutdown: {ex.Message}");
+                    }
+                    string progressLog = orchestration.DrainProgressLog();
+                    if (progressLog.Length > 0)
+                    {
+                        AgentRunTranscriptRecorder.AppendLine(runContext, progressLog);
                     }
                 }
 
-                await _uiDispatcher.RunAsync(async () => await _runOutputController.FinishStreamToTabAsync(runContext));
                 activeOpenSession.SessionHistoryText = runContext.SessionHistory.ToString();
                 activeOpenSession.ModelSessionHistoryText = runContext.ModelSessionHistory.ToString();
                 activeOpenSession.SessionHistoryTokenCount = runContext.SessionHistoryTokenCount;
@@ -765,6 +784,14 @@ namespace TxtAIEditor.Controls
                         await _runOutputController.AppendRunOutputLineAsync(runContext, string.Format(
                             _getString("AgentActivityHistorySaveFailedFormat", "히스토리 저장 실패: {0}"), ex.Message));
                     }
+                }
+                try
+                {
+                    await _uiDispatcher.RunAsync(async () => await _runOutputController.FinishStreamToTabAsync(runContext));
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to finish streaming agent output: {ex.Message}");
                 }
                 if (runContext.RewindSnapshot is { } snapshot)
                 {

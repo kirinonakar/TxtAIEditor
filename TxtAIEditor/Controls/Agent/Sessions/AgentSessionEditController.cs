@@ -207,7 +207,7 @@ namespace TxtAIEditor.Controls
                     {
                         if (root != null)
                         {
-                            root.IsRewinding = false;
+                            _openSessions.FinishRewinding(root);
                         }
                     }
                 }

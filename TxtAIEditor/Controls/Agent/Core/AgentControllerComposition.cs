@@ -237,6 +237,7 @@ namespace TxtAIEditor.Controls
                 openSessionController.EnsureSession,
                 openSessionController.RestoreSession,
                 openSessionController.ClearThinkingState,
+                openSessionController.FinishRewinding,
                 sessionEditController,
                 historyController,
                 displayText,

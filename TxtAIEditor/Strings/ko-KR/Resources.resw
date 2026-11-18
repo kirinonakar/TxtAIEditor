@@ -2956,6 +2956,7 @@
     <value>세션 히스토리 로드됨</value>
   </data>
   <data name="AgentSessionLoadFailedFormat" xml:space="preserve"><value>세션을 불러오지 못했습니다: {0}</value></data>
+  <data name="AgentHistoryMissingOrchestrator" xml:space="preserve"><value>오케스트레이터 · 대화 기록 없음</value></data>
   <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
     <value>새 탭에 입력</value>
   </data>
@@ -3665,6 +3666,7 @@
   <data name="AgentOpenSessionsTitle" xml:space="preserve">
     <value>열린 세션</value>
   </data>
+  <data name="AgentOpenSessionsCloseAllText" xml:space="preserve"><value>모두 닫기</value></data>
   <data name="AgentOpenSessionsEmptyText" xml:space="preserve">
     <value>열린 세션 없음</value>
   </data>

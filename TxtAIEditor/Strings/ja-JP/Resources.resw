@@ -2956,6 +2956,7 @@
     <value>セッション履歴がロードされました</value>
   </data>
   <data name="AgentSessionLoadFailedFormat" xml:space="preserve"><value>セッションを読み込めませんでした: {0}</value></data>
+  <data name="AgentHistoryMissingOrchestrator" xml:space="preserve"><value>オーケストレーター · 会話履歴なし</value></data>
   <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
     <value>新規タブに入力</value>
   </data>
@@ -3623,6 +3624,7 @@
   <data name="AgentOpenSessionsTitle" xml:space="preserve">
     <value>開いているセッション</value>
   </data>
+  <data name="AgentOpenSessionsCloseAllText" xml:space="preserve"><value>すべて閉じる</value></data>
   <data name="AgentOpenSessionsEmptyText" xml:space="preserve">
     <value>開いているセッションはありません</value>
   </data>

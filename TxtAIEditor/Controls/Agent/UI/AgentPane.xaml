@@ -186,11 +186,19 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
-                                <TextBlock x:Name="AgentOpenSessionsTitleText"
-                                           Grid.Row="0"
-                                           Text="열린 세션"
-                                           FontWeight="SemiBold"
-                                           FontSize="12"/>
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+                                    <TextBlock x:Name="AgentOpenSessionsTitleText"
+                                               Text="열린 세션"
+                                               VerticalAlignment="Center"
+                                               FontWeight="SemiBold"
+                                               FontSize="12"/>
+                                    <Button x:Name="AgentCloseAllOpenSessionsButton"
+                                            Style="{StaticResource AgentButtonStyle}"
+                                            Height="28"
+                                            Padding="8,0"
+                                            FontSize="11"
+                                            Click="OnAgentCloseAllOpenSessionsClick"/>
+                                </StackPanel>
                                 <MenuFlyoutSeparator Grid.Row="1"/>
                                 <ScrollViewer Grid.Row="2" MaxHeight="300" VerticalScrollBarVisibility="Auto">
                                     <StackPanel x:Name="AgentOpenSessionsListPanel"/>

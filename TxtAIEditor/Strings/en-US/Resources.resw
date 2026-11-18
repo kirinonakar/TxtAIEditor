@@ -2956,6 +2956,7 @@ Plan: {0}</value>
     <value>Session history loaded</value>
   </data>
   <data name="AgentSessionLoadFailedFormat" xml:space="preserve"><value>Could not load session: {0}</value></data>
+  <data name="AgentHistoryMissingOrchestrator" xml:space="preserve"><value>Orchestrator · Transcript unavailable</value></data>
   <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
     <value>New Tab</value>
   </data>
@@ -3665,6 +3666,7 @@ Plan: {0}</value>
   <data name="AgentOpenSessionsTitle" xml:space="preserve">
     <value>Open sessions</value>
   </data>
+  <data name="AgentOpenSessionsCloseAllText" xml:space="preserve"><value>Close all</value></data>
   <data name="AgentOpenSessionsEmptyText" xml:space="preserve">
     <value>No open sessions</value>
   </data>

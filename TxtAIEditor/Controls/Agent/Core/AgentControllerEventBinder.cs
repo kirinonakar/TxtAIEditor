@@ -40,6 +40,7 @@ namespace TxtAIEditor.Controls
             };
             agentPane.OpenSessionSelected += (_, sessionId) => openSessionController.SwitchSession(sessionId);
             agentPane.OpenSessionClosed += (_, sessionId) => openSessionController.CloseSession(sessionId);
+            agentPane.AllOpenSessionsClosed += (_, _) => openSessionController.CloseAllSessions();
             agentPane.HistorySelected += (_, historyId) => sessionHistoryCoordinator.LoadHistorySession(historyId);
             agentPane.HistoryDeleted += async (_, historyId) => await sessionHistoryCoordinator.DeleteHistorySessionAsync(historyId);
             agentPane.HistoryToolbarSaveClicked += async (_, _) => await sessionHistoryCoordinator.SaveCurrentVerboseHistoryAsync();

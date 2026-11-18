@@ -367,7 +367,11 @@ namespace TxtAIEditor.Controls
 
                 bool isSelected = string.Equals(_selectedHistoryId, item.Id, StringComparison.Ordinal);
                 string currentId = item.Id;
-                string title = $"{item.Title} ({item.TimeText})";
+                string sessionTitle = item.IsMissingOrchestrator
+                    ? AgentSessionLabels.Prefix(AgentSessionRole.Orchestrator) +
+                        _getString("AgentHistoryMissingOrchestrator", "오케스트레이터 · 대화 기록 없음")
+                    : item.Title;
+                string title = $"{sessionTitle} ({item.TimeText})";
                 var selectButton = new Button
                 {
                     Content = new TextBlock
@@ -406,6 +410,7 @@ namespace TxtAIEditor.Controls
                     VerticalAlignment = VerticalAlignment.Center,
                     Padding = new Thickness(0),
                     Style = buttonStyle,
+                    Visibility = item.IsMissingOrchestrator ? Visibility.Collapsed : Visibility.Visible,
                     IsEnabled = !_isBusy
                 };
                 ToolTipService.SetToolTip(deleteButton, _getString("AgentHistoryDeleteText", "삭제"));
