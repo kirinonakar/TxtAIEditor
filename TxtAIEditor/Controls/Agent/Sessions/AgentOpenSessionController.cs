@@ -180,7 +180,10 @@ namespace TxtAIEditor.Controls
             _openSessions.FirstOrDefault(item => string.Equals(item.Id, sessionId, StringComparison.Ordinal));
 
         public IEnumerable<string> GetOpenSubagentSessionIds(string parentId) =>
-            _openSessions.Where(item => item.OrchestratorSessionId == parentId).Select(item => item.Id);
+            GetOpenSubagentSessions(parentId).Select(item => item.Id);
+
+        public IEnumerable<AgentOpenSessionState> GetOpenSubagentSessions(string parentId) =>
+            _openSessions.Where(item => item.Role == AgentSessionRole.Subagent && item.OrchestratorSessionId == parentId);
 
         public bool IsMcpServerInOpenSession(string id) => _openSessions.Any(session => session.Selections.McpServers.Contains(id));
 

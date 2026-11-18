@@ -395,12 +395,18 @@ namespace TxtAIEditor.Controls
                 {
                     EditorSettings config = _settingsService.CurrentSettings;
                     EditorSettings workerSettings = CreateSubagentSettings(runContext.LlmSettings, config);
-                    var workerSessions = new Dictionary<string, AgentOpenSessionState>();
+                    var workerSessions = _openSessionController.GetOpenSubagentSessions(runContext.SessionId)
+                        .Where(session => !_openSessionController.IsPendingClose(session.Id))
+                        .ToDictionary(session => session.Id, StringComparer.Ordinal);
                     orchestration = new AgentSubagentCoordinator(
                         Math.Clamp(config.LlmMaxSubagents, 1, EditorSettings.MaxSubagentLimit),
                         (id, title, instruction, inbox, progress, token) =>
                         {
                             token.ThrowIfCancellationRequested();
+                            if (_openSessionController.IsSessionRunning(id) || _openSessionController.HasPendingSubagentShutdown(id))
+                            {
+                                throw new InvalidOperationException("The previous subagent assignment is still shutting down. Retry the follow-up once it finishes.");
+                            }
                             workerSessions.TryGetValue(id, out AgentOpenSessionState? previousState);
                             var workerSession = _openSessionController.EnsureSession(id, previousState);
                             _openSessionController.RestoreSessionBody(workerSession);
@@ -411,14 +417,15 @@ namespace TxtAIEditor.Controls
                             if (previousState == null)
                             {
                                 workerSession.Selections = runContext.Selections.Copy();
-                                runContext.RewindSnapshot?.SubagentSessionIds.Add(id);
                             }
+                            runContext.RewindSnapshot?.RecordSubagent(workerSession, isNewSession: previousState == null);
                             return RunSubagentAsync(runContext, workerSettings, currentRunActiveTab, currentRunSelectionSnapshot,
                                 workerSession, instruction, inbox, progress, token);
                         },
                         message => _runOutputController.AppendRunActivityAsync(runContext, message),
                         _getString,
-                        cancellationToken);
+                        cancellationToken,
+                        workerSessions.Values.Select(session => (session.Id, session.Title)));
                 }
 
                 runContext.StreamToTabTargetTabId = currentRunActiveTab?.Id;

@@ -230,9 +230,17 @@ namespace TxtAIEditor.Controls
         public Task RevertRunAsync(string sessionId, AgentSessionRewindSnapshot snapshot)
         {
             var priorEdits = snapshot.SessionEdits.Select(edit => edit.CommitOrder).ToHashSet();
-            var currentRunOwners = snapshot.SubagentSessionIds.Append(sessionId);
+            var currentRunOwners = snapshot.SubagentSessionIds.Concat(snapshot.SubagentInitialEditOrders.Keys).Append(sessionId);
             return RevertEditsAsync(GetOrderedEdits(currentRunOwners).Where(edit =>
-                edit.SessionId != sessionId || (edit.Preview.CommitOrder != 0 && !priorEdits.Contains(edit.Preview.CommitOrder))).Reverse());
+            {
+                long order = edit.Preview.CommitOrder;
+                if (edit.SessionId == sessionId)
+                {
+                    return order != 0 && !priorEdits.Contains(order);
+                }
+                return !snapshot.SubagentInitialEditOrders.TryGetValue(edit.SessionId, out var workerPriorEdits) ||
+                    !workerPriorEdits.Contains(order);
+            }).Reverse());
         }
 
         private async Task RevertEditsAsync(IEnumerable<RecordedEdit> edits)

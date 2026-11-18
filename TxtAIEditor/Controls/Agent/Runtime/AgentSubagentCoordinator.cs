@@ -35,10 +35,10 @@ namespace TxtAIEditor.Controls
         [
             CreateTool("spawn_subagent", "Start a background task and return its agent ID.",
                 new { title = Text("Short session title"), instruction = Text("Task, scope, and expected result") }, "title", "instruction"),
-            CreateTool("send_subagent_message", "Message a running subagent or start a follow-up in its session.",
+            CreateTool("send_subagent_message", "Message a running subagent or continue an existing session with its conversation history.",
                 new { agentId = Text("Subagent ID"), instruction = Text("Message or follow-up task") }, "agentId", "instruction"),
             CreateTool("cancel_subagent", "Request subagent cancellation.", new { agentId = Text("Subagent ID") }, "agentId"),
-            CreateTool("subagent_status", "List current subagent statuses.", new { }),
+            CreateTool("subagent_status", "List subagent IDs and statuses, including sessions from earlier turns.", new { }),
             CreateTool(WaitTool, "Wait for a completion. Omit agentId for the next available result.",
                 new
                 {
@@ -71,6 +71,8 @@ namespace TxtAIEditor.Controls
         private readonly CancellationTokenSource _cancellation;
         private readonly Dictionary<string, Worker> _workers = new(StringComparer.Ordinal);
         private readonly List<WorkerTurn> _turns = new();
+        private readonly bool _hasExistingWorkers;
+        private int _assignedWorkerCount;
         private readonly ConcurrentQueue<string> _progressLog = new();
         private readonly object _eventGate = new();
         private readonly List<WorkerReport> _pendingReports = new();
@@ -88,6 +90,7 @@ namespace TxtAIEditor.Controls
             Func<string, Task> publishProgress,
             Func<string, string, string> getString,
             CancellationToken cancellationToken,
+            IEnumerable<(string Id, string Title)> existingWorkers,
             TimeSpan? stopTimeout = null)
         {
             _limit = limit;
@@ -96,6 +99,11 @@ namespace TxtAIEditor.Controls
             _getString = getString;
             _cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             _stopTimeout = stopTimeout ?? TimeSpan.FromSeconds(10);
+            foreach (var (id, title) in existingWorkers)
+            {
+                _workers.Add(id, new Worker(id, title, isExisting: true));
+            }
+            _hasExistingWorkers = _workers.Count > 0;
         }
 
         public bool HasUncollectedResults => _turns.Any(turn => !turn.Delivered);
@@ -124,10 +132,12 @@ namespace TxtAIEditor.Controls
 
         public string BuildInstructions(bool planningMode) => $$"""
             [Orchestrator]
-            Own the task and verify delegated results before finalizing. Give up to {{_limit}} subagents distinct scopes, relevant context, and clear deliverables. Coordinate shared edits and launch independent tasks before waiting.
+            Own the task and verify delegated results before finalizing. Assign up to {{_limit}} distinct subagents per turn. Give them distinct scopes, relevant context, and clear deliverables. Coordinate shared edits and launch independent tasks before waiting.
             Act on [Subagent events] while continuing available work. When blocked on workers, yield a brief response to wait for an event or call wait_subagent for a completion. Address user updates that interrupt a wait.
             Text calls ([arg] is optional): spawn_subagent(title, instruction), send_subagent_message(agentId, instruction), cancel_subagent(agentId), subagent_status(), wait_subagent([agentId], [timeoutSeconds]), read_subagent_result(resultId, [offset], [limit]), list_subagent_reports([agentId], [offset]), report_progress(message).
-            """ + (planningMode ? "\nDelegate only investigation and plan review." : "");
+            """ + (_hasExistingWorkers
+                ? "\nSubagent sessions from earlier turns are available. Use subagent_status to find their IDs and send_subagent_message to continue related work with the same subagent."
+                : "") + (planningMode ? "\nDelegate only investigation and plan review." : "");
 
         public static string BuildWorkerInstructions(bool planningMode) => """
             [Subagent]
@@ -141,6 +151,7 @@ namespace TxtAIEditor.Controls
             _cancellation.Token.ThrowIfCancellationRequested();
             string id = GetStringArgument(arguments, "agentId").Trim();
             string instruction = GetStringArgument(arguments, "instruction").Trim();
+            string limitReached = $"Tool failed: the {_limit}-subagent limit for this turn has been reached. Reuse a subagent already assigned in this turn.";
             switch (name)
             {
                 case "spawn_subagent":
@@ -149,12 +160,12 @@ namespace TxtAIEditor.Controls
                     {
                         return "Tool failed: title and instruction are required.";
                     }
-                    if (_workers.Count >= _limit)
+                    if (_assignedWorkerCount >= _limit)
                     {
-                        return $"Tool failed: the {_limit}-subagent limit has been reached. Reuse an existing subagent for follow-up work.";
+                        return limitReached;
                     }
 
-                    var worker = new Worker(Guid.NewGuid().ToString(), AgentRunTextFormatter.TruncateUserPrompt(title));
+                    var worker = new Worker(Guid.NewGuid().ToString(), AgentRunTextFormatter.TruncateUserPrompt(title), isExisting: false);
                     _workers.Add(worker.Id, worker);
                     Start(worker, instruction);
                     return $"Started subagent {worker.Id} ({worker.Title}).";
@@ -164,9 +175,13 @@ namespace TxtAIEditor.Controls
                     {
                         return "Tool failed: a valid agentId and an instruction are required.";
                     }
-                    if (!recipient.Turn!.Cancellation.IsCancellationRequested && recipient.Turn.Inbox.TryQueue(instruction))
+                    if (recipient.Turn is { } current && !current.Cancellation.IsCancellationRequested && current.Inbox.TryQueue(instruction))
                     {
                         return $"Queued a message for subagent {recipient.Id} ({recipient.Title}).";
+                    }
+                    if (recipient.Turn == null && _assignedWorkerCount >= _limit)
+                    {
+                        return limitReached;
                     }
 
                     WorkerTurn followUp = Start(recipient, instruction);
@@ -192,7 +207,10 @@ namespace TxtAIEditor.Controls
                         ? "No subagents have been started."
                         : string.Join("\n", _workers.Values.Select(item =>
                         {
-                            WorkerTurn turn = item.Turn!;
+                            if (item.Turn is not { } turn)
+                            {
+                                return $"{item.Id} ({item.Title}): Idle. Available for follow-up.";
+                            }
                             WorkerResult? result = turn.Result;
                             string status = result?.Status.ToString() ??
                                 (turn.Cancellation.IsCancellationRequested ? "Cancelling" :
@@ -206,9 +224,16 @@ namespace TxtAIEditor.Controls
                         }));
 
                 case WaitTool:
-                    if (id.Length > 0 && !_workers.ContainsKey(id))
+                    if (id.Length > 0)
                     {
-                        return "Tool failed: unknown subagent ID.";
+                        if (!_workers.TryGetValue(id, out Worker? awaitedWorker))
+                        {
+                            return "Tool failed: unknown subagent ID.";
+                        }
+                        if (awaitedWorker.Turn == null)
+                        {
+                            return "This subagent has no assignment in the current turn.";
+                        }
                     }
                     TimeSpan timeout = Timeout.InfiniteTimeSpan;
                     if (arguments.ValueKind == JsonValueKind.Object && arguments.TryGetProperty("timeoutSeconds", out _))
@@ -381,7 +406,11 @@ namespace TxtAIEditor.Controls
 
         private WorkerTurn Start(Worker worker, string instruction)
         {
-            bool followUp = worker.Turn != null;
+            bool followUp = worker.IsExisting || worker.Turn != null;
+            if (worker.Turn == null)
+            {
+                _assignedWorkerCount++;
+            }
             Task[] pending = _turns.Where(turn => turn.Worker == worker && !turn.Run.IsCompleted).Select(turn => (Task)turn.Run).ToArray();
             var turn = new WorkerTurn(worker, CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token))
             {
@@ -711,10 +740,11 @@ namespace TxtAIEditor.Controls
         private sealed record WorkerReport(string Id, WorkerTurn Turn, string Kind, string Message);
         public sealed record PendingShutdown(string AgentId, Task Completion);
 
-        private sealed class Worker(string id, string title)
+        private sealed class Worker(string id, string title, bool isExisting)
         {
             public string Id { get; } = id;
             public string Title { get; } = title;
+            public bool IsExisting { get; } = isExisting;
             public WorkerTurn? Turn { get; set; }
         }
 

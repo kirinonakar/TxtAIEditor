@@ -249,6 +249,7 @@ namespace TxtAIEditor.Controls
     internal sealed class AgentSessionRewindSnapshot
     {
         public List<string> SubagentSessionIds { get; set; } = new();
+        public Dictionary<string, HashSet<long>> SubagentInitialEditOrders { get; set; } = new(StringComparer.Ordinal);
         public string Title { get; set; } = string.Empty;
         public string PromptText { get; set; } = string.Empty;
         public string OutputText { get; set; } = string.Empty;
@@ -281,6 +282,18 @@ namespace TxtAIEditor.Controls
                 Attachments = CloneAttachments(session.Attachments),
                 SessionEdits = CloneEdits(session.SessionEdits)
             };
+        }
+
+        public void RecordSubagent(AgentOpenSessionState session, bool isNewSession)
+        {
+            if (isNewSession)
+            {
+                SubagentSessionIds.Add(session.Id);
+            }
+            else if (!SubagentSessionIds.Contains(session.Id) && !SubagentInitialEditOrders.ContainsKey(session.Id))
+            {
+                SubagentInitialEditOrders.Add(session.Id, session.SessionEdits.Select(edit => edit.CommitOrder).ToHashSet());
+            }
         }
 
         public List<AgentAttachmentState> CloneAttachments()
