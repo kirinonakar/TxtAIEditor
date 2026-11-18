@@ -17,7 +17,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentMcpConfigurationService _configuration;
         private readonly AgentMcpOAuthService _oauthService;
         private readonly AgentMcpDialogService _dialogService;
-        private readonly ISet<string> _selectedServerIds;
+        private readonly AgentSessionSelectionContext _selections;
         private readonly Action<object> _initializePickerWindow;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
@@ -30,7 +30,7 @@ namespace TxtAIEditor.Controls
             AgentMcpConfigurationService configuration,
             AgentMcpOAuthService oauthService,
             AgentMcpDialogService dialogService,
-            ISet<string> selectedServerIds,
+            AgentSessionSelectionContext selections,
             Action<object> initializePickerWindow,
             Action<string, string> showError,
             Func<string, string, string> getString,
@@ -42,7 +42,7 @@ namespace TxtAIEditor.Controls
             _configuration = configuration;
             _oauthService = oauthService;
             _dialogService = dialogService;
-            _selectedServerIds = selectedServerIds;
+            _selections = selections;
             _initializePickerWindow = initializePickerWindow;
             _showError = showError;
             _getString = getString;
@@ -255,7 +255,7 @@ namespace TxtAIEditor.Controls
             {
                 _credentialStore.DeleteAllCredentials(duplicate);
                 _registry.Servers.Remove(duplicate);
-                _selectedServerIds.Remove(duplicate.Id);
+                _selections.Current.McpServers.Remove(duplicate.Id);
                 _connections.Reset(duplicate.Id);
             }
 

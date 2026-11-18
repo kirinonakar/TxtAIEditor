@@ -232,9 +232,13 @@ namespace TxtAIEditor.Composition
                     (_, tabItem, tabView) => documentModule.CloseRightTabs(tabItem, tabView),
                     (_, tabItem, tabView) => documentModule.CloseLeftTabs(tabItem, tabView),
                     (_, tabItem, tabView) => documentModule.CloseOtherTabs(tabItem, tabView),
+                    documentModule.CloseAllDiffTabs,
                     previewFacade.OpenNotebookSourceTabAsync,
                     previewFacade.OpenNotebookViewerTabAsync,
                     tab => window.OpenTabInNewWindowAsync(tab)));
+            previewModule.Composition.CompareTab.TabRightTapped += (tab, tabItem, args) =>
+                interactionControllers.TabContextMenu.ShowContextMenu(tab, tabItem, ui.EditorTabView, tabItem, args);
+
             var fileOpenDropController = interactionControllers.FileOpenDrop;
             var rootKeyboardShortcutController = interactionControllers.RootKeyboardShortcut;
             var terminalPanelController = interactionControllers.TerminalPanel;

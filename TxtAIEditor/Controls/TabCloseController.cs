@@ -222,6 +222,20 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public void CloseAllDiffTabs()
+        {
+            var diffTabs = _viewModel.Tabs.Where(tab => tab.IsDiffView).ToList();
+            foreach (var tab in diffTabs)
+            {
+                var tabItem = TabNavigationController.FindItem(_editorTabView, tab.Id)
+                    ?? TabNavigationController.FindItem(_editorTabView2, tab.Id);
+                if (tabItem != null)
+                {
+                    CloseAndCleanup(tab, tabItem);
+                }
+            }
+        }
+
         public void CloseAndCleanup(OpenedTab tab, TabViewItem tabItem)
         {
             CloseAndCleanup(tab, tabItem, openReplacementTab: true);

@@ -291,6 +291,11 @@ namespace TxtAIEditor.Controls
 
         internal void CloseMcpSessions()
         {
+            if (_openSessionController.FindOpenSession(_currentSessionId) is { } session)
+            {
+                _historyController.RememberSelections(session.Id, session.Selections);
+            }
+            _historyController.FlushPendingWrites();
             _mcpController.Close();
         }
 

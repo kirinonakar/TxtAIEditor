@@ -32,6 +32,7 @@ namespace TxtAIEditor.Controls
             CancellationToken cancellationToken = runContext.CancellationToken;
             string fixedPromptContext = await uiDispatcher.RunAsync<string>(async () =>
             {
+                using var selectionScope = mcpController.UseSelections(runContext.Selections);
                 await mcpController.ApplyPendingPluginChangesAsync(cancellationToken);
                 AgentWorkspaceFileResolver.VerifyPinnedWorkspace(runContext.WorkspaceRoot, runContext.PinnedWorkspaceRoot);
                 runContext.HasEnabledSkills = skillController.HasSelectedSkills();

@@ -126,36 +126,44 @@ namespace TxtAIEditor.Controls
                 callbacks.IsCurrentSessionRunning,
                 getString,
                 openFileInEditorAsync);
+            var sessionSelections = new AgentSessionSelectionContext();
+            var historyController = new AgentHistoryController(agentPane);
+            void SelectionChanged()
+            {
+                historyController.RememberSelections(currentSessionIdProvider(), sessionSelections.Visible);
+                callbacks.UpdateContextStatsSlow();
+            }
+
             var presetController = new AgentPresetController(
                 agentPane,
+                sessionSelections,
                 initializePickerWindow,
                 showError,
                 getString,
-                callbacks.UpdateContextStatsSlow,
+                SelectionChanged,
                 beforeDialog,
                 afterDialog);
             var skillController = new AgentSkillController(
                 agentPane,
+                sessionSelections,
                 getString,
-                callbacks.UpdateContextStatsSlow);
+                SelectionChanged);
             var mcpController = new AgentMcpController(
                 agentPane,
+                sessionSelections,
                 initializePickerWindow,
                 settingsService,
                 credentialService,
                 showError,
                 getString,
-                callbacks.UpdateContextStatsSlow,
+                SelectionChanged,
                 () => fileTools.WorkspaceRoot,
                 fileModifiedAsync,
                 beforeDialog,
                 afterDialog,
                 skillController,
                 callbacks.AddCurrentRunImageToolAttachment,
-                skillController.SetActivePluginSkills,
-                skillController.GetInstalledSkillOptionsAsync,
-                skillController.SetBuiltInRelatedSkills);
-            var historyController = new AgentHistoryController(agentPane);
+                skillController.GetInstalledSkillOptionsAsync);
             var sessionEditController = new AgentSessionEditController(
                 agentPane,
                 async action => await uiDispatcher.RunAsync<bool>(async () =>
@@ -179,6 +187,9 @@ namespace TxtAIEditor.Controls
                 attachmentController,
                 sessionEditController,
                 historyController,
+                sessionSelections,
+                presetController,
+                mcpController,
                 displayText,
                 runningSessions,
                 currentSessionIdProvider,
@@ -192,6 +203,7 @@ namespace TxtAIEditor.Controls
                 AppBadgeNotificationService.UpdateBadge,
                 getString,
                 navigateToFolderAsync);
+            sessionSelections.IsMcpServerInOpenSession = openSessionController.IsMcpServerInOpenSession;
             sessionEditController.BindOpenSessions(openSessionController);
             var sessionHistoryCoordinator = new AgentSessionHistoryCoordinator(
                 agentPane,

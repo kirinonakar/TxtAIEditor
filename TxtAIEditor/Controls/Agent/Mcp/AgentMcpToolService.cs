@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -16,19 +17,22 @@ namespace TxtAIEditor.Controls
         private readonly AgentMcpRegistry _registry;
         private readonly AgentMcpConnectionService _connections;
         private readonly AgentMcpCredentialStore _credentialStore;
-        private readonly ISet<string> _selectedServerIds;
+        private readonly AgentSessionSelectionContext _selections;
+        private HashSet<string> _selectedServerIds => _selections.Current.McpServers;
         private readonly AgentMcpPluginManagerTool _pluginManagerTool;
         private readonly AgentMcpComfyUiTool _comfyUiTool;
         private readonly AgentMcpBrowserUseTool _browserUseTool;
         private readonly ISettingsService _settingsService;
         private readonly Action<LlmMessageAttachment>? _addImageAttachment;
-        private readonly Dictionary<string, AgentMcpToolAlias> _toolAliases = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConditionalWeakTable<AgentSessionSelections, Dictionary<string, AgentMcpToolAlias>> _aliasesBySession = new();
+        private Dictionary<string, AgentMcpToolAlias> _toolAliases => _aliasesBySession.GetValue(_selections.Current,
+            _ => new(StringComparer.OrdinalIgnoreCase));
 
         public AgentMcpToolService(
             AgentMcpRegistry registry,
             AgentMcpConnectionService connections,
             AgentMcpCredentialStore credentialStore,
-            ISet<string> selectedServerIds,
+            AgentSessionSelectionContext selections,
             AgentMcpPluginManagerTool pluginManagerTool,
             AgentMcpComfyUiTool comfyUiTool,
             AgentMcpBrowserUseTool browserUseTool,
@@ -38,7 +42,7 @@ namespace TxtAIEditor.Controls
             _registry = registry;
             _connections = connections;
             _credentialStore = credentialStore;
-            _selectedServerIds = selectedServerIds;
+            _selections = selections;
             _pluginManagerTool = pluginManagerTool;
             _comfyUiTool = comfyUiTool;
             _browserUseTool = browserUseTool;

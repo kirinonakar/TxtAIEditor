@@ -234,7 +234,6 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="AgentHistoryTitleText"
                                            Grid.Column="0"
-                                           Text="세션 히스토리 (최근 20개)"
                                            FontWeight="SemiBold"
                                            FontSize="12"
                                            VerticalAlignment="Center"/>
@@ -260,7 +259,7 @@
                                 </Button>
                             </Grid>
                             <ScrollViewer Grid.Row="1" MaxHeight="300" VerticalScrollBarVisibility="Auto">
-                                <StackPanel x:Name="AgentHistoryListPanel" Spacing="4"/>
+                                <StackPanel x:Name="AgentHistoryListPanel"/>
                             </ScrollViewer>
                         </Grid>
                     </Flyout>
@@ -321,15 +320,16 @@
                       Padding="10"
                       CornerRadius="4"
                       ViewChanged="OnAgentOutputScrollViewerViewChanged">
-            <RichTextBlock x:Name="AgentOutputText"
-                           TextWrapping="Wrap"
-                           FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol"
-                           FontSize="13"
-                           Foreground="{ThemeResource AgentOutputForeground}"
-                           IsTextSelectionEnabled="True"
-                           Padding="0"
-                           DoubleTapped="OnOutputDoubleTapped"
-                           KeyDown="OnOutputTextKeyDown"/>
+            <ItemsRepeater x:Name="AgentOutputPages" VerticalCacheLength="1">
+                <ItemsRepeater.ItemTemplate>
+                    <DataTemplate>
+                        <RichTextBlock TextWrapping="Wrap"
+                                       Foreground="{ThemeResource AgentOutputForeground}"
+                                       IsTextSelectionEnabled="True"
+                                       MinHeight="1"/>
+                    </DataTemplate>
+                </ItemsRepeater.ItemTemplate>
+            </ItemsRepeater>
         </ScrollViewer>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">

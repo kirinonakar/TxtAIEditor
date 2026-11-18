@@ -123,6 +123,14 @@ namespace TxtAIEditor.Controls
             _serverStatus.Remove(serverId);
         }
 
+        public void StopIfUnused(string serverId)
+        {
+            if (!_isSelected(serverId))
+            {
+                Stop(serverId);
+            }
+        }
+
         public void Dispose()
         {
             foreach (var operation in _serverStartOperations.Values)

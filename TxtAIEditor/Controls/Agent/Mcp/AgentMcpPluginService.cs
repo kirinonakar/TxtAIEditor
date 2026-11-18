@@ -18,8 +18,9 @@ namespace TxtAIEditor.Controls
         private readonly AgentMcpRegistry _registry;
         private readonly AgentMcpConnectionService _connections;
         private readonly AgentMcpCredentialStore _credentialStore;
-        private readonly ISet<string> _selectedServerIds;
-        private readonly HashSet<string> _selectedAgentPluginIds = new(StringComparer.OrdinalIgnoreCase);
+        private readonly AgentSessionSelectionContext _selections;
+        private HashSet<string> _selectedServerIds => _selections.Current.McpServers;
+        private HashSet<string> _selectedAgentPluginIds => _selections.Current.McpPlugins;
         private readonly SemaphoreSlim _installGate = new(1, 1);
         private readonly AgentMcpDialogService _dialogService;
         private readonly Action<object> _initializePickerWindow;
@@ -29,7 +30,6 @@ namespace TxtAIEditor.Controls
         private readonly Action _rebuildAliases;
         private readonly Action _updateUI;
         private readonly AgentSkillController _skillController;
-        private readonly Action<IReadOnlyList<AgentPluginSkill>>? _activePluginSkillsChanged;
 
         public bool HasSelectedPlugins => _selectedAgentPluginIds.Count > 0;
 
@@ -37,7 +37,7 @@ namespace TxtAIEditor.Controls
             AgentMcpRegistry registry,
             AgentMcpConnectionService connections,
             AgentMcpCredentialStore credentialStore,
-            ISet<string> selectedServerIds,
+            AgentSessionSelectionContext selections,
             AgentMcpDialogService dialogService,
             Action<object> initializePickerWindow,
             Action<string, string> showError,
@@ -45,13 +45,12 @@ namespace TxtAIEditor.Controls
             Func<Task> saveAsync,
             Action rebuildAliases,
             Action updateUI,
-            AgentSkillController skillController,
-            Action<IReadOnlyList<AgentPluginSkill>>? activePluginSkillsChanged)
+            AgentSkillController skillController)
         {
             _registry = registry;
             _connections = connections;
             _credentialStore = credentialStore;
-            _selectedServerIds = selectedServerIds;
+            _selections = selections;
             _dialogService = dialogService;
             _initializePickerWindow = initializePickerWindow;
             _showError = showError;
@@ -60,7 +59,6 @@ namespace TxtAIEditor.Controls
             _rebuildAliases = rebuildAliases;
             _updateUI = updateUI;
             _skillController = skillController;
-            _activePluginSkillsChanged = activePluginSkillsChanged;
         }
 
         public void PruneSelection()
@@ -587,7 +585,7 @@ namespace TxtAIEditor.Controls
             foreach (AgentMcpServer server in GetPluginServers(plugin))
             {
                 _selectedServerIds.Remove(server.Id);
-                _connections.Stop(server.Id);
+                _connections.StopIfUnused(server.Id);
             }
 
             NotifyActivePluginSkills();
@@ -598,6 +596,7 @@ namespace TxtAIEditor.Controls
             DeactivateAgentPlugin(plugin);
             foreach (AgentMcpServer server in GetPluginServers(plugin).ToList())
             {
+                _connections.Stop(server.Id);
                 _credentialStore.DeleteAllCredentials(server);
                 _registry.Servers.Remove(server);
             }
@@ -615,7 +614,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public void NotifyActivePluginSkills()
+        public void NotifyActivePluginSkills(bool preserveOverrides = false)
         {
             _skillController.SetInstalledPluginSkills(_registry.Plugins.SelectMany(plugin =>
                 plugin.Skills.Select(skill => new AgentPluginSkill
@@ -624,11 +623,6 @@ namespace TxtAIEditor.Controls
                     Description = skill.Description,
                     SkillFilePath = skill.SkillFilePath
                 })));
-
-            if (_activePluginSkillsChanged == null)
-            {
-                return;
-            }
 
             var activeSkills = new List<AgentPluginSkill>();
             foreach (AgentPluginPackage plugin in _registry.Plugins.Where(plugin =>
@@ -642,7 +636,7 @@ namespace TxtAIEditor.Controls
                 }));
             }
 
-            _activePluginSkillsChanged(activeSkills);
+            _skillController.SetActivePluginSkills(activeSkills, preserveOverrides);
         }
 
         public List<AgentMcpServer> GetPluginServers(AgentPluginPackage plugin)

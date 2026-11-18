@@ -108,6 +108,9 @@ namespace TxtAIEditor.Composition
         public void CloseOtherTabs(TabViewItem tabItem, TabView tabView) =>
             _controllers.TabClose.CloseOtherTabs(tabItem, tabView);
 
+        public void CloseAllDiffTabs() =>
+            _controllers.TabClose.CloseAllDiffTabs();
+
         public void SetAdditionalTabCleanup(Action<string> cleanup) =>
             _controllers.TabClose.SetAdditionalTabCleanup(cleanup);
 

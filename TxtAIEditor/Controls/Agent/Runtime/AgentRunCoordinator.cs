@@ -181,6 +181,7 @@ namespace TxtAIEditor.Controls
             {
                 return;
             }
+            using var selectionScope = _mcpController.UseSelections(activeOpenSession.Selections);
   
             var settings = _settingsService.CurrentSettings;
 
@@ -265,6 +266,7 @@ namespace TxtAIEditor.Controls
             var context = new AgentRunContext
             {
                 SessionId = session.Id,
+                Selections = session.Selections,
                 SessionHistoryTokenCount = session.SessionHistoryTokenCount,
                 Attachments = session.Attachments.ToList(),
                 SessionEdits = session.SessionEdits.ToList(),
@@ -300,6 +302,8 @@ namespace TxtAIEditor.Controls
             session.WorkspaceRoot = parent.WorkspaceRoot;
             session.LlmSettings = workerSettings;
             session.Attachments = parent.Attachments.ToList();
+            using var selectionScope = _mcpController.UseSelections(session.Selections);
+            _mcpController.RefreshSessionSelection();
             var context = CreateRunContext(session, workerSettings, instruction);
             context.PinnedWorkspaceRoot = parent.PinnedWorkspaceRoot;
             context.IsPlanResearch = parent.IsPlanningMode;
@@ -320,6 +324,7 @@ namespace TxtAIEditor.Controls
             CancellationToken parentCancellation = default)
         {
             string userInstruction = runContext.OriginalUserInstruction;
+            using var selectionScope = _mcpController.UseSelections(runContext.Selections);
             bool isSubagent = activeOpenSession.Role == AgentSessionRole.Subagent;
             using var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(parentCancellation);
             runContext.Cancellation = cancellationSource;
@@ -398,12 +403,14 @@ namespace TxtAIEditor.Controls
                             token.ThrowIfCancellationRequested();
                             workerSessions.TryGetValue(id, out AgentOpenSessionState? previousState);
                             var workerSession = _openSessionController.EnsureSession(id, previousState);
+                            _openSessionController.RestoreSessionBody(workerSession);
                             workerSession.Role = AgentSessionRole.Subagent;
                             workerSession.OrchestratorSessionId = runContext.SessionId;
                             workerSession.Title = title;
                             workerSessions[id] = workerSession;
                             if (previousState == null)
                             {
+                                workerSession.Selections = runContext.Selections.Copy();
                                 runContext.RewindSnapshot?.SubagentSessionIds.Add(id);
                             }
                             return RunSubagentAsync(runContext, workerSettings, currentRunActiveTab, currentRunSelectionSnapshot,
@@ -759,6 +766,11 @@ namespace TxtAIEditor.Controls
                             _getString("AgentActivityHistorySaveFailedFormat", "히스토리 저장 실패: {0}"), ex.Message));
                     }
                 }
+                if (runContext.RewindSnapshot is { } snapshot)
+                {
+                    await activeOpenSession.RewindSnapshots.ArchiveAsync(snapshot);
+                    runContext.RewindSnapshot = null;
+                }
                 _activeWorkspaceRunContext.Value = null;
                 activeOpenSession.IsRunning = false;
                 _runningSessions.Remove(runContext.SessionId);
@@ -807,7 +819,7 @@ namespace TxtAIEditor.Controls
             if (!string.IsNullOrWhiteSpace(approvedPlanExecutionPrompt))
             {
                 await StartApprovedPlanSessionAsync(approvedPlanExecutionPrompt, approvedPlanWorkspaceRoot,
-                    runContext.PinnedWorkspaceRoot, useSubagents);
+                    runContext.PinnedWorkspaceRoot, useSubagents, runContext.Selections);
             }
 
             string? pendingFollowUp = runContext.FollowUps.Take(out _);
@@ -871,7 +883,7 @@ namespace TxtAIEditor.Controls
         }
 
         private async Task StartApprovedPlanSessionAsync(string executionPrompt, string workspaceRoot,
-            string? workspacePin, bool useSubagents)
+            string? workspacePin, bool useSubagents, AgentSessionSelections selections)
         {
             await _uiDispatcher.RunAsync(() =>
             {
@@ -894,6 +906,7 @@ namespace TxtAIEditor.Controls
                 session.ApprovedPlanWorkspacePin = workspacePin;
                 session.LlmSettings = _openSessionController.CreateSessionSettingsSnapshot();
                 session.UseSubagents = useSubagents;
+                session.Selections = selections.Copy();
                 session.UpdatedAt = DateTime.Now;
 
                 _agentPane.PlanningModeCheckBox.IsChecked = false;

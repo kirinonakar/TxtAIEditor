@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Interfaces;
 
@@ -17,7 +18,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string> _currentSessionIdProvider;
         private readonly Func<string> _currentFolderProvider;
         private readonly Func<string, string, string> _getString;
-        private readonly AgentHistoryTitleResolver _titleResolver = new();
+        private long _historyOpenRequest;
 
         public AgentSessionHistoryCoordinator(
             AgentPane agentPane,
@@ -70,6 +71,7 @@ namespace TxtAIEditor.Controls
                 Timestamp = DateTime.Now,
                 Title = openSession.Title,
                 Role = openSession.Role,
+                Selections = openSession.Selections.Copy(),
                 OrchestratorSessionId = openSession.OrchestratorSessionId,
                 SessionHistoryText = historyText,
                 ModelSessionHistoryText = context.ModelSessionHistory.ToString(),
@@ -84,12 +86,16 @@ namespace TxtAIEditor.Controls
 
         public void LoadHistorySession(string historyId)
         {
-            var item = _historyController.GetSession(historyId);
-            if (item == null) return;
+            _agentPane.DispatcherQueue.TryEnqueue(async () => await RestoreHistorySessionAsync(historyId));
+        }
 
+        private async Task RestoreHistorySessionAsync(string historyId)
+        {
+            long request = ++_historyOpenRequest;
+            string previousId = _currentSessionIdProvider();
             // 아직 실행 중(thinking)인 세션을 히스토리에서 불러오면 진행 중인 런 상태를
             // 덮어쓰게 되므로 그 세션만 막는다. 다른 세션이 실행 중이어도 히스토리는 열 수 있다.
-            if (_openSessionController.IsSessionRunning(item.Id))
+            if (_openSessionController.IsSessionRunning(historyId))
             {
                 _agentPane.ClearActivity(_getString(
                     "AgentActivityHistoryLoadRunningBlocked",
@@ -97,40 +103,57 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            _openSessionController.SaveActiveFromUI();
-
-            var session = _openSessionController.EnsureSession(item.Id);
-            session.Title = _titleResolver.Resolve(
-                item,
-                string.Empty);
-            session.Role = item.Role;
-            session.OrchestratorSessionId = item.OrchestratorSessionId;
-            session.UseSubagents = item.Role == AgentSessionRole.Orchestrator;
-            session.PromptText = string.Empty;
-            session.OutputText = AgentHistoryFormatter.Format(
-                item.SessionHistoryText,
-                _settingsService.CurrentSettings.LlmAgentVerbose,
-                _getString);
-            session.ActivityText = _getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨");
-            session.SessionHistoryText = item.SessionHistoryText;
-            session.ModelSessionHistoryText = item.ModelSessionHistoryText;
-            session.LastAnswerText = string.IsNullOrWhiteSpace(item.LastAnswerText)
-                ? AgentHistoryController.ExtractLastAgentResponse(item.SessionHistoryText)
-                : item.LastAnswerText;
-            session.SessionHistoryTokenCount = item.SessionHistoryTokenCount;
-            session.CurrentRunTranscriptTokens = 0;
-            session.SessionEdits = item.SessionEdits.ToList();
-            session.Attachments.Clear();
-            session.RewindSnapshots.Clear();
-            session.WorkspaceRoot = item.WorkspaceRoot ?? string.Empty;
-            _openSessionController.ClearThinkingState(session);
-            session.UpdatedAt = DateTime.Now;
-
-            _agentPane.DispatcherQueue.TryEnqueue(() =>
+            try
             {
+                var item = await _historyController.ReadSessionAsync(historyId);
+                if (item == null || request != _historyOpenRequest || previousId != _currentSessionIdProvider() ||
+                    _openSessionController.IsSessionRunning(historyId) || _historyController.GetEntry(historyId) == null)
+                {
+                    return;
+                }
+
+                _openSessionController.SaveActiveFromUI();
+                bool wasOpen = _openSessionController.FindOpenSession(item.Id) != null;
+                var session = _openSessionController.EnsureSession(item.Id);
+                _openSessionController.ApplyHistoryItem(session, item, restoreSelections: !wasOpen);
+                Exception? workerLoadError = null;
+                if (item.Role == AgentSessionRole.Orchestrator)
+                {
+                    foreach (string id in _historyController.GetSubagentSessionIds(item.Id).Reverse())
+                    {
+                        // Preserve the live state and drafts for subagents already open.
+                        if (_openSessionController.FindOpenSession(id) != null)
+                        {
+                            continue;
+                        }
+                        try
+                        {
+                            if (_historyController.OpenSession(id) is { } workerHistory)
+                            {
+                                _openSessionController.OpenUnloadedHistory(workerHistory, session.Selections);
+                            }
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            workerLoadError ??= ex;
+                        }
+                    }
+                }
+
                 _agentPane.HideHtmlCodeBlocks = !_settingsService.CurrentSettings.LlmAgentVerbose;
                 _openSessionController.RestoreSession(session);
-            });
+                if (workerLoadError != null)
+                {
+                    _openSessionController.ShowSessionLoadError(workerLoadError);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            {
+                if (request == _historyOpenRequest && previousId == _currentSessionIdProvider())
+                {
+                    _openSessionController.ShowSessionLoadError(ex);
+                }
+            }
         }
 
         public async Task DeleteHistorySessionAsync(string historyId)
@@ -138,7 +161,15 @@ namespace TxtAIEditor.Controls
             if (string.IsNullOrEmpty(historyId)) return;
 
             string currentSessionId = _currentSessionIdProvider();
-            await _historyController.DeleteAsync(historyId, currentSessionId);
+            try
+            {
+                await _historyController.DeleteAsync(historyId, currentSessionId);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            {
+                ShowHistoryWriteError(ex);
+                return;
+            }
 
             if (string.Equals(currentSessionId, historyId, StringComparison.Ordinal))
             {
@@ -153,9 +184,19 @@ namespace TxtAIEditor.Controls
         public async Task ClearAllHistoryAsync()
         {
             string currentSessionId = _currentSessionIdProvider();
-            await _historyController.ClearAsync(currentSessionId);
-            _openSessionController.CloseSession(currentSessionId);
+            try
+            {
+                await _historyController.ClearAsync(currentSessionId);
+                _openSessionController.CloseSession(currentSessionId);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            {
+                ShowHistoryWriteError(ex);
+            }
         }
+
+        private void ShowHistoryWriteError(Exception ex) => _agentPane.ClearActivity(string.Format(
+            _getString("AgentActivityHistorySaveFailedFormat", "히스토리 저장 실패: {0}"), ex.Message));
 
         public async Task SaveCurrentVerboseHistoryAsync()
         {

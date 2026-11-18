@@ -20,8 +20,8 @@ namespace TxtAIEditor.Controls
 
     internal sealed class AgentPaneSessionMenuCoordinator
     {
-        private const int OpenSessionButtonHeight = 28;
-        private const int OpenSessionRowHeight = 36;
+        private const int SessionButtonHeight = 28;
+        private const int SessionRowHeight = 36;
         private const int SubagentIndent = 20;
 
         private enum SessionTreeBranch { None, Parent, Child, LastChild }
@@ -152,13 +152,13 @@ namespace TxtAIEditor.Controls
             }
 
             Style? treeLineStyle = _resourceOwner.Resources["AgentSessionTreeLineStyle"] as Style;
-            foreach (var (item, branch) in GetOpenSessionTreeRows())
+            foreach (var (item, branch) in GetSessionTreeRows(_openSessionItems, item => item.Id, item => item.OrchestratorSessionId))
             {
                 bool isChild = branch is SessionTreeBranch.Child or SessionTreeBranch.LastChild;
                 var rowGrid = new Grid
                 {
                     ColumnSpacing = 4,
-                    Height = OpenSessionRowHeight,
+                    Height = SessionRowHeight,
                     Margin = new Thickness(0, 0, 10, 0)
                 };
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -217,7 +217,7 @@ namespace TxtAIEditor.Controls
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Height = OpenSessionButtonHeight,
+                    Height = SessionButtonHeight,
                     Margin = new Thickness(isChild ? SubagentIndent : 0, 0, 0, 0),
                     Padding = new Thickness(8, 0, 8, 0),
                     Style = buttonStyle,
@@ -239,7 +239,7 @@ namespace TxtAIEditor.Controls
                 {
                     Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
                     Width = 28,
-                    Height = OpenSessionButtonHeight,
+                    Height = SessionButtonHeight,
                     VerticalAlignment = VerticalAlignment.Center,
                     Padding = new Thickness(0),
                     Style = buttonStyle,
@@ -258,24 +258,25 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private IEnumerable<(AgentOpenSessionItemViewModel Item, SessionTreeBranch Branch)> GetOpenSessionTreeRows()
+        private static IEnumerable<(T Item, SessionTreeBranch Branch)> GetSessionTreeRows<T>(
+            IReadOnlyList<T> items, Func<T, string> getId, Func<T, string?> getParentId)
         {
-            var parentIds = _openSessionItems
-                .Where(item => string.IsNullOrEmpty(item.OrchestratorSessionId))
-                .Select(item => item.Id)
+            var parentIds = items
+                .Where(item => string.IsNullOrWhiteSpace(getParentId(item)))
+                .Select(getId)
                 .ToHashSet(StringComparer.Ordinal);
-            var childrenByParent = _openSessionItems
-                .Where(item => item.OrchestratorSessionId is string parentId && parentIds.Contains(parentId))
-                .ToLookup(item => item.OrchestratorSessionId!, StringComparer.Ordinal);
+            var childrenByParent = items
+                .Where(item => getParentId(item) is string parentId && parentIds.Contains(parentId))
+                .ToLookup(getParentId, StringComparer.Ordinal);
 
-            foreach (var item in _openSessionItems)
+            foreach (var item in items)
             {
-                if (item.OrchestratorSessionId is string parentId && parentIds.Contains(parentId))
+                if (getParentId(item) is string parentId && parentIds.Contains(parentId))
                 {
                     continue;
                 }
 
-                var children = childrenByParent[item.Id].ToArray();
+                var children = childrenByParent[getId(item)].ToArray();
                 yield return (item, children.Length == 0 ? SessionTreeBranch.None : SessionTreeBranch.Parent);
                 for (int i = 0; i < children.Length; i++)
                 {
@@ -292,7 +293,7 @@ namespace TxtAIEditor.Controls
             }
 
             const int stemLeft = 12;
-            const int rowCenter = OpenSessionRowHeight / 2;
+            const int rowCenter = SessionRowHeight / 2;
             var stem = new Rectangle
             {
                 Style = lineStyle,
@@ -302,7 +303,7 @@ namespace TxtAIEditor.Controls
             };
             if (branch == SessionTreeBranch.Parent)
             {
-                stem.Height = (OpenSessionRowHeight - OpenSessionButtonHeight) / 2;
+                stem.Height = (SessionRowHeight - SessionButtonHeight) / 2;
                 stem.VerticalAlignment = VerticalAlignment.Bottom;
                 row.Children.Add(stem);
                 return;
@@ -355,24 +356,36 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            foreach (var item in _historyItems)
+            Style? treeLineStyle = _resourceOwner.Resources["AgentSessionTreeLineStyle"] as Style;
+            foreach (var (item, branch) in GetSessionTreeRows(_historyItems, item => item.Id, item => item.OrchestratorSessionId))
             {
-                var rowGrid = new Grid { ColumnSpacing = 4, Margin = new Thickness(0, 2, 10, 2) };
+                bool isChild = branch is SessionTreeBranch.Child or SessionTreeBranch.LastChild;
+                var rowGrid = new Grid { ColumnSpacing = 4, Height = SessionRowHeight, Margin = new Thickness(0, 0, 10, 0) };
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                AddSessionTreeLines(rowGrid, branch, treeLineStyle);
 
                 bool isSelected = string.Equals(_selectedHistoryId, item.Id, StringComparison.Ordinal);
                 string currentId = item.Id;
+                string title = $"{item.Title} ({item.TimeText})";
                 var selectButton = new Button
                 {
-                    Content = isSelected ? $"✓ {item.Title} ({item.TimeText})" : $"{item.Title} ({item.TimeText})",
+                    Content = new TextBlock
+                    {
+                        Text = isSelected ? $"✓ {title}" : title,
+                        TextTrimming = TextTrimming.CharacterEllipsis
+                    },
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     HorizontalContentAlignment = HorizontalAlignment.Left,
-                    Height = 28,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Height = SessionButtonHeight,
+                    Margin = new Thickness(isChild ? SubagentIndent : 0, 0, 0, 0),
                     FontSize = 11,
                     Padding = new Thickness(8, 0, 8, 0),
                     Style = buttonStyle
                 };
+                AutomationProperties.SetName(selectButton, title);
+                ToolTipService.SetToolTip(selectButton, title);
                 if (isSelected)
                 {
                     selectButton.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
@@ -389,7 +402,8 @@ namespace TxtAIEditor.Controls
                 {
                     Content = new FontIcon { Glyph = "\uE74D", FontSize = 10 },
                     Width = 28,
-                    Height = 28,
+                    Height = SessionButtonHeight,
+                    VerticalAlignment = VerticalAlignment.Center,
                     Padding = new Thickness(0),
                     Style = buttonStyle,
                     IsEnabled = !_isBusy

@@ -21,6 +21,7 @@ namespace TxtAIEditor.Controls
         private readonly AgentToolExecutionGate _toolGate;
         private AgentOpenSessionController _openSessions = null!;
         private readonly Dictionary<string, List<AgentFileEditPreview>> _sessionEditsBySession = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, AgentSessionSpill<List<AgentFileEditPreview>>> _parkedEdits = new(StringComparer.Ordinal);
         private readonly HashSet<string> _recordingSessions = new(StringComparer.Ordinal);
         private readonly Func<string> _currentSessionIdProvider;
         private long _lastCommitOrder;
@@ -99,6 +100,60 @@ namespace TxtAIEditor.Controls
         public IReadOnlyList<AgentFileEditPreview> GetSessionEdits(string sessionId)
         {
             return GetOrCreateSessionEdits(sessionId);
+        }
+
+        public List<AgentFileEditPreview> ReadSessionEdits(string id)
+        {
+            if (_sessionEditsBySession.TryGetValue(id, out var live))
+            {
+                return live;
+            }
+            return _parkedEdits.TryGetValue(id, out var parked) ? parked.Read() :
+                _openSessions.FindOpenSession(id)?.UnloadedHistory?.ReadEdits() ?? _history.ReadSessionEdits(id);
+        }
+
+        public bool TryParkSessionEdits(string id, List<AgentFileEditPreview> fallback)
+        {
+            if (_recordingSessions.Contains(id))
+            {
+                return false;
+            }
+            if (_parkedEdits.ContainsKey(id))
+            {
+                return true;
+            }
+
+            var edits = _sessionEditsBySession.GetValueOrDefault(id) ?? fallback;
+            // Keep even an empty list if a history entry could contain older edits.
+            try
+            {
+                if (edits.Count > 0 || _history.GetEntry(id)?.EditsId != null)
+                {
+                    _parkedEdits.Add(id, AgentSessionSpill<List<AgentFileEditPreview>>.Write(edits));
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+            {
+                System.Diagnostics.Debug.WriteLine(ex.Message);
+                return false;
+            }
+            _sessionEditsBySession.Remove(id);
+            return true;
+        }
+
+        public void SetLiveEdits(string id, List<AgentFileEditPreview> edits)
+        {
+            ReleaseSessionEdits(id);
+            _sessionEditsBySession[id] = edits;
+        }
+
+        public void ReleaseSessionEdits(string id)
+        {
+            _sessionEditsBySession.Remove(id);
+            if (_parkedEdits.Remove(id, out var parked))
+            {
+                parked.Dispose();
+            }
         }
 
         public void Replace(IEnumerable<AgentFileEditPreview>? edits, string sessionId)
@@ -182,7 +237,7 @@ namespace TxtAIEditor.Controls
 
         private async Task RevertEditsAsync(IEnumerable<RecordedEdit> edits)
         {
-            var changedSessions = new HashSet<string>(StringComparer.Ordinal);
+            var changedSessions = new Dictionary<string, List<AgentFileEditPreview>>(StringComparer.Ordinal);
             try
             {
                 foreach (RecordedEdit edit in edits)
@@ -212,10 +267,10 @@ namespace TxtAIEditor.Controls
                         await RestoreTabAsync(preview);
                     }
 
-                    var sessionEdits = GetOrCreateSessionEdits(edit.SessionId);
+                    var sessionEdits = edit.SessionEdits;
                     sessionEdits.Remove(preview);
                     UpdateModificationNumbers(sessionEdits);
-                    changedSessions.Add(edit.SessionId);
+                    changedSessions[edit.SessionId] = sessionEdits;
 
                     if (fileBacked)
                     {
@@ -237,16 +292,29 @@ namespace TxtAIEditor.Controls
             {
                 if (changedSessions.Count > 0)
                 {
-                    var updates = changedSessions.ToDictionary(id => id, id => GetOrCreateSessionEdits(id).ToList());
-                    foreach (var (id, sessionEdits) in updates)
+                    foreach (var (id, sessionEdits) in changedSessions)
                     {
-                        if (_openSessions.FindOpenSession(id) is { } session)
+                        SetLiveEdits(id, sessionEdits);
+                        if (_openSessions.FindOpenSession(id) is { IsParked: false } session)
                         {
                             session.SessionEdits = sessionEdits;
                         }
                     }
                     UpdateModifiedFilesList();
-                    await _history.UpdateSessionEditsAsync(updates, _currentSessionIdProvider());
+                    try
+                    {
+                        await _history.UpdateSessionEditsAsync(changedSessions);
+                    }
+                    finally
+                    {
+                        foreach (var (id, sessionEdits) in changedSessions)
+                        {
+                            if (_openSessions.FindOpenSession(id) is not { IsParked: false, UnloadedHistory: null })
+                            {
+                                TryParkSessionEdits(id, sessionEdits);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -371,8 +439,7 @@ namespace TxtAIEditor.Controls
 
         private IEnumerable<string> GetSubagentIds(string sessionId)
         {
-            var snapshotIds = _openSessions.FindOpenSession(sessionId)?.RewindSnapshots
-                .SelectMany(snapshot => snapshot.SubagentSessionIds) ?? Enumerable.Empty<string>();
+            var snapshotIds = _openSessions.FindOpenSession(sessionId)?.RewindSnapshots.GetSubagentIds() ?? Enumerable.Empty<string>();
             return _openSessions.GetOpenSubagentSessionIds(sessionId)
                 .Concat(_history.GetSubagentSessionIds(sessionId)).Concat(snapshotIds).Distinct(StringComparer.Ordinal);
         }
@@ -384,13 +451,14 @@ namespace TxtAIEditor.Controls
         {
             return sessionIds.SelectMany(id =>
             {
-                long legacyOrder = _history.GetSession(id)?.Timestamp.ToUniversalTime().Ticks ?? 0;
-                return GetOrCreateSessionEdits(id).Select(preview => new RecordedEdit(id, preview,
+                long legacyOrder = _history.GetEntry(id)?.Timestamp.ToUniversalTime().Ticks ?? 0;
+                var sessionEdits = ReadSessionEdits(id);
+                return sessionEdits.Select(preview => new RecordedEdit(id, sessionEdits, preview,
                     preview.CommitOrder > 0 ? preview.CommitOrder : legacyOrder));
             }).OrderBy(edit => edit.Order);
         }
 
-        private sealed record RecordedEdit(string SessionId, AgentFileEditPreview Preview, long Order);
+        private sealed record RecordedEdit(string SessionId, List<AgentFileEditPreview> SessionEdits, AgentFileEditPreview Preview, long Order);
 
         private bool IsVisibleSession(string sessionId)
         {
@@ -407,8 +475,8 @@ namespace TxtAIEditor.Controls
             string key = sessionId ?? string.Empty;
             if (!_sessionEditsBySession.TryGetValue(key, out List<AgentFileEditPreview>? sessionEdits))
             {
-                sessionEdits = _history.GetSession(key)?.SessionEdits.Select(edit => Clone(edit)).ToList() ?? new();
-                _sessionEditsBySession[key] = sessionEdits;
+                sessionEdits = ReadSessionEdits(key);
+                SetLiveEdits(key, sessionEdits);
             }
 
             return sessionEdits;

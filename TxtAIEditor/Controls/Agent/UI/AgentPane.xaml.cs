@@ -37,6 +37,7 @@ namespace TxtAIEditor.Controls
     public sealed class AgentHistoryItemViewModel
     {
         public string Id { get; set; } = string.Empty;
+        public string? OrchestratorSessionId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string TimeText { get; set; } = string.Empty;
     }
@@ -127,7 +128,7 @@ namespace TxtAIEditor.Controls
                     AgentSelectedChipsCleared = () => AgentSelectedChipsCleared?.Invoke(this, EventArgs.Empty)
                 });
             _outputController = new AgentPaneOutputController(
-                AgentOutputText,
+                AgentOutputPages,
                 AgentOutputScrollViewer,
                 this);
             _sessionMenuCoordinator = new AgentPaneSessionMenuCoordinator(
@@ -249,11 +250,11 @@ namespace TxtAIEditor.Controls
 
         public void ApplySettings(EditorSettings settings)
         {
-            AgentOutputText.FontFamily = new FontFamily(
+            _outputController.SetFont(
                 string.IsNullOrWhiteSpace(settings.AgentFontFamily)
                     ? "Segoe UI, Segoe UI Emoji, Segoe UI Symbol"
-                    : settings.AgentFontFamily.Trim());
-            AgentOutputText.FontSize = Math.Clamp(settings.AgentFontSize, 8.0, 36.0);
+                    : settings.AgentFontFamily.Trim(),
+                Math.Clamp(settings.AgentFontSize, 8.0, 36.0));
 
             AgentPromptInput.FontFamily = new FontFamily(
                 string.IsNullOrWhiteSpace(settings.AgentPromptFontFamily)
@@ -304,7 +305,8 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(AgentOpenSessionsButton, getString("AgentOpenSessionsTooltip", "열린 세션"));
             AgentOpenSessionsTitleText.Text = getString("AgentOpenSessionsTitle", "열린 세션");
             ToolTipService.SetToolTip(AgentHistoryButton, getString("AgentHistoryTooltip", "세션 히스토리"));
-            AgentHistoryTitleText.Text = getString("AgentHistoryTitle", "세션 히스토리 (최근 20개)");
+            AgentHistoryTitleText.Text = string.Format(getString("AgentHistoryTitle", "세션 히스토리 (최근 {0}개)"),
+                AgentHistoryStore.MaxGroups);
             string saveHistoryTooltip = getString("AgentSaveHistoryTooltip", "현재 세션의 verbose 히스토리를 현재 폴더에 저장");
             ToolTipService.SetToolTip(AgentSaveHistoryButton, saveHistoryTooltip);
             AutomationProperties.SetName(AgentSaveHistoryButton, saveHistoryTooltip);
@@ -615,10 +617,6 @@ private Style? _accentRunButtonStyle;
             InsertNewTabOutputRequested?.Invoke(sender, e);
         }
 
-        private void OnOutputDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
-        {
-            _outputController.OnOutputDoubleTapped();
-        }
         private void OnAddAttachmentClick(object sender, RoutedEventArgs e)
         {
             AddAttachmentRequested?.Invoke(sender, e);
@@ -819,10 +817,6 @@ private Style? _accentRunButtonStyle;
             DiffCancelled?.Invoke(sender, e);
         }
 
-        private void OnOutputTextKeyDown(object sender, KeyRoutedEventArgs e)
-        {
-            _outputController.CopySelectionOrAll(e);
-        }
         public void UpdateAgentPresetsMenu(
             IReadOnlyList<string> presetNames,
             IReadOnlyCollection<string> selectedPresetNames,

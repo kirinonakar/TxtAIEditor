@@ -13,6 +13,7 @@ namespace TxtAIEditor.Core.Models
 
         public string Id { get; } = Guid.NewGuid().ToString();
         public string TabId => Id;
+        internal bool IsDiffView { get; init; }
 
         private EditorDocument? _document;
         public string? DocumentId => _document?.DocumentId;

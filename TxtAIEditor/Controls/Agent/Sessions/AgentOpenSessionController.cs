@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using TxtAIEditor.Core.Interfaces;
@@ -18,6 +19,10 @@ namespace TxtAIEditor.Controls
         private readonly AgentAttachmentController _attachmentController;
         private readonly AgentSessionEditController _sessionEditController;
         private readonly AgentHistoryController _historyController;
+        private readonly AgentSessionSelectionContext _selections;
+        private readonly AgentPresetController _presetController;
+        private readonly AgentMcpController _mcpController;
+        private readonly AgentHistoryTitleResolver _historyTitleResolver = new();
         private readonly AgentDisplayLocalizer _displayText;
         private readonly Dictionary<string, AgentRunContext> _runningSessions;
         private readonly Func<string> _currentSessionIdProvider;
@@ -36,6 +41,10 @@ namespace TxtAIEditor.Controls
         private readonly Dictionary<string, PendingRunOutputBuffer> _pendingRunOutputBuffers = new(StringComparer.Ordinal);
         private readonly HashSet<string> _pendingCloseSessionIds = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _pendingSubagentShutdowns = new(StringComparer.Ordinal);
+        private readonly Dictionary<AgentOpenSessionState, long> _idleDeadlines = new();
+        private readonly DispatcherQueueTimer _idleTimer;
+        private bool _parkingIdleSessions;
+        private static readonly TimeSpan SessionIdleDelay = TimeSpan.FromMinutes(10);
         private bool _restoringOpenSession;
         private const int RunOutputFlushDelayMs = 75;
         private const int MaxRunOutputFlushChars = 8_000;
@@ -47,6 +56,9 @@ namespace TxtAIEditor.Controls
             AgentAttachmentController attachmentController,
             AgentSessionEditController sessionEditController,
             AgentHistoryController historyController,
+            AgentSessionSelectionContext selections,
+            AgentPresetController presetController,
+            AgentMcpController mcpController,
             AgentDisplayLocalizer displayText,
             Dictionary<string, AgentRunContext> runningSessions,
             Func<string> currentSessionIdProvider,
@@ -67,6 +79,9 @@ namespace TxtAIEditor.Controls
             _attachmentController = attachmentController;
             _sessionEditController = sessionEditController;
             _historyController = historyController;
+            _selections = selections;
+            _presetController = presetController;
+            _mcpController = mcpController;
             _displayText = displayText;
             _runningSessions = runningSessions;
             _currentSessionIdProvider = currentSessionIdProvider;
@@ -80,6 +95,9 @@ namespace TxtAIEditor.Controls
             _completedNotificationCountChanged = completedNotificationCountChanged;
             _getString = getString;
             _navigateToFolderAsync = navigateToFolderAsync;
+            _idleTimer = agentPane.DispatcherQueue.CreateTimer();
+            _idleTimer.IsRepeating = false;
+            _idleTimer.Tick += async (_, _) => await ParkIdleSessionsAsync();
         }
 
         public bool IsCurrentSessionRunning()
@@ -151,6 +169,10 @@ namespace TxtAIEditor.Controls
 
             session = previousState ?? CreateBlankSession(sessionId);
             _openSessions.Insert(0, session);
+            if (IsSessionVisible(sessionId))
+            {
+                _selections.Visible = session.Selections;
+            }
             return session;
         }
 
@@ -159,6 +181,8 @@ namespace TxtAIEditor.Controls
 
         public IEnumerable<string> GetOpenSubagentSessionIds(string parentId) =>
             _openSessions.Where(item => item.OrchestratorSessionId == parentId).Select(item => item.Id);
+
+        public bool IsMcpServerInOpenSession(string id) => _openSessions.Any(session => session.Selections.McpServers.Contains(id));
 
         public AgentOpenSessionState CreateBlankSession(string? sessionId = null)
         {
@@ -169,6 +193,7 @@ namespace TxtAIEditor.Controls
                 OutputText = _displayText.OutputPlaceholder,
                 ActivityText = _displayText.ActivityIdle,
                 WorkspaceRoot = CaptureCurrentWorkspaceRoot(),
+                Selections = _selections.Visible.Copy(),
                 LlmSettings = CreateSessionSettingsSnapshot()
             };
         }
@@ -249,15 +274,105 @@ namespace TxtAIEditor.Controls
             }
             session.UpdatedAt = DateTime.Now;
             UpdateSessionTitle(session, session.PromptText);
+            _historyController.RememberSelections(session.Id, session.Selections);
             RefreshSessionTitleDisplay();
         }
 
-        public void RestoreSession(AgentOpenSessionState session)
+        public void RestoreSessionBody(AgentOpenSessionState session)
         {
+            if (session.UnloadedHistory is { } history)
+            {
+                ApplyHistoryItem(session, history.ReadSession(_sessionEditController.ReadSessionEdits(session.Id)), restoreSelections: false);
+            }
+            else if (session.IsParked)
+            {
+                var edits = _sessionEditController.ReadSessionEdits(session.Id);
+                session.RestoreBody();
+                session.SessionEdits = edits;
+                _sessionEditController.SetLiveEdits(session.Id, edits);
+            }
+        }
+
+        public void OpenUnloadedHistory(AgentHistoryStore.OpenHistorySession history, AgentSessionSelections parentSelections)
+        {
+            var entry = history.Entry;
+            var session = EnsureSession(entry.Id);
+            session.UnloadedHistory = history;
+            session.Title = entry.Title;
+            session.Role = entry.Role;
+            session.OrchestratorSessionId = entry.OrchestratorSessionId;
+            session.Selections = (entry.Selections ?? parentSelections).Copy();
+            session.WorkspaceRoot = entry.WorkspaceRoot ?? string.Empty;
+        }
+
+        public void ApplyHistoryItem(AgentOpenSessionState session, AgentHistoryItem item, bool restoreSelections)
+        {
+            session.ReleaseUnloadedHistory();
+            session.DiscardStoredBody();
+            session.Title = _historyTitleResolver.Resolve(item, string.Empty);
+            session.Role = item.Role;
+            session.OrchestratorSessionId = item.OrchestratorSessionId;
+            if (restoreSelections && item.Selections is { } selections)
+            {
+                session.Selections = selections;
+            }
+            session.UseSubagents = item.Role == AgentSessionRole.Orchestrator;
+            session.PromptText = string.Empty;
+            session.OutputText = string.Empty;
+            session.NeedsHistoryFormatting = true;
+            session.ActivityText = _getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨");
+            session.SessionHistoryText = item.SessionHistoryText;
+            session.ModelSessionHistoryText = item.ModelSessionHistoryText;
+            session.LastAnswerText = string.IsNullOrWhiteSpace(item.LastAnswerText)
+                ? AgentHistoryController.ExtractLastAgentResponse(item.SessionHistoryText)
+                : item.LastAnswerText;
+            session.SessionHistoryTokenCount = item.SessionHistoryTokenCount;
+            session.CurrentRunTranscriptTokens = 0;
+            session.SessionEdits = item.SessionEdits;
+            _sessionEditController.SetLiveEdits(session.Id, item.SessionEdits);
+            session.Attachments.Clear();
+            session.RewindSnapshots.Clear();
+            session.WorkspaceRoot = item.WorkspaceRoot ?? string.Empty;
+            ClearThinkingState(session);
+            session.UpdatedAt = DateTime.Now;
+        }
+
+        public void ShowSessionLoadError(Exception ex)
+        {
+            _agentPane.ClearActivity(string.Format(_getString("AgentSessionLoadFailedFormat",
+                "세션을 불러오지 못했습니다: {0}"), ex.Message));
+        }
+
+        public void RestoreSession(AgentOpenSessionState session) => TryRestoreSession(session);
+
+        private bool TryRestoreSession(AgentOpenSessionState session)
+        {
+            try
+            {
+                RestoreSessionBody(session);
+                if (session.NeedsHistoryFormatting)
+                {
+                    session.OutputText = AgentHistoryFormatter.Format(session.SessionHistoryText,
+                        _settingsService.CurrentSettings.LlmAgentVerbose, _getString);
+                    session.NeedsHistoryFormatting = false;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            {
+                ShowSessionLoadError(ex);
+                return false;
+            }
+
+            var previous = FindOpenSession(_currentSessionIdProvider());
+            _idleDeadlines.Remove(session);
+            using var selectionScope = _selections.Use(session.Selections);
             _restoringOpenSession = true;
             try
             {
                 _setCurrentSessionId(session.Id);
+                _selections.Visible = session.Selections;
+                _presetController.RefreshSelection();
+                _mcpController.RefreshSessionSelection();
                 session.CompletedNotificationCount = 0;
                 bool isRunningSession = _runningSessions.TryGetValue(session.Id, out AgentRunContext? runContext);
                 string sessionHistory = isRunningSession
@@ -316,6 +431,82 @@ namespace TxtAIEditor.Controls
             finally
             {
                 _restoringOpenSession = false;
+            }
+
+            if (previous != null && previous != session)
+            {
+                ScheduleInactiveSessionParking(previous);
+            }
+            return true;
+        }
+
+        private void ScheduleInactiveSessionParking(AgentOpenSessionState session)
+        {
+            if (session.IsParked || IsSessionVisible(session.Id))
+            {
+                return;
+            }
+
+            _idleDeadlines[session] = Environment.TickCount64 + (long)SessionIdleDelay.TotalMilliseconds;
+            ScheduleIdleTimer();
+        }
+
+        private void ScheduleIdleTimer()
+        {
+            if (_parkingIdleSessions)
+            {
+                return;
+            }
+            _idleTimer.Stop();
+            if (_idleDeadlines.Count > 0)
+            {
+                _idleTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1, _idleDeadlines.Values.Min() - Environment.TickCount64));
+                _idleTimer.Start();
+            }
+        }
+
+        private async Task ParkIdleSessionsAsync()
+        {
+            _parkingIdleSessions = true;
+            try
+            {
+                long now = Environment.TickCount64;
+                foreach (var (session, deadline) in _idleDeadlines.ToArray())
+                {
+                    bool StillScheduled() => _idleDeadlines.TryGetValue(session, out long scheduled) && scheduled == deadline;
+                    bool IsBusy() => IsSessionRunning(session.Id) || HasPendingSubagentShutdown(session.Id);
+                    if (deadline > now || !StillScheduled())
+                    {
+                        continue;
+                    }
+                    if (IsBusy())
+                    {
+                        _idleDeadlines[session] = now + (long)SessionIdleDelay.TotalMilliseconds;
+                        continue;
+                    }
+
+                    if (!session.IsParked && !IsSessionVisible(session.Id) && !IsReusableBlankSession(session) &&
+                        _sessionEditController.TryParkSessionEdits(session.Id, session.SessionEdits))
+                    {
+                        try
+                        {
+                            await session.ParkBodyAsync(() => StillScheduled() && !IsSessionVisible(session.Id) && !IsBusy());
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+                        {
+                            System.Diagnostics.Debug.WriteLine(ex.Message);
+                        }
+                    }
+                    if (StillScheduled())
+                    {
+                        _idleDeadlines.Remove(session);
+                    }
+                }
+            }
+            finally
+            {
+                _parkingIdleSessions = false;
+                ScheduleIdleTimer();
             }
         }
 
@@ -396,6 +587,34 @@ namespace TxtAIEditor.Controls
 
                 closedVisibleSession |= IsSessionVisible(item.Id);
                 _openSessions.Remove(item);
+                _idleDeadlines.Remove(item);
+                _historyController.RememberSelections(item.Id, item.Selections);
+                _mcpController.ReleaseUnusedConnections(item.Selections.McpServers);
+                bool parentStillOpen = item.OrchestratorSessionId is string parentId &&
+                    FindOpenSession(parentId) != null && !sessionsToClose.Any(closing => closing.Id == parentId);
+                if (parentStillOpen && item.UnloadedHistory == null)
+                {
+                    _sessionEditController.TryParkSessionEdits(item.Id, item.SessionEdits);
+                }
+                else if (!parentStillOpen)
+                {
+                    _sessionEditController.ReleaseSessionEdits(item.Id);
+                }
+                item.ReleaseUnloadedHistory();
+                // A running orchestrator can still send work to a closed worker.
+                if (item.OrchestratorSessionId is not string ownerId || !IsSessionRunning(ownerId))
+                {
+                    item.DiscardStoredBody();
+                    foreach (string workerId in item.RewindSnapshots.GetSubagentIds()
+                        .Concat(_historyController.GetSubagentSessionIds(item.Id)).Distinct(StringComparer.Ordinal))
+                    {
+                        if (FindOpenSession(workerId) == null)
+                        {
+                            _sessionEditController.ReleaseSessionEdits(workerId);
+                        }
+                    }
+                    item.RewindSnapshots.Clear();
+                }
             }
 
             foreach (string runningSessionId in sessionsToStop)
@@ -412,7 +631,12 @@ namespace TxtAIEditor.Controls
                     _openSessions.Add(next);
                 }
 
-                RestoreSession(next);
+                if (!TryRestoreSession(next))
+                {
+                    var blank = CreateBlankSession();
+                    _openSessions.Add(blank);
+                    RestoreSession(blank);
+                }
                 return;
             }
 
@@ -475,6 +699,7 @@ namespace TxtAIEditor.Controls
             var session = EnsureSession(sessionId);
             session.CompletedNotificationCount++;
             session.UpdatedAt = DateTime.Now;
+            ScheduleInactiveSessionParking(session);
             UpdateUI();
         }
 
@@ -1064,7 +1289,7 @@ namespace TxtAIEditor.Controls
 
         private bool IsReusableBlankSession(AgentOpenSessionState session)
         {
-            if (session.IsRunning || _runningSessions.ContainsKey(session.Id))
+            if (session.IsParked || session.UnloadedHistory != null || session.IsRunning || _runningSessions.ContainsKey(session.Id))
             {
                 return false;
             }

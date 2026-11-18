@@ -25,13 +25,21 @@ namespace TxtAIEditor.Controls
 
     internal sealed class AgentOpenSessionState
     {
+        private sealed record SessionBody(string PromptText, string OutputText, string ActivityText,
+            string SessionHistoryText, string ModelSessionHistoryText, string LastAnswerText,
+            List<AgentAttachmentState> Attachments);
+
+        private AgentSessionSpill<SessionBody>? _storedBody;
+
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Title { get; set; } = string.Empty;
         public AgentSessionRole Role { get; set; }
+        public AgentSessionSelections Selections { get; set; } = new();
         public string? OrchestratorSessionId { get; set; }
         public bool UseSubagents { get; set; }
         public string PromptText { get; set; } = string.Empty;
         public string OutputText { get; set; } = string.Empty;
+        public bool NeedsHistoryFormatting { get; set; }
         public string ActivityText { get; set; } = string.Empty;
         public string SessionHistoryText { get; set; } = string.Empty;
         public string ModelSessionHistoryText { get; set; } = string.Empty;
@@ -45,7 +53,7 @@ namespace TxtAIEditor.Controls
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
         public List<AgentAttachmentState> Attachments { get; set; } = new();
         public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
-        public List<AgentSessionRewindSnapshot> RewindSnapshots { get; set; } = new();
+        public AgentSessionRewindStack RewindSnapshots { get; } = new();
         public bool IsRunning { get; set; }
         public bool IsRewinding { get; set; }
         public int CompletedNotificationCount { get; set; }
@@ -55,6 +63,61 @@ namespace TxtAIEditor.Controls
         public string ThinkingLinePrefix { get; set; } = string.Empty;
         public Func<string>? LiveThinkingLabel { get; set; }
         public EditorSettings? LlmSettings { get; set; }
+        public AgentHistoryStore.OpenHistorySession? UnloadedHistory { get; set; }
+
+        public bool IsParked => _storedBody != null;
+
+        public async Task ParkBodyAsync(Func<bool> canPark)
+        {
+            var body = new SessionBody(PromptText, OutputText, ActivityText,
+                SessionHistoryText, ModelSessionHistoryText, LastAnswerText, Attachments.ToList());
+            var stored = await Task.Run(() => AgentSessionSpill<SessionBody>.Write(body));
+            if (!canPark())
+            {
+                stored.Dispose();
+                return;
+            }
+
+            _storedBody = stored;
+            PromptText = string.Empty;
+            OutputText = string.Empty;
+            ActivityText = string.Empty;
+            SessionHistoryText = string.Empty;
+            ModelSessionHistoryText = string.Empty;
+            LastAnswerText = string.Empty;
+            Attachments = new();
+            SessionEdits = new();
+        }
+
+        public void RestoreBody()
+        {
+            if (_storedBody == null)
+            {
+                return;
+            }
+
+            var body = _storedBody.Read();
+            PromptText = body.PromptText;
+            OutputText = body.OutputText;
+            ActivityText = body.ActivityText;
+            SessionHistoryText = body.SessionHistoryText;
+            ModelSessionHistoryText = body.ModelSessionHistoryText;
+            LastAnswerText = body.LastAnswerText;
+            Attachments = body.Attachments;
+            DiscardStoredBody();
+        }
+
+        public void DiscardStoredBody()
+        {
+            _storedBody?.Dispose();
+            _storedBody = null;
+        }
+
+        public void ReleaseUnloadedHistory()
+        {
+            UnloadedHistory?.Dispose();
+            UnloadedHistory = null;
+        }
     }
 
     internal enum AgentRunStatus { Running, Completed, Stopped, Failed }
@@ -64,6 +127,7 @@ namespace TxtAIEditor.Controls
         public AgentRunStatus Status { get; set; } = AgentRunStatus.Running;
         public AgentRequestTokenCalibration RequestTokenCalibration { get; } = new();
         public string SessionId { get; set; } = string.Empty;
+        public AgentSessionSelections Selections { get; init; } = new();
         public CancellationTokenSource? Cancellation { get; set; }
         public CancellationToken CancellationToken { get; set; }
         public CancellationToken ParentCancellationToken { get; set; }
@@ -184,7 +248,7 @@ namespace TxtAIEditor.Controls
 
     internal sealed class AgentSessionRewindSnapshot
     {
-        public List<string> SubagentSessionIds { get; } = new();
+        public List<string> SubagentSessionIds { get; set; } = new();
         public string Title { get; set; } = string.Empty;
         public string PromptText { get; set; } = string.Empty;
         public string OutputText { get; set; } = string.Empty;

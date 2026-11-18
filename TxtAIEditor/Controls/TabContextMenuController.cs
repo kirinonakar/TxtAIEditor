@@ -27,6 +27,7 @@ namespace TxtAIEditor.Controls
         private readonly Action<OpenedTab, TabViewItem, TabView> _closeRightTabs;
         private readonly Action<OpenedTab, TabViewItem, TabView> _closeLeftTabs;
         private readonly Action<OpenedTab, TabViewItem, TabView> _closeOtherTabs;
+        private readonly Action _closeAllDiffTabs;
         private readonly Action<string>? _runFileInTerminal;
         private readonly Func<TabViewItem, TabView?> _tabViewResolver;
         private readonly Func<string, Task>? _openNotebookSourceAsync;
@@ -48,6 +49,7 @@ namespace TxtAIEditor.Controls
             Action<OpenedTab, TabViewItem, TabView> closeRightTabs,
             Action<OpenedTab, TabViewItem, TabView> closeLeftTabs,
             Action<OpenedTab, TabViewItem, TabView> closeOtherTabs,
+            Action closeAllDiffTabs,
             Action<string>? runFileInTerminal,
             Func<TabViewItem, TabView?> tabViewResolver,
             Func<string, Task>? openNotebookSourceAsync = null,
@@ -68,6 +70,7 @@ namespace TxtAIEditor.Controls
             _closeRightTabs = closeRightTabs;
             _closeLeftTabs = closeLeftTabs;
             _closeOtherTabs = closeOtherTabs;
+            _closeAllDiffTabs = closeAllDiffTabs;
             _runFileInTerminal = runFileInTerminal;
             _tabViewResolver = tabViewResolver;
             _openNotebookSourceAsync = openNotebookSourceAsync;
@@ -79,6 +82,28 @@ namespace TxtAIEditor.Controls
         public MenuFlyout CreateContextFlyout(OpenedTab tab, TabViewItem tabItem, TabView targetTabView)
         {
             var menu = new MenuFlyout();
+            if (tab.IsDiffView)
+            {
+                var closeAllDiffItem = new MenuFlyoutItem
+                {
+                    Text = _getString("TabMenuCloseAllDiffTabs", "Diff 모두 닫기"),
+                    Icon = new SymbolIcon(Symbol.Clear)
+                };
+                closeAllDiffItem.Click += (_, __) => _closeAllDiffTabs();
+                menu.Items.Add(closeAllDiffItem);
+            }
+            else
+            {
+                AddFileMenuItems(menu, tab, tabItem);
+            }
+
+            menu.Items.Add(new MenuFlyoutSeparator());
+            AddCloseMenuItems(menu, tab, tabItem, targetTabView);
+            return menu;
+        }
+
+        private void AddFileMenuItems(MenuFlyout menu, OpenedTab tab, TabViewItem tabItem)
+        {
             string? fileActionPath = GetFileActionPath(tab);
             bool hasActionPath = !string.IsNullOrEmpty(fileActionPath) || !string.IsNullOrWhiteSpace(tab.RemotePath);
 
@@ -266,9 +291,10 @@ namespace TxtAIEditor.Controls
                     menu.Items.Add(encryptItem);
                 }
             }
+        }
 
-            menu.Items.Add(new MenuFlyoutSeparator());
-
+        private void AddCloseMenuItems(MenuFlyout menu, OpenedTab tab, TabViewItem tabItem, TabView targetTabView)
+        {
             var closeRightItem = new MenuFlyoutItem { Text = _getString("TabMenuCloseRight", "오른쪽 탭 닫기"), Icon = new SymbolIcon(Symbol.Forward) };
             closeRightItem.Click += (_, __) => _closeRightTabs(tab, tabItem, targetTabView);
             menu.Items.Add(closeRightItem);
@@ -280,8 +306,6 @@ namespace TxtAIEditor.Controls
             var closeOthersItem = new MenuFlyoutItem { Text = _getString("TabMenuCloseOthers", "다른 탭 닫기"), Icon = new SymbolIcon(Symbol.Cancel) };
             closeOthersItem.Click += (_, __) => _closeOtherTabs(tab, tabItem, targetTabView);
             menu.Items.Add(closeOthersItem);
-
-            return menu;
         }
 
         public void ShowContextMenu(

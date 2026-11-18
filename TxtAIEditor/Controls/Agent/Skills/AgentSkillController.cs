@@ -23,21 +23,24 @@ namespace TxtAIEditor.Controls
         private readonly Action _contextChanged;
         private readonly IReadOnlyList<string> _skillDirectories;
         private readonly List<AgentSkill> _skills = new();
-        private readonly Dictionary<string, AgentSkill> _activePluginSkills = new(StringComparer.OrdinalIgnoreCase);
+        private readonly AgentSessionSelectionContext _selections;
+        private Dictionary<string, AgentSkill> _activePluginSkills => _selections.Current.ActivePluginSkills;
         private readonly Dictionary<string, AgentSkill> _installedPluginSkills = new(StringComparer.OrdinalIgnoreCase);
-        private readonly HashSet<string> _removedPluginSkills = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, HashSet<string>> _builtInRelatedSkills = new(StringComparer.OrdinalIgnoreCase);
-        private readonly HashSet<string> _removedBuiltInRelatedSkills = new(StringComparer.OrdinalIgnoreCase);
-        private readonly HashSet<string> _selectedSkillNames = new(StringComparer.OrdinalIgnoreCase);
+        private HashSet<string> _removedPluginSkills => _selections.Current.DisabledPluginSkills;
+        private Dictionary<string, HashSet<string>> _builtInRelatedSkills => _selections.Current.BuiltInRelatedSkills;
+        private HashSet<string> _removedBuiltInRelatedSkills => _selections.Current.DisabledBuiltInSkills;
+        private HashSet<string> _selectedSkillNames => _selections.Current.Skills;
         private readonly SemaphoreSlim _loadGate = new(1, 1);
         private Task? _loadTask;
 
         public AgentSkillController(
             AgentPane agentPane,
+            AgentSessionSelectionContext selections,
             Func<string, string, string> getString,
             Action contextChanged)
         {
             _agentPane = agentPane;
+            _selections = selections;
             _getString = getString;
             _contextChanged = contextChanged;
             _skillDirectories = AgentSkillDirectories.GetSkillSearchDirectories();
@@ -266,7 +269,7 @@ namespace TxtAIEditor.Controls
             UpdateUI();
         }
 
-        public void SetBuiltInRelatedSkills(string pluginId, IReadOnlyList<string> skillNames)
+        public void SetBuiltInRelatedSkills(string pluginId, IReadOnlyList<string> skillNames, bool preserveOverrides = false)
         {
             string key = pluginId?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(key))
@@ -285,7 +288,7 @@ namespace TxtAIEditor.Controls
                 previousNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             }
 
-            if (!previousNames.SetEquals(names))
+            if (!preserveOverrides && !previousNames.SetEquals(names))
             {
                 // The configured list changed (ComfyUI activated, deactivated, or
                 // re-saved), so re-apply it and drop deselection overrides.
@@ -403,7 +406,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public void SetActivePluginSkills(IEnumerable<AgentPluginSkill> pluginSkills)
+        public void SetActivePluginSkills(IEnumerable<AgentPluginSkill> pluginSkills, bool preserveOverrides = false)
         {
             var previousNames = new HashSet<string>(_activePluginSkills.Keys, StringComparer.OrdinalIgnoreCase);
             _activePluginSkills.Clear();
@@ -422,8 +425,11 @@ namespace TxtAIEditor.Controls
                 };
             }
 
-            previousNames.SymmetricExceptWith(_activePluginSkills.Keys);
-            _removedPluginSkills.ExceptWith(previousNames);
+            if (!preserveOverrides)
+            {
+                previousNames.SymmetricExceptWith(_activePluginSkills.Keys);
+                _removedPluginSkills.ExceptWith(previousNames);
+            }
             UpdateUI();
         }
 
@@ -503,11 +509,10 @@ namespace TxtAIEditor.Controls
                     CanDelete = AgentSkillDirectories.IsInsideUserSkillsDirectory(skill.SkillFilePath)
                 })
                 .ToList();
-            var selectedNames = GetSelectedSkillNamesForUi();
-
             void ApplyUI()
             {
-                _agentPane.UpdateAgentSkillsMenu(skillItems, selectedNames, _getString);
+                using var visible = _selections.Use(_selections.Visible);
+                _agentPane.UpdateAgentSkillsMenu(skillItems, GetSelectedSkillNamesForUi(), _getString);
                 QueueContextChanged();
             }
 
@@ -539,11 +544,10 @@ namespace TxtAIEditor.Controls
 
         private void UpdateSelectionUI()
         {
-            var selectedNames = GetSelectedSkillNamesForUi();
-
             void ApplyUI()
             {
-                _agentPane.UpdateAgentSkillSelection(selectedNames, _getString);
+                using var visible = _selections.Use(_selections.Visible);
+                _agentPane.UpdateAgentSkillSelection(GetSelectedSkillNamesForUi(), _getString);
                 QueueContextChanged();
             }
 

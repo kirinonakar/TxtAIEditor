@@ -70,9 +70,9 @@ namespace TxtAIEditor.Controls
                 session.IsRewinding = true;
                 try
                 {
-                    AgentSessionRewindSnapshot snapshot = session.RewindSnapshots[^1];
+                    AgentSessionRewindSnapshot snapshot = session.RewindSnapshots.ReadLatest();
                     await _sessionEditController.RevertRunAsync(sessionId, snapshot);
-                    session.RewindSnapshots.RemoveAt(session.RewindSnapshots.Count - 1);
+                    session.RewindSnapshots.RemoveLatest(snapshot);
                     RestoreOpenSessionFromSnapshot(session, snapshot);
                     await PersistRewoundSessionHistoryAsync(session);
                 }
@@ -135,6 +135,7 @@ namespace TxtAIEditor.Controls
                 Timestamp = DateTime.Now,
                 Title = session.Title,
                 Role = session.Role,
+                Selections = session.Selections.Copy(),
                 OrchestratorSessionId = session.OrchestratorSessionId,
                 SessionHistoryText = session.SessionHistoryText,
                 ModelSessionHistoryText = session.ModelSessionHistoryText,

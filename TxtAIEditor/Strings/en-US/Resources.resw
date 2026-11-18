@@ -1814,6 +1814,9 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="TabMenuCloseOthers" xml:space="preserve">
     <value>Close Other Tabs</value>
   </data>
+  <data name="TabMenuCloseAllDiffTabs" xml:space="preserve">
+    <value>Close All Diff Tabs</value>
+  </data>
   <data name="TabMenuRunPython" xml:space="preserve">
     <value>Run</value>
   </data>
@@ -2938,7 +2941,7 @@ Plan: {0}</value>
     <value>Session History</value>
   </data>
   <data name="AgentHistoryTitle" xml:space="preserve">
-    <value>Session History (Recent 20)</value>
+    <value>Session History (Recent {0})</value>
   </data>
   <data name="AgentDeleteHistoryTooltip" xml:space="preserve">
     <value>Clear All History</value>
@@ -2952,6 +2955,7 @@ Plan: {0}</value>
   <data name="AgentHistoryLoadedActivity" xml:space="preserve">
     <value>Session history loaded</value>
   </data>
+  <data name="AgentSessionLoadFailedFormat" xml:space="preserve"><value>Could not load session: {0}</value></data>
   <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
     <value>New Tab</value>
   </data>

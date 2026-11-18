@@ -29,10 +29,12 @@ namespace TxtAIEditor.Controls
         private readonly Action? _afterDialog;
         private readonly string _presetsFilePath;
         private readonly List<AgentPreset> _presets = new();
-        private readonly HashSet<string> _selectedPresetNames = new(StringComparer.OrdinalIgnoreCase);
+        private readonly AgentSessionSelectionContext _selections;
+        private HashSet<string> _selectedPresetNames => _selections.Current.Presets;
 
         public AgentPresetController(
             AgentPane agentPane,
+            AgentSessionSelectionContext selections,
             Action<object> initializePickerWindow,
             Action<string, string> showError,
             Func<string, string, string> getString,
@@ -41,6 +43,7 @@ namespace TxtAIEditor.Controls
             Action? afterDialog)
         {
             _agentPane = agentPane;
+            _selections = selections;
             _initializePickerWindow = initializePickerWindow;
             _showError = showError;
             _getString = getString;
@@ -411,14 +414,15 @@ namespace TxtAIEditor.Controls
             UpdateUI();
         }
 
+        public void RefreshSelection() => UpdateUI();
+
         private void UpdateUI()
         {
             var presetNames = _presets.Select(p => p.Name).ToList();
-            var selectedNames = _selectedPresetNames.ToList();
 
             void ApplyUI()
             {
-                _agentPane.UpdateAgentPresetsMenu(presetNames, selectedNames, _getString);
+                _agentPane.UpdateAgentPresetsMenu(presetNames, _selections.Visible.Presets.ToList(), _getString);
                 QueueContextChanged();
             }
 

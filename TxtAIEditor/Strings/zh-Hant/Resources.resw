@@ -1814,6 +1814,9 @@
   <data name="TabMenuCloseOthers" xml:space="preserve">
     <value>關閉其他 Tab</value>
   </data>
+  <data name="TabMenuCloseAllDiffTabs" xml:space="preserve">
+    <value>關閉所有差異索引標籤</value>
+  </data>
   <data name="TabMenuRunPython" xml:space="preserve">
     <value>執行</value>
   </data>
@@ -2938,7 +2941,7 @@
     <value>會話歷史記錄</value>
   </data>
   <data name="AgentHistoryTitle" xml:space="preserve">
-    <value>會話歷史記錄（最近 20 個）</value>
+    <value>會話歷史記錄（最近 {0} 個）</value>
   </data>
   <data name="AgentDeleteHistoryTooltip" xml:space="preserve">
     <value>清除所有歷史記錄</value>
@@ -2952,6 +2955,7 @@
   <data name="AgentHistoryLoadedActivity" xml:space="preserve">
     <value>會話歷史記錄已載入</value>
   </data>
+  <data name="AgentSessionLoadFailedFormat" xml:space="preserve"><value>無法載入會話：{0}</value></data>
   <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
     <value>新分頁</value>
   </data>

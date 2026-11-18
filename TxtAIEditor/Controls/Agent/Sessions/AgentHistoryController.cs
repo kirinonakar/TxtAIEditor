@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using TxtAIEditor.Core.Services.LLM;
 
@@ -17,6 +14,7 @@ namespace TxtAIEditor.Controls
         public DateTime Timestamp { get; set; }
         public string Title { get; set; } = string.Empty;
         public AgentSessionRole Role { get; set; }
+        public AgentSessionSelections? Selections { get; set; }
         public string? OrchestratorSessionId { get; set; }
         public string SessionHistoryText { get; set; } = string.Empty;
         public string ModelSessionHistoryText { get; set; } = string.Empty;
@@ -28,37 +26,21 @@ namespace TxtAIEditor.Controls
 
     internal sealed class AgentHistoryController
     {
-        private const int MaxHistoryItems = 20;
-
         private readonly AgentPane _agentPane;
-        private readonly string _historyFilePath;
-        private readonly List<AgentHistoryItem> _history = new();
-        private readonly SemaphoreSlim _saveGate = new(1, 1);
+        private readonly AgentHistoryStore _store = AgentHistoryStore.Shared;
+        private readonly object _writeGate = new();
+        private volatile Task _pendingWrite = Task.CompletedTask;
 
         public AgentHistoryController(AgentPane agentPane)
         {
             _agentPane = agentPane;
-
-            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            string settingsDir = Path.Combine(userProfile, ".TxtAIEditor");
-            _historyFilePath = Path.Combine(settingsDir, "agent-history.json");
         }
 
         public async Task LoadAsync(string currentSessionId)
         {
             try
             {
-                if (File.Exists(_historyFilePath))
-                {
-                    string json = await File.ReadAllTextAsync(_historyFilePath);
-                    var loaded = JsonSerializer.Deserialize<List<AgentHistoryItem>>(json);
-                    if (loaded != null)
-                    {
-                        _history.Clear();
-                        _history.AddRange(loaded.Where(h => !string.IsNullOrWhiteSpace(h.Id)));
-                        RestoreLegacySubagentLinks();
-                    }
-                }
+                await Task.Run(_store.Load);
             }
             catch (Exception ex)
             {
@@ -68,96 +50,75 @@ namespace TxtAIEditor.Controls
             UpdateUI(currentSessionId);
         }
 
-        public AgentHistoryItem? GetSession(string historyId)
+        public AgentHistoryEntry? GetEntry(string id) => _store.Entries.FirstOrDefault(entry => entry.Id == id);
+
+        public async Task<AgentHistoryItem?> ReadSessionAsync(string id)
         {
-            return _history.FirstOrDefault(h => h.Id == historyId);
+            await _pendingWrite;
+            return await Task.Run(() => _store.ReadSession(id));
         }
+        public AgentHistoryStore.OpenHistorySession? OpenSession(string id) => _store.OpenSession(id);
+
+        public List<AgentFileEditPreview> ReadSessionEdits(string id) => _store.ReadSessionEdits(id);
 
         public IEnumerable<string> GetSubagentSessionIds(string parentId) =>
-            _history.Where(item => item.OrchestratorSessionId == parentId).Select(item => item.Id);
+            _store.Entries.Where(item => item.Role == AgentSessionRole.Subagent && item.OrchestratorSessionId == parentId)
+                .Select(item => item.Id);
 
-        public async Task UpdateSessionEditsAsync(IReadOnlyDictionary<string, List<AgentFileEditPreview>> updates, string currentSessionId)
+        public Task UpdateSessionEditsAsync(IReadOnlyDictionary<string, List<AgentFileEditPreview>> updates)
         {
-            bool changed = false;
-            foreach (AgentHistoryItem item in _history)
-            {
-                if (updates.TryGetValue(item.Id, out List<AgentFileEditPreview>? edits))
-                {
-                    item.SessionEdits = edits;
-                    changed = true;
-                }
-            }
-            if (changed)
-            {
-                await SaveAsync(currentSessionId);
-            }
-        }
-
-        private void RestoreLegacySubagentLinks()
-        {
-            var unlinked = _history.Where(item =>
-                item.Role == AgentSessionRole.Subagent && string.IsNullOrEmpty(item.OrchestratorSessionId)).ToList();
-            if (unlinked.Count == 0)
-            {
-                return;
-            }
-
-            foreach (AgentHistoryItem parent in _history.Where(item => item.Role == AgentSessionRole.Orchestrator))
-            {
-                // Older history recorded the new session ID in the spawn tool result.
-                var matches = Regex.Matches(parent.SessionHistoryText ?? string.Empty,
-                    @"^\[tool: spawn[_ -]subagent result\]\r?\nStarted subagent ([0-9a-f-]{36}) \(",
-                    RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-                foreach (Match match in matches)
-                {
-                    string childId = match.Groups[1].Value;
-                    var child = unlinked.FirstOrDefault(item => string.Equals(item.Id, childId, StringComparison.Ordinal));
-                    if (child != null)
-                    {
-                        child.OrchestratorSessionId = parent.Id;
-                        unlinked.Remove(child);
-                    }
-                }
-
-                if (unlinked.Count == 0)
-                {
-                    return;
-                }
-            }
+            var snapshot = updates.ToDictionary(pair => pair.Key, pair => AgentSessionRewindSnapshot.CloneEdits(pair.Value));
+            return EnqueueWrite(() => _store.UpdateSessionEdits(snapshot));
         }
 
         public async Task SaveSessionAsync(AgentHistoryItem session, string currentSessionId)
         {
             session.SessionHistoryText = AgentRunTranscriptService.ConvertToolCallTagsToLogTags(session.SessionHistoryText);
             session.SessionHistoryText = AgentRunTranscriptService.ConvertUserRequestMarkersForHistory(session.SessionHistoryText);
-            var existing = _history.FirstOrDefault(h => h.Id == session.Id);
-            if (existing != null)
-            {
-                existing.Timestamp = session.Timestamp;
-                existing.Title = session.Title;
-                existing.Role = session.Role;
-                existing.OrchestratorSessionId = session.OrchestratorSessionId;
-                existing.SessionHistoryText = session.SessionHistoryText;
-                existing.ModelSessionHistoryText = session.ModelSessionHistoryText;
-                existing.LastAnswerText = session.LastAnswerText;
-                existing.SessionHistoryTokenCount = session.SessionHistoryTokenCount;
-                existing.SessionEdits = session.SessionEdits.ToList();
-                existing.WorkspaceRoot = session.WorkspaceRoot;
+            await EnqueueWrite(() => _store.SaveSession(session));
+            UpdateUI(currentSessionId);
+        }
 
-                _history.Remove(existing);
-                _history.Insert(0, existing);
-            }
-            else
+        public void RememberSelections(string id, AgentSessionSelections selections)
+        {
+            var entry = GetEntry(id);
+            if (entry == null || (_pendingWrite.IsCompleted && selections.EquivalentTo(entry.Selections)))
             {
-                _history.Insert(0, session);
+                return;
             }
 
-            while (_history.Count > MaxHistoryItems)
-            {
-                _history.RemoveAt(_history.Count - 1);
-            }
+            var snapshot = selections.Copy();
+            _ = EnqueueWrite(() => _store.UpdateSelections(id, snapshot));
+        }
 
-            await SaveAsync(currentSessionId);
+        public void FlushPendingWrites() => _pendingWrite.GetAwaiter().GetResult();
+
+        private Task EnqueueWrite(Action action)
+        {
+            lock (_writeGate)
+            {
+                Task write = RunAfterAsync(_pendingWrite, action);
+                _pendingWrite = ObserveWriteAsync(write);
+                return write;
+            }
+        }
+
+        private static async Task RunAfterAsync(Task previous, Action action)
+        {
+            await previous.ConfigureAwait(false);
+            await Task.Run(action).ConfigureAwait(false);
+        }
+
+        private static async Task ObserveWriteAsync(Task write)
+        {
+            try
+            {
+                await write.ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to save agent history: {ex.Message}");
+            }
         }
 
         public async Task DeleteAsync(string historyId, string currentSessionId)
@@ -167,27 +128,20 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            var item = _history.FirstOrDefault(h => h.Id == historyId);
-            if (item != null)
-            {
-                _history.Remove(item);
-                await SaveAsync(currentSessionId);
-                return;
-            }
-
+            await EnqueueWrite(() => _store.Delete(historyId));
             UpdateUI(currentSessionId);
         }
 
         public async Task ClearAsync(string currentSessionId)
         {
-            _history.Clear();
-            await SaveAsync(currentSessionId);
+            await EnqueueWrite(() => _store.Delete(null));
+            UpdateUI(currentSessionId);
         }
 
         public void UpdateUI(string currentSessionId)
         {
-            var viewModels = _history
-                .OrderByDescending(h => h.Timestamp)
+            var viewModels = AgentHistoryStore.GroupEntries(_store.Entries)
+                .SelectMany(group => group.OrderBy(item => item.Id != group.Key))
                 .Select(h =>
                 {
                     string prefix = string.Empty;
@@ -207,6 +161,7 @@ namespace TxtAIEditor.Controls
                     return new AgentHistoryItemViewModel
                     {
                         Id = h.Id,
+                        OrchestratorSessionId = h.Role == AgentSessionRole.Subagent ? h.OrchestratorSessionId : null,
                         Title = $"{AgentSessionLabels.Prefix(h.Role)}{prefix}{h.Title}",
                         TimeText = h.Timestamp.ToString("MM-dd HH:mm")
                     };
@@ -217,32 +172,6 @@ namespace TxtAIEditor.Controls
             {
                 _agentPane.UpdateHistoryItems(viewModels, currentSessionId);
             });
-        }
-
-        private async Task SaveAsync(string currentSessionId)
-        {
-            await _saveGate.WaitAsync();
-            try
-            {
-                string? dir = Path.GetDirectoryName(_historyFilePath);
-                if (dir != null && !Directory.Exists(dir))
-                {
-                    Directory.CreateDirectory(dir);
-                }
-
-                string json = JsonSerializer.Serialize(_history, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(_historyFilePath, json);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to save agent history: {ex.Message}");
-            }
-            finally
-            {
-                _saveGate.Release();
-            }
-
-            UpdateUI(currentSessionId);
         }
 
         public static string ExtractLastAgentResponse(string historyText)

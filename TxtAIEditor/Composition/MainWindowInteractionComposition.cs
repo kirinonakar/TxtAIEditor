@@ -61,6 +61,7 @@ namespace TxtAIEditor.Composition
         Action<OpenedTab, TabViewItem, TabView> CloseRightTabs,
         Action<OpenedTab, TabViewItem, TabView> CloseLeftTabs,
         Action<OpenedTab, TabViewItem, TabView> CloseOtherTabs,
+        Action CloseAllDiffTabs,
         Func<string, Task> OpenNotebookSourceTabAsync,
         Func<string, Task> OpenNotebookViewerTabAsync,
         Func<OpenedTab, Task> OpenTabInNewWindowAsync);
@@ -188,6 +189,7 @@ namespace TxtAIEditor.Composition
                 callbacks.CloseRightTabs,
                 callbacks.CloseLeftTabs,
                 callbacks.CloseOtherTabs,
+                callbacks.CloseAllDiffTabs,
                 terminalPanel.RunFileInTerminal,
                 tabNavigation.GetTabViewForItem,
                 callbacks.OpenNotebookSourceTabAsync,

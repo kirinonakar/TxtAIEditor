@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.Web.WebView2.Core;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
@@ -31,6 +32,8 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, EditorDocumentSession?> _getEditorSession;
         private readonly ConditionalWeakTable<WebView2, ComparisonState> _comparisons = new();
         private readonly HashSet<string> _revertingPaths = new(StringComparer.OrdinalIgnoreCase);
+
+        internal event Action<OpenedTab, TabViewItem, RightTappedRoutedEventArgs>? TabRightTapped;
 
         private sealed class ComparisonState
         {
@@ -91,6 +94,11 @@ namespace TxtAIEditor.Controls
             string fileName = Path.GetFileName(pathA);
             foreach (var t in _viewModel.Tabs)
             {
+                if (!t.IsDiffView)
+                {
+                    continue;
+                }
+
                 if (string.Equals(t.Title, title, StringComparison.Ordinal) ||
                     (!string.IsNullOrEmpty(customTitle) && 
                      t.Title.StartsWith(diffTitlePrefix, StringComparison.Ordinal) && 
@@ -170,7 +178,8 @@ namespace TxtAIEditor.Controls
             {
                 Title = title,
                 FilePath = string.Empty,
-                ContentPreview = string.Empty
+                ContentPreview = string.Empty,
+                IsDiffView = true
             };
 
             _viewModel.Tabs.Add(tab);
@@ -190,6 +199,7 @@ namespace TxtAIEditor.Controls
                 Content = grid,
                 Tag = tab.Id
             };
+            tabItem.RightTapped += (_, args) => TabRightTapped?.Invoke(tab, tabItem, args);
 
             var env = await WebViewEnvironmentProvider.GetSharedAsync();
             await diffWebView.EnsureCoreWebView2Async(env);
@@ -408,6 +418,11 @@ namespace TxtAIEditor.Controls
             string fileName = Path.GetFileName(pathA);
             foreach (var t in _viewModel.Tabs)
             {
+                if (!t.IsDiffView)
+                {
+                    continue;
+                }
+
                 if (string.Equals(t.Title, title, StringComparison.Ordinal) ||
                     (t.Title.StartsWith(diffTitlePrefix, StringComparison.Ordinal) && t.Title.Contains(fileName)))
                 {

@@ -72,14 +72,20 @@ namespace TxtAIEditor.Controls
         private readonly Func<Task<IReadOnlyList<AgentPluginEntry>>> _getEntriesAsync;
         private readonly Action<AgentPluginEntry, bool> _setActive;
         private readonly Func<string, JsonElement, CancellationToken, Task<AgentPluginInstallResult>> _installAsync;
-        private readonly Dictionary<string, (AgentPluginEntry Entry, bool Active, long Order)> _pending = new(StringComparer.OrdinalIgnoreCase);
+        private readonly AgentSessionSelectionContext _selections;
+        private readonly System.Runtime.CompilerServices.ConditionalWeakTable<AgentSessionSelections,
+            Dictionary<string, (AgentPluginEntry Entry, bool Active, long Order)>> _pendingBySession = new();
+        private Dictionary<string, (AgentPluginEntry Entry, bool Active, long Order)> _pending => _pendingBySession.GetValue(
+            _selections.Current, _ => new(StringComparer.OrdinalIgnoreCase));
         private long _changeOrder;
 
         public AgentMcpPluginManagerTool(
+            AgentSessionSelectionContext selections,
             Func<Task<IReadOnlyList<AgentPluginEntry>>> getEntriesAsync,
             Action<AgentPluginEntry, bool> setActive,
             Func<string, JsonElement, CancellationToken, Task<AgentPluginInstallResult>> installAsync)
         {
+            _selections = selections;
             _getEntriesAsync = getEntriesAsync;
             _setActive = setActive;
             _installAsync = installAsync;
@@ -266,7 +272,7 @@ namespace TxtAIEditor.Controls
         internal static bool IsInstallAlias(string alias) => alias is InstallPluginAlias or InstallMcpAlias or InstallSkillAlias;
 
         private void QueueActiveChange(AgentPluginEntry entry, bool active) =>
-            _pending[entry.Id] = (entry, active, ++_changeOrder);
+            _pending[entry.Id] = (entry, active, Interlocked.Increment(ref _changeOrder));
 
         private object DescribeEntry(AgentPluginEntry entry) => new
         {

@@ -1814,6 +1814,9 @@
   <data name="TabMenuCloseOthers" xml:space="preserve">
     <value>他のタブを閉じる</value>
   </data>
+  <data name="TabMenuCloseAllDiffTabs" xml:space="preserve">
+    <value>すべての差分タブを閉じる</value>
+  </data>
   <data name="TabMenuRunPython" xml:space="preserve">
     <value>実行</value>
   </data>
@@ -2938,7 +2941,7 @@
     <value>セッション履歴</value>
   </data>
   <data name="AgentHistoryTitle" xml:space="preserve">
-    <value>セッション履歴 (最近の20件)</value>
+    <value>セッション履歴 (最近の{0}件)</value>
   </data>
   <data name="AgentDeleteHistoryTooltip" xml:space="preserve">
     <value>すべての履歴を削除</value>
@@ -2952,6 +2955,7 @@
   <data name="AgentHistoryLoadedActivity" xml:space="preserve">
     <value>セッション履歴がロードされました</value>
   </data>
+  <data name="AgentSessionLoadFailedFormat" xml:space="preserve"><value>セッションを読み込めませんでした: {0}</value></data>
   <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
     <value>新規タブに入力</value>
   </data>

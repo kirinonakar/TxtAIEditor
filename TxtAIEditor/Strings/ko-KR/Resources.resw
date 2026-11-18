@@ -1814,6 +1814,9 @@
   <data name="TabMenuCloseOthers" xml:space="preserve">
     <value>다른 탭 닫기</value>
   </data>
+  <data name="TabMenuCloseAllDiffTabs" xml:space="preserve">
+    <value>Diff 모두 닫기</value>
+  </data>
   <data name="TabMenuRunPython" xml:space="preserve">
     <value>실행</value>
   </data>
@@ -2938,7 +2941,7 @@
     <value>세션 히스토리</value>
   </data>
   <data name="AgentHistoryTitle" xml:space="preserve">
-    <value>세션 히스토리 (최근 20개)</value>
+    <value>세션 히스토리 (최근 {0}개)</value>
   </data>
   <data name="AgentDeleteHistoryTooltip" xml:space="preserve">
     <value>전체 히스토리 삭제</value>
@@ -2952,6 +2955,7 @@
   <data name="AgentHistoryLoadedActivity" xml:space="preserve">
     <value>세션 히스토리 로드됨</value>
   </data>
+  <data name="AgentSessionLoadFailedFormat" xml:space="preserve"><value>세션을 불러오지 못했습니다: {0}</value></data>
   <data name="LlmInsertNewTabOutputButtonText" xml:space="preserve">
     <value>새 탭에 입력</value>
   </data>
