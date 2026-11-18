@@ -16,7 +16,8 @@ namespace TxtAIEditor.Controls
         string Result,
         string ResultForTranscript,
         bool InterruptedWait,
-        string NormalizedName);
+        string NormalizedName,
+        int? NativeCallIndex);
 
     internal sealed record AgentToolBatchResult(IReadOnlyList<AgentToolCallResult> Results, bool StopAfterLoopGuard);
 
@@ -214,7 +215,8 @@ namespace TxtAIEditor.Controls
                     toolResult);
 
                 results.Add(new AgentToolCallResult(
-                    currentToolName, currentArguments, toolResult, toolResultForTranscript, interruptedSubagentWait, normalizedToolName));
+                    currentToolName, currentArguments, toolResult, toolResultForTranscript,
+                    interruptedSubagentWait, normalizedToolName, tc.NativeCallIndex));
 
                 if (interruptedSubagentWait || stopAfterLoopGuard ||
                     (!IsSuccessfulToolResult(toolResult) && toolCalls.Count == 1))

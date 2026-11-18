@@ -112,7 +112,7 @@ namespace TxtAIEditor.Controls
 
             // The old actual count describes a different prompt after compaction.
             tokenCalibration?.Reset();
-            return new AgentContextCompressionResult(compressedPrefix + tail, true);
+            return new AgentContextCompressionResult(compressedPrefix + tail, true, prefixLength, compressedPrefix.Length);
         }
 
         public bool ExceedsInputBudget(EditorSettings settings, int requestTokens, AgentRequestTokenCalibration tokenCalibration) =>
@@ -280,14 +280,18 @@ namespace TxtAIEditor.Controls
 
     internal sealed class AgentContextCompressionResult
     {
-        public AgentContextCompressionResult(string transcript, bool compressed)
+        public AgentContextCompressionResult(string transcript, bool compressed, int replacedPrefixLength = 0, int newPrefixLength = 0)
         {
             Transcript = transcript;
             Compressed = compressed;
+            ReplacedPrefixLength = replacedPrefixLength;
+            NewPrefixLength = newPrefixLength;
         }
 
         public string Transcript { get; }
         public bool Compressed { get; }
+        public int ReplacedPrefixLength { get; }
+        public int NewPrefixLength { get; }
 
         public static AgentContextCompressionResult Unchanged(string transcript) =>
             new(transcript, false);

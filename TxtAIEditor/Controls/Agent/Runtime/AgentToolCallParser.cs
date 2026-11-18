@@ -95,6 +95,7 @@ namespace TxtAIEditor.Controls
         {
             public string ToolName;
             public JsonElement Arguments;
+            public int? NativeCallIndex;
         }
 
         public static bool TryParse(string response, out string toolName, out JsonElement arguments)

@@ -32,7 +32,7 @@ namespace TxtAIEditor.Core.Services.LLM
             return await ExecuteAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult, onNativeToolCall, onApiType, sessionId);
         }
 
-        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null, string? sessionId = null)
+        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null, string? sessionId = null, GeminiToolRequest? geminiTools = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string providerName = settings.LlmProvider;
@@ -140,6 +140,7 @@ namespace TxtAIEditor.Core.Services.LLM
                             }
                         },
                         Tools = tools,
+                        GeminiTools = geminiTools,
                         OnUsage = onProviderUsage,
                         OnNativeToolCall = async () =>
                         {
@@ -166,6 +167,7 @@ namespace TxtAIEditor.Core.Services.LLM
                         CancellationToken = cancellationToken,
                         Attachments = attachments,
                         Tools = tools,
+                        GeminiTools = geminiTools,
                         OnUsage = onProviderUsage,
                         OnNativeToolCall = async () =>
                         {
@@ -255,7 +257,8 @@ namespace TxtAIEditor.Core.Services.LLM
                         onVisionFallbackResult: null,
                         onNativeToolCall: onNativeToolCall,
                         onApiType: onApiType,
-                        sessionId: sessionId);
+                        sessionId: sessionId,
+                        geminiTools: geminiTools);
                     if (IsLlmEmptyResponse(continuationResponse))
                     {
                         if (onChunk != null)

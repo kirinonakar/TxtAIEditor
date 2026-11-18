@@ -56,19 +56,52 @@ namespace TxtAIEditor.Core.Services.LLM
             return !string.IsNullOrEmpty(model) && model.Contains("gemma-4", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool HasNativeThoughtPart(JsonElement parts)
+        internal static bool IsGeminiProvider(string? provider) =>
+            provider?.Trim().ToLowerInvariant() is "google" or "gemini";
+
+        internal static bool SupportsFunctionCalling(string? model)
         {
-            foreach (JsonElement part in parts.EnumerateArray())
+            string name = model?.Trim().ToLowerInvariant() ?? string.Empty;
+            return (!name.Contains("gemma") || IsGemma4(name)) &&
+                !name.Contains("-tts") && !name.Contains("-image") && !name.Contains("-live") && !name.Contains("-embedding");
+        }
+
+        private static GeminiFunctionCatalog? AddFunctionTools(
+            Dictionary<string, object> payload, LlmCompletionRequest completion)
+        {
+            if (completion.Tools is not { Count: > 0 } tools)
             {
-                if (part.TryGetProperty("thought", out JsonElement thought) &&
-                    thought.ValueKind == JsonValueKind.True)
-                {
-                    return true;
-                }
+                return null;
             }
 
-            return false;
+            var catalog = new GeminiFunctionCatalog(tools);
+            payload["tools"] = catalog.GetTools();
+            if (completion.GeminiTools is { } request)
+            {
+                payload["contents"] = request.Conversation.BuildContents(completion.UserContent,
+                    request.TranscriptStart, request.TranscriptLength, text => BuildUserParts(text, completion.Attachments));
+            }
+            return catalog;
         }
+
+        private static async Task NotifyFunctionTurnAsync(LlmCompletionRequest completion, GeminiFunctionTurn turn)
+        {
+            completion.CancellationToken.ThrowIfCancellationRequested();
+            if (completion.GeminiTools is { } request)
+            {
+                request.Conversation.PendingTurn = turn;
+            }
+            if (completion.OnNativeToolCall != null)
+            {
+                await completion.OnNativeToolCall();
+            }
+        }
+
+        private static bool IsTruncated(JsonElement candidate) =>
+            candidate.TryGetProperty("finishReason", out var reason) && reason.ValueEquals("MAX_TOKENS");
+
+        private static bool IsThought(JsonElement part) =>
+            part.TryGetProperty("thought", out var thought) && thought.ValueKind == JsonValueKind.True;
 
         private static int EstimateTokenCount(string text)
         {
@@ -296,35 +329,20 @@ namespace TxtAIEditor.Core.Services.LLM
             return url;
         }
 
-        public async Task<string> GenerateCompletionAsync(LlmCompletionRequest completion)
+        private async Task<(Dictionary<string, object> Payload, GeminiFunctionCatalog? Functions)> BuildPayloadAsync(
+            LlmCompletionRequest completion)
         {
-            var endpoint = completion.Endpoint;
-            var apiKey = completion.ApiKey;
             var model = completion.Model;
-            var systemPrompt = completion.SystemPrompt;
-            var userContent = completion.UserContent;
-            var cancellationToken = completion.CancellationToken;
-            var attachments = completion.Attachments;
-            var tools = completion.Tools;
-            var onUsage = completion.OnUsage;
-            var onNativeToolCall = completion.OnNativeToolCall;
-            var onApiType = completion.OnApiType;
-            cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrEmpty(apiKey))
-                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
-
-            string baseUrl = string.IsNullOrWhiteSpace(endpoint) ? "https://generativelanguage.googleapis.com" : endpoint.TrimEnd('/');
-            await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.GeminiGenerateContent);
-            string requestUrl = BuildGeminiUrl(baseUrl, model, false);
-
-            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
+            bool supportsTools = SupportsFunctionCalling(model);
+            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, completion.CancellationToken);
             if (outputLimit <= 0) outputLimit = 65536;
             outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
                 contextLimit,
                 outputLimit,
-                systemPrompt,
-                userContent,
-                attachments);
+                completion.SystemPrompt,
+                completion.UserContent,
+                completion.Attachments,
+                supportsTools ? completion.Tools : null);
 
             var generationConfigDict = new Dictionary<string, object>
             {
@@ -357,18 +375,36 @@ namespace TxtAIEditor.Core.Services.LLM
                     new
                     {
                         role = "user",
-                        parts = BuildUserParts(userContent, attachments)
+                        parts = BuildUserParts(completion.UserContent, completion.Attachments)
                     }
                 },
                 ["systemInstruction"] = new
                 {
                     parts = new[]
                     {
-                        new { text = systemPrompt }
+                        new { text = completion.SystemPrompt }
                     }
                 },
                 ["generationConfig"] = generationConfigDict
             };
+            return (payload, supportsTools ? AddFunctionTools(payload, completion) : null);
+        }
+
+        public async Task<string> GenerateCompletionAsync(LlmCompletionRequest completion)
+        {
+            var endpoint = completion.Endpoint;
+            var apiKey = completion.ApiKey;
+            var model = completion.Model;
+            var cancellationToken = completion.CancellationToken;
+            var onUsage = completion.OnUsage;
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrEmpty(apiKey))
+                throw new ArgumentException(_localizationService.GetString("LlmErrorInvalidApiKey", "API Key가 유효하지 않습니다. 설정을 먼저 확인해 주십시오."));
+
+            string baseUrl = string.IsNullOrWhiteSpace(endpoint) ? "https://generativelanguage.googleapis.com" : endpoint.TrimEnd('/');
+            await LlmApiTypeReporter.ReportAsync(completion.OnApiType, LlmApiTypes.GeminiGenerateContent);
+            string requestUrl = BuildGeminiUrl(baseUrl, model, false);
+            var (payload, functionCatalog) = await BuildPayloadAsync(completion);
 
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
@@ -388,13 +424,25 @@ namespace TxtAIEditor.Core.Services.LLM
                     {
                         var root = doc.RootElement;
                         await LlmUsageReporter.TryReportUsageAsync(root, onUsage);
-                        // Extract candidates[0].content.parts[0].text
                         if (root.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
                         {
                             var firstCandidate = candidates[0];
+                            if (functionCatalog != null && IsTruncated(firstCandidate))
+                            {
+                                throw new ResponseTruncatedException();
+                            }
                             if (firstCandidate.TryGetProperty("content", out var candidateContent) &&
                                 candidateContent.TryGetProperty("parts", out var parts) && parts.GetArrayLength() > 0)
                             {
+                                if (functionCatalog?.ReadTurn(parts.EnumerateArray().Select(part => part.Clone()).ToArray()) is { } turn)
+                                {
+                                    await NotifyFunctionTurnAsync(completion, turn);
+                                    string text = string.Concat(turn.ModelParts.Where(part => !IsThought(part) &&
+                                        part.TryGetProperty("text", out _)).Select(part => part.GetProperty("text").GetString()));
+                                    string calls = GeminiFunctionCatalog.FormatCalls(turn);
+                                    return string.IsNullOrWhiteSpace(text) ? calls : text.TrimEnd() + "\n\n" + calls;
+                                }
+
                                 if (IsGemma4(model))
                                 {
                                     var sb = new StringBuilder();
@@ -435,10 +483,17 @@ namespace TxtAIEditor.Core.Services.LLM
                                 }
                                 else
                                 {
-                                    var firstPart = parts[0];
-                                    if (firstPart.TryGetProperty("text", out var text))
+                                    var answer = new StringBuilder();
+                                    foreach (JsonElement part in parts.EnumerateArray())
                                     {
-                                        return text.GetString() ?? string.Empty;
+                                        if (!IsThought(part) && part.TryGetProperty("text", out var text))
+                                        {
+                                            answer.Append(text.GetString());
+                                        }
+                                    }
+                                    if (answer.Length > 0)
+                                    {
+                                        return answer.ToString();
                                     }
                                 }
                             }
@@ -455,13 +510,8 @@ namespace TxtAIEditor.Core.Services.LLM
             var endpoint = completion.Endpoint;
             var apiKey = completion.ApiKey;
             var model = completion.Model;
-            var systemPrompt = completion.SystemPrompt;
-            var userContent = completion.UserContent;
             var cancellationToken = completion.CancellationToken;
-            var attachments = completion.Attachments;
-            var tools = completion.Tools;
             var onUsage = completion.OnUsage;
-            var onNativeToolCall = completion.OnNativeToolCall;
             var onApiType = completion.OnApiType;
             var onReasoning = completion.OnReasoning;
             var onChunk = completion.OnChunk ?? throw new ArgumentException("A streaming callback is required.", nameof(completion));
@@ -473,58 +523,7 @@ namespace TxtAIEditor.Core.Services.LLM
             await LlmApiTypeReporter.ReportAsync(onApiType, LlmApiTypes.GeminiGenerateContent);
             string requestUrl = BuildGeminiUrl(baseUrl, model, true);
 
-            var (contextLimit, outputLimit) = await GetTokenLimitsAsync(model, cancellationToken);
-            if (outputLimit <= 0) outputLimit = 65536;
-            outputLimit = LlmTokenBudget.GetSafeMaxOutputTokens(
-                contextLimit,
-                outputLimit,
-                systemPrompt,
-                userContent,
-                attachments);
-
-            var generationConfigDict = new Dictionary<string, object>
-            {
-                ["maxOutputTokens"] = outputLimit
-            };
-            LlmRequestTuning.SetTemperature(generationConfigDict, 0.5);
-
-            if (HasThinking)
-            {
-                string levelStr = _thinkingLevel.ToUpperInvariant();
-                if (model.Contains("gemma", StringComparison.OrdinalIgnoreCase) && levelStr == "LOW")
-                {
-                    levelStr = "MINIMAL";
-                }
-                else if (levelStr == "XHIGH" || levelStr == "MAX")
-                {
-                    levelStr = "HIGH";
-                }
-
-                generationConfigDict["thinkingConfig"] = new Dictionary<string, object>
-                {
-                    ["thinkingLevel"] = levelStr
-                };
-            }
-
-            var payload = new Dictionary<string, object>
-            {
-                ["contents"] = new[]
-                {
-                    new
-                    {
-                        role = "user",
-                        parts = BuildUserParts(userContent, attachments)
-                    }
-                },
-                ["systemInstruction"] = new
-                {
-                    parts = new[]
-                    {
-                        new { text = systemPrompt }
-                    }
-                },
-                ["generationConfig"] = generationConfigDict
-            };
+            var (payload, functionCatalog) = await BuildPayloadAsync(completion);
 
             using (var request = new HttpRequestMessage(HttpMethod.Post, requestUrl))
             {
@@ -543,7 +542,18 @@ namespace TxtAIEditor.Core.Services.LLM
                     using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
                     using (var reader = new LlmSseReader(stream))
                     {
+                        _accumulatedText = string.Empty;
+                        _lastProcessedIndex = 0;
+                        _inThought = false;
+                        _thoughtBuffer = string.Empty;
                         bool usedThoughtAwareProcessing = false;
+                        var modelParts = functionCatalog == null ? null : new List<JsonElement>();
+                        bool hasAnswerText = false;
+                        async Task EmitTextAsync(string text)
+                        {
+                            hasAnswerText |= !string.IsNullOrWhiteSpace(text);
+                            await onChunk(text);
+                        }
                         while (true)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -566,22 +576,33 @@ namespace TxtAIEditor.Core.Services.LLM
                                         if (firstCandidate.TryGetProperty("content", out var candidateContent) &&
                                             candidateContent.TryGetProperty("parts", out var parts) && parts.GetArrayLength() > 0)
                                         {
-                                            if (IsGemma4(model) || HasNativeThoughtPart(parts))
+                                            if (modelParts != null)
+                                            {
+                                                modelParts.AddRange(parts.EnumerateArray().Select(part => part.Clone()));
+                                            }
+                                            if (IsGemma4(model))
                                             {
                                                 usedThoughtAwareProcessing = true;
                                                 cancellationToken.ThrowIfCancellationRequested();
-                                                await ProcessGemma4StreamPartsAsync(parts, onChunk, onReasoning);
+                                                await ProcessGemma4StreamPartsAsync(parts, EmitTextAsync, onReasoning);
                                             }
                                             else
                                             {
-                                                var firstPart = parts[0];
-                                                if (firstPart.TryGetProperty("text", out var text))
+                                                foreach (JsonElement part in parts.EnumerateArray())
                                                 {
-                                                    string? chunk = text.GetString();
-                                                    if (!string.IsNullOrEmpty(chunk))
+                                                    if (!part.TryGetProperty("text", out var text) ||
+                                                        text.GetString() is not { Length: > 0 } chunk)
                                                     {
-                                                        cancellationToken.ThrowIfCancellationRequested();
-                                                        await onChunk(chunk);
+                                                        continue;
+                                                    }
+                                                    cancellationToken.ThrowIfCancellationRequested();
+                                                    if (!IsThought(part))
+                                                    {
+                                                        await EmitTextAsync(chunk);
+                                                    }
+                                                    else if (onReasoning != null)
+                                                    {
+                                                        await onReasoning(chunk);
                                                     }
                                                 }
                                             }
@@ -597,7 +618,12 @@ namespace TxtAIEditor.Core.Services.LLM
                         if (usedThoughtAwareProcessing)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            await FlushGemma4StreamAsync(onChunk, onReasoning);
+                            await FlushGemma4StreamAsync(EmitTextAsync, onReasoning);
+                        }
+                        if (modelParts != null && functionCatalog?.ReadTurn(modelParts) is { } turn)
+                        {
+                            await NotifyFunctionTurnAsync(completion, turn);
+                            await onChunk((hasAnswerText ? "\n\n" : string.Empty) + GeminiFunctionCatalog.FormatCalls(turn));
                         }
                     }
                 }

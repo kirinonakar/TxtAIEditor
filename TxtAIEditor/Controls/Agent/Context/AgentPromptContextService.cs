@@ -139,7 +139,7 @@ namespace TxtAIEditor.Controls
             // A vision fallback reuses this prompt with its own provider.
             bool includePluginManagerTextTools = !SupportsNativeToolCatalog(settings) ||
                 (!string.IsNullOrWhiteSpace(settings.LlmVisionFallbackModel) &&
-                    UsesTextToolCalls(settings.LlmVisionFallbackProvider));
+                    UsesTextToolCalls(settings.LlmVisionFallbackProvider, settings.LlmVisionFallbackModel));
             string mcpSection = includeMcp
                 ? _mcpController.BuildSelectedMcpSection(includePluginManagerTextTools, planningMode)
                 : string.Empty;
@@ -409,11 +409,10 @@ namespace TxtAIEditor.Controls
         }
 
         internal static bool SupportsNativeToolCatalog(EditorSettings? settings) =>
-            !UsesTextToolCalls(settings?.LlmProvider);
+            !UsesTextToolCalls(settings?.LlmProvider, settings?.LlmModel);
 
-        // GeminiProvider currently omits function declarations from its request.
-        private static bool UsesTextToolCalls(string? provider) =>
-            provider?.Trim().ToLowerInvariant() is "gemini" or "google";
+        private static bool UsesTextToolCalls(string? provider, string? model) =>
+            GeminiProvider.IsGeminiProvider(provider) && !GeminiProvider.SupportsFunctionCalling(model);
 
     }
 }

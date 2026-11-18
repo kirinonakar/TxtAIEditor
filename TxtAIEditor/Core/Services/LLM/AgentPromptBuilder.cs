@@ -89,7 +89,19 @@ namespace TxtAIEditor.Core.Services.LLM
             string workspaceContext,
             string selectedText,
             string openTabsContext,
-            string languageCode = "en-US")
+            string languageCode = "en-US") =>
+            BuildUserContent(fixedContext, conversationTranscript, workspaceContext, selectedText,
+                openTabsContext, languageCode, out _, out _);
+
+        internal static string BuildUserContent(
+            string fixedContext,
+            string conversationTranscript,
+            string workspaceContext,
+            string selectedText,
+            string openTabsContext,
+            string languageCode,
+            out int transcriptStart,
+            out int transcriptLength)
         {
             SplitConversationTranscript(
                 conversationTranscript,
@@ -105,6 +117,8 @@ namespace TxtAIEditor.Core.Services.LLM
 
             builder.AppendLine();
             builder.AppendLine("[Append-only conversation]");
+            transcriptStart = builder.Length;
+            transcriptLength = appendOnlyTranscript.Length;
             builder.AppendLine(appendOnlyTranscript);
 
             builder.AppendLine();

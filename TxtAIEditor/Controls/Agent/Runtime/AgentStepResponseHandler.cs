@@ -82,7 +82,8 @@ namespace TxtAIEditor.Controls
                 throw new LlmRequestException(getString("AgentTruncatedRetryLimit", "응답 잘림이 반복되어 Agent 실행을 중단했습니다. 다시 실행해 주세요."));
             }
 
-            if (string.IsNullOrWhiteSpace(responseForTranscript))
+            GeminiFunctionTurn? geminiTurn = streamResult.GeminiTurn;
+            if (geminiTurn == null && string.IsNullOrWhiteSpace(responseForTranscript))
             {
                 await runOutputController.StopRunThinkingActivityAsync(runContext);
 
@@ -122,8 +123,8 @@ namespace TxtAIEditor.Controls
 
             await runOutputController.StopRunThinkingActivityAsync(runContext);
 
-            bool responseLooksLikeToolResultReplay = responseInspector.LooksLikeToolResultReplay(response);
-            bool responseHasToolSyntax = AgentToolCallParser.ContainsToolCallSyntax(response);
+            bool responseLooksLikeToolResultReplay = geminiTurn == null && responseInspector.LooksLikeToolResultReplay(response);
+            bool responseHasToolSyntax = geminiTurn != null || AgentToolCallParser.ContainsToolCallSyntax(response);
             bool responseRequiresToolHandling = responseHasToolSyntax || responseLooksLikeToolResultReplay;
 
             int endLength = cleanResponse.Length;
@@ -171,6 +172,25 @@ namespace TxtAIEditor.Controls
             }
 
             runContext.ToolCancellationToken.ThrowIfCancellationRequested();
+
+            if (geminiTurn != null)
+            {
+                var nativeCalls = new List<AgentToolCallParser.ToolCallInfo>();
+                for (int index = 0; index < geminiTurn.Calls.Count; index++)
+                {
+                    var call = geminiTurn.Calls[index];
+                    if (call.ToolName != null)
+                    {
+                        nativeCalls.Add(new AgentToolCallParser.ToolCallInfo
+                        {
+                            ToolName = call.ToolName,
+                            Arguments = call.Arguments,
+                            NativeCallIndex = index
+                        });
+                    }
+                }
+                return new AgentToolTurn(nativeCalls, responseForTranscript, retainedThinkingSection, true);
+            }
 
             bool parsedToolCall = AgentToolCallParser.TryParseMulti(response, out List<AgentToolCallParser.ToolCallInfo> toolCalls);
             if (responseLooksLikeToolResultReplay || !parsedToolCall || toolCalls.Count == 0)

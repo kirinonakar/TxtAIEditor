@@ -120,6 +120,7 @@ namespace TxtAIEditor.Controls
                 if (compressionResult.Compressed)
                 {
                     compressed = true;
+                    transcript.GeminiTools?.ReplaceTranscriptPrefix(compressionResult.ReplacedPrefixLength, compressionResult.NewPrefixLength);
                     transcript.ModelText = compressionResult.Transcript;
                 }
 

@@ -56,8 +56,13 @@ namespace TxtAIEditor.Controls
             IReadOnlyList<LlmTool> agentToolsList,
             IReadOnlyList<LlmMessageAttachment> imageAttachments,
             CancellationToken cancellationToken,
+            GeminiToolConversation? geminiConversation,
             bool deferAnswer = false)
         {
+            if (geminiConversation != null)
+            {
+                geminiConversation.PendingTurn = null;
+            }
             string thinkingLabel = _getString("AgentActivityThinking", "생각중");
             var requestThinking = new ThinkingProgress(_displayText);
             await _runOutputController.BeginRunThinkingActivityAsync(runContext, thinkingLabel, requestThinking.FormatLabel);
@@ -493,7 +498,8 @@ namespace TxtAIEditor.Controls
                         runContext.ApiType = apiType;
                         return Task.CompletedTask;
                     },
-                    sessionId: runContext.SessionId);
+                    sessionId: runContext.SessionId,
+                    geminiConversation: geminiConversation);
                 await RefreshContextStatsAsync(force: true);
             }
             catch (ResponseTruncatedException)
@@ -638,7 +644,8 @@ namespace TxtAIEditor.Controls
                 PrintedLength = printedLength,
                 HeldPotentialToolCallText = heldPotentialToolCallText,
                 VisibleTextFlushed = visibleTextFlushed,
-                UsedNativeFunctionToolCall = nativeFunctionToolCallDetected
+                UsedNativeFunctionToolCall = nativeFunctionToolCallDetected,
+                GeminiTurn = geminiConversation?.PendingTurn
             };
         }
 
@@ -666,5 +673,6 @@ namespace TxtAIEditor.Controls
         public bool HeldPotentialToolCallText { get; init; }
         public bool VisibleTextFlushed { get; init; }
         public bool UsedNativeFunctionToolCall { get; init; }
+        public GeminiFunctionTurn? GeminiTurn { get; init; }
     }
 }

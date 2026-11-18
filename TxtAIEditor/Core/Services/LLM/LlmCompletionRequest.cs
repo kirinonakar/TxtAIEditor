@@ -20,6 +20,7 @@ namespace TxtAIEditor.Core.Services.LLM
         public Func<LlmTokenUsage, Task>? OnUsage { get; init; }
         public Func<Task>? OnNativeToolCall { get; init; }
         public Func<string, Task>? OnApiType { get; init; }
+        internal GeminiToolRequest? GeminiTools { get; init; }
 
         // The generated record formatter would otherwise expose credentials/prompts.
         public override string ToString() => nameof(LlmCompletionRequest);

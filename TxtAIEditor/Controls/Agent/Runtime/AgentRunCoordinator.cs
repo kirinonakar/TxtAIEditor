@@ -520,6 +520,7 @@ namespace TxtAIEditor.Controls
                         request.Tools,
                         request.ImageAttachments,
                         cancellationToken,
+                        transcript.GeminiTools,
                         deferAnswer: deferAnswer);
                     responseStreamInProgress = false;
                     runContext.ToolCancellationToken.ThrowIfCancellationRequested();
@@ -575,6 +576,13 @@ namespace TxtAIEditor.Controls
                     if (orchestration != null)
                     {
                         transcript.DisplayText += orchestration.DrainProgressLog();
+                    }
+                    if (streamResult.GeminiTurn is { } geminiTurn)
+                    {
+                        transcript.GeminiTools?.AddTurn(transcript.ModelText.Length, transcriptUpdate.Text, geminiTurn,
+                            toolCallResults.Where(result => result.NativeCallIndex.HasValue).ToDictionary(
+                                result => result.NativeCallIndex!.Value,
+                                result => (result.ResultForTranscript, IsSuccessfulToolResult(result.Result))));
                     }
                     transcript.ModelText += transcriptUpdate.Text;
                     runContext.CurrentRunTranscriptTokens += transcriptUpdate.Tokens;
