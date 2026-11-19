@@ -34,20 +34,22 @@
                 <Setter Property="VerticalAlignment" Value="Center"/>
             </Style>
 
-            <!-- Custom style for left/right sidebar toggles in the status bar -->
-            <Style x:Key="SidebarToggleButtonStyle" TargetType="ToggleButton">
+            <!-- Shared dimensions and content alignment for panel controls. -->
+            <Style x:Key="StatusBarPanelButtonStyle" TargetType="ButtonBase">
                 <Setter Property="Background" Value="Transparent"/>
                 <Setter Property="Foreground" Value="{ThemeResource StatusBarForegroundBrush}"/>
                 <Setter Property="BorderThickness" Value="0"/>
                 <Setter Property="Padding" Value="0"/>
                 <Setter Property="Height" Value="22"/>
                 <Setter Property="Width" Value="26"/>
+                <Setter Property="MinHeight" Value="0"/>
+                <Setter Property="MinWidth" Value="0"/>
                 <Setter Property="CornerRadius" Value="3"/>
                 <Setter Property="HorizontalAlignment" Value="Center"/>
                 <Setter Property="VerticalAlignment" Value="Center"/>
                 <Setter Property="Template">
                     <Setter.Value>
-                        <ControlTemplate TargetType="ToggleButton">
+                        <ControlTemplate TargetType="ButtonBase">
                             <Grid x:Name="RootGrid" CornerRadius="{TemplateBinding CornerRadius}" Background="{TemplateBinding Background}">
                                 <ContentPresenter x:Name="ContentPresenter"
                                                   Content="{TemplateBinding Content}"
@@ -104,12 +106,15 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="4"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <ToggleButton x:Name="LeftPanelToggle"
                           Grid.Column="0"
-                          Style="{StaticResource SidebarToggleButtonStyle}"
+                          Style="{StaticResource StatusBarPanelButtonStyle}"
                           IsChecked="True"
                           Click="HandleLeftPanelToggleClick"
                           ToolTipService.ToolTip="좌측 패널 (Ctrl+1)">
@@ -187,39 +192,37 @@
                           VerticalAlignment="Center"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                <Grid VerticalAlignment="Center">
-                    <ToggleButton x:Name="ChatTabToggle"
-                                  Style="{StaticResource SidebarToggleButtonStyle}">
-                        <FontIcon Glyph="&#xE8A7;" FontSize="11" RenderTransformOrigin="0.5,0.5">
-                            <FontIcon.RenderTransform>
-                                <ScaleTransform ScaleX="-1"/>
-                            </FontIcon.RenderTransform>
-                        </FontIcon>
-                    </ToggleButton>
-                    <Border x:Name="ChatTabOutline"
-                            BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
-                            BorderThickness="1" CornerRadius="3"
-                            IsHitTestVisible="False" Visibility="Collapsed"/>
-                </Grid>
+            <ToggleButton x:Name="ChatTabToggle"
+                          Grid.Column="4"
+                          Style="{StaticResource StatusBarPanelButtonStyle}">
+                <FontIcon Glyph="&#xE8A7;" FontSize="11" RenderTransformOrigin="0.5,0.5">
+                    <FontIcon.RenderTransform>
+                        <ScaleTransform ScaleX="-1"/>
+                    </FontIcon.RenderTransform>
+                </FontIcon>
+            </ToggleButton>
+            <Border x:Name="ChatTabOutline" Grid.Column="4"
+                    Width="{Binding Width, ElementName=ChatTabToggle}"
+                    Height="{Binding Height, ElementName=ChatTabToggle}"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="3"
+                    IsHitTestVisible="False" Visibility="Collapsed"/>
 
-                <Button x:Name="ExpandPreviewButton"
-                        Height="22" Width="26" Padding="0"
-                        Click="HandleExpandPreviewClick"
-                        ToolTipService.ToolTip="프리뷰 늘리기"
-                        CornerRadius="3"
-                        HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <FontIcon Glyph="&#xE1BF;" FontSize="11"/>
-                </Button>
-            </StackPanel>
+            <Button x:Name="ExpandPreviewButton"
+                    Grid.Column="6"
+                    Style="{StaticResource StatusBarPanelButtonStyle}"
+                    Click="HandleExpandPreviewClick"
+                    ToolTipService.ToolTip="프리뷰 늘리기">
+                <FontIcon Glyph="&#xE1BF;" FontSize="11"/>
+            </Button>
 
             <ToggleButton x:Name="RightPanelToggle"
-                          Grid.Column="5"
-                          Style="{StaticResource SidebarToggleButtonStyle}"
+                          Grid.Column="8"
+                          Style="{StaticResource StatusBarPanelButtonStyle}"
                           IsChecked="True"
                           Click="HandleRightPanelToggleClick"
-                          ToolTipService.ToolTip="우측 패널 (Ctrl+2)"
-                          Margin="8,0,0,0">
+                          ToolTipService.ToolTip="우측 패널 (Ctrl+2)">
                 <FontIcon Glyph="&#xE145;" FontSize="11" RenderTransformOrigin="0.5,0.5">
                     <FontIcon.RenderTransform>
                         <ScaleTransform ScaleX="-1"/>
