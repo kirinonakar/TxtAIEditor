@@ -15,7 +15,7 @@ namespace TxtAIEditor.Controls
         private const string ChatChartGuidance = """
             [Chat charts]
             Open chart blocks with ```chart for YAML (type, labels, series [{title,data}], optional beginAtZero) or ```advanced-chart for Chart.js 4 JSON (type, data, options).
-            Both support type "function" with expression "a*sin(x)" or series [{title,expression}]. Slider parameters (alias params) use {"a":{"value":1,"min":0,"max":5,"step":0.1}}. Use *, ^, and math functions like abs(x). Bounds xMin/xMax and yMin/yMax are optional. "linear-function" takes a,b.
+            Both support type "function" with expression "a*sin(x)" or series [{title,expression}]. Slider parameters (alias params) use {"a":{"value":1,"min":0,"max":5,"step":0.1}}. Use *, ^, and math functions like abs(x). Undeclared t aliases x. Bounds xMin/xMax and yMin/yMax are optional. "linear-function" takes a,b.
             Advanced JSON type "line" or "function" can define curves in data.datasets [{label,expression,...style}]. Use built-in tooltip, legend and interaction options.
             """;
 

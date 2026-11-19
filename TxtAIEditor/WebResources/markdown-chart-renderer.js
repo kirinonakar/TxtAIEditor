@@ -84,7 +84,7 @@ function createFunctionChart(input, linear, options = {}, data = {}) {
             ...options,
             scales: {
                 ...scales,
-                x: { type: 'linear', title: { display: true, text: 'x' }, ...x, ...graph.xRange },
+                x: { type: 'linear', title: { display: true, text: graph.xLabel }, ...x, ...graph.xRange },
                 y: { title: { display: true, text: 'y' }, ...y }
             },
             plugins: input.type === 'line' || plugins === false ? plugins : {

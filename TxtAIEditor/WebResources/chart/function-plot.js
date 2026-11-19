@@ -13,6 +13,7 @@ function compileExpression(expression, parameters) {
         .replace(/π/g, 'pi').replaceAll('**', '^');
     const tokens = source.match(/(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|[a-z_]\w*|\S/gi) ?? [];
     let position = 0;
+    let horizontalVariable;
     function take(symbol) {
         if (tokens[position] !== symbol) return false;
         position++;
@@ -34,11 +35,19 @@ function compileExpression(expression, parameters) {
             if (!Number.isFinite(value)) throw new Error('Expected a finite number');
             return () => value;
         }
-        if (token === 'x') return x => x;
+        if (token === 'x') {
+            horizontalVariable = 'x';
+            return x => x;
+        }
         if (token === 'pi') return () => Math.PI;
         if (token === 'e') return () => Math.E;
         const parameter = parameters.get(token);
         if (parameter) return () => parameter.value;
+
+        if (token === 't') {
+            horizontalVariable ??= 't';
+            return x => x;
+        }
 
         const fn = unaryFunctions.get(token);
         if (fn && take('(')) {
@@ -87,7 +96,7 @@ function compileExpression(expression, parameters) {
 
     const evaluate = sum();
     if (position !== tokens.length) throw new Error(`Unexpected expression token: ${tokens[position]}`);
-    return evaluate;
+    return { evaluate, horizontalVariable };
 }
 
 function readParameter(specification, defaultLimit = 10) {
@@ -138,7 +147,7 @@ export function createFunctionPlot(input, linear) {
         yRange ??= readRange(-yLimit, yLimit);
         return {
             curves: [{ label: 'y = ax + b', evaluate: x => a.value * x + b.value }],
-            parameters: new Map([['a', a], ['b', b]]), xRange, yRange, intervals: 1,
+            parameters: new Map([['a', a], ['b', b]]), xRange, yRange, xLabel: 'x', intervals: 1,
             formatEquation: number => `y = ${number.format(a.value)}x ${b.value < 0 ? '−' : '+'} ${number.format(Math.abs(b.value))}`
         };
     }
@@ -167,11 +176,13 @@ export function createFunctionPlot(input, linear) {
         return {
             equation,
             label: typeof entry.title === 'string' && entry.title.trim() ? entry.title : equation,
-            evaluate: compileExpression(expression, parameters)
+            ...compileExpression(expression, parameters)
         };
     });
+    const xLabel = curves.some(curve => curve.horizontalVariable === 't') &&
+        !curves.some(curve => curve.horizontalVariable === 'x') ? 't' : 'x';
     return {
-        curves, parameters, xRange, yRange, intervals: 400,
+        curves, parameters, xRange, yRange, xLabel, intervals: 400,
         formatEquation: () => curves.map(curve => curve.equation).join(', ')
     };
 }
