@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
@@ -39,6 +40,17 @@ namespace TxtAIEditor.Controls
                    !string.IsNullOrWhiteSpace(item.Path) &&
                    File.Exists(item.Path) &&
                    IsSupportedImage(item.Path);
+        }
+
+        public static bool CanInsertMarkdownImage(ExplorerItem? item)
+        {
+            return item is { IsRemote: false, IsArchiveEntry: false, IsFolder: false } &&
+                   (IsSupportedImage(item.Path) || IsSvgFile(item.Path));
+        }
+
+        public static bool IsSvgFile(string filePath)
+        {
+            return string.Equals(Path.GetExtension(filePath), ".svg", StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool CanOpenFile(ExplorerItem? item)

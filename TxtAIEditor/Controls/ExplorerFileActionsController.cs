@@ -317,12 +317,7 @@ namespace TxtAIEditor.Controls
                 addFolderFavoriteItem.Visibility = hasSingleItem && !isArchiveEntry ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (flyout.Items.Count > 6 && flyout.Items[6] is MenuFlyoutItem markdownItem)
-            {
-                markdownItem.Visibility = hasSingleItem && item != null && !item.IsRemote && !isArchiveEntry && !item.IsFolder && ExplorerItemCapabilities.IsSupportedImage(item.Path)
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
+            SetMenuVisibility(flyout, 6, hasSingleItem && ExplorerItemCapabilities.CanInsertMarkdownImage(item));
 
             bool canOpenFile = hasSingleItem && ExplorerItemCapabilities.CanOpenFile(item);
             if (flyout.Items.Count > 7 && flyout.Items[7] is MenuFlyoutItem externalViewerItem)
@@ -526,7 +521,7 @@ namespace TxtAIEditor.Controls
         private async void OnInsertMarkdownImageClick(object sender, RoutedEventArgs e)
         {
             var item = _selection.GetItem(sender);
-            if (item == null || item.IsFolder || !ExplorerItemCapabilities.IsSupportedImage(item.Path))
+            if (item == null || !ExplorerItemCapabilities.CanInsertMarkdownImage(item))
             {
                 return;
             }
@@ -630,6 +625,14 @@ namespace TxtAIEditor.Controls
             string baseDirectory = GetMarkdownBaseDirectory();
             string imagePath = item.Path;
             string relativePath = Path.GetRelativePath(baseDirectory, imagePath).Replace('\\', '/');
+            if (ExplorerItemCapabilities.IsSvgFile(imagePath))
+            {
+                string target = Path.IsPathFullyQualified(relativePath)
+                    ? new Uri(imagePath).AbsoluteUri
+                    : string.Join("/", relativePath.Split('/').Select(Uri.EscapeDataString));
+                return $"![[{target}]]";
+            }
+
             string altText = Path.GetFileNameWithoutExtension(item.Name)
                 .Replace("[", "\\[")
                 .Replace("]", "\\]");

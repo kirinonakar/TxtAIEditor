@@ -13,12 +13,10 @@ namespace TxtAIEditor.Controls
     internal sealed class AgentPromptContextService
     {
         private const string ChatRenderingGuidance = """
-            [Chat tab rendering]
-            Open chart blocks with ```chart for YAML (type, labels, series [{title,data}], optional beginAtZero) or ```advanced-chart for Chart.js 4 JSON (type, data, options).
-            Both support type "function" with expression "a*sin(x)" or series [{title,expression}]. Slider parameters (alias params) use {"a":{"value":1,"min":0,"max":5,"step":0.1}}. Use *, ^, and math functions like abs(x). Undeclared t aliases x. Bounds xMin/xMax and yMin/yMax are optional. "linear-function" takes a,b.
-            Advanced JSON type "line" or "function" can define curves in data.datasets [{label,expression,...style}]. Use built-in tooltip, legend and interaction options.
-            To show SVG inline in your reply, use a fenced ```svg block containing a complete <svg xmlns="http://www.w3.org/2000/svg"> element. Include a viewBox and keep the SVG self-contained.
-            To display an existing SVG file inline, use ![[example.svg]] or ![[assets/example.svg]] with a path relative to the agent workspace.
+            [Chat rendering]
+            Use when helpful: LaTeX $...$ inline or $$ on separate lines for display math; ```mermaid for diagrams; ```svg for self-contained <svg> with a viewBox; ![[path.svg]] for workspace-relative SVG files.
+            ```chart: YAML with type, labels, series [{title,data}], optional beginAtZero. ```advanced-chart: Chart.js 4 JSON with type, data, optional options.
+            Either chart fence: type=function with expression (e.g. a*sin(x)) or series [{title,expression}], params {name:{value,min,max,step}} for sliders, optional xMin/xMax and yMin/yMax. linear-function takes a,b. Advanced line/function also supports data.datasets[].expression.
             """;
 
         private readonly AgentPane _agentPane;
