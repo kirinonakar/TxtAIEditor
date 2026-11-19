@@ -3236,6 +3236,9 @@
   <data name="AgentChatTurnNavigation" xml:space="preserve">
     <value>跳轉</value>
   </data>
+  <data name="AgentChatSessionsTitle" xml:space="preserve">
+    <value>會話</value>
+  </data>
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>聊天分頁</value>
   </data>

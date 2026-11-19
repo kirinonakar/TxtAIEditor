@@ -268,7 +268,7 @@ namespace TxtAIEditor.Controls
                             action = "labels",
                             title = _getString("AgentChatTabTitle", "Agent 채팅"),
                             turns = _getString("AgentChatTurnNavigation", "바로가기"),
-                            sessions = _getString("AgentOpenSessionsTitle", "열린 세션"),
+                            sessions = _getString("AgentChatSessionsTitle", "세션"),
                             newSession = _getString("AgentNewSessionButton", "새 세션"),
                             closeAllSessions = _getString("AgentOpenSessionsCloseAllText", "모두 닫기"),
                             emptySessions = _getString("AgentOpenSessionsEmptyText", "열린 세션 없음"),

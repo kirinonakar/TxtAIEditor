@@ -3236,6 +3236,9 @@
   <data name="AgentChatTurnNavigation" xml:space="preserve">
     <value>ジャンプ</value>
   </data>
+  <data name="AgentChatSessionsTitle" xml:space="preserve">
+    <value>セッション</value>
+  </data>
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>チャットタブ</value>
   </data>

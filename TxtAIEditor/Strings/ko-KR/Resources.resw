@@ -3236,6 +3236,9 @@
   <data name="AgentChatTurnNavigation" xml:space="preserve">
     <value>바로가기</value>
   </data>
+  <data name="AgentChatSessionsTitle" xml:space="preserve">
+    <value>세션</value>
+  </data>
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>채팅 탭</value>
   </data>

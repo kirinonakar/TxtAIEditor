@@ -3236,6 +3236,9 @@ Plan: {0}</value>
   <data name="AgentChatTurnNavigation" xml:space="preserve">
     <value>Jump to</value>
   </data>
+  <data name="AgentChatSessionsTitle" xml:space="preserve">
+    <value>Sessions</value>
+  </data>
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>Chat Tab</value>
   </data>
