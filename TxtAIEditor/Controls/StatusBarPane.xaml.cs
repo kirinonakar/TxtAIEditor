@@ -45,6 +45,12 @@ namespace TxtAIEditor.Controls
         public Button LineNumberButtonControl => LineNumberButton;
         public Button LineEndingButtonControl => LineEndingButton;
 
+        internal void UpdateChatTabToggle(bool isActive, bool showOutline)
+        {
+            ChatTabToggle.IsChecked = isActive;
+            ChatTabOutline.Visibility = showOutline ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         public void Localize(Func<string, string, string> getString)
         {
             StatusLineLabel.Text = getString("StatusLineLabel", "줄");

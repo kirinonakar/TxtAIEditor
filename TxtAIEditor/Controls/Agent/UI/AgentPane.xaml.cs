@@ -233,7 +233,15 @@ namespace TxtAIEditor.Controls
         }
         public CheckBox SubagentsCheckBox => AgentSubagentsCheckBox;
         public ToggleButton StreamToTabToggleButton => AgentStreamToTabToggleButton;
-        internal void ToggleChatTab() => AgentStreamToTabToggleButton.IsChecked = AgentStreamToTabToggleButton.IsChecked != true;
+        internal event Action? ChatTabToggleRequested;
+
+        internal void ToggleChatTab() => ChatTabToggleRequested?.Invoke();
+
+        internal void UpdateChatTabToggle(bool isActive, bool showOutline)
+        {
+            AgentStreamToTabToggleButton.IsChecked = isActive;
+            ChatTabOutline.Visibility = showOutline ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         public bool HideHtmlCodeBlocks
         {

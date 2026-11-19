@@ -42,6 +42,7 @@ namespace TxtAIEditor.Controls
         private double _terminalSplitterStartHeight = 0;
         private double _terminalSplitterStartPointerY = 0;
         private bool _tabActionSpacerUpdateQueued;
+        private TabView? _activeTabView;
         private double _stickyAgentPanelTop;
         private string _noOpenTabsText = "열린 탭이 없습니다";
 
@@ -73,11 +74,22 @@ namespace TxtAIEditor.Controls
         public event TypedEventHandler<TabView, TabViewTabDroppedOutsideEventArgs>? SecondaryTabDroppedOutside;
         public event SelectionChangedEventHandler? SecondarySelectionChanged;
         public event RoutedEventHandler? TabViewGotFocus;
+        internal event EventHandler? ActiveTabViewChanged;
         public event RoutedEventHandler? MoveTabLeftClick;
         public event RoutedEventHandler? MoveTabRightClick;
         public event EventHandler? TerminalPanelHeightChanged;
 
-        public TabView? ActiveTabView { get; set; }
+        public TabView? ActiveTabView
+        {
+            get => _activeTabView;
+            set
+            {
+                if (ReferenceEquals(_activeTabView, value)) return;
+
+                _activeTabView = value;
+                ActiveTabViewChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
         public EditorSplitMode CurrentSplitMode { get; private set; } = EditorSplitMode.None;
         public double LastTerminalHeight { get; set; } = 220;
 

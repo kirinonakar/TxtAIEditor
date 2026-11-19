@@ -341,18 +341,22 @@
         </ScrollViewer>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-            <ToggleButton x:Name="AgentStreamToTabToggleButton"
-                          Width="32"
-                          Height="28"
-                          IsChecked="False"
-                          VerticalAlignment="Center"
-                          Style="{StaticResource AgentToggleButtonStyle}">
-                <FontIcon Glyph="&#xE8A7;" FontSize="12" RenderTransformOrigin="0.5,0.5">
-                    <FontIcon.RenderTransform>
-                        <ScaleTransform ScaleX="-1"/>
-                    </FontIcon.RenderTransform>
-                </FontIcon>
-            </ToggleButton>
+            <Grid VerticalAlignment="Center">
+                <ToggleButton x:Name="AgentStreamToTabToggleButton"
+                              Width="32"
+                              Height="28"
+                              Style="{StaticResource AgentToggleButtonStyle}">
+                    <FontIcon Glyph="&#xE8A7;" FontSize="12" RenderTransformOrigin="0.5,0.5">
+                        <FontIcon.RenderTransform>
+                            <ScaleTransform ScaleX="-1"/>
+                        </FontIcon.RenderTransform>
+                    </FontIcon>
+                </ToggleButton>
+                <Border x:Name="ChatTabOutline"
+                        BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="4"
+                        IsHitTestVisible="False" Visibility="Collapsed"/>
+            </Grid>
             <Button x:Name="AgentInsertOutputButton"
                     Content="마지막 답변"
                     HorizontalAlignment="Stretch"
