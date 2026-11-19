@@ -33,6 +33,7 @@ let hiddenOutput = [];
 let messageViews = [];
 let jumpLinks = [];
 let selectedJump = null;
+let jumpSyncFrame = 0;
 let output = '';
 let sessionId = null;
 let imageWorkspaceKey = null;
@@ -59,6 +60,7 @@ let nextCopyId = 0;
 
 function scrollToEnd() {
     if (followOutput) history.scrollTop = history.scrollHeight;
+    queueCurrentJumpSync();
 }
 
 function resolveChatImageUrl(source) {
@@ -104,7 +106,11 @@ function getImageLoad({ workspaceKey, requestId, path }) {
 
 history.addEventListener('scroll', () => {
     followOutput = history.scrollHeight - history.scrollTop - history.clientHeight < 44;
+    queueCurrentJumpSync();
 });
+const jumpLayoutObserver = new ResizeObserver(queueCurrentJumpSync);
+jumpLayoutObserver.observe(history);
+jumpLayoutObserver.observe(messages);
 messages.addEventListener('load', scrollToEnd, true);
 messages.addEventListener('error', event => {
     if (event.target.dataset?.previewImageSource) replaceChatImageWithAlt(event.target);
@@ -322,8 +328,51 @@ function renderConversation(offset, renderAll) {
     return targets;
 }
 
+function jumpTop(target) {
+    const margin = Number.parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
+    return target.getBoundingClientRect().top - margin;
+}
+
+function findCurrentJump() {
+    if (!jumpLinks.length) return null;
+    const lastScrollTop = history.scrollHeight - history.clientHeight;
+    // The last request may be too close to the end to reach the top of the viewport.
+    if (lastScrollTop > 0 && history.scrollTop >= lastScrollTop - 1) return jumpLinks.at(-1).button;
+
+    const top = history.getBoundingClientRect().top + history.clientTop;
+    let first = 0;
+    let end = jumpLinks.length;
+    while (first < end) {
+        const middle = Math.floor((first + end) / 2);
+        if (jumpTop(jumpLinks[middle].target) <= top + 1) first = middle + 1;
+        else end = middle;
+    }
+    return jumpLinks[Math.max(0, first - 1)].button;
+}
+
+function queueCurrentJumpSync() {
+    if (jumpSyncFrame) return;
+    jumpSyncFrame = requestAnimationFrame(() => {
+        jumpSyncFrame = 0;
+        if (!history.clientHeight) return;
+        const current = findCurrentJump();
+        if (current === selectedJump) return;
+        selectedJump?.removeAttribute('aria-current');
+        selectedJump = current;
+        if (!current) return;
+
+        current.setAttribute('aria-current', 'location');
+        const top = turns.getBoundingClientRect().top + turns.clientTop;
+        const bottom = top + turns.clientHeight;
+        const button = current.getBoundingClientRect();
+        if (button.top < top) turns.scrollTop += button.top - top;
+        else if (button.bottom > bottom) turns.scrollTop += button.bottom - bottom;
+    });
+}
+
 function showJumpLinks(targets) {
-    for (const [index, { node: target, copyText }] of targets.entries()) {
+    const visibleTargets = targets.filter(({ node }) => !node.hidden);
+    for (const [index, { node: target, copyText }] of visibleTargets.entries()) {
         const text = copyText.trim().replace(/\s+/g, ' ');
         const excerpt = text.slice(0, 200);
         const existing = jumpLinks[index];
@@ -341,18 +390,15 @@ function showJumpLinks(targets) {
         summary.textContent = excerpt;
         button.append(number, summary);
         button.addEventListener('click', () => {
-            selectedJump?.removeAttribute('aria-current');
-            selectedJump = button;
-            button.setAttribute('aria-current', 'location');
             followOutput = false;
-            const margin = Number.parseFloat(getComputedStyle(target).scrollMarginTop);
-            history.scrollTop += target.getBoundingClientRect().top - history.getBoundingClientRect().top - margin;
+            history.scrollTop += jumpTop(target) - history.getBoundingClientRect().top - history.clientTop;
+            queueCurrentJumpSync();
         });
         if (existing) existing.button.replaceWith(button);
         else turns.append(button);
         jumpLinks[index] = { target, excerpt, button };
     }
-    while (jumpLinks.length > targets.length) jumpLinks.pop().button.remove();
+    while (jumpLinks.length > visibleTargets.length) jumpLinks.pop().button.remove();
 }
 
 function setCopyAllLabel(label, icon = '⧉') {
