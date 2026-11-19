@@ -1003,7 +1003,7 @@ namespace TxtAIEditor.Controls
 
             foreach (string path in paths)
             {
-                string fullPath = _workspace.ResolveInsideWorkspace(path, allowOutside: true);
+                string fullPath = await _workspace.ResolveReadPathAsync(path, _cancellationToken());
                 if (!File.Exists(fullPath))
                 {
                     return $"merge_files failed: source file not found: {path}";
@@ -1274,7 +1274,7 @@ namespace TxtAIEditor.Controls
                 return "split_file failed: path is empty.";
             }
 
-            string fullPath = _workspace.ResolveInsideWorkspace(path, allowOutside: true);
+            string fullPath = await _workspace.ResolveReadPathAsync(path, _cancellationToken());
             if (!File.Exists(fullPath))
             {
                 return _workspace.BuildMissingFileMessage("split_file", path);

@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace TxtAIEditor.Controls
 {
@@ -15,10 +17,17 @@ namespace TxtAIEditor.Controls
         };
 
         private readonly Func<string> _workspaceRootProvider;
+        private readonly Func<IReadOnlyList<string>>? _readAttachmentPathsProvider;
+        private readonly Func<string, CancellationToken, Task<bool>>? _confirmExternalReadAsync;
 
-        public AgentWorkspaceFileResolver(Func<string> workspaceRootProvider)
+        public AgentWorkspaceFileResolver(
+            Func<string> workspaceRootProvider,
+            Func<IReadOnlyList<string>>? readAttachmentPathsProvider = null,
+            Func<string, CancellationToken, Task<bool>>? confirmExternalReadAsync = null)
         {
             _workspaceRootProvider = workspaceRootProvider;
+            _readAttachmentPathsProvider = readAttachmentPathsProvider;
+            _confirmExternalReadAsync = confirmExternalReadAsync;
         }
 
         public string WorkspaceRoot => ResolveWorkspaceRoot();
@@ -59,7 +68,28 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public string ResolveInsideWorkspace(string path, bool allowOutside = false)
+        public string ResolveInsideWorkspace(string path) => ResolvePath(path, allowOutside: false).FullPath;
+
+        public async Task<string> ResolveReadPathAsync(string path, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var (fullPath, candidate, outsideWorkspace) = ResolvePath(path, allowOutside: true);
+            if (outsideWorkspace &&
+                _readAttachmentPathsProvider?.Invoke().Any(attachedPath => SamePhysicalPath(candidate, attachedPath)) != true)
+            {
+                bool approved = _confirmExternalReadAsync != null &&
+                    await _confirmExternalReadAsync(fullPath, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!approved)
+                {
+                    throw new UnauthorizedAccessException($"Permission to read the external file was declined: {fullPath}");
+                }
+            }
+
+            return fullPath;
+        }
+
+        private (string FullPath, string Candidate, bool OutsideWorkspace) ResolvePath(string path, bool allowOutside)
         {
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -77,34 +107,29 @@ namespace TxtAIEditor.Controls
             if (IsInsideRoot(root, candidate))
             {
                 RequirePhysicalContainment(root, candidate);
-                return ResolvePhysicalPath(candidate, confinedTo: root);
+                return (ResolvePhysicalPath(candidate, confinedTo: root), candidate, false);
             }
             if (!string.IsNullOrWhiteSpace(configuredRoot) && IsInsideRoot(configuredRoot, candidate))
             {
                 RequirePhysicalContainment(configuredRoot, candidate);
-                return ResolvePhysicalPath(Path.GetFullPath(Path.GetRelativePath(configuredRoot, candidate), root), confinedTo: root);
+                string resolved = ResolvePhysicalPath(Path.GetFullPath(Path.GetRelativePath(configuredRoot, candidate), root), confinedTo: root);
+                return (resolved, candidate, false);
             }
             if (AgentSkillDirectories.IsInsideUserSkillsDirectory(candidate))
             {
                 string configuredSkills = AgentSkillDirectories.UserSkillsDirectory;
                 string skillsRoot = ResolvePhysicalPath(Path.GetFullPath(configuredSkills));
                 RequirePhysicalContainment(configuredSkills, candidate);
-                return ResolvePhysicalPath(Path.GetFullPath(Path.GetRelativePath(configuredSkills, candidate), skillsRoot), confinedTo: skillsRoot);
+                string resolved = ResolvePhysicalPath(Path.GetFullPath(Path.GetRelativePath(configuredSkills, candidate), skillsRoot), confinedTo: skillsRoot);
+                return (resolved, candidate, !IsInsidePhysicalRoot(root, resolved));
             }
-            if (allowOutside && Path.IsPathFullyQualified(path) &&
-                string.Equals(path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar), candidate, StringComparison.OrdinalIgnoreCase))
+            if (allowOutside)
             {
-                string resolved = ResolvePhysicalPath(candidate);
-                if (File.Exists(resolved))
-                {
-                    return resolved;
-                }
+                return (ResolvePhysicalPath(candidate), candidate, true);
             }
 
             throw new InvalidOperationException($"Path escapes workspace root: {path}");
         }
-
-        public string ResolveEditLockPath(string path, bool allowOutside = false) => ResolveInsideWorkspace(path, allowOutside);
 
         public void VerifyResolvedPath(string fullPath)
         {

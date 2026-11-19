@@ -124,7 +124,7 @@ namespace TxtAIEditor.Controls
                 return "read_file failed: path is empty. Provide the exact file path from the user task or list_files.";
             }
 
-            string fullPath = _workspace.ResolveInsideWorkspace(path, allowOutside: true);
+            string fullPath = await _workspace.ResolveReadPathAsync(path, cancellationToken);
             if (!File.Exists(fullPath))
             {
                 return _workspace.BuildMissingFileMessage("read_file", path);

@@ -43,9 +43,9 @@ namespace TxtAIEditor.Controls
             string fullPath;
             try
             {
-                fullPath = _workspace.ResolveInsideWorkspace(path, allowOutside: true);
+                fullPath = await _workspace.ResolveReadPathAsync(path, _cancellationToken());
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return string.Format(_getString("AgentExtractDocumentFailedFormat", "extract_document failed: {0}"), ex.Message);
             }

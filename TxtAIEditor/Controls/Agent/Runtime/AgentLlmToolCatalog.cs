@@ -118,7 +118,7 @@ namespace TxtAIEditor.Controls
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Workspace-relative path." },
+                            path = new { type = "string", description = "File path. Reads outside the workspace require approval unless the file is attached." },
                             startLine = new { type = "integer", description = "1-based. Default 1." },
                             lineCount = new { type = "integer", description = "Default 160." }
                         },
@@ -134,7 +134,7 @@ namespace TxtAIEditor.Controls
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string", description = "Workspace-relative path." },
+                            path = new { type = "string", description = "Image path. Reads outside the workspace require approval unless the image is attached." },
                             original = new { type = "boolean", description = "Keep original bytes. Default false." }
                         },
                         required = new[] { "path" }
@@ -149,7 +149,7 @@ namespace TxtAIEditor.Controls
                         type = "object",
                         properties = new
                         {
-                            path = new { type = "string" },
+                            path = new { type = "string", description = "Document path. Reads outside the workspace require approval unless the document is attached." },
                             outputPath = new { type = "string", description = "Workspace destination. Omit for automatic naming." },
                             maxChars = new { type = "integer", description = "Default 5000000." }
                         },

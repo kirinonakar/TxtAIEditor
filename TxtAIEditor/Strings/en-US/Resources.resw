@@ -2677,6 +2677,15 @@ Plan: {0}</value>
   <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
     <value>Exa fetching web content: {0}</value>
   </data>
+  <data name="AgentExternalReadTitle" xml:space="preserve">
+    <value>Allow access to an external file</value>
+  </data>
+  <data name="AgentExternalReadDescriptionFormat" xml:space="preserve">
+    <value>Allow the agent to read this file outside the workspace?&#10;&#10;{0}</value>
+  </data>
+  <data name="AgentExternalReadAllowOnce" xml:space="preserve">
+    <value>Allow once</value>
+  </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell Execution Confirmation</value>
   </data>

@@ -348,8 +348,9 @@ function replaceInlineMath(value, render) {
         .replace(/(^|[^\w\\])\$([^$\n]+?)\$/g, (_, prefix, expr) => `${prefix}${render(expr, false)}`);
 }
 
-function stashInlineMath(value, stash, mathFragments) {
+function stashInlineMath(value, stash, mathFragments, normalizeExpression) {
     return replaceInlineMath(value, (expr, display) => {
+        if (normalizeExpression) expr = normalizeExpression(expr);
         const index = mathFragments.push({ expr, display }) - 1;
         return stash(`<span data-txtai-math-index="${index}"></span>`);
     });
@@ -417,7 +418,7 @@ function inlineMarkdown(text, options = {}) {
     let out = String(text ?? '');
     out = stashCodeSpans(out, stash);
     out = out.replace(/!\[([^\]]*)\]\(([^)]*)\)/g, (_, alt, target) => stash(renderMarkdownImage(alt, target, options)));
-    out = stashInlineMath(out, stash, mathFragments);
+    out = stashInlineMath(out, stash, mathFragments, options.normalizeInlineMath);
     if (options.allowHtml !== false) out = stashHtmlTags(out, stash);
     // Block parsing has already treated an escaped list marker as plain text.
     out = out.replace(/^([ \t]*\d+)\\([.)])(?=[ \t])/, '$1$2');
@@ -710,6 +711,10 @@ function splitTableRow(line) {
     return parseMarkdownTableRow(line)?.cells.map(cell => cell.text.replace(/\\\|/g, '|').trim()) || null;
 }
 
+function tableRowContainsInlineMath(line) {
+    return splitTableRow(line)?.some(containsInlineMath) ?? false;
+}
+
 function isTableSeparator(line) {
     const cells = splitTableRow(line);
     return !!cells?.length && cells.every(cell => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, '')));
@@ -946,11 +951,6 @@ function renderMarkdownTableBlock(block, options = {}) {
         if (align) return ` style="text-align:${align}${hasBr ? ';white-space:pre-line' : ''}"`;
         return hasBr ? ' style="white-space:pre-line"' : '';
     };
-    const renderCell = (cell, tag, i) => {
-        const processed = String(cell || '').replace(/<br\s*\/?>/gi, '\u0003');
-        const rendered = inlineMarkdown(processed, options).replace(/\u0003/g, '<br>');
-        return `<${tag}${cellStyle(cell, i)}>${rendered || '&nbsp;'}</${tag}>`;
-    };
     if (options.editableTableRow) {
         const row = (line, header) => options.editableTableRow(
             block.sourceLines[line - block.startLine], line, header, aligns, block.header.length);
@@ -958,20 +958,31 @@ function renderMarkdownTableBlock(block, options = {}) {
         for (let line = block.startLine + 2; line <= block.endLine; line++) html += row(line, false);
         return `${html}</tbody></table>`;
     }
-    let html = '<table><thead><tr>';
-    block.header.forEach((cell, i) => {
-        html += renderCell(cell, 'th', i);
-    });
-    html += '</tr></thead><tbody>';
-    block.rows.forEach(row => {
-        html += '<tr>';
-        const count = Math.max(block.header.length, row.length);
-        for (let i = 0; i < count; i++) {
-            html += renderCell(row[i] || '', 'td', i);
-        }
-        html += '</tr>';
-    });
-    return `${html}</tbody></table>`;
+    const renderRow = (cells, tag, source) => {
+        const escapedRow = /^\s*\\\||\|\s*\\\s*$/.test(source);
+        const cellOptions = {
+            ...options,
+            normalizeInlineMath(expression) {
+                const normalized = expression.replace(/(?<!\\)\\</g, '<');
+                // Escaped table rows can contain a doubled thin-space command.
+                // Keep TeX row breaks inside environments such as aligned.
+                return escapedRow && !normalized.includes('\\begin{')
+                    ? normalized.replace(/(?<!\\)\\\\,/g, '\\,')
+                    : normalized;
+            }
+        };
+        const count = Math.max(block.header.length, cells.length);
+        const renderedCells = Array.from({ length: count }, (_, i) => {
+            const cell = cells[i] || '';
+            const processed = cell.replace(/<br\s*\/?>/gi, '\u0003');
+            const rendered = inlineMarkdown(processed, cellOptions).replace(/\u0003/g, '<br>');
+            return `<${tag}${cellStyle(cell, i)}>${rendered || '&nbsp;'}</${tag}>`;
+        });
+        return `<tr>${renderedCells.join('')}</tr>`;
+    };
+    const header = renderRow(block.header, 'th', block.sourceLines[0]);
+    const rows = block.rows.map((cells, index) => renderRow(cells, 'td', block.sourceLines[index + 2]));
+    return `<table><thead>${header}</thead><tbody>${rows.join('')}</tbody></table>`;
 }
 
 function indentColumnLength(value, tabSize = 4) {
@@ -1264,9 +1275,10 @@ function blockContainsInlineMath(block, getLine, options = {}) {
         });
         return found;
     }
-    if (block?.kind !== 'paragraph') return false;
+    if (block?.kind !== 'paragraph' && block?.kind !== 'table') return false;
+    const lineContainsMath = block.kind === 'table' ? tableRowContainsInlineMath : containsInlineMath;
     for (let line = block.startLine; line <= block.endLine; line++) {
-        if (containsInlineMath(getLine(line))) return true;
+        if (lineContainsMath(getLine(line))) return true;
     }
     return false;
 }
@@ -1589,5 +1601,6 @@ export {
     renderPreviewEmbeds,
     renderPreviewLineAt,
     renderPreviewLineRange,
-    sanitizeHtml
+    sanitizeHtml,
+    tableRowContainsInlineMath
 };

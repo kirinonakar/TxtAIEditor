@@ -129,7 +129,10 @@ namespace TxtAIEditor.Controls
         {
             _getString = getString ?? ((_, fallback) => fallback);
             _workspaceRootProvider = workspaceRootProvider;
-            _workspace = new AgentWorkspaceFileResolver(ResolveWorkspaceRoot);
+            _workspace = new AgentWorkspaceFileResolver(
+                ResolveWorkspaceRoot,
+                () => ReadAttachmentPathsProvider?.Invoke() ?? [],
+                (path, token) => ConfirmExternalReadAsync?.Invoke(path, token) ?? Task.FromResult(false));
             _workspaceFiles = new AgentWorkspaceFileToolService(_workspace);
             _images = new AgentImageToolService(_workspace);
             _documents = new AgentDocumentExtractionToolService(
@@ -160,9 +163,13 @@ namespace TxtAIEditor.Controls
         public Action<string>? ActivityReporter { get; set; }
         public Func<string?>? WorkspaceRootOverrideProvider { get; set; }
         internal Func<CancellationToken>? RunCancellationTokenProvider { get; set; }
+        internal Func<IReadOnlyList<string>>? ReadAttachmentPathsProvider { get; set; }
+        internal Func<string, CancellationToken, Task<bool>>? ConfirmExternalReadAsync { get; set; }
 
         public string WorkspaceRoot => _workspace.WorkspaceRoot;
-        internal string ResolveToolPath(string path, bool allowOutside = false) => _workspace.ResolveInsideWorkspace(path, allowOutside);
+        internal string ResolveToolPath(string path) => _workspace.ResolveInsideWorkspace(path);
+        internal Task<string> ResolveReadPathAsync(string path) =>
+            _workspace.ResolveReadPathAsync(path, RunCancellationTokenProvider?.Invoke() ?? default);
         internal void VerifyToolPath(string fullPath) => _workspace.VerifyResolvedPath(fullPath);
         internal void VerifyWorkspaceWritePath(string fullPath) => _workspace.VerifyWritablePath(fullPath, allowSkills: false);
 
@@ -217,7 +224,8 @@ namespace TxtAIEditor.Controls
 
         public Task<AgentReadImageResult> ReadImageAsync(string path, bool original = false)
         {
-            return RunInBackgroundAsync(() => _images.ReadImageAsync(path, original));
+            CancellationToken token = RunCancellationTokenProvider?.Invoke() ?? default;
+            return RunInBackgroundAsync(() => _images.ReadImageAsync(path, original, token), token);
         }
 
         public Task<string> ExtractDocumentAsync(string path, string outputPath, int maxChars)
@@ -295,8 +303,7 @@ namespace TxtAIEditor.Controls
                 allowedEndLine));
         }
 
-        public string ResolveEditLockPath(string path) => _workspace.ResolveEditLockPath(path);
-        public string ResolveReadLockPath(string path) => _workspace.ResolveEditLockPath(path, allowOutside: true);
+        public string ResolveEditLockPath(string path) => _workspace.ResolveInsideWorkspace(path);
 
         public Task<string> ApplyPatchAsync(string? path, string patchText)
         {

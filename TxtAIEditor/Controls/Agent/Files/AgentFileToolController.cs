@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,6 +27,7 @@ namespace TxtAIEditor.Controls
             public string? LastFilePath { get; set; }
             public AgentSelectionSnapshot? SelectionSnapshot { get; set; }
             public string? ActiveTabPath { get; set; }
+            public IReadOnlyList<string> AttachmentPaths { get; set; } = [];
             public bool UseCapturedContextOnly { get; set; }
             public HashSet<string> WrittenFiles { get; } = new(StringComparer.OrdinalIgnoreCase);
         }
@@ -51,11 +53,18 @@ namespace TxtAIEditor.Controls
             _currentRunState.Value = new RunFileToolState();
         }
 
-        public void SetRunContext(AgentSelectionSnapshot selectionSnapshot, OpenedTab? activeTab, bool useCapturedContextOnly)
+        public void SetRunContext(
+            AgentSelectionSnapshot selectionSnapshot,
+            OpenedTab? activeTab,
+            IReadOnlyList<AgentAttachmentState> attachments,
+            bool useCapturedContextOnly)
         {
             RunFileToolState state = _currentRunState.Value ??= new RunFileToolState();
             state.SelectionSnapshot = selectionSnapshot;
             state.ActiveTabPath = activeTab?.FilePath;
+            state.AttachmentPaths = attachments.Select(attachment => attachment.Path)
+                .Where(Path.IsPathFullyQualified)
+                .ToArray();
             state.UseCapturedContextOnly = useCapturedContextOnly;
         }
 
@@ -147,6 +156,8 @@ namespace TxtAIEditor.Controls
             string path = GetFirstStringArgument(arguments, "path", "file", "filePath", "file_path");
             return string.IsNullOrWhiteSpace(path) ? string.Empty : path;
         }
+
+        public IReadOnlyList<string> GetReadAttachmentPaths() => _currentRunState.Value?.AttachmentPaths ?? [];
 
         public string GetEditPathArgument(JsonElement arguments)
         {
@@ -305,7 +316,7 @@ namespace TxtAIEditor.Controls
 
         private async Task<string> OpenFileByPathAsync(string path)
         {
-            string fullPath = _fileTools.ResolveToolPath(path, allowOutside: true);
+            string fullPath = await _fileTools.ResolveReadPathAsync(path);
 
             if (!File.Exists(fullPath))
             {

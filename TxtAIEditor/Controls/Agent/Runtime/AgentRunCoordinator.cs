@@ -443,7 +443,8 @@ namespace TxtAIEditor.Controls
                         workerSessions.Values.Select(session => (session.Id, session.Title)));
                 }
 
-                _fileToolController.SetRunContext(currentRunSelectionSnapshot, currentRunActiveTab, useCapturedContextOnly: isSubagent);
+                _fileToolController.SetRunContext(currentRunSelectionSnapshot, currentRunActiveTab,
+                    runContext.Attachments, useCapturedContextOnly: isSubagent);
                 string currentWorkspaceContext = await _promptContextService.BuildWorkspaceContextAsync(
                     conversationTurn,
                     currentRunActiveTab,

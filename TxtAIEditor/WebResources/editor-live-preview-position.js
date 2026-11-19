@@ -1,4 +1,5 @@
 import { state } from './editor-core.js';
+import { parseMarkdownTableRow } from './editor-markdown-table-model.js';
 
 export function createLivePreviewPositionResolver({
     findEditablePreviewBlockContaining,
@@ -100,25 +101,12 @@ export function createLivePreviewPositionResolver({
                     clickedLine = Math.min(block.endLine, block.startLine + 2 + Math.max(0, tbodyRowIndex));
                 }
                 
-                const rawLineText = state.cache.get(clickedLine) || '';
                 const cellIndex = Array.from(targetTr.querySelectorAll('td, th')).indexOf(targetCell);
-                const offset = getTextOffsetInElement(targetCell, targetNode, targetOffset);
-                
-                const cells = rawLineText.split('|');
-                if (cellIndex + 1 < cells.length) {
-                    let startIdx = 0;
-                    for (let i = 0; i <= cellIndex; i++) {
-                        startIdx += cells[i].length + 1;
-                    }
-                    const cellRaw = cells[cellIndex + 1];
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = inlineMarkdown(cellRaw.trim(), { tabSize: state.tabSize || 4 });
-                    const htmlLineText = tempDiv.textContent || '';
-                    
-                    const mappedOffset = mapHtmlOffsetToRawOffset(cellRaw, htmlLineText, offset);
-                    finalColumn = startIdx + mappedOffset;
-                } else {
-                    finalColumn = 0;
+                const sourceCell = parseMarkdownTableRow(state.cache.get(clickedLine))?.cells[cellIndex];
+                if (sourceCell) {
+                    const offset = getTextOffsetInElement(targetCell, targetNode, targetOffset);
+                    finalColumn = sourceCell.start +
+                        mapHtmlOffsetToRawOffset(sourceCell.text, targetCell.textContent || '', offset);
                 }
             } else {
                 clickedLine = defaultLine;

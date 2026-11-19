@@ -2677,6 +2677,15 @@
   <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
     <value>Exa 웹 페이지 읽는 중: {0}</value>
   </data>
+  <data name="AgentExternalReadTitle" xml:space="preserve">
+    <value>외부 파일 읽기 허가</value>
+  </data>
+  <data name="AgentExternalReadDescriptionFormat" xml:space="preserve">
+    <value>작업 폴더 밖에 있는 이 파일을 에이전트가 읽도록 허용하시겠습니까?&#10;&#10;{0}</value>
+  </data>
+  <data name="AgentExternalReadAllowOnce" xml:space="preserve">
+    <value>이번만 허용</value>
+  </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell 실행 확인</value>
   </data>

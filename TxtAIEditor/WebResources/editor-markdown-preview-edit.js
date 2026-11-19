@@ -1,4 +1,4 @@
-import { blockContainsInlineMath, containsInlineMath, escapeHtml, findEditablePreviewBlockContaining, inlineMarkdown, isRenderedCodeFence, renderPreviewLineAt, sanitizeHtml } from './markdown-preview-renderer.js';
+import { blockContainsInlineMath, containsInlineMath, escapeHtml, findEditablePreviewBlockContaining, inlineMarkdown, isRenderedCodeFence, renderPreviewLineAt, sanitizeHtml, tableRowContainsInlineMath } from './markdown-preview-renderer.js';
 import { parseMarkdownTableRow } from './editor-markdown-table-model.js';
 
 // Every text node remains part of the Markdown source, in source order. Hiding
@@ -39,6 +39,7 @@ export function needsMarkdownPreviewBlockRefresh(state, lineNumber) {
     const text = state.cache.get(lineNumber) || '';
     const row = element?.closest('.line-row');
     if (row?.classList.contains('live-preview-source-math') ||
+        (kind === 'table' && tableRowContainsInlineMath(text)) ||
         ((!kind || ['paragraph', 'list', 'continuation'].includes(kind)) && containsInlineMath(text))) return true;
     if (!usesMarkdownPreviewEditing(state)) return false;
     if (text.trim() && row?.classList.contains('live-preview-empty')) return true;
@@ -141,18 +142,11 @@ function inlineSource(text, options, depth = 0) {
 }
 
 function tableSource(text, header, options) {
-    let html = '';
-    let start = 0;
-    for (let index = 0; index <= text.length; index++) {
-        if (index !== text.length && (text[index] !== '|' || text[index - 1] === '\\')) continue;
-        const cell = text.slice(start, index);
-        if (cell || (start > 0 && index < text.length)) {
-            html += `<span class="md-preview-cell${header ? ' md-preview-cell-header' : ''}">${content(inlineSource(cell, options))}</span>`;
-        }
-        if (index < text.length) html += syntax('|');
-        start = index + 1;
-    }
-    return `<span class="md-preview-table">${html}</span>`;
+    const row = parseMarkdownTableRow(text);
+    if (!row) return escapeHtml(text);
+    const cells = row.cells.map(cell =>
+        `<span class="md-preview-cell${header ? ' md-preview-cell-header' : ''}">${content(inlineSource(cell.text, options))}</span>`);
+    return `<span class="md-preview-table">${syntax(row.prefix)}${cells.join(syntax('|'))}${syntax(row.suffix)}</span>`;
 }
 
 function editableAttributes(text, lineNumber, state, kind) {

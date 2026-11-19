@@ -44,6 +44,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 - read_file(path, [startLine], [lineCount]) uses 1-based lines. Read targeted ranges in large files and continue if relevant lines remain.
                 - read_image(path, [original]) accepts up to 25 MiB and proportionally scales down to a 2048 px longest side unless original is true. MCP image attachments retain original bytes and MIME type.
                 - extract_document(path, [outputPath], [maxChars]) extracts PDF, DOCX, PPTX, XLSX, or HWPX. Read the generated TXT/CSV in ranges. Scanned PDFs may need OCR.
+                - File tools request user approval to read an unattached file outside the workspace. If the user declines, stop trying to read that file.
                 - create_file(path, content, [openAfterCreate]), overwrite_file(path, content), append_to_file(path, content), merge_files(targetPath, paths), split_file(path, linesPerFile or ranges of {path, startLine, endLine}).
                 - search_replace(path, search, replacement, [useRegex], [matchCase], [wholeWord], [maxReplacements], [startLine], [endLine]) for text replacements. Zero maxReplacements replaces all matches.
                 - apply_patch(patch, [path]) for structured edits. Every hunk needs @@ -oldStart,oldCount +newStart,newCount @@. For multiple existing files, omit path and put *** Update File: relative/path sections between *** Begin Patch and *** End Patch. End the patch at that marker.

@@ -131,6 +131,7 @@ namespace TxtAIEditor.Controls
 
             context.Add("");
             context.Add("[Agent attachments]");
+            context.Add("To read an attachment from disk, use its exact Path with read_image, read_file, or extract_document as appropriate. Keep absolute paths as shown.");
             foreach (var attachment in items)
             {
                 context.Add($"- {attachment.DisplayName} ({attachment.Detail}, approx {attachment.EstimatedTokens:N0} tokens)");

@@ -71,7 +71,7 @@ namespace TxtAIEditor.Controls
             string path = name == "read_file" ? GetStringArgument(arguments, "path") : GetImagePath(arguments);
             try
             {
-                return _fileTools.ResolveReadLockPath(path);
+                return _fileTools.ResolveToolPath(path);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or NotSupportedException)
             {

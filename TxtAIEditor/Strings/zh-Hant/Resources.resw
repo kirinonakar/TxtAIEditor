@@ -2677,6 +2677,15 @@
   <data name="AgentActivityWebFetchExaFormat" xml:space="preserve">
     <value>Exa 取得網頁內容：{0}</value>
   </data>
+  <data name="AgentExternalReadTitle" xml:space="preserve">
+    <value>允許讀取外部檔案</value>
+  </data>
+  <data name="AgentExternalReadDescriptionFormat" xml:space="preserve">
+    <value>是否允許代理讀取這個位於工作區之外的檔案？&#10;&#10;{0}</value>
+  </data>
+  <data name="AgentExternalReadAllowOnce" xml:space="preserve">
+    <value>僅允許一次</value>
+  </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell 執行確認</value>
   </data>

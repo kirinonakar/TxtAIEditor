@@ -317,7 +317,9 @@ namespace TxtAIEditor.Controls
                 async action => await uiDispatcher.RunAsync(action),
                 callbacks.AppendActivity,
                 getString,
-                callbacks.GetActiveRunContext);
+                callbacks.GetActiveRunContext,
+                beforeDialog,
+                afterDialog);
             var planController = new AgentPlanController(
                 callbacks.GetActiveRunContext,
                 confirmationController,
@@ -356,6 +358,8 @@ namespace TxtAIEditor.Controls
 
             fileTools.ConfirmFileEditAsync = confirmationController.ConfirmFileEditAsync;
             fileTools.ConfirmPowerShellAsync = confirmationController.ConfirmPowerShellAsync;
+            fileTools.ReadAttachmentPathsProvider = fileToolController.GetReadAttachmentPaths;
+            fileTools.ConfirmExternalReadAsync = confirmationController.ConfirmExternalReadAsync;
             fileTools.FileEditCommittedAsync = TrackFileEditAsync;
             fileTools.ActivityReporter = callbacks.AppendActivity;
             if (fileModifiedAsync != null)

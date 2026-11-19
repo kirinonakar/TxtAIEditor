@@ -2,18 +2,20 @@
 // HTML, escaped pipes, or the alignment separator of an unrelated column.
 export function parseMarkdownTableRow(source) {
     const text = String(source ?? '');
-    const pipes = [];
-    for (let index = 0; index < text.length; index++) {
+    const prefix = /^\s*\\?\|/.exec(text)?.[0];
+    if (!prefix) return null;
+    const pipes = [prefix.length - 1];
+    for (let index = prefix.length; index < text.length; index++) {
         if (text[index] !== '|') continue;
         let slashes = 0;
         for (let previous = index - 1; previous >= 0 && text[previous] === '\\'; previous--) slashes++;
         if (slashes % 2 === 0) pipes.push(index);
     }
-    if (pipes.length < 2 || text.slice(0, pipes[0]).trim() || text.slice(pipes.at(-1) + 1).trim()) return null;
+    if (pipes.length < 2 || !/^\s*\\?\s*$/.test(text.slice(pipes.at(-1) + 1))) return null;
     const cells = pipes.slice(1).map((pipe, index) => ({
         text: text.slice(pipes[index] + 1, pipe), start: pipes[index] + 1, end: pipe
     }));
-    return { source: text, prefix: text.slice(0, pipes[0] + 1), suffix: text.slice(pipes.at(-1)), cells };
+    return { source: text, prefix, suffix: text.slice(pipes.at(-1)), cells };
 }
 
 export function readMarkdownTable(startLine, lineCount, getLine) {

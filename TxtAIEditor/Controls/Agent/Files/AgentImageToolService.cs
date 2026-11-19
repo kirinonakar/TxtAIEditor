@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
@@ -20,7 +21,7 @@ namespace TxtAIEditor.Controls
             _workspace = workspace;
         }
 
-        public async Task<AgentReadImageResult> ReadImageAsync(string path, bool original = false)
+        public async Task<AgentReadImageResult> ReadImageAsync(string path, bool original, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -33,9 +34,9 @@ namespace TxtAIEditor.Controls
             string fullPath;
             try
             {
-                fullPath = _workspace.ResolveInsideWorkspace(path, allowOutside: true);
+                fullPath = await _workspace.ResolveReadPathAsync(path, cancellationToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return new AgentReadImageResult
                 {
