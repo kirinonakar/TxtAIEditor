@@ -39,16 +39,42 @@ function applyFunctionData(target, graph) {
     target.options.scales.y.max = yRange.max;
 }
 
-function createFunctionChart(graph) {
+function createFunctionChart(input, linear, options = {}, data = {}) {
+    if (!isRecord(options) || !isRecord(data)) {
+        throw new Error('Expected Chart.js options and data objects for a function chart');
+    }
+    const { scales = {}, plugins } = options;
+    const { datasets = [] } = data;
+    if (!isRecord(scales) || !Array.isArray(datasets) || !datasets.every(isRecord)) {
+        throw new Error('Expected a scales object and a datasets array');
+    }
+    const { x = {}, y = {} } = scales;
+    if (!isRecord(x) || !isRecord(y)) throw new Error('Expected x and y axis options');
+    const { xMin = x.min, xMax = x.max, yMin = y.min, yMax = y.max } = input;
+    const graph = createFunctionPlot({ ...input, xMin, xMax, yMin, yMax }, linear);
+    const [curveStyle, ...otherDatasets] = datasets;
+
     const config = {
         type: 'line',
-        data: { datasets: [{ label: graph.equation, pointRadius: 0, borderWidth: 2, spanGaps: false }] },
+        data: {
+            ...data,
+            datasets: [{
+                label: graph.equation, pointRadius: 0, borderWidth: 2, spanGaps: false,
+                ...curveStyle, xAxisID: 'x', yAxisID: 'y', indexAxis: 'x'
+            }, ...otherDatasets]
+        },
         options: {
+            ...options,
             scales: {
-                x: { type: 'linear', ...graph.xRange, title: { display: true, text: 'x' } },
-                y: { title: { display: true, text: 'y' } }
+                ...scales,
+                x: { type: 'linear', title: { display: true, text: 'x' }, ...x, ...graph.xRange },
+                y: { title: { display: true, text: 'y' }, ...y }
             },
-            plugins: { legend: { display: false }, tooltip: { enabled: false } }
+            plugins: plugins === false ? false : {
+                ...plugins,
+                legend: plugins?.legend ?? { display: false },
+                tooltip: plugins?.tooltip ?? { enabled: false }
+            }
         },
         [functionPlotKey]: graph
     };
@@ -58,10 +84,6 @@ function createFunctionChart(graph) {
 
 function fromBasicChart(input) {
     const name = String(input.type || '').toLowerCase();
-    if (name === 'function' || name === 'linear-function') {
-        return createFunctionChart(createFunctionPlot(input, name === 'linear-function'));
-    }
-
     const type = baseTypes.get(name);
     if (!type || !Array.isArray(input.series) || !input.series.length ||
         (input.labels !== undefined && !Array.isArray(input.labels))) {
@@ -118,6 +140,11 @@ export async function parseMarkdownChart(language, source) {
     }
     if (!isRecord(input)) throw new Error('Expected a chart configuration object');
     validateChartData(input);
+    const type = typeof input.type === 'string' ? input.type.toLowerCase() : '';
+    if (type === 'function' || type === 'linear-function') {
+        return createFunctionChart(input, type === 'linear-function',
+            basic ? undefined : input.options, basic ? undefined : input.data);
+    }
     if (basic) return fromBasicChart(input);
     if (typeof input.type !== 'string' || !isRecord(input.data) || !Array.isArray(input.data.datasets) ||
         (input.options !== undefined && !isRecord(input.options))) {
