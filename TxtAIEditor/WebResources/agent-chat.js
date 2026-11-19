@@ -11,6 +11,7 @@ const turnTitle = document.getElementById('turn-title');
 const sessions = document.getElementById('sessions');
 const sessionsTitle = document.getElementById('sessions-title');
 const sessionsEmpty = document.getElementById('sessions-empty');
+const newSessionButton = document.getElementById('new-session');
 const copyAllButton = document.getElementById('copy-all');
 const copyAllText = document.getElementById('copy-all-text');
 const copyAllIcon = document.getElementById('copy-all-icon');
@@ -488,6 +489,10 @@ copyAllButton.addEventListener('click', () => {
     host.postMessage({ action: 'copy', copyId: sessionCopyId, text });
 });
 
+newSessionButton.addEventListener('click', () => {
+    host.postMessage({ action: 'newSession' });
+});
+
 function syncComposer() {
     if (!composing) {
         if (composerSessionId !== sessionId) {
@@ -604,6 +609,9 @@ host.addEventListener('message', ({ data }) => {
             turnTitle.textContent = data.turns;
             sessionsTitle.textContent = data.sessions;
             sessionsEmpty.textContent = data.emptySessions;
+            newSessionButton.title = data.newSession;
+            newSessionButton.setAttribute('aria-label', data.newSession);
+            newSessionButton.disabled = false;
             untitledSessionLabel = data.untitledSession;
             runningSessionLabel = data.runningSession;
             promptBox.placeholder = data.prompt;

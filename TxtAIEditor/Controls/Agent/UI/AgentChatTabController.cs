@@ -269,6 +269,7 @@ namespace TxtAIEditor.Controls
                             title = _getString("AgentChatTabTitle", "Agent 채팅"),
                             turns = _getString("AgentChatTurnNavigation", "바로가기"),
                             sessions = _getString("AgentOpenSessionsTitle", "열린 세션"),
+                            newSession = _getString("AgentNewSessionButton", "새 세션"),
                             emptySessions = _getString("AgentOpenSessionsEmptyText", "열린 세션 없음"),
                             untitledSession = _getString("AgentOpenSessionUntitled", "새 세션"),
                             runningSession = _getString("AgentOpenSessionRunningSuffix", "실행 중"),
@@ -322,15 +323,11 @@ namespace TxtAIEditor.Controls
                     case "selectSession":
                         if (ReadString(message, "sessionId") is { Length: > 0 } sessionToSelect)
                         {
-                            _pane.DispatcherQueue.TryEnqueue(() =>
-                            {
-                                if (_tab == tab && _readyWebView == core && _navigation.GetActiveTab() == tab)
-                                {
-                                    _pane.SelectOpenSession(sessionToSelect);
-                                    Refresh();
-                                }
-                            });
+                            QueueSessionAction(tab, core, () => _pane.SelectOpenSession(sessionToSelect));
                         }
+                        break;
+                    case "newSession":
+                        QueueSessionAction(tab, core, _pane.RequestNewSession);
                         break;
                     case "submit":
                         string? sessionId = ReadString(message, "sessionId");
@@ -353,6 +350,18 @@ namespace TxtAIEditor.Controls
             {
                 Debug.WriteLine(ex);
             }
+        }
+
+        private void QueueSessionAction(OpenedTab tab, CoreWebView2 core, Action action)
+        {
+            _pane.DispatcherQueue.TryEnqueue(() =>
+            {
+                if (_tab == tab && _readyWebView == core && _navigation.GetActiveTab() == tab)
+                {
+                    action();
+                    Refresh();
+                }
+            });
         }
 
         private static string? ReadString(JsonElement message, string property) =>
