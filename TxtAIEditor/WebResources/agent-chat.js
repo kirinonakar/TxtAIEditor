@@ -12,6 +12,7 @@ const sessions = document.getElementById('sessions');
 const sessionsTitle = document.getElementById('sessions-title');
 const sessionsEmpty = document.getElementById('sessions-empty');
 const newSessionButton = document.getElementById('new-session');
+const closeAllSessionsButton = document.getElementById('close-all-sessions');
 const copyAllButton = document.getElementById('copy-all');
 const copyAllText = document.getElementById('copy-all-text');
 const copyAllIcon = document.getElementById('copy-all-icon');
@@ -468,6 +469,7 @@ function showSessions(items) {
         cursor = button.nextElementSibling;
     }
     sessionsEmpty.hidden = items.length > 0;
+    closeAllSessionsButton.disabled = items.length === 0;
     syncSessionSelection();
 }
 
@@ -491,6 +493,10 @@ copyAllButton.addEventListener('click', () => {
 
 newSessionButton.addEventListener('click', () => {
     host.postMessage({ action: 'newSession' });
+});
+
+closeAllSessionsButton.addEventListener('click', () => {
+    host.postMessage({ action: 'closeAllSessions' });
 });
 
 function syncComposer() {
@@ -612,6 +618,8 @@ host.addEventListener('message', ({ data }) => {
             newSessionButton.title = data.newSession;
             newSessionButton.setAttribute('aria-label', data.newSession);
             newSessionButton.disabled = false;
+            closeAllSessionsButton.title = data.closeAllSessions;
+            closeAllSessionsButton.setAttribute('aria-label', data.closeAllSessions);
             untitledSessionLabel = data.untitledSession;
             runningSessionLabel = data.runningSession;
             promptBox.placeholder = data.prompt;

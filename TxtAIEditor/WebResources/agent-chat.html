@@ -30,9 +30,14 @@
         <section class="turn-section session-section">
             <div class="turn-header">
                 <h2 id="sessions-title"></h2>
-                <button id="new-session" class="message-copy" type="button" disabled>
-                    <span aria-hidden="true">+</span>
-                </button>
+                <div class="session-actions">
+                    <button id="new-session" class="message-copy" type="button" disabled>
+                        <span aria-hidden="true">+</span>
+                    </button>
+                    <button id="close-all-sessions" class="message-copy" type="button" disabled>
+                        <span class="trash-icon" aria-hidden="true">&#xE74D;</span>
+                    </button>
+                </div>
             </div>
             <nav id="sessions" aria-labelledby="sessions-title"></nav>
             <p id="sessions-empty" hidden></p>

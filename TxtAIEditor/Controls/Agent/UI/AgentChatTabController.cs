@@ -270,6 +270,7 @@ namespace TxtAIEditor.Controls
                             turns = _getString("AgentChatTurnNavigation", "바로가기"),
                             sessions = _getString("AgentOpenSessionsTitle", "열린 세션"),
                             newSession = _getString("AgentNewSessionButton", "새 세션"),
+                            closeAllSessions = _getString("AgentOpenSessionsCloseAllText", "모두 닫기"),
                             emptySessions = _getString("AgentOpenSessionsEmptyText", "열린 세션 없음"),
                             untitledSession = _getString("AgentOpenSessionUntitled", "새 세션"),
                             runningSession = _getString("AgentOpenSessionRunningSuffix", "실행 중"),
@@ -328,6 +329,9 @@ namespace TxtAIEditor.Controls
                         break;
                     case "newSession":
                         QueueSessionAction(tab, core, _pane.RequestNewSession);
+                        break;
+                    case "closeAllSessions":
+                        QueueSessionAction(tab, core, _pane.RequestCloseAllSessions);
                         break;
                     case "submit":
                         string? sessionId = ReadString(message, "sessionId");

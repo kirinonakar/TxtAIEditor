@@ -229,10 +229,16 @@ body {
 
 #copy-all { flex-shrink: 0; margin: 0; padding-inline: 5px; white-space: nowrap; }
 #copy-all-icon { display: none; }
-#new-session {
+.session-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-inline-start: auto;
+}
+
+.session-actions button {
     display: grid;
     place-items: center;
-    flex-shrink: 0;
     width: 26px;
     height: 26px;
     margin: 0;
@@ -240,6 +246,7 @@ body {
     font-size: 1rem;
     line-height: 1;
 }
+.trash-icon { font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets"; }
 
 .turn-panel nav {
     display: grid;
@@ -313,6 +320,7 @@ body {
 
 @media (max-width: 540px) {
     .turn-panel { width: clamp(88px, 26vw, 140px); padding: 10px 6px; }
+    .session-section .turn-header { flex-wrap: wrap; }
     #turn-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     .turn-section:first-child .turn-header { justify-content: center; }
     #copy-all-text { display: none; }

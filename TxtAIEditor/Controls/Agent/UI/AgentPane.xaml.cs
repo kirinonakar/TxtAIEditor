@@ -596,7 +596,7 @@ private Style? _accentRunButtonStyle;
         private void OnAgentCloseAllOpenSessionsClick(object sender, RoutedEventArgs e)
         {
             AgentOpenSessionsFlyout.Hide();
-            AllOpenSessionsClosed?.Invoke(this, EventArgs.Empty);
+            RequestCloseAllSessions();
         }
 
         private void OnDeleteHistoryClick(object sender, RoutedEventArgs e)
@@ -1013,6 +1013,8 @@ private Style? _accentRunButtonStyle;
         internal void SelectOpenSession(string sessionId) => OpenSessionSelected?.Invoke(this, sessionId);
 
         internal void RequestNewSession() => NewSessionRequested?.Invoke(AgentNewSessionButton, new RoutedEventArgs());
+
+        internal void RequestCloseAllSessions() => AllOpenSessionsClosed?.Invoke(this, EventArgs.Empty);
 
     }
 }
