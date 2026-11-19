@@ -104,16 +104,17 @@ function readParameter(specification, defaultLimit = 10) {
         throw new Error('Expected a finite initial parameter value within its slider range');
     }
 
-    // A numeric step has to share the HTML range input's grid, which starts at min.
+    // Native range steps start at min. Off-grid initial values use a grid anchored at value.
     const followsStep = step => {
         const index = (value - min) / step;
         return Math.abs(index - Math.round(index)) < 1e-8;
     };
     const step = definition.step ?? (followsStep(0.1) ? 0.1 : 'any');
-    if (step !== 'any' && (!Number.isFinite(step) || step <= 0 || !followsStep(step))) {
-        throw new Error('Expected a positive slider step aligned with the initial value');
+    if (step !== 'any' && (!Number.isFinite(step) || step <= 0)) {
+        throw new Error('Expected a positive slider step');
     }
-    return { value, min, max, step };
+    const stepBase = step !== 'any' && !followsStep(step) ? value : undefined;
+    return { value, min, max, step, stepBase };
 }
 
 function readRange(min, max) {

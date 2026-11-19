@@ -218,6 +218,32 @@ function observeChartRemoval() {
     removalObserver.observe(document.documentElement, { childList: true, subtree: true });
 }
 
+function configureParameterSlider(slider, { min, max, step, value, stepBase }) {
+    if (stepBase !== undefined) {
+        // The native range uses integer positions so keyboard navigation also follows the requested step.
+        const first = Math.floor((min - stepBase) / step + 1e-8);
+        const last = Math.ceil((max - stepBase) / step - 1e-8);
+        if (first < last && Number.isSafeInteger(last - first)) {
+            slider.min = String(first);
+            slider.max = String(last);
+            slider.step = '1';
+            slider.value = String(value === min ? first : value === max ? last : Math.round((value - stepBase) / step));
+            return () => {
+                const position = slider.valueAsNumber;
+                if (position === first) return min;
+                if (position === last) return max;
+                return stepBase + position * step;
+            };
+        }
+    }
+
+    slider.min = String(min);
+    slider.max = String(max);
+    slider.step = stepBase === undefined ? String(step) : 'any';
+    slider.value = String(value);
+    return () => slider.valueAsNumber;
+}
+
 function addFunctionControls(block, frame, canvas, chart, graph) {
     const title = graph.curves.length === 1 ? document.createElement('div') : null;
     if (title) title.className = 'chart-function-equation';
@@ -240,19 +266,20 @@ function addFunctionControls(block, frame, canvas, chart, graph) {
         const name = document.createElement('span');
         name.textContent = key;
         const value = document.createElement('span');
-        value.textContent = number.format(parameter.value);
         value.setAttribute('aria-hidden', 'true');
         const slider = document.createElement('input');
         slider.type = 'range';
-        slider.min = String(parameter.min);
-        slider.max = String(parameter.max);
-        slider.step = String(parameter.step);
-        slider.value = String(parameter.value);
+        const readValue = configureParameterSlider(slider, parameter);
         slider.setAttribute('aria-label', key);
+        const updateValueLabel = () => {
+            value.textContent = number.format(parameter.value);
+            slider.setAttribute('aria-valuetext', value.textContent);
+        };
+        updateValueLabel();
         slider.addEventListener('input', event => {
             event.stopPropagation();
-            parameter.value = slider.valueAsNumber;
-            value.textContent = number.format(parameter.value);
+            parameter.value = readValue();
+            updateValueLabel();
             updateEquation();
             applyFunctionData(chart, graph);
             chart.update('none');
