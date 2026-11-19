@@ -1,0 +1,207 @@
+const unaryFunctions = new Map(Object.entries({
+    abs: Math.abs, sqrt: Math.sqrt, cbrt: Math.cbrt,
+    sin: Math.sin, cos: Math.cos, tan: Math.tan,
+    asin: Math.asin, acos: Math.acos, atan: Math.atan,
+    sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
+    exp: Math.exp, ln: Math.log, log: Math.log, log10: Math.log10, log2: Math.log2,
+    floor: Math.floor, ceil: Math.ceil, round: Math.round, sign: Math.sign
+}));
+const numberLiteral = /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+
+function compileExpression(expression, parameters) {
+    const source = expression.replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/−/g, '-')
+        .replace(/π/g, 'pi').replaceAll('**', '^');
+    const tokens = source.match(/(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|[a-z_]\w*|\S/gi) ?? [];
+    let position = 0;
+    function take(symbol) {
+        if (tokens[position] !== symbol) return false;
+        position++;
+        return true;
+    }
+
+    function primary() {
+        const token = tokens[position++];
+        if (token === '(') {
+            const expression = sum();
+            if (!take(')')) throw new Error('Expected a closing parenthesis');
+            return expression;
+        }
+        if (token && numberLiteral.test(token)) {
+            const value = Number(token);
+            if (!Number.isFinite(value)) throw new Error('Expected a finite number');
+            return () => value;
+        }
+        if (token === 'x') return x => x;
+        if (token === 'pi') return () => Math.PI;
+        if (token === 'e') return () => Math.E;
+        const parameter = parameters.get(token);
+        if (parameter) return () => parameter.value;
+
+        const fn = unaryFunctions.get(token);
+        if (fn && take('(')) {
+            const argument = sum();
+            if (!take(')')) throw new Error('Expected a closing parenthesis');
+            return x => fn(argument(x));
+        }
+        throw new Error(token ? `Unexpected expression token: ${token}` : 'Expected an expression');
+    }
+
+    function unary() {
+        if (take('+')) return unary();
+        if (take('-')) {
+            const operand = unary();
+            return x => -operand(x);
+        }
+        const base = primary();
+        if (!take('^')) return base;
+        const exponent = unary();
+        return x => base(x) ** exponent(x);
+    }
+
+    function product() {
+        let result = unary();
+        while (tokens[position] === '*' || tokens[position] === '/') {
+            const multiply = take('*');
+            if (!multiply) take('/');
+            const left = result;
+            const right = unary();
+            result = multiply ? x => left(x) * right(x) : x => left(x) / right(x);
+        }
+        return result;
+    }
+
+    function sum() {
+        let result = product();
+        while (tokens[position] === '+' || tokens[position] === '-') {
+            const add = take('+');
+            if (!add) take('-');
+            const left = result;
+            const right = product();
+            result = add ? x => left(x) + right(x) : x => left(x) - right(x);
+        }
+        return result;
+    }
+
+    const evaluate = sum();
+    if (position !== tokens.length) throw new Error(`Unexpected expression token: ${tokens[position]}`);
+    return evaluate;
+}
+
+function readParameter(specification, defaultLimit = 10) {
+    const definition = typeof specification === 'number' ? { value: specification } : specification;
+    if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
+        throw new Error('Expected a parameter number or a mapping with value, min, max and step');
+    }
+
+    const { value } = definition;
+    const limit = Math.ceil(Math.max(defaultLimit, Math.abs(value)));
+    const { min = -limit, max = limit } = definition;
+    if (![value, min, max].every(Number.isFinite) || min >= max ||
+        !Number.isFinite(max - min) || value < min || value > max) {
+        throw new Error('Expected a finite initial parameter value within its slider range');
+    }
+
+    // A numeric step has to share the HTML range input's grid, which starts at min.
+    const followsStep = step => {
+        const index = (value - min) / step;
+        return Math.abs(index - Math.round(index)) < 1e-8;
+    };
+    const step = definition.step ?? (followsStep(0.1) ? 0.1 : 'any');
+    if (step !== 'any' && (!Number.isFinite(step) || step <= 0 || !followsStep(step))) {
+        throw new Error('Expected a positive slider step aligned with the initial value');
+    }
+    return { value, min, max, step };
+}
+
+function readRange(min, max) {
+    if (![min, max].every(Number.isFinite) || min >= max || !Number.isFinite(max - min)) {
+        throw new Error('Expected a finite axis range with min < max');
+    }
+    return { min, max };
+}
+
+export function createFunctionPlot(input, linear) {
+    const { xMin = -10, xMax = 10, yMin, yMax } = input;
+    const xRange = readRange(xMin, xMax);
+    let yRange = yMin === undefined && yMax === undefined ? null : readRange(yMin, yMax);
+    if (linear) {
+        const { a: aValue = 1, b: bValue = 0 } = input;
+        const a = readParameter(aValue, 5);
+        const b = readParameter(bValue);
+        // Keep the same scale across all positions of the original linear sliders.
+        const yLimit = Math.max(Math.abs(a.min), Math.abs(a.max)) * Math.max(Math.abs(xMin), Math.abs(xMax)) +
+            Math.max(Math.abs(b.min), Math.abs(b.max));
+        yRange ??= readRange(-yLimit, yLimit);
+        return {
+            equation: 'y = ax + b', parameters: new Map([['a', a], ['b', b]]), xRange, yRange,
+            intervals: 1, evaluate: x => a.value * x + b.value,
+            formatEquation: number => `y = ${number.format(a.value)}x ${b.value < 0 ? '−' : '+'} ${number.format(Math.abs(b.value))}`
+        };
+    }
+
+    const expression = typeof input.expression === 'string' ? input.expression.trim().replace(/^y\s*=\s*/, '') : '';
+    if (!expression || expression.length > 512) throw new Error('Expected an expression of at most 512 characters');
+    const definitions = input.parameters ?? {};
+    if (typeof definitions !== 'object' || Array.isArray(definitions) || Object.keys(definitions).length > 12) {
+        throw new Error('Expected a mapping of up to 12 parameters');
+    }
+    const parameters = new Map();
+    for (const [name, definition] of Object.entries(definitions)) {
+        if (!/^[a-z_]\w{0,31}$/i.test(name) || ['x', 'pi', 'e'].includes(name) || unaryFunctions.has(name)) {
+            throw new Error(`Invalid parameter name: ${name}`);
+        }
+        parameters.set(name, readParameter(definition));
+    }
+    const equation = `y = ${expression}`;
+    return {
+        equation, parameters, xRange, yRange, intervals: 400,
+        evaluate: compileExpression(expression, parameters),
+        formatEquation: () => equation
+    };
+}
+
+function autoYRange(points) {
+    const values = points.map(point => point.y).filter(Number.isFinite).sort((a, b) => a - b);
+    if (!values.length) return { min: -1, max: 1 };
+    const last = values.length - 1;
+    const low = values[Math.floor(last * 0.025)];
+    const high = values[Math.ceil(last * 0.975)];
+    const typicalSpan = high - low || Math.max(Math.abs(low) * 0.1, 1);
+    // Include ordinary extrema while keeping samples near poles from dominating the scale.
+    const min = Math.max(values[0], low - 2 * typicalSpan);
+    const max = Math.min(values[last], high + 2 * typicalSpan);
+    const padding = (max - min || typicalSpan) * 0.08;
+    return { min: min - padding, max: max + padding };
+}
+
+export function sampleFunctionPlot(graph) {
+    const { min, max } = graph.xRange;
+    const valueAt = x => {
+        const y = graph.evaluate(x);
+        return Number.isFinite(4 * y) ? y : null;
+    };
+    const points = Array.from({ length: graph.intervals + 1 }, (_, index) => {
+        const x = index === graph.intervals ? max : min + (max - min) * (index / graph.intervals);
+        return { x, y: valueAt(x) };
+    });
+    const yRange = graph.yRange ?? autoYRange(points);
+    if (graph.intervals === 1) return { points, yRange };
+
+    const connected = [points[0]];
+    const jumpThreshold = (yRange.max - yRange.min) * 0.6;
+    for (let index = 1; index < points.length; index++) {
+        const previous = points[index - 1];
+        const point = points[index];
+        if (previous.y !== null && point.y !== null && Math.abs(point.y - previous.y) > jumpThreshold) {
+            const x = previous.x + (point.x - previous.x) / 2;
+            const midpoint = valueAt(x);
+            // Opposite sides of a pole can both have finite samples. Break the line
+            // when the midpoint is outside the values of the two endpoints.
+            if (midpoint === null || midpoint < Math.min(previous.y, point.y) || midpoint > Math.max(previous.y, point.y)) {
+                connected.push({ x, y: null });
+            }
+        }
+        connected.push(point);
+    }
+    return { points: connected, yRange };
+}

@@ -104,6 +104,8 @@ namespace TxtAIEditor.Controls
                 ? _displayText.OutputPlaceholder
                 : snapshot.OutputText;
             session.ChatPrompts = snapshot.ChatPrompts;
+            session.PendingChatPrompts = Array.Empty<string>();
+            session.DeferredFollowUp = null;
             session.ChatHiddenOutput = snapshot.ChatHiddenOutput;
             session.ActivityText = string.IsNullOrWhiteSpace(snapshot.ActivityText)
                 ? _displayText.ActivityIdle

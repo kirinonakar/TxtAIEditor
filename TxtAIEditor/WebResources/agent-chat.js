@@ -8,6 +8,9 @@ const history = document.getElementById('history');
 const messages = document.getElementById('messages');
 const turns = document.getElementById('turns');
 const turnTitle = document.getElementById('turn-title');
+const copyAllButton = document.getElementById('copy-all');
+const copyAllText = document.getElementById('copy-all-text');
+const copyAllIcon = document.getElementById('copy-all-icon');
 const composer = document.getElementById('composer');
 const promptBox = document.getElementById('prompt');
 const sendButton = document.getElementById('send');
@@ -21,6 +24,7 @@ const markdownOptions = { allowHtml: false, deferOpenDiagrams: true, diagramLoad
 const drafts = new Map();
 const pending = new Map();
 let promptRanges = [];
+let pendingPrompts = [];
 let hiddenOutput = [];
 let messageViews = [];
 let jumpLinks = [];
@@ -37,6 +41,15 @@ let thinkingLabel = '';
 let toolStatusPrefixes = [];
 let verboseToolPrefix = '';
 let chartErrorLabel = '';
+let copyLabel = '';
+let copiedLabel = '';
+let copyFailedLabel = '';
+let copyAllLabel = '';
+let userRoleLabel = '';
+let assistantRoleLabel = '';
+let sessionCopyId = null;
+let sessionCopyFeedbackTimer;
+let nextCopyId = 0;
 
 function scrollToEnd() {
     if (followOutput) history.scrollTop = history.scrollHeight;
@@ -61,8 +74,14 @@ function findInlineLogTag(line) {
 
 function assistantBlocks(text) {
     const blocks = [];
+    const markdown = [];
     let lines = [];
     function flushMarkdown() {
+        let first = 0;
+        let last = lines.length;
+        while (first < last && !lines[first].trim()) first++;
+        while (last > first && !lines[last - 1].trim()) last--;
+        if (first < last) markdown.push(lines.slice(first, last).join('\n'));
         for (let number = 1; number <= lines.length;) {
             const block = renderBlockAt(number, lines.length, lineNumber => lines[lineNumber - 1], markdownOptions);
             if (block?.html) blocks.push({ html: block.html });
@@ -134,18 +153,22 @@ function assistantBlocks(text) {
         lines.push(line);
     }
     flushMarkdown();
-    return blocks;
+    return { blocks, copyText: markdown.join('\n\n') };
 }
 
 function renderAssistant(view, text) {
-    const blocks = assistantBlocks(text);
+    const { blocks, copyText } = assistantBlocks(text);
+    const content = view.content;
+    view.copyText = copyText;
+    view.copyButton.hidden = !copyText;
+    view.node.hidden = !blocks.length;
 
     for (const [index, block] of blocks.entries()) {
-        let node = view.node.children[index];
+        let node = content.children[index];
         if (node && node.blockHtml === block.html && node.activity === block.activity) continue;
         if (!node) {
             node = document.createElement('div');
-            view.node.append(node);
+            content.append(node);
         }
         node.blockHtml = block.html;
         node.activity = block.activity;
@@ -153,8 +176,30 @@ function renderAssistant(view, text) {
         if (block.activity === undefined) node.innerHTML = block.html;
         else node.textContent = block.activity;
     }
-    while (view.node.children.length > blocks.length) view.node.lastElementChild.remove();
-    void renderPreviewEmbeds(view.node, scrollToEnd, { errorLabel: chartErrorLabel });
+    while (content.children.length > blocks.length) content.lastElementChild.remove();
+    void renderPreviewEmbeds(content, scrollToEnd, { errorLabel: chartErrorLabel });
+}
+
+function createMessageView(role, start) {
+    const node = document.createElement('div');
+    node.className = `message ${role}`;
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.className = 'message-copy';
+    copyButton.textContent = copyLabel;
+    copyButton.setAttribute('aria-live', 'polite');
+    copyButton.hidden = true;
+    node.append(content, copyButton);
+
+    const view = { node, content, role, start, copyButton, copyId: String(++nextCopyId), copyText: '' };
+    copyButton.addEventListener('click', () => {
+        if (view.copyText) {
+            host.postMessage({ action: 'copy', copyId: view.copyId, text: view.copyText });
+        }
+    });
+    return view;
 }
 
 function renderConversation(offset, appearanceChanged) {
@@ -174,44 +219,45 @@ function renderConversation(offset, appearanceChanged) {
         return text + (position < end ? output.slice(position, end) : '');
     }
 
-    function show(role, start, end, userText = null, preamble = '') {
+    function show(role, start, end, userText = '', preamble = '') {
         const previous = messageViews[index];
         let view = previous;
         const reusable = previous?.role === role && previous.start === start;
         if (!reusable) {
-            const node = document.createElement('div');
-            node.className = `message ${role}`;
-            if (previous) previous.node.replaceWith(node);
-            else messages.append(node);
-            view = { node, role, start };
+            view = createMessageView(role, start);
+            if (previous) previous.node.replaceWith(view.node);
+            else messages.append(view.node);
         }
         if (role === 'user') {
-            if (view.userText !== userText) view.node.textContent = userText;
-            view.userText = userText;
+            if (view.copyText !== userText) view.content.textContent = userText;
+            view.copyText = userText;
+            view.copyButton.hidden = !userText;
+            view.node.hidden = !userText;
         } else if (!reusable || appearanceChanged || view.end !== end || offset < end) {
             renderAssistant(view, preamble + visibleOutput(start, end));
         }
         view.end = end;
         nextViews.push(view);
         index++;
-        return view.node;
+        return view;
     }
 
     const targets = [];
     for (const [turn, range] of promptRanges.entries()) {
         targets.push(show('user', range.start, range.end, range.text));
         const end = promptRanges[turn + 1]?.start ?? output.length;
-        show('assistant', range.end, end, null, turn === 0 ? visibleOutput(0, range.start) : '');
+        show('assistant', range.end, end, '', turn === 0 ? visibleOutput(0, range.start) : '');
     }
     if (!promptRanges.length) show('assistant', 0, output.length);
+    for (const text of pendingPrompts) targets.push(show('user', null, null, text));
     for (; index < messageViews.length; index++) messageViews[index].node.remove();
     messageViews = nextViews;
     return targets;
 }
 
 function showJumpLinks(targets) {
-    for (const [index, target] of targets.entries()) {
-        const text = promptRanges[index].text.trim().replace(/\s+/g, ' ');
+    for (const [index, { node: target, copyText }] of targets.entries()) {
+        const text = copyText.trim().replace(/\s+/g, ' ');
         const excerpt = text.slice(0, 200);
         const existing = jumpLinks[index];
         if (existing?.target === target && existing.excerpt === excerpt) continue;
@@ -241,6 +287,24 @@ function showJumpLinks(targets) {
     while (jumpLinks.length > targets.length) jumpLinks.pop().button.remove();
 }
 
+function setCopyAllLabel(label, icon = '⧉') {
+    copyAllText.textContent = label;
+    copyAllIcon.textContent = icon;
+    copyAllButton.title = label;
+    copyAllButton.setAttribute('aria-label', label);
+}
+
+copyAllButton.addEventListener('click', () => {
+    const entries = messageViews.filter(view => view.copyText);
+    if (!entries.length) return;
+    const text = entries.map(view => {
+        const role = view.role === 'user' ? userRoleLabel : assistantRoleLabel;
+        return `## ${role}\n\n${view.copyText}`;
+    }).join('\n\n');
+    sessionCopyId = String(++nextCopyId);
+    host.postMessage({ action: 'copy', copyId: sessionCopyId, text });
+});
+
 function syncComposer() {
     if (!composing) {
         if (composerSessionId !== sessionId) {
@@ -250,8 +314,8 @@ function syncComposer() {
         composer.hidden = !canSubmit;
         promptBox.disabled = !canSubmit;
     }
-    sendButton.disabled = composing || !canSubmit || composerSessionId !== sessionId ||
-        pending.has(sessionId) || !promptBox.value.trim();
+    sendButton.disabled = !canSubmit || composerSessionId !== sessionId ||
+        pending.has(sessionId) || (!composing && !promptBox.value.trim());
 }
 
 function update(message) {
@@ -265,8 +329,12 @@ function update(message) {
         selectedJump = null;
         output = '';
         promptRanges = [];
+        pendingPrompts = [];
         hiddenOutput = [];
         followOutput = true;
+        sessionCopyId = null;
+        clearTimeout(sessionCopyFeedbackTimer);
+        setCopyAllLabel(copyAllLabel);
     }
 
     const nextTheme = /dark/i.test(message.theme) ? 'Dark' : 'Light';
@@ -280,12 +348,14 @@ function update(message) {
 
     const nextOutput = output.slice(0, message.offset) + message.text;
     if (message.prompts) promptRanges = message.prompts;
+    if (message.pendingPrompts) pendingPrompts = message.pendingPrompts;
     if (message.hiddenOutput) hiddenOutput = message.hiddenOutput;
-    if (switched || appearanceChanged || message.prompts || message.hiddenOutput || nextOutput !== output) {
+    if (switched || appearanceChanged || message.prompts || message.pendingPrompts || message.hiddenOutput || nextOutput !== output) {
         const offset = message.hiddenOutput && nextOutput === output ? 0 : message.offset;
         output = nextOutput;
         const targets = renderConversation(offset, appearanceChanged);
-        if (switched || message.prompts) showJumpLinks(targets);
+        copyAllButton.disabled = !messageViews.some(view => view.copyText);
+        if (switched || message.prompts || message.pendingPrompts) showJumpLinks(targets);
     }
     canSubmit = message.canSubmit;
     syncComposer();
@@ -326,7 +396,7 @@ promptBox.addEventListener('keydown', event => {
 });
 composer.addEventListener('submit', event => {
     event.preventDefault();
-    if (sendButton.disabled) return;
+    if (sendButton.disabled || composing || !promptBox.value.trim()) return;
     const prompt = promptBox.value;
     pending.set(sessionId, prompt);
     followOutput = true;
@@ -348,10 +418,31 @@ host.addEventListener('message', ({ data }) => {
             toolStatusPrefixes = data.toolStatusPrefixes.filter(Boolean);
             verboseToolPrefix = data.verboseToolPrefix;
             chartErrorLabel = data.chartErrorLabel;
+            copyLabel = data.copy;
+            copiedLabel = data.copied;
+            copyFailedLabel = data.copyFailed;
+            copyAllLabel = data.copyAll;
+            userRoleLabel = data.userRole;
+            assistantRoleLabel = data.assistantRole;
+            setCopyAllLabel(copyAllLabel);
             break;
         case 'update':
             update(data);
             break;
+        case 'copyResult': {
+            if (data.copyId === sessionCopyId) {
+                clearTimeout(sessionCopyFeedbackTimer);
+                setCopyAllLabel(data.success ? copiedLabel : copyFailedLabel, data.success ? '✓' : '×');
+                sessionCopyFeedbackTimer = setTimeout(() => setCopyAllLabel(copyAllLabel), 1600);
+                break;
+            }
+            const view = messageViews.find(message => message.copyId === data.copyId);
+            if (!view) break;
+            clearTimeout(view.copyFeedbackTimer);
+            view.copyButton.textContent = data.success ? copiedLabel : copyFailedLabel;
+            view.copyFeedbackTimer = setTimeout(() => { view.copyButton.textContent = copyLabel; }, 1600);
+            break;
+        }
         case 'submitResult': {
             const sent = pending.get(data.sessionId);
             pending.delete(data.sessionId);

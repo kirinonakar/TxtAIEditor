@@ -234,7 +234,7 @@ Copyright (c) 2026 **kirinonakar**. All rights reserved.
 
 ### Third-Party Licenses
 
-This software includes Mermaid, Pele, xterm.js, KaTeX, and HarfBuzz.
+This software includes Mermaid, Pele, xterm.js, KaTeX, Chart.js, and HarfBuzz.
 
 **Mermaid**  
 License: MIT License  
@@ -254,6 +254,11 @@ Copyright (c) 2012-2013, Christopher Jeffrey
 **KaTeX**  
 License: MIT License  
 Copyright (c) 2013-2020 Khan Academy and other contributors  
+
+**[Chart.js](https://www.chartjs.org)** (4.6.1)<br>
+License: MIT License<br>
+Copyright (c) 2014-2024 Chart.js Contributors<br>
+The bundled [Chart.js license](TxtAIEditor/WebResources/chart/Chart.js.LICENSE.md) contains the full notice.
 
 **[HarfBuzz](https://github.com/harfbuzz/harfbuzzjs)** (harfbuzzjs 1.6.4)<br>
 License: "Old MIT" License (harfbuzzjs wrapper: MIT License)<br>

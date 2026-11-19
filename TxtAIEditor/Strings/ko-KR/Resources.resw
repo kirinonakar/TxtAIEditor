@@ -3200,6 +3200,21 @@
   <data name="AgentChatTabTitle" xml:space="preserve">
     <value>Agent 채팅</value>
   </data>
+  <data name="AgentChatCopyAll" xml:space="preserve">
+    <value>전체 복사</value>
+  </data>
+  <data name="AgentChatUserRole" xml:space="preserve">
+    <value>사용자 지시</value>
+  </data>
+  <data name="AgentChatAssistantRole" xml:space="preserve">
+    <value>AI 답변</value>
+  </data>
+  <data name="AgentChatCopied" xml:space="preserve">
+    <value>복사됨</value>
+  </data>
+  <data name="AgentChatCopyFailed" xml:space="preserve">
+    <value>복사 실패</value>
+  </data>
   <data name="AgentChatTurnNavigation" xml:space="preserve">
     <value>지시 바로가기</value>
   </data>

@@ -262,8 +262,16 @@ namespace TxtAIEditor.Controls
             runContext.RewindSnapshot = rewindSnapshot;
             runContext.IsPlanningMode = requestedPlanningMode;
             runContext.PendingPlanPath = pendingPlanPath;
+            var initialFollowUp = activeOpenSession.DeferredFollowUp;
+            activeOpenSession.DeferredFollowUp = null;
+            if (initialFollowUp != null && initialFollowUp.Text != userInstruction)
+            {
+                activeOpenSession.PendingChatPrompts =
+                    [.. activeOpenSession.PendingChatPrompts.Skip(initialFollowUp.Prompts.Count)];
+                initialFollowUp = null;
+            }
             onStarted?.Invoke();
-            await ExecuteRunAsync(activeOpenSession, runContext, conversationTurn, useSubagents);
+            await ExecuteRunAsync(activeOpenSession, runContext, conversationTurn, useSubagents, initialFollowUp: initialFollowUp);
         }
 
         private AgentRunContext CreateRunContext(AgentOpenSessionState session, EditorSettings settings, string instruction)
@@ -326,7 +334,8 @@ namespace TxtAIEditor.Controls
             bool useSubagents,
             OpenedTab? inheritedTab = null,
             AgentSelectionSnapshot? inheritedSelection = null,
-            CancellationToken parentCancellation = default)
+            CancellationToken parentCancellation = default,
+            AgentFollowUpBatch? initialFollowUp = null)
         {
             string userInstruction = runContext.OriginalUserInstruction;
             using var selectionScope = _mcpController.UseSelections(runContext.Selections);
@@ -379,7 +388,8 @@ namespace TxtAIEditor.Controls
             {
                 await _runOutputController.ClearRunActivityAsync(runContext, _getString("AgentActivityStarting", "시작 중"));
                 await _runOutputController.BeginRunOutputBlockAsync(runContext, _runTextFormatter.BuildRunHeader(
-                    isSubagent ? userInstruction : _promptContextService.BuildInstructionDisplay(userInstruction), isSubagent), userInstruction);
+                    isSubagent ? userInstruction : _promptContextService.BuildInstructionDisplay(userInstruction), isSubagent),
+                    userInstruction, initialFollowUp);
                 await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityCollectingContext", "맥락 수집 중"));
                 runContext.ToolCancellationToken.ThrowIfCancellationRequested();
                 runContext.PinnedWorkspaceRoot ??= AgentWorkspaceFileResolver.ResolveWorkspaceDirectory(runContext.WorkspaceRoot);
@@ -488,9 +498,10 @@ namespace TxtAIEditor.Controls
                     }
                     string fixedPromptContext = await _modelRequestBuilder.BuildFixedPromptContextAsync(
                         runContext, orchestration, isSubagent);
-                    string? queuedFollowUpPrompt = runContext.FollowUps.Take(out Task followUpRequested);
-                    if (!string.IsNullOrWhiteSpace(queuedFollowUpPrompt))
+                    var queuedFollowUp = runContext.FollowUps.Take(out Task followUpRequested);
+                    if (queuedFollowUp != null)
                     {
+                        string queuedFollowUpPrompt = queuedFollowUp.Text;
                         string followUpTurn = isSubagent
                             ? $"[user]\n{AgentSessionLabels.OrchestratorPrompt}\n{queuedFollowUpPrompt}"
                             : _promptContextService.BuildConversationTurn(queuedFollowUpPrompt);
@@ -504,7 +515,8 @@ namespace TxtAIEditor.Controls
 
                         string followUpHeader = _runTextFormatter.BuildRunHeader(
                             isSubagent ? queuedFollowUpPrompt : _promptContextService.BuildInstructionDisplay(queuedFollowUpPrompt), isSubagent);
-                        await _runOutputController.AppendRunOutputLineAsync(runContext, followUpHeader, queuedFollowUpPrompt);
+                        await _runOutputController.AppendRunOutputLineAsync(
+                            runContext, followUpHeader, queuedFollowUpPrompt, isSubagent ? null : queuedFollowUp);
                     }
 
                     AgentModelRequest request = await _modelRequestBuilder.BuildAsync(
@@ -860,19 +872,20 @@ namespace TxtAIEditor.Controls
                     runContext.PinnedWorkspaceRoot, useSubagents, runContext.Selections);
             }
 
-            string? pendingFollowUp = runContext.FollowUps.Take(out _);
-            if (!string.IsNullOrWhiteSpace(pendingFollowUp))
+            var pendingFollowUp = runContext.FollowUps.Take(out _);
+            if (pendingFollowUp != null)
             {
                 await _uiDispatcher.RunAsync(async () =>
                 {
+                    activeOpenSession.DeferredFollowUp = pendingFollowUp;
                     if (_openSessionController.IsSessionVisible(runContext.SessionId))
                     {
-                        _agentPane.Prompt.Text = pendingFollowUp;
+                        _agentPane.Prompt.Text = pendingFollowUp.Text;
                         await RunAgentAsync();
                     }
                     else
                     {
-                        activeOpenSession.PromptText = pendingFollowUp;
+                        activeOpenSession.PromptText = pendingFollowUp.Text;
                         activeOpenSession.UpdatedAt = DateTime.Now;
                         _openSessionController.UpdateUI();
                     }
@@ -1014,6 +1027,8 @@ namespace TxtAIEditor.Controls
                 return false;
             }
 
+            var session = _openSessionController.EnsureSession(context.SessionId);
+            session.PendingChatPrompts = [.. session.PendingChatPrompts, prompt];
             string queuedNotice = _getString(
                 "AgentFollowUpQueued",
                 "추가 지시가 대기 중입니다. 다음 도구 호출이 끝나면 전송됩니다.");

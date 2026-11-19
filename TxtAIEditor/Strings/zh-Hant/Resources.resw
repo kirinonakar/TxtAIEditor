@@ -3200,6 +3200,21 @@
   <data name="AgentChatTabTitle" xml:space="preserve">
     <value>代理程式聊天</value>
   </data>
+  <data name="AgentChatCopyAll" xml:space="preserve">
+    <value>複製全部</value>
+  </data>
+  <data name="AgentChatUserRole" xml:space="preserve">
+    <value>使用者指示</value>
+  </data>
+  <data name="AgentChatAssistantRole" xml:space="preserve">
+    <value>AI 回覆</value>
+  </data>
+  <data name="AgentChatCopied" xml:space="preserve">
+    <value>已複製</value>
+  </data>
+  <data name="AgentChatCopyFailed" xml:space="preserve">
+    <value>複製失敗</value>
+  </data>
   <data name="AgentChatTurnNavigation" xml:space="preserve">
     <value>跳到指示</value>
   </data>

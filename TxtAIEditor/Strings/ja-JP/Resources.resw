@@ -3200,6 +3200,21 @@
   <data name="AgentChatTabTitle" xml:space="preserve">
     <value>エージェント チャット</value>
   </data>
+  <data name="AgentChatCopyAll" xml:space="preserve">
+    <value>すべてコピー</value>
+  </data>
+  <data name="AgentChatUserRole" xml:space="preserve">
+    <value>ユーザー指示</value>
+  </data>
+  <data name="AgentChatAssistantRole" xml:space="preserve">
+    <value>AIの回答</value>
+  </data>
+  <data name="AgentChatCopied" xml:space="preserve">
+    <value>コピー済み</value>
+  </data>
+  <data name="AgentChatCopyFailed" xml:space="preserve">
+    <value>コピーに失敗</value>
+  </data>
   <data name="AgentChatTurnNavigation" xml:space="preserve">
     <value>指示へ移動</value>
   </data>

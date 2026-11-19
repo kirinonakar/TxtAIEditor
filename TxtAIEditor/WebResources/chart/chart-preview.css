@@ -21,5 +21,39 @@
     max-height: 100%;
 }
 
+.chart-function-equation {
+    margin-bottom: .4em;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.chart-function-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: .6em 1.2em;
+    margin-bottom: .5em;
+}
+
+.chart-function-controls label {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0 .6em;
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.chart-function-controls input {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    accent-color: var(--accent, #2688c5);
+}
+
+@media print {
+    .chart-function-controls { display: none; }
+}
+
 .chart-error-label:empty { display: none; }
 .chart-error-label { color: var(--muted, var(--fg)); }

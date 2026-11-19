@@ -41,6 +41,8 @@ namespace TxtAIEditor.Controls
         public string PromptText { get; set; } = string.Empty;
         public string OutputText { get; set; } = string.Empty;
         public List<AgentChatPrompt> ChatPrompts { get; set; } = new();
+        public string[] PendingChatPrompts { get; set; } = Array.Empty<string>();
+        public AgentFollowUpBatch? DeferredFollowUp { get; set; }
         public List<AgentChatOutputRange> ChatHiddenOutput { get; set; } = new();
         public bool NeedsHistoryFormatting { get; set; }
         public string ActivityText { get; set; } = string.Empty;
@@ -190,11 +192,16 @@ namespace TxtAIEditor.Controls
         public AgentFollowUpQueue FollowUps { get; set; } = new();
     }
 
+    internal sealed record AgentFollowUpBatch(IReadOnlyList<string> Prompts)
+    {
+        public string Text { get; } = string.Join(Environment.NewLine + Environment.NewLine, Prompts);
+    }
+
     internal sealed class AgentFollowUpQueue
     {
         private readonly object _gate = new();
         private TaskCompletionSource _requested = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private string? _prompt;
+        private List<string>? _prompts;
         private bool _closed;
 
         public bool TryQueue(string prompt)
@@ -205,26 +212,24 @@ namespace TxtAIEditor.Controls
                 {
                     return false;
                 }
-                _prompt = _prompt == null
-                    ? prompt
-                    : _prompt + Environment.NewLine + Environment.NewLine + prompt;
+                (_prompts ??= new List<string>()).Add(prompt);
                 _requested.TrySetResult();
                 return true;
             }
         }
 
-        public string? Take(out Task requested)
+        public AgentFollowUpBatch? Take(out Task requested)
         {
             lock (_gate)
             {
-                string? prompt = _prompt;
-                if (prompt != null)
+                var prompts = _prompts;
+                if (prompts != null)
                 {
-                    _prompt = null;
+                    _prompts = null;
                     _requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 }
                 requested = _requested.Task;
-                return prompt;
+                return prompts == null ? null : new AgentFollowUpBatch(prompts);
             }
         }
 
@@ -232,7 +237,7 @@ namespace TxtAIEditor.Controls
         {
             lock (_gate)
             {
-                if (_prompt != null)
+                if (_prompts != null)
                 {
                     return false;
                 }
@@ -246,7 +251,7 @@ namespace TxtAIEditor.Controls
             lock (_gate)
             {
                 _closed = true;
-                return _prompt;
+                return _prompts == null ? null : string.Join(Environment.NewLine + Environment.NewLine, _prompts);
             }
         }
     }

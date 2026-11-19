@@ -12,9 +12,10 @@ namespace TxtAIEditor.Controls
             _openSessionController = openSessionController;
         }
 
-        public Task BeginRunOutputBlockAsync(AgentRunContext context, string title, string prompt)
+        public Task BeginRunOutputBlockAsync(
+            AgentRunContext context, string title, string prompt, AgentFollowUpBatch? followUp = null)
         {
-            return _openSessionController.BeginRunOutputBlockAsync(context, title, prompt);
+            return _openSessionController.BeginRunOutputBlockAsync(context, title, prompt, followUp);
         }
 
         public Task ClearRunActivityAsync(AgentRunContext context, string text)
@@ -49,9 +50,10 @@ namespace TxtAIEditor.Controls
             return _openSessionController.AppendRunOutputTextAsync(context, text, hideInChat: true);
         }
 
-        public Task AppendRunOutputLineAsync(AgentRunContext context, string line, string? prompt = null)
+        public Task AppendRunOutputLineAsync(
+            AgentRunContext context, string line, string? prompt = null, AgentFollowUpBatch? followUp = null)
         {
-            return _openSessionController.AppendRunOutputLineAsync(context, line, prompt);
+            return _openSessionController.AppendRunOutputLineAsync(context, line, prompt, followUp);
         }
 
         public void EnqueueRunUi(

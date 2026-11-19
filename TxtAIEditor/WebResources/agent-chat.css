@@ -63,11 +63,18 @@ body {
     scroll-margin-top: 20px;
 }
 
-.message:empty { display: none; }
+.message[hidden], .message-copy[hidden] { display: none; }
 
 .user {
     align-self: flex-end;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
     max-width: min(88%, 620px);
+}
+
+.user .message-content {
+    max-width: 100%;
     padding: 10px 16px;
     border: 1px solid var(--line);
     border-radius: 18px 18px 5px 18px;
@@ -75,8 +82,24 @@ body {
     white-space: pre-wrap;
 }
 
+.message-copy {
+    margin-top: .4rem;
+    padding: 2px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: .8rem;
+    cursor: pointer;
+}
+
+.message-copy:hover { background: var(--bubble); color: var(--foreground); }
+.message-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.message-copy:disabled { opacity: .45; cursor: default; }
+
 .assistant p { margin: 0 0 .7em; }
-.assistant > :last-child > :last-child { margin-bottom: 0; }
+.assistant .message-content > :last-child > :last-child { margin-bottom: 0; }
 .assistant h1, .assistant h2, .assistant h3 { line-height: 1.3; }
 .assistant h1 { font-size: 1.55em; }
 .assistant h2 { font-size: 1.33em; }
@@ -168,12 +191,25 @@ body {
     background: var(--card);
 }
 
-.turn-panel h2 {
-    margin: 0 7px 12px;
+.turn-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.turn-header h2 {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
     color: var(--muted);
     font-size: .82rem;
     font-weight: 600;
 }
+
+#copy-all { flex-shrink: 0; margin: 0; padding-inline: 5px; white-space: nowrap; }
+#copy-all-icon { display: none; }
 
 .turn-panel nav { display: grid; gap: 4px; }
 
@@ -202,6 +238,9 @@ body {
 @media (max-width: 540px) {
     .turn-panel { width: 46px; padding: 10px 4px; }
     .turn-panel h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .turn-header { justify-content: center; }
+    #copy-all-text { display: none; }
+    #copy-all-icon { display: inline; font-size: 1rem; }
     .turn-link { display: flex; justify-content: center; padding-inline: 2px; }
     .turn-excerpt { display: none; }
 }

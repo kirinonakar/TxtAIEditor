@@ -8,7 +8,7 @@ namespace TxtAIEditor.Controls
 
     internal sealed record AgentChatSnapshot(
         string SessionId, string Output, IReadOnlyList<AgentChatPrompt> Prompts,
-        IReadOnlyList<AgentChatOutputRange> HiddenOutput, bool CanSubmit);
+        IReadOnlyList<string> PendingPrompts, IReadOnlyList<AgentChatOutputRange> HiddenOutput, bool CanSubmit);
 
     internal static class AgentChatTranscript
     {

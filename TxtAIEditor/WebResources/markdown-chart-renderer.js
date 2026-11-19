@@ -1,3 +1,5 @@
+import { createFunctionPlot, sampleFunctionPlot } from './chart/function-plot.js';
+
 const baseTypes = new Map([
     ['bar', 'bar'], ['line', 'line'], ['pie', 'pie'], ['doughnut', 'doughnut'],
     ['polararea', 'polarArea'], ['radar', 'radar'], ['bubble', 'bubble'], ['scatter', 'scatter']
@@ -6,6 +8,7 @@ const chartSelector = '.chart-block[data-chart-language][data-chart-source]';
 const charts = new Map();
 const pending = new WeakSet();
 const forbiddenKeys = new Set(['__proto__', 'constructor', 'prototype']);
+const functionPlotKey = Symbol('function plot');
 let chartLibrary;
 let removalObserver;
 
@@ -29,8 +32,37 @@ function validateChartData(value, depth = 0, budget = { remaining: 24000 }) {
     }
 }
 
+function applyFunctionData(target, graph) {
+    const { points, yRange } = sampleFunctionPlot(graph);
+    target.data.datasets[0].data = points;
+    target.options.scales.y.min = yRange.min;
+    target.options.scales.y.max = yRange.max;
+}
+
+function createFunctionChart(graph) {
+    const config = {
+        type: 'line',
+        data: { datasets: [{ label: graph.equation, pointRadius: 0, borderWidth: 2, spanGaps: false }] },
+        options: {
+            scales: {
+                x: { type: 'linear', ...graph.xRange, title: { display: true, text: 'x' } },
+                y: { title: { display: true, text: 'y' } }
+            },
+            plugins: { legend: { display: false }, tooltip: { enabled: false } }
+        },
+        [functionPlotKey]: graph
+    };
+    applyFunctionData(config, graph);
+    return config;
+}
+
 function fromBasicChart(input) {
-    const type = baseTypes.get(String(input.type || '').toLowerCase());
+    const name = String(input.type || '').toLowerCase();
+    if (name === 'function' || name === 'linear-function') {
+        return createFunctionChart(createFunctionPlot(input, name === 'linear-function'));
+    }
+
+    const type = baseTypes.get(name);
     if (!type || !Array.isArray(input.series) || !input.series.length ||
         (input.labels !== undefined && !Array.isArray(input.labels))) {
         throw new Error('Expected a chart type, labels array and one or more series');
@@ -125,6 +157,54 @@ function observeChartRemoval() {
     removalObserver.observe(document.documentElement, { childList: true, subtree: true });
 }
 
+function addFunctionControls(block, frame, canvas, chart, graph) {
+    const title = document.createElement('div');
+    title.className = 'chart-function-equation';
+    const controls = document.createElement('div');
+    controls.className = 'chart-function-controls';
+    controls.setAttribute('contenteditable', 'false');
+    // Keep native range gestures and clicks out of inline preview's editing handlers.
+    for (const name of ['pointerdown', 'click', 'dblclick']) {
+        controls.addEventListener(name, event => event.stopPropagation());
+    }
+    const number = new Intl.NumberFormat(undefined, { maximumSignificantDigits: 6 });
+    const updateEquation = () => {
+        const equation = graph.formatEquation(number);
+        title.textContent = equation;
+        canvas.setAttribute('aria-label', equation);
+    };
+
+    for (const [key, parameter] of graph.parameters) {
+        const label = document.createElement('label');
+        const name = document.createElement('span');
+        name.textContent = key;
+        const value = document.createElement('span');
+        value.textContent = number.format(parameter.value);
+        value.setAttribute('aria-hidden', 'true');
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = String(parameter.min);
+        slider.max = String(parameter.max);
+        slider.step = String(parameter.step);
+        slider.value = String(parameter.value);
+        slider.setAttribute('aria-label', key);
+        slider.addEventListener('input', event => {
+            event.stopPropagation();
+            parameter.value = slider.valueAsNumber;
+            value.textContent = number.format(parameter.value);
+            updateEquation();
+            applyFunctionData(chart, graph);
+            chart.update('none');
+        });
+        label.append(name, value, slider);
+        controls.append(label);
+    }
+
+    updateEquation();
+    block.insertBefore(title, frame);
+    if (graph.parameters.size > 0) block.insertBefore(controls, frame);
+}
+
 function drawChart(block, Chart, config, appearance) {
     const [color, borderColor, font] = appearance;
     const options = config.options ??= {};
@@ -152,6 +232,8 @@ function drawChart(block, Chart, config, appearance) {
             chart.destroy();
             throw new Error('Canvas context is unavailable');
         }
+        const graph = config[functionPlotKey];
+        if (graph) addFunctionControls(block, frame, canvas, chart, graph);
         return chart;
     } catch (error) {
         Chart.getChart(canvas)?.destroy();
@@ -174,11 +256,19 @@ async function drawChartBlock(block, { errorLabel, shouldDefer } = {}) {
         const config = await parseMarkdownChart(block.dataset.chartLanguage, source);
         const Chart = await loadChartLibrary();
         if (!block.isConnected || shouldDefer?.()) return false;
+        const graph = config[functionPlotKey];
+        if (graph && previous?.graph) {
+            for (const [name, parameter] of graph.parameters) {
+                const value = previous.graph.parameters.get(name)?.value;
+                if (value >= parameter.min && value <= parameter.max) parameter.value = value;
+            }
+            applyFunctionData(config, graph);
+        }
         previous?.chart.destroy();
         charts.delete(block);
         const appearance = chartAppearance(block);
         const chart = drawChart(block, Chart, config, appearance);
-        charts.set(block, { chart, appearance: JSON.stringify(appearance) });
+        charts.set(block, { chart, appearance: JSON.stringify(appearance), graph });
         observeChartRemoval();
     } catch (error) {
         if (!block.isConnected || shouldDefer?.()) return false;

@@ -161,7 +161,9 @@ export function bindTextInputEvents({ renderer }) {
     viewport.addEventListener('focusout', () => {
         if (csvTableMode.isEnabled) return;
         setTimeout(() => {
-            const hasLineTextFocus = !!document.activeElement?.closest?.('.line-text');
+            const activeElement = document.activeElement;
+            if (activeElement?.closest?.('.chart-function-controls')) return;
+            const hasLineTextFocus = !!activeElement?.closest?.('.line-text');
             const shouldKeepSelectionEditContext = hasCustomSelection();
             if (state.inlineLivePreviewEnabled && !hasLineTextFocus) {
                 if (shouldKeepSelectionEditContext && state.inlineLivePreviewSourceLine) {

@@ -17,7 +17,13 @@
         <div id="messages" class="conversation"></div>
     </main>
     <aside class="turn-panel">
-        <h2 id="turn-title"></h2>
+        <div class="turn-header">
+            <h2 id="turn-title"></h2>
+            <button id="copy-all" class="message-copy" type="button" aria-live="polite" disabled>
+                <span id="copy-all-icon" aria-hidden="true">⧉</span>
+                <span id="copy-all-text"></span>
+            </button>
+        </div>
         <nav id="turns" aria-labelledby="turn-title"></nav>
     </aside>
     <form id="composer" class="composer" hidden>

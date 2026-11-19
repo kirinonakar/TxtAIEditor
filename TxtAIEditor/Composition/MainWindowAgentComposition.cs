@@ -248,7 +248,8 @@ namespace TxtAIEditor.Composition
                     editor.TabDirtyState.MarkTabDirty(tab);
                     callbacks.UpdateWindowTitle();
                     return true;
-                });
+                },
+                isChatTabActive: () => shell.TabNavigation.GetActiveTab()?.IsAgentChat == true);
 
             agentChat.Connect(agent, tabBridges);
             window.Closed += (_, _) =>

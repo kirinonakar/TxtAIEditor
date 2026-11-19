@@ -13,6 +13,7 @@ using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
 using TxtAIEditor.Editor;
 using TxtAIEditor.ViewModels;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace TxtAIEditor.Controls
 {
@@ -188,6 +189,12 @@ namespace TxtAIEditor.Controls
                             turns = _getString("AgentChatTurnNavigation", "지시 바로가기"),
                             prompt = _getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력..."),
                             send = _getString("AgentSendButton", "전송"),
+                            copy = _getString("EditorContextMenuCopy", "복사"),
+                            copyAll = _getString("AgentChatCopyAll", "전체 복사"),
+                            userRole = _getString("AgentChatUserRole", "사용자 지시"),
+                            assistantRole = _getString("AgentChatAssistantRole", "AI 답변"),
+                            copied = _getString("AgentChatCopied", "복사됨"),
+                            copyFailed = _getString("AgentChatCopyFailed", "복사 실패"),
                             thinking = _getString("AgentActivityThinking", "생각중"),
                             verboseToolPrefix = _getString("AgentToolRunning", "도구 실행 중") + ":",
                             toolStatusPrefixes = new[]
@@ -210,6 +217,13 @@ namespace TxtAIEditor.Controls
                                     _handleShortcut(shortcut);
                                 }
                             });
+                        }
+                        break;
+                    case "copy":
+                        if (ReadString(message, "copyId") is { } copyId && ReadString(message, "text") is { Length: > 0 } text)
+                        {
+                            bool success = _navigation.GetActiveTab() == tab && TryCopyText(text);
+                            Post(new { action = "copyResult", copyId, success });
                         }
                         break;
                     case "submit":
@@ -240,6 +254,23 @@ namespace TxtAIEditor.Controls
                 ? value.GetString()
                 : null;
 
+        private static bool TryCopyText(string text)
+        {
+            try
+            {
+                var dataPackage = new DataPackage();
+                dataPackage.SetText(text);
+                Clipboard.SetContent(dataPackage);
+                Clipboard.Flush();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+                return false;
+            }
+        }
+
         private void Refresh()
         {
             if (_readyWebView == null || _agent == null)
@@ -253,12 +284,15 @@ namespace TxtAIEditor.Controls
             bool sameSession = _lastSnapshot?.SessionId == snapshot.SessionId;
             bool shouldSendPrompts = !sameSession || !ReferenceEquals(_lastSnapshot?.Prompts, snapshot.Prompts) ||
                 _lastPromptCount != snapshot.Prompts.Count;
+            bool shouldSendPendingPrompts = !sameSession ||
+                !ReferenceEquals(_lastSnapshot?.PendingPrompts, snapshot.PendingPrompts);
             int hiddenCount = snapshot.HiddenOutput.Count;
             int hiddenEnd = hiddenCount == 0 ? 0 : snapshot.HiddenOutput[^1].End;
             bool shouldSendHiddenOutput = !sameSession || !ReferenceEquals(_lastSnapshot?.HiddenOutput, snapshot.HiddenOutput) ||
                 _lastHiddenCount != hiddenCount || _lastHiddenEnd != hiddenEnd;
             bool outputChanged = !sameSession || !ReferenceEquals(_lastSnapshot?.Output, snapshot.Output);
-            if (!shouldSendPrompts && !shouldSendHiddenOutput && !outputChanged && _lastSnapshot?.CanSubmit == snapshot.CanSubmit &&
+            if (!shouldSendPrompts && !shouldSendPendingPrompts && !shouldSendHiddenOutput && !outputChanged &&
+                _lastSnapshot?.CanSubmit == snapshot.CanSubmit &&
                 _lastTheme == settings.Theme && _lastUsePele == settings.UsePele)
             {
                 return;
@@ -272,6 +306,7 @@ namespace TxtAIEditor.Controls
                 offset,
                 text = snapshot.Output[offset..],
                 prompts = shouldSendPrompts ? snapshot.Prompts : null,
+                pendingPrompts = shouldSendPendingPrompts ? snapshot.PendingPrompts : null,
                 hiddenOutput = shouldSendHiddenOutput ? snapshot.HiddenOutput : null,
                 snapshot.CanSubmit,
                 theme = settings.Theme,

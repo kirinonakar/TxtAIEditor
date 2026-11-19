@@ -323,6 +323,8 @@ namespace TxtAIEditor.Controls
             session.PromptText = string.Empty;
             session.OutputText = string.Empty;
             session.ChatPrompts = new();
+            session.PendingChatPrompts = Array.Empty<string>();
+            session.DeferredFollowUp = null;
             session.ChatHiddenOutput = new();
             session.NeedsHistoryFormatting = true;
             session.ActivityText = _getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨");
@@ -846,7 +848,7 @@ namespace TxtAIEditor.Controls
             var session = EnsureSession(_currentSessionIdProvider());
             string output = _agentPane.GetRawOutputText();
             return new AgentChatSnapshot(session.Id, session.ChatPrompts.Count == 0 ? NormalizePlaceholderOutput(output) : output,
-                session.ChatPrompts, session.ChatHiddenOutput, CanSubmitChatPrompt);
+                session.ChatPrompts, session.PendingChatPrompts, session.ChatHiddenOutput, CanSubmitChatPrompt);
         }
 
         internal void FormatSessionOutput(AgentOpenSessionState session)
@@ -857,7 +859,8 @@ namespace TxtAIEditor.Controls
                 _settingsService.CurrentSettings.LlmAgentVerbose, _getString, session.ChatPrompts);
         }
 
-        public async Task BeginRunOutputBlockAsync(AgentRunContext context, string title, string prompt)
+        public async Task BeginRunOutputBlockAsync(
+            AgentRunContext context, string title, string prompt, AgentFollowUpBatch? followUp = null)
         {
             await FlushQueuedRunOutputTextAsync(context);
             await RunOnUIThreadAsync(() =>
@@ -875,7 +878,7 @@ namespace TxtAIEditor.Controls
                     CompleteThinkingInSession(session);
                     start = AppendOutputLineToSession(session, title);
                 }
-                RecordChatPrompt(session, start, title, prompt);
+                RecordChatPrompt(session, start, title, prompt, followUp);
             });
         }
 
@@ -932,7 +935,8 @@ namespace TxtAIEditor.Controls
             return Task.CompletedTask;
         }
 
-        public async Task AppendRunOutputLineAsync(AgentRunContext context, string line, string? prompt = null)
+        public async Task AppendRunOutputLineAsync(
+            AgentRunContext context, string line, string? prompt = null, AgentFollowUpBatch? followUp = null)
         {
             await FlushQueuedRunOutputTextAsync(context);
             await RunOnUIThreadAsync(() =>
@@ -952,7 +956,7 @@ namespace TxtAIEditor.Controls
                 }
                 if (prompt != null)
                 {
-                    RecordChatPrompt(session, start, line, prompt);
+                    RecordChatPrompt(session, start, line, prompt, followUp);
                 }
                 else
                 {
@@ -1381,10 +1385,24 @@ namespace TxtAIEditor.Controls
                 session.SessionEdits.Count == 0;
         }
 
-        private static void RecordChatPrompt(AgentOpenSessionState session, int start, string header, string prompt)
+        private static void RecordChatPrompt(
+            AgentOpenSessionState session, int start, string header, string prompt, AgentFollowUpBatch? followUp)
         {
-            session.ChatPrompts.Add(new AgentChatPrompt(start, session.OutputText.Length,
-                string.IsNullOrWhiteSpace(prompt) ? AgentChatTranscript.ReadPromptHeader(header) : prompt));
+            int end = session.OutputText.Length;
+            if (followUp == null)
+            {
+                session.ChatPrompts.Add(new AgentChatPrompt(start, end,
+                    string.IsNullOrWhiteSpace(prompt) ? AgentChatTranscript.ReadPromptHeader(header) : prompt));
+                return;
+            }
+
+            // The AgentPanel retains a single header for the batched model request.
+            foreach (string instruction in followUp.Prompts)
+            {
+                session.ChatPrompts.Add(new AgentChatPrompt(start, end, instruction));
+                start = end;
+            }
+            session.PendingChatPrompts = [.. session.PendingChatPrompts.Skip(followUp.Prompts.Count)];
         }
 
         private static void RecordHiddenChatOutput(AgentOpenSessionState session, int start, int end)
