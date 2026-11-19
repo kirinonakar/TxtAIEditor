@@ -278,7 +278,8 @@ function showJumpLinks(targets) {
             selectedJump = button;
             button.setAttribute('aria-current', 'location');
             followOutput = false;
-            target.scrollIntoView({ block: 'start' });
+            const margin = Number.parseFloat(getComputedStyle(target).scrollMarginTop);
+            history.scrollTop += target.getBoundingClientRect().top - history.getBoundingClientRect().top - margin;
         });
         if (existing) existing.button.replaceWith(button);
         else turns.append(button);

@@ -1,5 +1,6 @@
 :root {
     color-scheme: light;
+    overflow: hidden;
     --surface: #fafbfc;
     --foreground: #202628;
     --muted: #55666b;
@@ -37,6 +38,7 @@ body {
     grid-template-rows: minmax(0, 1fr) auto;
     height: 100dvh;
     margin: 0;
+    overflow: clip;
     background: var(--surface);
     color: var(--foreground);
 }
@@ -44,6 +46,7 @@ body {
 #history {
     grid-area: 1 / 1;
     overflow: auto;
+    overscroll-behavior: contain;
     overflow-anchor: none;
     scrollbar-gutter: stable both-edges;
 }
@@ -185,9 +188,11 @@ body {
 
 .turn-panel {
     grid-area: 1 / 2 / 3 / 3;
+    display: flex;
+    flex-direction: column;
     width: clamp(140px, 22vw, 230px);
+    min-height: 0;
     padding: 18px 10px;
-    overflow: auto;
     border-inline-start: 1px solid var(--line);
     background: var(--card);
 }
@@ -212,7 +217,13 @@ body {
 #copy-all { flex-shrink: 0; margin: 0; padding-inline: 5px; white-space: nowrap; }
 #copy-all-icon { display: none; }
 
-.turn-panel nav { display: grid; gap: 4px; }
+.turn-panel nav {
+    display: grid;
+    gap: 4px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+}
 
 .turn-link {
     display: grid;
