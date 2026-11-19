@@ -40,6 +40,8 @@ namespace TxtAIEditor.Core.Models
         public double AgentFontSize { get; set; } = 13.0;
         public string AgentPromptFontFamily { get; set; } = "Segoe UI, Malgun Gothic";
         public double AgentPromptFontSize { get; set; } = 12.0;
+        public string AgentChatFontFamily { get; set; } = "Segoe UI";
+        public double AgentChatFontSize { get; set; } = 16.0;
         public bool AutoSave { get; set; } = false;
         public bool AutoSaveAllowNonGitFolders { get; set; } = false;
         public string PreviewMode { get; set; } = "Markdown";

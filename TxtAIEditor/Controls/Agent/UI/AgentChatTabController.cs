@@ -45,6 +45,7 @@ namespace TxtAIEditor.Controls
         private int _lastHiddenEnd;
         private string? _lastTheme;
         private bool _lastUsePele;
+        private (string Family, double Size)? _lastFont;
 
         public AgentChatTabController(AgentPane pane, EditorWorkspacePane workspace, MainWindowViewModel viewModel,
             ITabCloseCommands documents, TabNavigationController navigation, ISettingsService settings,
@@ -182,6 +183,7 @@ namespace TxtAIEditor.Controls
                     case "ready":
                         _readyWebView = core;
                         _lastSnapshot = null;
+                        _lastFont = null;
                         Post(new
                         {
                             action = "labels",
@@ -281,6 +283,13 @@ namespace TxtAIEditor.Controls
             GetActiveDocument();
             var snapshot = _agent.GetChatSnapshot();
             var settings = _settings.CurrentSettings;
+            var font = (Family: settings.AgentChatFontFamily, Size: settings.AgentChatFontSize);
+            if (_lastFont != font)
+            {
+                Post(new { action = "font", family = font.Family, size = font.Size });
+                _lastFont = font;
+            }
+
             bool sameSession = _lastSnapshot?.SessionId == snapshot.SessionId;
             bool shouldSendPrompts = !sameSession || !ReferenceEquals(_lastSnapshot?.Prompts, snapshot.Prompts) ||
                 _lastPromptCount != snapshot.Prompts.Count;

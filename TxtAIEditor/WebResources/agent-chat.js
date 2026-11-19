@@ -429,6 +429,13 @@ host.addEventListener('message', ({ data }) => {
         case 'update':
             update(data);
             break;
+        case 'font': {
+            const style = document.documentElement.style;
+            style.setProperty('--chat-font-family', JSON.stringify(data.family));
+            style.setProperty('--chat-font-size', `${data.size}px`);
+            scrollToEnd();
+            break;
+        }
         case 'copyResult': {
             if (data.copyId === sessionCopyId) {
                 clearTimeout(sessionCopyFeedbackTimer);

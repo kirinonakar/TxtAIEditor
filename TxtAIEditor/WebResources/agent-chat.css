@@ -12,7 +12,7 @@
     --link: #075d7c;
     --bg: var(--surface);
     --fg: var(--foreground);
-    font: 16px/1.65 "Segoe UI", system-ui, sans-serif;
+    font: var(--chat-font-size, 16px)/1.65 var(--chat-font-family, "Segoe UI"), system-ui, sans-serif;
 }
 
 :root[data-theme="dark"] {
@@ -130,6 +130,7 @@ body {
 .assistant :not(pre) > code { padding: .12em .27em; border-radius: 4px; background: var(--code); }
 .assistant table { border-collapse: collapse; }
 .assistant th, .assistant td { padding: 5px 10px; border: 1px solid var(--line); }
+.assistant thead th { background: color-mix(in srgb, var(--fg) 10%, transparent); }
 .assistant .activity { margin: 0 0 4px; color: var(--muted); font-size: .8rem; white-space: pre-wrap; }
 .assistant .mermaid-block, .assistant .katex-display, .block:has(table) { overflow-x: auto; }
 .assistant .mermaid-block { margin: .75em 0; }

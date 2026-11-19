@@ -1406,6 +1406,15 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="SettingsAgentPromptFontSize" xml:space="preserve">
     <value>User Prompt Font Size</value>
   </data>
+  <data name="SettingsAppearanceGroupAgentChat" xml:space="preserve">
+    <value>Chat Tab Font</value>
+  </data>
+  <data name="SettingsAgentChatFontFamily" xml:space="preserve">
+    <value>Font Family</value>
+  </data>
+  <data name="SettingsAgentChatFontSize" xml:space="preserve">
+    <value>Font Size</value>
+  </data>
   <data name="SettingsShortcuts" xml:space="preserve">
     <value>Shortcuts</value>
   </data>

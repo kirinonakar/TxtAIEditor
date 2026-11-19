@@ -53,6 +53,14 @@ namespace TxtAIEditor.Core.Services
 
         private static void ApplyDefaults(EditorSettings settings)
         {
+            if (string.IsNullOrWhiteSpace(settings.AgentChatFontFamily))
+            {
+                settings.AgentChatFontFamily = "Segoe UI";
+            }
+            settings.AgentChatFontSize = double.IsFinite(settings.AgentChatFontSize)
+                ? Math.Clamp(settings.AgentChatFontSize, 10.0, 24.0)
+                : 16.0;
+
             if (string.IsNullOrWhiteSpace(settings.ExternalViewerPath))
             {
                 settings.ExternalViewerPath = EditorSettings.DefaultExternalViewerPath;

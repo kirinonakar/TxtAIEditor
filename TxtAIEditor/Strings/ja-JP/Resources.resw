@@ -1406,6 +1406,15 @@
   <data name="SettingsAgentPromptFontSize" xml:space="preserve">
     <value>ユーザープロンプトの文字サイズ</value>
   </data>
+  <data name="SettingsAppearanceGroupAgentChat" xml:space="preserve">
+    <value>チャットタブのフォント</value>
+  </data>
+  <data name="SettingsAgentChatFontFamily" xml:space="preserve">
+    <value>フォント</value>
+  </data>
+  <data name="SettingsAgentChatFontSize" xml:space="preserve">
+    <value>文字サイズ</value>
+  </data>
   <data name="SettingsShortcuts" xml:space="preserve">
     <value>ショートカット</value>
   </data>

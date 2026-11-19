@@ -1406,6 +1406,15 @@
   <data name="SettingsAgentPromptFontSize" xml:space="preserve">
     <value>用戶提示字級</value>
   </data>
+  <data name="SettingsAppearanceGroupAgentChat" xml:space="preserve">
+    <value>聊天分頁字型</value>
+  </data>
+  <data name="SettingsAgentChatFontFamily" xml:space="preserve">
+    <value>字型</value>
+  </data>
+  <data name="SettingsAgentChatFontSize" xml:space="preserve">
+    <value>字級</value>
+  </data>
   <data name="SettingsShortcuts" xml:space="preserve">
     <value>快速鍵</value>
   </data>

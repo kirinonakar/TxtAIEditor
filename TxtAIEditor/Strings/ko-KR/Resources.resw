@@ -1406,6 +1406,15 @@
   <data name="SettingsAgentPromptFontSize" xml:space="preserve">
     <value>사용자 프롬프트 글자 크기</value>
   </data>
+  <data name="SettingsAppearanceGroupAgentChat" xml:space="preserve">
+    <value>채팅 탭 글꼴</value>
+  </data>
+  <data name="SettingsAgentChatFontFamily" xml:space="preserve">
+    <value>글꼴</value>
+  </data>
+  <data name="SettingsAgentChatFontSize" xml:space="preserve">
+    <value>글자 크기</value>
+  </data>
   <data name="SettingsShortcuts" xml:space="preserve">
     <value>단축키</value>
   </data>

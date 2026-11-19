@@ -34,6 +34,8 @@ namespace TxtAIEditor.Core.Services
         private readonly Slider _agentSizeSlider;
         private readonly ComboBox _agentPromptFontFamilyCombo;
         private readonly Slider _agentPromptSizeSlider;
+        private readonly ComboBox _agentChatFontFamilyCombo;
+        private readonly Slider _agentChatSizeSlider;
         private readonly Slider _rightPanelNormalWidthSlider;
         private readonly Slider _rightPanelExpandedWidthSlider;
 
@@ -106,6 +108,8 @@ namespace TxtAIEditor.Core.Services
             _agentSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.AgentFontSize, StepFrequency = 1 };
             _agentPromptFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AgentPromptFontFamily);
             _agentPromptSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.AgentPromptFontSize, StepFrequency = 1 };
+            _agentChatFontFamilyCombo = SettingsDialogUi.CreateFontComboBox(settings.AgentChatFontFamily);
+            _agentChatSizeSlider = new Slider { Minimum = 10, Maximum = 24, Value = settings.AgentChatFontSize, StepFrequency = 1 };
             _rightPanelNormalWidthSlider = new Slider { Minimum = 150, Maximum = 1200, Value = settings.RightSidebarNormalWidth, StepFrequency = 10 };
             _rightPanelExpandedWidthSlider = new Slider { Minimum = 150, Maximum = 1200, Value = settings.RightSidebarExpandedWidth, StepFrequency = 10 };
 
@@ -116,6 +120,7 @@ namespace TxtAIEditor.Core.Services
             section.Children.Add(CreatePreviewCard(getString, settings, previewBgDropdown, previewFgDropdown));
             section.Children.Add(CreateAozoraCard(getString, settings, aozoraBgDropdown, aozoraFgDropdown));
             section.Children.Add(CreateAgentCard(getString, settings));
+            section.Children.Add(CreateAgentChatCard(getString));
             section.Children.Add(CreateRightPanelWidthCard(getString, settings));
             Content = section;
         }
@@ -337,6 +342,25 @@ namespace TxtAIEditor.Core.Services
                 "\uE8B9");
         }
 
+        private Border CreateAgentChatCard(Func<string, string, string> getString)
+        {
+            var content = new StackPanel { Spacing = 6 };
+            SettingsDialogUi.AddLabel(content, getString("SettingsAgentChatFontFamily", "글꼴"));
+            content.Children.Add(_agentChatFontFamilyCombo);
+
+            string sizeLabel = getString("SettingsAgentChatFontSize", "글자 크기");
+            var sizeText = new TextBlock
+            {
+                Text = $"{sizeLabel} ({_agentChatSizeSlider.Value:0}px)",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+            content.Children.Add(sizeText);
+            content.Children.Add(_agentChatSizeSlider);
+            _agentChatSizeSlider.ValueChanged += (_, args) => sizeText.Text = $"{sizeLabel} ({args.NewValue:0}px)";
+
+            return CreateCard(getString("SettingsAppearanceGroupAgentChat", "채팅 탭 글꼴"), content, "\uE8B9");
+        }
+
         private Border CreateRightPanelWidthCard(Func<string, string, string> getString, EditorSettings settings)
         {
             var content = new StackPanel { Spacing = 6 };
@@ -400,6 +424,8 @@ namespace TxtAIEditor.Core.Services
             settings.AgentFontSize = _agentSizeSlider.Value;
             settings.AgentPromptFontFamily = SettingsDialogUi.GetSelectedComboText(_agentPromptFontFamilyCombo, settings.AgentPromptFontFamily);
             settings.AgentPromptFontSize = _agentPromptSizeSlider.Value;
+            settings.AgentChatFontFamily = SettingsDialogUi.GetSelectedComboText(_agentChatFontFamilyCombo, settings.AgentChatFontFamily);
+            settings.AgentChatFontSize = _agentChatSizeSlider.Value;
             settings.RightSidebarNormalWidth = _rightPanelNormalWidthSlider.Value;
             settings.RightSidebarExpandedWidth = _rightPanelExpandedWidthSlider.Value;
         }
