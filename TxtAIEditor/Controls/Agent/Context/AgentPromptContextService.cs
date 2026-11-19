@@ -12,11 +12,13 @@ namespace TxtAIEditor.Controls
 {
     internal sealed class AgentPromptContextService
     {
-        private const string ChatChartGuidance = """
-            [Chat charts]
+        private const string ChatRenderingGuidance = """
+            [Chat tab rendering]
             Open chart blocks with ```chart for YAML (type, labels, series [{title,data}], optional beginAtZero) or ```advanced-chart for Chart.js 4 JSON (type, data, options).
             Both support type "function" with expression "a*sin(x)" or series [{title,expression}]. Slider parameters (alias params) use {"a":{"value":1,"min":0,"max":5,"step":0.1}}. Use *, ^, and math functions like abs(x). Undeclared t aliases x. Bounds xMin/xMax and yMin/yMax are optional. "linear-function" takes a,b.
             Advanced JSON type "line" or "function" can define curves in data.datasets [{label,expression,...style}]. Use built-in tooltip, legend and interaction options.
+            To show SVG inline in your reply, use a fenced ```svg block containing a complete <svg xmlns="http://www.w3.org/2000/svg"> element. Include a viewBox and keep the SVG self-contained.
+            To display an existing SVG file inline, use ![[example.svg]] or ![[assets/example.svg]] with a path relative to the agent workspace.
             """;
 
         private readonly AgentPane _agentPane;
@@ -194,7 +196,7 @@ namespace TxtAIEditor.Controls
 
         public string BuildFixedPromptContextForRun(
             string? workspaceRoot = null, bool includeMcp = true, EditorSettings? settings = null, bool? planningMode = null,
-            bool includeChatCharts = false)
+            bool includeChatRendering = false)
         {
             string skills = _skillController.BuildSelectedSkillSection();
             return BuildFixedPromptContext(workspaceRoot, includeMcp, settings ?? _settingsProvider(), planningMode ?? _agentPane.PlanningMode) +
@@ -202,7 +204,7 @@ namespace TxtAIEditor.Controls
                 "[Current plugin selection for this model turn]" + Environment.NewLine +
                 "This turn's MCP tools and enabled skills override past selections. Use skill_use before applying a relevant skill." + Environment.NewLine +
                 (string.IsNullOrWhiteSpace(skills) ? "No agent skills are currently enabled." : skills) +
-                (includeChatCharts ? Environment.NewLine + Environment.NewLine + ChatChartGuidance : string.Empty);
+                (includeChatRendering ? Environment.NewLine + Environment.NewLine + ChatRenderingGuidance : string.Empty);
         }
 
         public string BuildSessionHistoryForPrompt(

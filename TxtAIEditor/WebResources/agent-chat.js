@@ -19,7 +19,10 @@ const answerHeader = /^\[(?:Agent Response|assistant: (?:response|final answer))
 const logHeader = /^\[(?:Agent run\]|LLM API:|Tool (?:result|completed|failed)[:\]])/i;
 const sectionHeader = /^\[(?:Agent tool call|assistant: (?:tool call|thinking|error)|tool: .+ (?:arguments|result)|Tool result: .+|Global agent rules|Retry detail: .+|Compressed context used for subsequent model requests)\]/i;
 const sectionEnd = /^\[End (?:global agent rules|retry detail|compressed context)\]/i;
-const markdownOptions = { allowHtml: false, deferOpenDiagrams: true, diagramLoadingText: '', renderCharts: true };
+const markdownOptions = {
+    allowHtml: false, deferOpenDiagrams: true, diagramLoadingText: '', renderCharts: true,
+    resolveSvgFileUrl: resolveChatSvgFileUrl
+};
 
 const drafts = new Map();
 const pending = new Map();
@@ -31,6 +34,7 @@ let jumpLinks = [];
 let selectedJump = null;
 let output = '';
 let sessionId = null;
+let svgBaseHref = null;
 let composerSessionId = null;
 let canSubmit = false;
 let composing = false;
@@ -55,9 +59,17 @@ function scrollToEnd() {
     if (followOutput) history.scrollTop = history.scrollHeight;
 }
 
+function resolveChatSvgFileUrl(source) {
+    const scheme = /^[a-z][a-z0-9+.-]*:/i.exec(source)?.[0].toLowerCase();
+    if (!svgBaseHref || source.startsWith('//') ||
+        (scheme && scheme !== 'file:' && !/^[a-z]:[\\/]/i.test(source))) return '';
+    return `${svgBaseHref}?path=${encodeURIComponent(source)}`;
+}
+
 history.addEventListener('scroll', () => {
     followOutput = history.scrollHeight - history.scrollTop - history.clientHeight < 44;
 });
+messages.addEventListener('load', scrollToEnd, true);
 
 function findInlineLogTag(line) {
     let codeSpanWidth = 0;
@@ -202,7 +214,7 @@ function createMessageView(role, start) {
     return view;
 }
 
-function renderConversation(offset, appearanceChanged) {
+function renderConversation(offset, renderAll) {
     const nextViews = [];
     let index = 0;
     let hiddenIndex = 0;
@@ -233,7 +245,7 @@ function renderConversation(offset, appearanceChanged) {
             view.copyText = userText;
             view.copyButton.hidden = !userText;
             view.node.hidden = !userText;
-        } else if (!reusable || appearanceChanged || view.end !== end || offset < end) {
+        } else if (!reusable || renderAll || view.end !== end || offset < end) {
             renderAssistant(view, preamble + visibleOutput(start, end));
         }
         view.end = end;
@@ -321,6 +333,8 @@ function syncComposer() {
 
 function update(message) {
     const switched = sessionId !== message.sessionId;
+    const svgWorkspaceChanged = svgBaseHref !== message.svgBaseHref;
+    svgBaseHref = message.svgBaseHref;
     if (switched) {
         sessionId = message.sessionId;
         messages.replaceChildren();
@@ -351,10 +365,10 @@ function update(message) {
     if (message.prompts) promptRanges = message.prompts;
     if (message.pendingPrompts) pendingPrompts = message.pendingPrompts;
     if (message.hiddenOutput) hiddenOutput = message.hiddenOutput;
-    if (switched || appearanceChanged || message.prompts || message.pendingPrompts || message.hiddenOutput || nextOutput !== output) {
+    if (switched || appearanceChanged || svgWorkspaceChanged || message.prompts || message.pendingPrompts || message.hiddenOutput || nextOutput !== output) {
         const offset = message.hiddenOutput && nextOutput === output ? 0 : message.offset;
         output = nextOutput;
-        const targets = renderConversation(offset, appearanceChanged);
+        const targets = renderConversation(offset, appearanceChanged || svgWorkspaceChanged);
         copyAllButton.disabled = !messageViews.some(view => view.copyText);
         if (switched || message.prompts || message.pendingPrompts) showJumpLinks(targets);
     }

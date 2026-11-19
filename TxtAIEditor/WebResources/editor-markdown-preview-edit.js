@@ -1,4 +1,4 @@
-import { blockContainsInlineMath, containsInlineMath, escapeHtml, findEditablePreviewBlockContaining, inlineMarkdown, isRenderedCodeFence, renderPreviewLineAt, sanitizeHtml, tableRowContainsInlineMath } from './markdown-preview-renderer.js';
+import { blockContainsInlineMath, containsInlineMath, escapeHtml, findEditablePreviewBlockContaining, inlineMarkdown, isRenderedCodeFence, renderMarkdownSvgFile, renderPreviewLineAt, sanitizeHtml, tableRowContainsInlineMath } from './markdown-preview-renderer.js';
 import { parseMarkdownTableRow } from './editor-markdown-table-model.js';
 
 // Every text node remains part of the Markdown source, in source order. Hiding
@@ -106,6 +106,13 @@ function inlineSource(text, options, depth = 0) {
         if (code) {
             html += syntax(code[1]) + `<code>${content(escapeHtml(code[2]))}</code>` + syntax(code[1]);
             index += code[0].length;
+            continue;
+        }
+        const svgFile = !options.htmlSource && /^!\[\[([^\]\n]+)\]\]/.exec(rest);
+        const svgImage = svgFile ? renderMarkdownSvgFile(svgFile[1], options) : null;
+        if (svgImage?.startsWith('<img ')) {
+            html += `<span class="md-preview-atom">${syntax(svgFile[0])}${svgImage}</span>`;
+            index += svgFile[0].length;
             continue;
         }
         const image = !options.htmlSource && /^!\[([^\]]*)\]\(([^)]*)\)/.exec(rest);

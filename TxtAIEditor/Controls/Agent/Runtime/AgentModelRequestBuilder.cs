@@ -22,7 +22,7 @@ namespace TxtAIEditor.Controls
         AgentContextCompressionService contextCompressionService,
         AgentRunTranscriptService runTranscriptService,
         AgentRunOutputController runOutputController,
-        Func<bool> isChatTabActive,
+    Func<bool> isChatTabOpen,
         Func<string, string, string> getString,
         Action<bool> updateContextStatsImmediate)
     {
@@ -41,7 +41,7 @@ namespace TxtAIEditor.Controls
                 return promptContextService.BuildFixedPromptContextForRun(
                     runContext.PinnedWorkspaceRoot, includeMcp: !runContext.IsPlanResearch,
                     settings: runContext.LlmSettings, planningMode: planningMode,
-                    includeChatCharts: !isSubagent && runOutputController.IsSessionVisible(runContext.SessionId) && isChatTabActive());
+                    includeChatRendering: !isSubagent && runOutputController.IsSessionVisible(runContext.SessionId) && isChatTabOpen());
             });
             if (orchestration != null)
             {

@@ -847,7 +847,8 @@ namespace TxtAIEditor.Controls
         {
             var session = EnsureSession(_currentSessionIdProvider());
             string output = _agentPane.GetRawOutputText();
-            return new AgentChatSnapshot(session.Id, session.ChatPrompts.Count == 0 ? NormalizePlaceholderOutput(output) : output,
+            return new AgentChatSnapshot(session.Id, session.WorkspaceRoot,
+                session.ChatPrompts.Count == 0 ? NormalizePlaceholderOutput(output) : output,
                 session.ChatPrompts, session.PendingChatPrompts, session.ChatHiddenOutput, CanSubmitChatPrompt);
         }
 

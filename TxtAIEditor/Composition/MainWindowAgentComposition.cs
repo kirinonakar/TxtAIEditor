@@ -249,7 +249,7 @@ namespace TxtAIEditor.Composition
                     callbacks.UpdateWindowTitle();
                     return true;
                 },
-                isChatTabActive: () => shell.TabNavigation.GetActiveTab()?.IsAgentChat == true);
+                isChatTabOpen: () => agentChat.IsOpen);
 
             agentChat.Connect(agent, tabBridges);
             window.Closed += (_, _) =>

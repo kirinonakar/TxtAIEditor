@@ -63,7 +63,7 @@ namespace TxtAIEditor.Controls
             Func<string, Task>? navigateToFolderAsync = null,
             Func<OpenedTab, string?, Task<bool>>? saveTabAsync = null,
             Func<OpenedTab, string, Task<bool>>? editTabAsync = null,
-            Func<bool>? isChatTabActive = null)
+            Func<bool>? isChatTabOpen = null)
         {
             _agentPane = agentPane;
             _settingsService = settingsService;
@@ -101,7 +101,7 @@ namespace TxtAIEditor.Controls
                 navigateToFolderAsync,
                 saveTabAsync,
                 editTabAsync,
-                isChatTabActive ?? (() => false),
+                isChatTabOpen ?? (() => false),
                 new AgentControllerCompositionCallbacks(
                     IsCurrentSessionRunning,
                     UpdateContextStats,

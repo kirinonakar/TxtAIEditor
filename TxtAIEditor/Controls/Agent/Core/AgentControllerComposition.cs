@@ -88,7 +88,7 @@ namespace TxtAIEditor.Controls
             Func<string, Task>? navigateToFolderAsync,
             Func<OpenedTab, string?, Task<bool>>? saveTabAsync,
             Func<OpenedTab, string, Task<bool>>? editTabAsync,
-            Func<bool> isChatTabActive,
+            Func<bool> isChatTabOpen,
             AgentControllerCompositionCallbacks callbacks)
         {
             var uiDispatcher = new AgentUiDispatcher(agentPane.DispatcherQueue);
@@ -269,7 +269,7 @@ namespace TxtAIEditor.Controls
                 callbacks.GetActiveTabForContext,
                 callbacks.GetActiveSelectionText,
                 callbacks.BuildActiveSelectionContext,
-                () => promptContextService.BuildFixedPromptContextForRun(includeChatCharts: isChatTabActive()),
+                () => promptContextService.BuildFixedPromptContextForRun(includeChatRendering: isChatTabOpen()),
                 promptContextService.BuildConversationTurn,
                 promptContextService.BuildWorkspaceContext,
                 promptContextService.BuildSessionHistoryForPrompt,
@@ -351,7 +351,7 @@ namespace TxtAIEditor.Controls
             var modelRequestBuilder = new AgentModelRequestBuilder(
                 uiDispatcher, mcpController, skillController, promptContextService, llmToolCatalog,
                 new AgentContextCompressionService(llmService, modelContextLimits), runTranscriptService,
-                runOutputController, isChatTabActive, getString, callbacks.UpdateContextStatsImmediate);
+                runOutputController, isChatTabOpen, getString, callbacks.UpdateContextStatsImmediate);
             var stepResponseHandler = new AgentStepResponseHandler(
                 responseInspector, runTranscriptService, runOutputController, uiDispatcher,
                 getString, callbacks.UpdateContextStatsImmediate);

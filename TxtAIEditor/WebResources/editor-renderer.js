@@ -524,7 +524,8 @@ function createEditorRenderer({
                 if (!preview.pending && !preview.source) {
                     const language = renderedSourceBlock.language?.toLowerCase();
                     const previewClass = isChartFence(language) ? 'md-preview-chart-decoration'
-                        : language === 'mermaid' ? 'md-preview-mermaid-decoration' : 'md-preview-math-decoration';
+                        : language === 'mermaid' ? 'md-preview-mermaid-decoration'
+                        : language === 'svg' ? 'md-preview-svg-decoration' : 'md-preview-math-decoration';
                     previewDecoration = `<div class="md-preview-block-decoration ${previewClass}" contenteditable="false" aria-hidden="true">${preview.html}</div>`;
                 }
             }
@@ -983,7 +984,7 @@ function createEditorRenderer({
 
     function watchLivePreviewImages() {
         if (!state.inlineLivePreviewEnabled) return;
-        viewport.querySelectorAll('.live-preview-row img').forEach(img => {
+        viewport.querySelectorAll('.live-preview-row img, .md-preview-svg-decoration img').forEach(img => {
             if (img.dataset.livePreviewImageWatch === '1') return;
             img.dataset.livePreviewImageWatch = '1';
             const src = img.getAttribute('src');

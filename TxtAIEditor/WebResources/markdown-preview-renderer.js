@@ -262,11 +262,38 @@ function resolvePreviewSrcset(value, options = {}) {
 function renderMarkdownImage(alt, target, options = {}) {
     const parsed = parseMarkdownImageTarget(target);
     if (!isSafeMediaUrl(parsed.src)) return escapeHtml(`![${alt}](${target})`);
-    const imageKey = previewImageKey(parsed.src, options);
+    return renderPreviewImage(alt, parsed.src, options, parsed.title);
+}
+
+function renderPreviewImage(alt, source, options, imageTitle = '') {
+    const imageKey = previewImageKey(source, options);
     if (options.failedImageSources?.has(imageKey)) return escapeHtml(alt);
-    const src = resolvePreviewResourceUrl(parsed.src, options);
-    const title = parsed.title ? ` title="${escapeAttribute(parsed.title)}"` : '';
+    const src = resolvePreviewResourceUrl(source, options);
+    const title = imageTitle ? ` title="${escapeAttribute(imageTitle)}"` : '';
     return `<img src="${escapeAttribute(src)}" alt="${escapeAttribute(alt)}"${title} decoding="async" data-preview-image-key="${escapeAttribute(imageKey)}">`;
+}
+
+function renderMarkdownSvgFile(target, options = {}) {
+    const source = target.trim();
+    const path = source.split(/[?#]/, 1)[0];
+    const fileName = path.split(/[\\/]/).at(-1);
+    if (!/\.svg$/i.test(fileName) || !isSafeMediaUrl(source)) return null;
+
+    const url = options.resolveSvgFileUrl ? options.resolveSvgFileUrl(source) : source;
+    return url ? renderPreviewImage(fileName, url, options) : null;
+}
+
+function renderSvgFence(source) {
+    const svgNamespace = 'http://www.w3.org/2000/svg';
+    const svg = new DOMParser().parseFromString(source.trim(), 'image/svg+xml').documentElement;
+    if (svg?.localName !== 'svg' || (svg.namespaceURI && svg.namespaceURI !== svgNamespace)) return null;
+
+    if (!svg.namespaceURI) svg.removeAttribute('xmlns');
+    const markup = svg.namespaceURI ? svg.outerHTML : svg.outerHTML.replace(/^<svg\b/, `<svg xmlns="${svgNamespace}"`);
+    // The SVG image context keeps scripts and external resources isolated from the preview.
+    const src = `data:image/svg+xml,${encodeURIComponent(markup)}`;
+    const title = [...svg.children].find(child => child.localName === 'title')?.textContent || '';
+    return `<div><img src="${src}" alt="${escapeAttribute(title)}" decoding="async"></div>`;
 }
 
 function sanitizeHtml(html, options = {}) {
@@ -417,6 +444,10 @@ function inlineMarkdown(text, options = {}) {
     };
     let out = String(text ?? '');
     out = stashCodeSpans(out, stash);
+    out = out.replace(/(?<!\\)!\[\[([^\]\n]+)\]\]/g, (match, target) => {
+        const image = renderMarkdownSvgFile(target, options);
+        return image === null ? match : stash(image);
+    });
     out = out.replace(/!\[([^\]]*)\]\(([^)]*)\)/g, (_, alt, target) => stash(renderMarkdownImage(alt, target, options)));
     out = stashInlineMath(out, stash, mathFragments, options.normalizeInlineMath);
     if (options.allowHtml !== false) out = stashHtmlTags(out, stash);
@@ -523,6 +554,10 @@ function collectFencedCodeBlock(startLine, maxLine, getLine, options = {}) {
 
 function renderFencedCodeBlock(block, options = {}) {
     const lang = (block.language || '').toLowerCase();
+    if (lang === 'svg' && block.closed) {
+        const image = renderSvgFence(block.code);
+        if (image) return image;
+    }
     if (options.renderCharts && block.closed && isChartFence(lang)) {
         return `<div class="chart-block" data-chart-language="${lang}" data-chart-source="${escapeAttribute(block.code)}"></div>`;
     }
@@ -1567,7 +1602,7 @@ function initializeMermaid(theme = diagramTheme) {
 }
 
 function isRenderedCodeFence(language) {
-    return isChartFence(language) || ['math', 'latex', 'mermaid'].includes(language?.toLowerCase());
+    return isChartFence(language) || ['math', 'latex', 'mermaid', 'svg'].includes(language?.toLowerCase());
 }
 
 function renderPreviewEmbeds(root, onRendered, chartOptions) {
@@ -1597,6 +1632,7 @@ export {
     renderLatexLine,
     renderLine,
     renderMarkdownLine,
+    renderMarkdownSvgFile,
     renderMermaidBlocks,
     renderPreviewEmbeds,
     renderPreviewLineAt,
