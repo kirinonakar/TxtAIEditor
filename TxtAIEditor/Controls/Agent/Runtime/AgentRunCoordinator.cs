@@ -389,7 +389,7 @@ namespace TxtAIEditor.Controls
                 if (!string.IsNullOrWhiteSpace(globalAgentsMdLogSection))
                 {
                     AgentRunTranscriptRecorder.AppendLine(runContext, globalAgentsMdLogSection);
-                    await _runOutputController.AppendRunOutputTextAsync(
+                    await _runOutputController.AppendRunDiagnosticTextAsync(
                         runContext,
                         globalAgentsMdLogSection + Environment.NewLine + Environment.NewLine);
                 }
@@ -639,7 +639,7 @@ namespace TxtAIEditor.Controls
 
                         if (!string.IsNullOrWhiteSpace(displayResult))
                         {
-                            await _runOutputController.AppendRunOutputTextAsync(runContext, displayResult.TrimEnd() + Environment.NewLine);
+                            await _runOutputController.AppendRunDiagnosticTextAsync(runContext, displayResult.TrimEnd() + Environment.NewLine);
                         }
                     }
 

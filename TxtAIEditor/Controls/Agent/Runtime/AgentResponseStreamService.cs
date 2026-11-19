@@ -142,7 +142,7 @@ namespace TxtAIEditor.Controls
                     stepReasoningBuilder.Append(reasoningChunk);
                     runContext.StreamingReasoningText = stepReasoningBuilder.ToString();
                     UpdateInFlightReasoningTokens(reasoningChunk);
-                    await _runOutputController.AppendRunOutputTextAsync(runContext, reasoningChunk);
+                    await _runOutputController.AppendRunDiagnosticTextAsync(runContext, reasoningChunk);
                     await RefreshContextStatsAsync();
                 };
             }
@@ -332,10 +332,7 @@ namespace TxtAIEditor.Controls
                                     }
                                     else
                                     {
-                                        _runOutputController.EnqueueRunUi(
-                                            runContext,
-                                            () => _agentPane.AppendOutputText(streamedText),
-                                            session => _openSessionController.AppendOutputTextToSession(session, streamedText));
+                                        await _runOutputController.AppendRunDiagnosticTextAsync(runContext, streamedText);
                                         printedLength = streamedText.Length;
                                     }
                                 }
@@ -365,10 +362,7 @@ namespace TxtAIEditor.Controls
                             }
                             else
                             {
-                                _runOutputController.EnqueueRunUi(
-                                    runContext,
-                                    () => _agentPane.AppendOutputText(chunk),
-                                    session => _openSessionController.AppendOutputTextToSession(session, chunk));
+                                await _runOutputController.AppendRunDiagnosticTextAsync(runContext, chunk);
                                 printedLength = streamedText.Length;
                             }
                             return;
@@ -402,10 +396,7 @@ namespace TxtAIEditor.Controls
                             }
                             else
                             {
-                                _runOutputController.EnqueueRunUi(
-                                    runContext,
-                                    () => _agentPane.AppendOutputText(chunk),
-                                    session => _openSessionController.AppendOutputTextToSession(session, chunk));
+                                await _runOutputController.AppendRunDiagnosticTextAsync(runContext, chunk);
                                 printedLength = streamedText.Length;
                             }
                             return;
@@ -439,10 +430,7 @@ namespace TxtAIEditor.Controls
                             else
                             {
                                 string toolCallText = streamedText.Substring(toolCallIndex);
-                                _runOutputController.EnqueueRunUi(
-                                    runContext,
-                                    () => _agentPane.AppendOutputText(toolCallText),
-                                    session => _openSessionController.AppendOutputTextToSession(session, toolCallText));
+                                await _runOutputController.AppendRunDiagnosticTextAsync(runContext, toolCallText);
                                 printedLength = streamedText.Length;
                             }
                         }

@@ -7,6 +7,7 @@
     <title>TxtAIEditor Virtual Preview</title>
     <link rel="stylesheet" href="katex/katex.min.css">
     <link rel="stylesheet" href="pele-theme.css">
+    <link rel="stylesheet" href="chart/chart-preview.css">
     <script src="katex/katex.min.js"></script>
     <style>
         :root {
@@ -471,6 +472,7 @@
             #print-container pre,
             #print-container .math.display,
             #print-container .mermaid-block,
+            #print-container .chart-block,
             #print-container .csv-table-wrap {
                 overflow: visible;
                 white-space: pre-wrap;
@@ -506,7 +508,7 @@
             escapeHtml,
             configureDiagramRenderer,
             renderPreviewLineAt,
-            renderMermaidBlocks: renderSharedMermaidBlocks,
+            renderPreviewEmbeds,
         } = await import(`./markdown-preview-renderer.js?v=${encodeURIComponent(moduleVersion)}`);
         const {
             buildHtmlPreviewFrameBridgeScript,
@@ -834,6 +836,7 @@
         }
 
         function applyTheme(message) {
+            state.chartErrorLabel = message.chartErrorLabel ?? state.chartErrorLabel;
             const theme = message.theme || 'Dark';
             const isAozora = message.mode === 'aozora';
             const defaultBg = theme === 'PastelDark' ? '#24273a' : (theme === 'Light' ? '#ffffff' : '#1e1e1e');
@@ -869,12 +872,6 @@
                 block.classList.remove('rendered', 'rendering');
                 block.innerHTML = 'Rendering...';
             });
-            if (blocks.length > 0) {
-                renderSharedMermaidBlocks(viewport, () => {
-                    state.lastRangeKey = '';
-                    measureRenderedRows();
-                });
-            }
         }
 
         function setupVirtualHeight() {
@@ -1012,6 +1009,7 @@
                 line => state.cache.has(line) ? state.cache.get(line) : undefined,
                 {
                     mode: state.mode,
+                    renderCharts: true,
                     baseHref: state.baseHref,
                     tabSize: state.tabSize,
                     rangeEnd,
@@ -1160,10 +1158,10 @@
             }
 
             if (newImagesAdded) watchRenderedImages();
-            renderSharedMermaidBlocks(viewport, () => {
+            renderPreviewEmbeds(viewport, () => {
                 state.lastRangeKey = '';
                 measureRenderedRows();
-            });
+            }, { errorLabel: state.chartErrorLabel });
             measureRenderedRows();
         }
 
@@ -1323,6 +1321,7 @@
             const skipRef = { val: 0 };
             const options = {
                 mode,
+                renderCharts: true,
                 baseHref: baseHref || state.baseHref,
                 tabSize: Number(tabSize || state.tabSize || 4),
                 rangeEnd: lines.length,
@@ -1355,6 +1354,9 @@
                     container.style.tabSize = String(message.tabSize || 4);
                     document.body.appendChild(container);
                     container.style.display = 'block';
+                    container.style.color = '#1a1a1a';
+                    container.style.setProperty('--fg', '#1a1a1a');
+                    container.style.setProperty('--bg', '#fff');
                     if (message.mode === 'text') {
                         container.textContent = message.text;
                         container.style.whiteSpace = 'pre-wrap';
@@ -1362,12 +1364,9 @@
                     } else {
                         container.innerHTML = buildPrintDocumentHtml(message.mode, message.text,
                             message.baseHref, message.tabSize, message.csvEmptyMessage);
-                        await renderSharedMermaidBlocks(container);
+                        await renderPreviewEmbeds(container, null, { errorLabel: message.chartErrorLabel });
                     }
                     // Lay out the actual print document before waiting for fonts.
-                    container.style.color = '#000';
-                    container.style.setProperty('--fg', '#1a1a1a');
-                    container.style.setProperty('--bg', '#fff');
                     await Promise.all([...container.querySelectorAll('img')].map(image => {
                         image.loading = 'eager';
                         if (image.complete) return;
@@ -1420,9 +1419,9 @@
                 }, 100);
             };
 
-            const mermaidBlocks = printContainer.querySelectorAll('.mermaid-block:not(.rendered)');
-            if (mermaidBlocks.length > 0) {
-                renderSharedMermaidBlocks(printContainer).then(triggerPrint);
+            const embeds = printContainer.querySelector('.mermaid-block:not(.rendered), .chart-block');
+            if (embeds) {
+                renderPreviewEmbeds(printContainer, null, { errorLabel: message.chartErrorLabel }).then(triggerPrint);
                 setTimeout(triggerPrint, 1500); // Fallback in case a diagram render hangs.
             } else {
                 triggerPrint();

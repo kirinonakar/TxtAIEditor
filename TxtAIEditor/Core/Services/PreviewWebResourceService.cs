@@ -21,6 +21,10 @@ namespace TxtAIEditor.Core.Services
             "editor-commands.js",
             "editor-ui.js",
             "markdown-preview-renderer.js",
+            "markdown-chart-renderer.js",
+            "chart/chart-preview.css",
+            "chart/chart.umd.min.js",
+            "chart/js-yaml.esm.min.js",
             "pele-theme.css",
             "pele/pele.js",
             "hangul-autocomplete.js"

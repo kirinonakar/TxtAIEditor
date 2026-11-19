@@ -1,4 +1,7 @@
-import { configureDiagramRenderer, renderBlockAt, renderMermaidBlocks } from './markdown-preview-renderer.js';
+import {
+    configureDiagramRenderer, fencedCodeInfo, isFencedCodeClose, renderBlockAt, renderPreviewEmbeds
+} from './markdown-preview-renderer.js';
+import { shortcutNameFromKeyboardEvent } from './html-preview-frame-bridge.js';
 
 const host = window.chrome.webview;
 const history = document.getElementById('history');
@@ -8,12 +11,17 @@ const turnTitle = document.getElementById('turn-title');
 const composer = document.getElementById('composer');
 const promptBox = document.getElementById('prompt');
 const sendButton = document.getElementById('send');
-const timestamp = /^\d{2}:\d{2}:\d{2} {2}/;
-const markdownOptions = { allowHtml: false, deferOpenDiagrams: true, diagramLoadingText: '' };
+const timestamp = /^\d{2}:\d{2}:\d{2}[ \t]+(.*)/;
+const answerHeader = /^\[(?:Agent Response|assistant: (?:response|final answer))\]:?[ \t]*/i;
+const logHeader = /^\[(?:Agent run\]|LLM API:|Tool (?:result|completed|failed)[:\]])/i;
+const sectionHeader = /^\[(?:Agent tool call|assistant: (?:tool call|thinking|error)|tool: .+ (?:arguments|result)|Tool result: .+|Global agent rules|Retry detail: .+|Compressed context used for subsequent model requests)\]/i;
+const sectionEnd = /^\[End (?:global agent rules|retry detail|compressed context)\]/i;
+const markdownOptions = { allowHtml: false, deferOpenDiagrams: true, diagramLoadingText: '', renderCharts: true };
 
 const drafts = new Map();
 const pending = new Map();
 let promptRanges = [];
+let hiddenOutput = [];
 let messageViews = [];
 let jumpLinks = [];
 let selectedJump = null;
@@ -25,6 +33,10 @@ let composing = false;
 let followOutput = true;
 let theme = '';
 let usePele = false;
+let thinkingLabel = '';
+let toolStatusPrefixes = [];
+let verboseToolPrefix = '';
+let chartErrorLabel = '';
 
 function scrollToEnd() {
     if (followOutput) history.scrollTop = history.scrollHeight;
@@ -34,21 +46,99 @@ history.addEventListener('scroll', () => {
     followOutput = history.scrollHeight - history.scrollTop - history.clientHeight < 44;
 });
 
-function renderAssistant(view, text) {
-    const lines = text.replace(/\r\n?/g, '\n').split('\n');
-    const getLine = number => lines[number - 1];
+function findInlineLogTag(line) {
+    let codeSpanWidth = 0;
+    for (const match of line.matchAll(/`+|<(think|thought|tool_call|log_tool_call)\b[^>]*>/gi)) {
+        if (!match[1]) {
+            if (!codeSpanWidth) codeSpanWidth = match[0].length;
+            else if (codeSpanWidth === match[0].length) codeSpanWidth = 0;
+        } else if (!codeSpanWidth) {
+            return match;
+        }
+    }
+    return null;
+}
+
+function assistantBlocks(text) {
     const blocks = [];
-    for (let number = 1; number <= lines.length;) {
-        const line = getLine(number);
-        if (timestamp.test(line) || /^\[(?:Agent run|Agent Response|assistant: final answer)\]:?$/i.test(line)) {
-            blocks.push({ activity: line });
-            number++;
+    let lines = [];
+    function flushMarkdown() {
+        for (let number = 1; number <= lines.length;) {
+            const block = renderBlockAt(number, lines.length, lineNumber => lines[lineNumber - 1], markdownOptions);
+            if (block?.html) blocks.push({ html: block.html });
+            number = (block?.endLine ?? number) + 1;
+        }
+        lines = [];
+    }
+
+    let fence = null;
+    let inLogSection = false;
+    let logTag = null;
+    for (let line of text.replace(/\r\n?/g, '\n').split('\n')) {
+        if (fence) {
+            lines.push(line);
+            if (isFencedCodeClose(line, fence)) fence = null;
             continue;
         }
-        const block = renderBlockAt(number, lines.length, getLine, markdownOptions);
-        if (block?.html) blocks.push({ html: block.html });
-        number = (block?.endLine ?? number) + 1;
+        const label = line.trimStart();
+        const activity = timestamp.exec(label);
+        if (activity) {
+            inLogSection = false;
+            logTag = null;
+            const message = activity[1];
+            if (thinkingLabel && (message === thinkingLabel ||
+                [' ', '.'].includes(message.charAt(thinkingLabel.length)) && message.startsWith(thinkingLabel))) {
+                flushMarkdown();
+                blocks.push({ activity: line });
+            }
+            continue;
+        }
+        const answer = answerHeader.exec(label);
+        if (answer) {
+            inLogSection = false;
+            logTag = null;
+            line = label.slice(answer[0].length);
+        } else if (sectionHeader.test(label) || (verboseToolPrefix && label.startsWith(verboseToolPrefix))) {
+            inLogSection = true;
+            continue;
+        } else if (sectionEnd.test(label)) {
+            inLogSection = false;
+            continue;
+        } else if (inLogSection || logHeader.test(label) || toolStatusPrefixes.some(prefix => label.startsWith(prefix))) {
+            continue;
+        }
+
+        fence = logTag ? null : fencedCodeInfo(line);
+        if (!fence) {
+            // Keep prose before or after native inline reasoning and tool-call payloads.
+            let visible = '';
+            while (line) {
+                if (logTag) {
+                    const end = line.toLowerCase().indexOf(`</${logTag}>`);
+                    if (end < 0) break;
+                    line = line.slice(end + logTag.length + 3);
+                    logTag = null;
+                } else {
+                    const start = findInlineLogTag(line);
+                    if (!start) {
+                        visible += line;
+                        break;
+                    }
+                    visible += line.slice(0, start.index);
+                    line = line.slice(start.index + start[0].length);
+                    logTag = start[1].toLowerCase();
+                }
+            }
+            line = visible;
+        }
+        lines.push(line);
     }
+    flushMarkdown();
+    return blocks;
+}
+
+function renderAssistant(view, text) {
+    const blocks = assistantBlocks(text);
 
     for (const [index, block] of blocks.entries()) {
         let node = view.node.children[index];
@@ -64,12 +154,25 @@ function renderAssistant(view, text) {
         else node.textContent = block.activity;
     }
     while (view.node.children.length > blocks.length) view.node.lastElementChild.remove();
-    void renderMermaidBlocks(view.node, scrollToEnd);
+    void renderPreviewEmbeds(view.node, scrollToEnd, { errorLabel: chartErrorLabel });
 }
 
 function renderConversation(offset, appearanceChanged) {
     const nextViews = [];
     let index = 0;
+    let hiddenIndex = 0;
+
+    function visibleOutput(start, end) {
+        let text = '';
+        let position = start;
+        while (hiddenIndex < hiddenOutput.length && hiddenOutput[hiddenIndex].end <= start) hiddenIndex++;
+        for (let i = hiddenIndex; i < hiddenOutput.length && hiddenOutput[i].start < end; i++) {
+            const { start: hiddenStart, end: hiddenEnd } = hiddenOutput[i];
+            if (hiddenStart > position) text += output.slice(position, hiddenStart);
+            position = hiddenEnd;
+        }
+        return text + (position < end ? output.slice(position, end) : '');
+    }
 
     function show(role, start, end, userText = null, preamble = '') {
         const previous = messageViews[index];
@@ -86,7 +189,7 @@ function renderConversation(offset, appearanceChanged) {
             if (view.userText !== userText) view.node.textContent = userText;
             view.userText = userText;
         } else if (!reusable || appearanceChanged || view.end !== end || offset < end) {
-            renderAssistant(view, preamble + output.slice(start, end));
+            renderAssistant(view, preamble + visibleOutput(start, end));
         }
         view.end = end;
         nextViews.push(view);
@@ -98,7 +201,7 @@ function renderConversation(offset, appearanceChanged) {
     for (const [turn, range] of promptRanges.entries()) {
         targets.push(show('user', range.start, range.end, range.text));
         const end = promptRanges[turn + 1]?.start ?? output.length;
-        show('assistant', range.end, end, null, turn === 0 ? output.slice(0, range.start) : '');
+        show('assistant', range.end, end, null, turn === 0 ? visibleOutput(0, range.start) : '');
     }
     if (!promptRanges.length) show('assistant', 0, output.length);
     for (; index < messageViews.length; index++) messageViews[index].node.remove();
@@ -162,6 +265,7 @@ function update(message) {
         selectedJump = null;
         output = '';
         promptRanges = [];
+        hiddenOutput = [];
         followOutput = true;
     }
 
@@ -176,9 +280,11 @@ function update(message) {
 
     const nextOutput = output.slice(0, message.offset) + message.text;
     if (message.prompts) promptRanges = message.prompts;
-    if (switched || appearanceChanged || message.prompts || nextOutput !== output) {
+    if (message.hiddenOutput) hiddenOutput = message.hiddenOutput;
+    if (switched || appearanceChanged || message.prompts || message.hiddenOutput || nextOutput !== output) {
+        const offset = message.hiddenOutput && nextOutput === output ? 0 : message.offset;
         output = nextOutput;
-        const targets = renderConversation(message.offset, appearanceChanged);
+        const targets = renderConversation(offset, appearanceChanged);
         if (switched || message.prompts) showJumpLinks(targets);
     }
     canSubmit = message.canSubmit;
@@ -198,6 +304,21 @@ promptBox.addEventListener('compositionend', () => {
     composing = false;
     requestAnimationFrame(syncComposer);
 });
+window.addEventListener('keydown', event => {
+    if (event.defaultPrevented || event.isComposing || composing || event.keyCode === 229) return;
+    if (event.key === 'F7') {
+        event.preventDefault();
+        return;
+    }
+    const altOnly = event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+    const shortcut = altOnly && event.key === 'ArrowLeft' ? 'previousTab'
+        : altOnly && event.key === 'ArrowRight' ? 'nextTab'
+        : shortcutNameFromKeyboardEvent(event);
+    if (!shortcut) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.repeat) host.postMessage({ action: 'shortcut', name: shortcut });
+}, true);
 promptBox.addEventListener('keydown', event => {
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing || composing || event.keyCode === 229) return;
     event.preventDefault();
@@ -223,6 +344,10 @@ host.addEventListener('message', ({ data }) => {
             promptBox.setAttribute('aria-label', data.prompt);
             sendButton.title = data.send;
             sendButton.setAttribute('aria-label', data.send);
+            thinkingLabel = data.thinking;
+            toolStatusPrefixes = data.toolStatusPrefixes.filter(Boolean);
+            verboseToolPrefix = data.verboseToolPrefix;
+            chartErrorLabel = data.chartErrorLabel;
             break;
         case 'update':
             update(data);

@@ -3784,6 +3784,9 @@
   <data name="SaveDialogJupyterFileFilter" xml:space="preserve">
     <value>Jupyter Notebook ファイル</value>
   </data>
+  <data name="PreviewChartError" xml:space="preserve">
+    <value>グラフを表示できません。</value>
+  </data>
   <data name="PreviewCsvEmpty" xml:space="preserve">
     <value>空の CSV ファイルです。</value>
   </data>

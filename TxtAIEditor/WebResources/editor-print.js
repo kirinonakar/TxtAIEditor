@@ -1,6 +1,6 @@
 import { imeController, post, queueRender, state } from './editor-core.js';
 import { isFullHtmlLivePreviewActive } from './editor-html-live-preview.js';
-const { renderMermaidBlocks, renderPreviewLineAt } = await import(
+const { renderPreviewEmbeds, renderPreviewLineAt } = await import(
     `./markdown-preview-renderer.js?v=${encodeURIComponent(window.__TxtAIEditorVersion || Date.now())}`);
 
 let printing = false;
@@ -11,6 +11,7 @@ function buildLivePrintHtml(fullText) {
     const skipRef = { val: 0 };
     const options = {
         mode: 'markdown',
+        renderCharts: true,
         baseHref: state.livePreviewBaseHref || '',
         localResourceVersion: state.livePreviewLocalResourceVersion || '0',
         tabSize: state.tabSize || 4,
@@ -129,7 +130,7 @@ export async function printDocument(fullText, ensurePreviewDependencies = async 
 
     try {
         if (livePreview) {
-            await renderMermaidBlocks(printContainer);
+            await renderPreviewEmbeds(printContainer, null, { errorLabel: state.chartErrorLabel });
             await waitForPrintImages(printContainer);
             await document.fonts?.ready;
         }

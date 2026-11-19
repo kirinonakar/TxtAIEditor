@@ -398,6 +398,7 @@ namespace TxtAIEditor.Controls
                     localResourceVersion = tab.PreviewResourceVersion,
                     wordWrap = _settingsService.CurrentSettings.WordWrap,
                     usePele = _settingsService.CurrentSettings.UsePele,
+                    chartErrorLabel = _getString("PreviewChartError", "차트를 표시할 수 없습니다."),
                     tabSize = _settingsService.CurrentSettings.TabSize,
                     theme = _settingsService.CurrentSettings.Theme,
                     customBackgroundColor = _settingsService.CurrentSettings.CustomBackgroundColor,
@@ -453,7 +454,8 @@ namespace TxtAIEditor.Controls
                     text = previewText,
                     baseHref = GetPreviewBaseHref(tab),
                     tabSize = _settingsService.CurrentSettings.TabSize,
-                    csvEmptyMessage = _getString("PreviewCsvEmpty", "빈 CSV 파일입니다.")
+                    csvEmptyMessage = _getString("PreviewCsvEmpty", "빈 CSV 파일입니다."),
+                    chartErrorLabel = _getString("PreviewChartError", "차트를 표시할 수 없습니다.")
                 };
                 coreWebView.PostWebMessageAsJson(JsonSerializer.Serialize(printMsg));
                 return true;

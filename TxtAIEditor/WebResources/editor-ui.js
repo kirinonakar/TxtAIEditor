@@ -21,7 +21,7 @@ const {
     findEditablePreviewBlockContaining,
     inlineMarkdown,
     listItemInfo,
-    renderMermaidBlocks,
+    renderPreviewEmbeds,
     renderPreviewLineAt
 } = await import(`./markdown-preview-renderer.js?v=${encodeURIComponent(window.__TxtAIEditorVersion || Date.now())}`);
 import {
@@ -46,7 +46,7 @@ import { bindPrintSupport } from './editor-print.js';
 const renderer = createEditorRenderer({
     findEditablePreviewBlockContaining,
     getCaretOffset,
-    renderMermaidBlocks,
+    renderPreviewEmbeds,
     renderPreviewLineAt,
     setCaret
 });

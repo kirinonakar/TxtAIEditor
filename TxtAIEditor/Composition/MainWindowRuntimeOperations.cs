@@ -452,8 +452,11 @@ namespace TxtAIEditor.Composition
 
             if (_state.TabBridges.TryGetValue(tabId, out var bridgeGroup))
             {
-                bridgeGroup.WebView.Focus(FocusState.Programmatic);
-                _ = bridgeGroup.Bridge.FocusAsync();
+                if (bridgeGroup.WebView.IsLoaded && bridgeGroup.WebView.CoreWebView2 != null)
+                {
+                    bridgeGroup.WebView.Focus(FocusState.Programmatic);
+                    _ = bridgeGroup.Bridge?.FocusAsync();
+                }
                 return;
             }
 

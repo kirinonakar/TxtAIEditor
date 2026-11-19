@@ -1,4 +1,5 @@
 import { markdownTableAlignment as tableAlignment, parseMarkdownTableRow } from './editor-markdown-table-model.js';
+import { isChartFence, renderChartBlocks } from './markdown-chart-renderer.js';
 
 const mermaidCache = new Map();
 let diagramRenderer = 'mermaid';
@@ -521,6 +522,9 @@ function collectFencedCodeBlock(startLine, maxLine, getLine, options = {}) {
 
 function renderFencedCodeBlock(block, options = {}) {
     const lang = (block.language || '').toLowerCase();
+    if (options.renderCharts && block.closed && isChartFence(lang)) {
+        return `<div class="chart-block" data-chart-language="${lang}" data-chart-source="${escapeAttribute(block.code)}"></div>`;
+    }
     if (lang === 'mermaid' && (block.closed || !options.deferOpenDiagrams)) {
         const cachedSvg = diagramRenderer === 'mermaid' ? mermaidCache.get(block.code) : null;
         const attributes = `data-diagram-version="${diagramRevision}" data-code="${escapeAttribute(block.code)}"`;
@@ -1550,6 +1554,17 @@ function initializeMermaid(theme = diagramTheme) {
     }
 }
 
+function isRenderedCodeFence(language) {
+    return isChartFence(language) || ['math', 'latex', 'mermaid'].includes(language?.toLowerCase());
+}
+
+function renderPreviewEmbeds(root, onRendered, chartOptions) {
+    return Promise.all([
+        renderMermaidBlocks(root, onRendered),
+        renderChartBlocks(root, onRendered, chartOptions)
+    ]);
+}
+
 export {
     blockContainsInlineMath,
     configureDiagramRenderer,
@@ -1558,9 +1573,12 @@ export {
     escapeAttribute,
     escapeHtml,
     fencedCodeInfo,
+    isFencedCodeClose,
     findEditablePreviewBlockContaining,
     initializeMermaid,
     inlineMarkdown,
+    isChartFence,
+    isRenderedCodeFence,
     listItemInfo,
     renderBlockAt,
     renderLatex,
@@ -1568,6 +1586,7 @@ export {
     renderLine,
     renderMarkdownLine,
     renderMermaidBlocks,
+    renderPreviewEmbeds,
     renderPreviewLineAt,
     renderPreviewLineRange,
     sanitizeHtml

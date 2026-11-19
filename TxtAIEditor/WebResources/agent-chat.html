@@ -7,6 +7,7 @@
     <title></title>
     <link rel="stylesheet" href="katex/katex.min.css">
     <link rel="stylesheet" href="pele-theme.css">
+    <link rel="stylesheet" href="chart/chart-preview.css">
     <link rel="stylesheet" href="agent-chat.css">
     <script src="katex/katex.min.js" defer></script>
     <script type="module" src="agent-chat.js"></script>
@@ -20,7 +21,7 @@
         <nav id="turns" aria-labelledby="turn-title"></nav>
     </aside>
     <form id="composer" class="composer" hidden>
-        <textarea id="prompt" rows="1" spellcheck="true" disabled></textarea>
+        <textarea id="prompt" rows="1" spellcheck="false" disabled></textarea>
         <button id="send" type="submit" disabled>
             <span aria-hidden="true">↑</span>
         </button>

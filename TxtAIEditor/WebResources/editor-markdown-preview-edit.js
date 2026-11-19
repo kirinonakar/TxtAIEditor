@@ -1,4 +1,4 @@
-import { blockContainsInlineMath, containsInlineMath, escapeHtml, findEditablePreviewBlockContaining, inlineMarkdown, renderPreviewLineAt, sanitizeHtml } from './markdown-preview-renderer.js';
+import { blockContainsInlineMath, containsInlineMath, escapeHtml, findEditablePreviewBlockContaining, inlineMarkdown, isRenderedCodeFence, renderPreviewLineAt, sanitizeHtml } from './markdown-preview-renderer.js';
 import { parseMarkdownTableRow } from './editor-markdown-table-model.js';
 
 // Every text node remains part of the Markdown source, in source order. Hiding
@@ -48,7 +48,7 @@ export function needsMarkdownPreviewBlockRefresh(state, lineNumber) {
     return block &&
         lineNumber >= block.startLine && lineNumber <= block.endLine &&
         (block.kind === 'math' || (block.kind === 'code' &&
-            ['math', 'latex', 'mermaid'].includes(block.language?.toLowerCase())));
+            isRenderedCodeFence(block.language)));
 }
 
 function inlineSource(text, options, depth = 0) {
@@ -223,7 +223,7 @@ function editableHtmlBlock(block, startLine, state, options) {
 }
 
 function editableCodeBlock(block, startLine, state, options, sourceLines = null, sourceLineNumbers = null) {
-    if (['math', 'latex', 'mermaid'].includes(block.language?.toLowerCase())) return null;
+    if (isRenderedCodeFence(block.language)) return null;
     const lines = sourceLines || Array.from({ length: block.endLine - startLine + 1 }, (_, index) => state.cache.get(startLine + index) || '');
     const boundary = (text, line) => `<span class="line-text md-preview-embedded-line md-preview-code-fence" data-markdown-preview-line="code-fence" data-line="${line}" contenteditable="false">${syntax(text)}</span>`;
     const langClass = block.language ? ` class="language-${escapeHtml(block.language)}"` : '';
@@ -299,7 +299,7 @@ export function renderEditableMarkdownLine(text, lineNumber, state, previewOptio
         (block?.kind === 'paragraph' && blockContainsInlineMath(block, line => line === lineNumber ? text : state.cache.get(line)))) {
         return escapeHtml(text);
     }
-    if (block?.kind === 'math' || (block?.kind === 'code' && ['math', 'latex', 'mermaid'].includes(block.language?.toLowerCase()))) {
+    if (block?.kind === 'math' || (block?.kind === 'code' && isRenderedCodeFence(block.language))) {
         return escapeHtml(text);
     }
     if (block?.kind === 'code') {

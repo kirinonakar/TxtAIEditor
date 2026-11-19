@@ -323,6 +323,7 @@ namespace TxtAIEditor.Controls
             session.PromptText = string.Empty;
             session.OutputText = string.Empty;
             session.ChatPrompts = new();
+            session.ChatHiddenOutput = new();
             session.NeedsHistoryFormatting = true;
             session.ActivityText = _getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨");
             session.SessionHistoryText = item.SessionHistoryText;
@@ -845,12 +846,13 @@ namespace TxtAIEditor.Controls
             var session = EnsureSession(_currentSessionIdProvider());
             string output = _agentPane.GetRawOutputText();
             return new AgentChatSnapshot(session.Id, session.ChatPrompts.Count == 0 ? NormalizePlaceholderOutput(output) : output,
-                session.ChatPrompts, CanSubmitChatPrompt);
+                session.ChatPrompts, session.ChatHiddenOutput, CanSubmitChatPrompt);
         }
 
         internal void FormatSessionOutput(AgentOpenSessionState session)
         {
             session.ChatPrompts = new();
+            session.ChatHiddenOutput = new();
             session.OutputText = AgentHistoryFormatter.Format(session.SessionHistoryText,
                 _settingsService.CurrentSettings.LlmAgentVerbose, _getString, session.ChatPrompts);
         }
@@ -919,14 +921,14 @@ namespace TxtAIEditor.Controls
             });
         }
 
-        public Task AppendRunOutputTextAsync(AgentRunContext context, string text)
+        public Task AppendRunOutputTextAsync(AgentRunContext context, string text, bool hideInChat = false)
         {
             if (string.IsNullOrEmpty(text))
             {
                 return Task.CompletedTask;
             }
 
-            QueueRunOutputText(context, text);
+            QueueRunOutputText(context, text, hideInChat);
             return Task.CompletedTask;
         }
 
@@ -951,6 +953,10 @@ namespace TxtAIEditor.Controls
                 if (prompt != null)
                 {
                     RecordChatPrompt(session, start, line, prompt);
+                }
+                else
+                {
+                    RecordHiddenChatOutput(session, start, session.OutputText.Length);
                 }
             });
         }
@@ -1124,7 +1130,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private void AppendRunOutputTextOnCurrentThread(AgentRunContext context, string text)
+        private void AppendRunOutputTextOnCurrentThread(AgentRunContext context, string text, bool hideInChat)
         {
             var session = FindOpenSession(context.SessionId);
             if (session == null)
@@ -1133,21 +1139,43 @@ namespace TxtAIEditor.Controls
             }
             if (IsSessionVisible(context.SessionId))
             {
+                if (hideInChat)
+                {
+                    _agentPane.StopThinkingActivity();
+                    int start = NormalizePlaceholderOutput(_agentPane.GetRawOutputText()).Length;
+                    _agentPane.AppendOutputText(text);
+                    RecordHiddenChatOutput(session, start, _agentPane.GetRawOutputText().Length);
+                    return;
+                }
                 _agentPane.AppendOutputText(text);
             }
             else
             {
+                if (hideInChat)
+                {
+                    CompleteThinkingInSession(session);
+                }
+                int start = hideInChat ? NormalizePlaceholderOutput(session.OutputText).Length : 0;
                 AppendOutputTextToSession(session, text);
+                if (hideInChat)
+                {
+                    RecordHiddenChatOutput(session, start, session.OutputText.Length);
+                }
             }
         }
 
-        private void QueueRunOutputText(AgentRunContext context, string text)
+        private void QueueRunOutputText(AgentRunContext context, string text, bool hideInChat)
         {
             lock (_runOutputBufferGate)
             {
                 PendingRunOutputBuffer buffer = GetOrCreateRunOutputBuffer(context.SessionId);
                 buffer.Context = context;
-                buffer.PendingText.Append(text);
+                if (buffer.Tail == null || buffer.Tail.HideInChat != hideInChat)
+                {
+                    buffer.Tail = new PendingRunOutputChunk(new StringBuilder(), hideInChat);
+                    buffer.Chunks.Enqueue(buffer.Tail);
+                }
+                buffer.Tail.Text.Append(text);
 
                 if (buffer.FlushTask is { IsCompleted: false })
                 {
@@ -1164,7 +1192,7 @@ namespace TxtAIEditor.Controls
 
             while (true)
             {
-                if (!TryDequeueRunOutputText(sessionId, out AgentRunContext? context, out string text))
+                if (!TryDequeueRunOutputText(sessionId, out AgentRunContext? context, out string text, out bool hideInChat))
                 {
                     return;
                 }
@@ -1172,7 +1200,7 @@ namespace TxtAIEditor.Controls
                 if (context != null)
                 {
                     await RunOnUIThreadAsync(
-                        () => AppendRunOutputTextOnCurrentThread(context, text),
+                        () => AppendRunOutputTextOnCurrentThread(context, text, hideInChat),
                         DispatcherQueuePriority.Low);
                 }
 
@@ -1203,13 +1231,13 @@ namespace TxtAIEditor.Controls
                     continue;
                 }
 
-                if (!TryDequeueRunOutputText(context.SessionId, out AgentRunContext? bufferedContext, out string text))
+                if (!TryDequeueRunOutputText(context.SessionId, out AgentRunContext? bufferedContext, out string text, out bool hideInChat))
                 {
                     return;
                 }
 
                 await RunOnUIThreadAsync(
-                    () => AppendRunOutputTextOnCurrentThread(bufferedContext ?? context, text),
+                    () => AppendRunOutputTextOnCurrentThread(bufferedContext ?? context, text, hideInChat),
                     DispatcherQueuePriority.Low);
             }
         }
@@ -1229,12 +1257,13 @@ namespace TxtAIEditor.Controls
         private bool TryDequeueRunOutputText(
             string sessionId,
             out AgentRunContext? context,
-            out string text)
+            out string text,
+            out bool hideInChat)
         {
             lock (_runOutputBufferGate)
             {
                 if (!_pendingRunOutputBuffers.TryGetValue(sessionId, out PendingRunOutputBuffer? buffer) ||
-                    buffer.PendingText.Length == 0)
+                    !buffer.Chunks.TryPeek(out var chunk))
                 {
                     if (buffer != null)
                     {
@@ -1243,12 +1272,19 @@ namespace TxtAIEditor.Controls
 
                     context = buffer?.Context;
                     text = string.Empty;
+                    hideInChat = false;
                     return false;
                 }
 
-                int take = Math.Min(buffer.PendingText.Length, MaxRunOutputFlushChars);
-                text = buffer.PendingText.ToString(0, take);
-                buffer.PendingText.Remove(0, take);
+                int take = Math.Min(chunk.Text.Length, MaxRunOutputFlushChars);
+                text = chunk.Text.ToString(0, take);
+                chunk.Text.Remove(0, take);
+                if (chunk.Text.Length == 0)
+                {
+                    buffer.Chunks.Dequeue();
+                    if (buffer.Chunks.Count == 0) buffer.Tail = null;
+                }
+                hideInChat = chunk.HideInChat;
                 context = buffer.Context;
                 return true;
             }
@@ -1259,7 +1295,7 @@ namespace TxtAIEditor.Controls
             lock (_runOutputBufferGate)
             {
                 if (!_pendingRunOutputBuffers.TryGetValue(sessionId, out PendingRunOutputBuffer? buffer) ||
-                    buffer.PendingText.Length > 0)
+                    buffer.Chunks.Count > 0)
                 {
                     return false;
                 }
@@ -1349,6 +1385,20 @@ namespace TxtAIEditor.Controls
         {
             session.ChatPrompts.Add(new AgentChatPrompt(start, session.OutputText.Length,
                 string.IsNullOrWhiteSpace(prompt) ? AgentChatTranscript.ReadPromptHeader(header) : prompt));
+        }
+
+        private static void RecordHiddenChatOutput(AgentOpenSessionState session, int start, int end)
+        {
+            if (start >= end) return;
+            var ranges = session.ChatHiddenOutput;
+            if (ranges.Count > 0 && ranges[^1].End == start)
+            {
+                ranges[^1] = ranges[^1] with { End = end };
+            }
+            else
+            {
+                ranges.Add(new AgentChatOutputRange(start, end));
+            }
         }
 
         private int AppendOutputLineToSession(AgentOpenSessionState session, string line)
@@ -1448,10 +1498,13 @@ namespace TxtAIEditor.Controls
 
         private sealed class PendingRunOutputBuffer
         {
-            public StringBuilder PendingText { get; } = new();
+            public Queue<PendingRunOutputChunk> Chunks { get; } = new();
+            public PendingRunOutputChunk? Tail { get; set; }
             public AgentRunContext? Context { get; set; }
             public Task? FlushTask { get; set; }
         }
+
+        private sealed record PendingRunOutputChunk(StringBuilder Text, bool HideInChat);
 
         internal static EditorSettings CloneSessionSettings(EditorSettings settings)
         {

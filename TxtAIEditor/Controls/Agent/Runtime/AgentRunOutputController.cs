@@ -44,6 +44,11 @@ namespace TxtAIEditor.Controls
             return _openSessionController.AppendRunOutputTextAsync(context, text);
         }
 
+        public Task AppendRunDiagnosticTextAsync(AgentRunContext context, string text)
+        {
+            return _openSessionController.AppendRunOutputTextAsync(context, text, hideInChat: true);
+        }
+
         public Task AppendRunOutputLineAsync(AgentRunContext context, string line, string? prompt = null)
         {
             return _openSessionController.AppendRunOutputLineAsync(context, line, prompt);

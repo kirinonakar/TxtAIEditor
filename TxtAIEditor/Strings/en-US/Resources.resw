@@ -3826,6 +3826,9 @@ Plan: {0}</value>
   <data name="SaveDialogJupyterFileFilter" xml:space="preserve">
     <value>Jupyter Notebook File</value>
   </data>
+  <data name="PreviewChartError" xml:space="preserve">
+    <value>The chart could not be displayed.</value>
+  </data>
   <data name="PreviewCsvEmpty" xml:space="preserve">
     <value>Empty CSV file.</value>
   </data>

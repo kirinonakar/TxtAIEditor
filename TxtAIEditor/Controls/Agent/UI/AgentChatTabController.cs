@@ -30,6 +30,7 @@ namespace TxtAIEditor.Controls
         private readonly ISettingsService _settings;
         private readonly Func<string, string, string> _getString;
         private readonly Action<string, string> _showError;
+        private readonly Action<string> _handleShortcut;
         private readonly DispatcherQueueTimer _refreshTimer;
         private AgentController? _agent;
         private IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)>? _tabBridges;
@@ -39,12 +40,14 @@ namespace TxtAIEditor.Controls
         private CoreWebView2? _readyWebView;
         private AgentChatSnapshot? _lastSnapshot;
         private int _lastPromptCount;
+        private int _lastHiddenCount;
+        private int _lastHiddenEnd;
         private string? _lastTheme;
         private bool _lastUsePele;
 
         public AgentChatTabController(AgentPane pane, EditorWorkspacePane workspace, MainWindowViewModel viewModel,
             ITabCloseCommands documents, TabNavigationController navigation, ISettingsService settings,
-            Func<string, string, string> getString, Action<string, string> showError)
+            Func<string, string, string> getString, Action<string, string> showError, Action<string> handleShortcut)
         {
             _pane = pane;
             _workspace = workspace;
@@ -54,6 +57,7 @@ namespace TxtAIEditor.Controls
             _settings = settings;
             _getString = getString;
             _showError = showError;
+            _handleShortcut = handleShortcut;
             _refreshTimer = pane.DispatcherQueue.CreateTimer();
             _refreshTimer.Interval = TimeSpan.FromMilliseconds(100);
             _refreshTimer.Tick += (_, _) => Refresh();
@@ -183,10 +187,30 @@ namespace TxtAIEditor.Controls
                             title = _getString("AgentChatTabTitle", "Agent 채팅"),
                             turns = _getString("AgentChatTurnNavigation", "지시 바로가기"),
                             prompt = _getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력..."),
-                            send = _getString("AgentSendButton", "전송")
+                            send = _getString("AgentSendButton", "전송"),
+                            thinking = _getString("AgentActivityThinking", "생각중"),
+                            verboseToolPrefix = _getString("AgentToolRunning", "도구 실행 중") + ":",
+                            toolStatusPrefixes = new[]
+                            {
+                                _getString("AgentHistoryToolCompletedFormat", "[도구 실행]: {0}").Split("{0}")[0].TrimEnd(),
+                                _getString("AgentHistoryToolFailedFormat", "[도구 실행 실패]: {0}").Split("{0}")[0].TrimEnd()
+                            },
+                            chartErrorLabel = _getString("PreviewChartError", "차트를 표시할 수 없습니다.")
                         });
                         Refresh();
                         _refreshTimer.Start();
+                        break;
+                    case "shortcut":
+                        if (ReadString(message, "name") is { } shortcut)
+                        {
+                            _pane.DispatcherQueue.TryEnqueue(() =>
+                            {
+                                if (_tab == tab && _navigation.GetActiveTab() == tab)
+                                {
+                                    _handleShortcut(shortcut);
+                                }
+                            });
+                        }
                         break;
                     case "submit":
                         string? sessionId = ReadString(message, "sessionId");
@@ -229,8 +253,12 @@ namespace TxtAIEditor.Controls
             bool sameSession = _lastSnapshot?.SessionId == snapshot.SessionId;
             bool shouldSendPrompts = !sameSession || !ReferenceEquals(_lastSnapshot?.Prompts, snapshot.Prompts) ||
                 _lastPromptCount != snapshot.Prompts.Count;
+            int hiddenCount = snapshot.HiddenOutput.Count;
+            int hiddenEnd = hiddenCount == 0 ? 0 : snapshot.HiddenOutput[^1].End;
+            bool shouldSendHiddenOutput = !sameSession || !ReferenceEquals(_lastSnapshot?.HiddenOutput, snapshot.HiddenOutput) ||
+                _lastHiddenCount != hiddenCount || _lastHiddenEnd != hiddenEnd;
             bool outputChanged = !sameSession || !ReferenceEquals(_lastSnapshot?.Output, snapshot.Output);
-            if (!shouldSendPrompts && !outputChanged && _lastSnapshot?.CanSubmit == snapshot.CanSubmit &&
+            if (!shouldSendPrompts && !shouldSendHiddenOutput && !outputChanged && _lastSnapshot?.CanSubmit == snapshot.CanSubmit &&
                 _lastTheme == settings.Theme && _lastUsePele == settings.UsePele)
             {
                 return;
@@ -244,12 +272,15 @@ namespace TxtAIEditor.Controls
                 offset,
                 text = snapshot.Output[offset..],
                 prompts = shouldSendPrompts ? snapshot.Prompts : null,
+                hiddenOutput = shouldSendHiddenOutput ? snapshot.HiddenOutput : null,
                 snapshot.CanSubmit,
                 theme = settings.Theme,
                 usePele = settings.UsePele
             });
             _lastSnapshot = snapshot;
             _lastPromptCount = snapshot.Prompts.Count;
+            _lastHiddenCount = hiddenCount;
+            _lastHiddenEnd = hiddenEnd;
             _lastTheme = settings.Theme;
             _lastUsePele = settings.UsePele;
         }

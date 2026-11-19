@@ -303,6 +303,7 @@ function applyOptions(msg) {
         msg.bracketPairColorization === undefined ? true : !!msg.bracketPairColorization,
         msg.longLineProtectionFormat, msg.csvJsonKeyHeader, msg.csvJsonValueHeader,
         msg.foldCollapseText, msg.foldExpandText, msg.foldSelectionFormat,
+        msg.chartErrorLabel,
         msg.markdownTableText,
         !!msg.editInMarkdownPreview, !!msg.usePele, theme
     ]);
@@ -319,6 +320,7 @@ function applyOptions(msg) {
     }
     state.syntaxHighlighting = msg.hasOwnProperty('syntaxHighlighting') ? !!msg.syntaxHighlighting : true;
     state.editInMarkdownPreview = !!msg.editInMarkdownPreview;
+    state.chartErrorLabel = msg.chartErrorLabel ?? state.chartErrorLabel;
     state.markdownTableText = msg.markdownTableText || state.markdownTableText;
     document.body.classList.toggle('markdown-preview-editing', state.editInMarkdownPreview);
     state.showDirtyLines = msg.hasOwnProperty('showDirtyLines') ? !!msg.showDirtyLines : true;

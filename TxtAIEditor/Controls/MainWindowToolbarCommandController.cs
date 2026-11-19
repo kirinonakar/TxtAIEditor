@@ -314,7 +314,8 @@ namespace TxtAIEditor.Controls
                     fontSize = mode == "text" ? settings.FontSize :
                         mode == "aozora" ? settings.AozoraPreviewFontSize : settings.PreviewFontSize,
                     usePele = settings.UsePele,
-                    csvEmptyMessage = _getLocalizedString("PreviewCsvEmpty", "빈 CSV 파일입니다.")
+                    csvEmptyMessage = _getLocalizedString("PreviewCsvEmpty", "빈 CSV 파일입니다."),
+                    chartErrorLabel = _getLocalizedString("PreviewChartError", "차트를 표시할 수 없습니다.")
                 }, mode == "html", core => _pdfPreview?.RegisterDocumentResourceAccess(core));
             }
             catch (Exception ex)

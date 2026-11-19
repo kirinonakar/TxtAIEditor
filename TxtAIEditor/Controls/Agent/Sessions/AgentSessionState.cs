@@ -27,7 +27,8 @@ namespace TxtAIEditor.Controls
     {
         private sealed record SessionBody(string PromptText, string OutputText, string ActivityText,
             string SessionHistoryText, string ModelSessionHistoryText, string LastAnswerText,
-            List<AgentAttachmentState> Attachments, List<AgentChatPrompt> ChatPrompts);
+            List<AgentAttachmentState> Attachments, List<AgentChatPrompt> ChatPrompts,
+            List<AgentChatOutputRange> ChatHiddenOutput);
 
         private AgentSessionSpill<SessionBody>? _storedBody;
 
@@ -40,6 +41,7 @@ namespace TxtAIEditor.Controls
         public string PromptText { get; set; } = string.Empty;
         public string OutputText { get; set; } = string.Empty;
         public List<AgentChatPrompt> ChatPrompts { get; set; } = new();
+        public List<AgentChatOutputRange> ChatHiddenOutput { get; set; } = new();
         public bool NeedsHistoryFormatting { get; set; }
         public string ActivityText { get; set; } = string.Empty;
         public string SessionHistoryText { get; set; } = string.Empty;
@@ -71,7 +73,8 @@ namespace TxtAIEditor.Controls
         public async Task ParkBodyAsync(Func<bool> canPark)
         {
             var body = new SessionBody(PromptText, OutputText, ActivityText,
-                SessionHistoryText, ModelSessionHistoryText, LastAnswerText, Attachments.ToList(), ChatPrompts.ToList());
+                SessionHistoryText, ModelSessionHistoryText, LastAnswerText, Attachments.ToList(),
+                ChatPrompts.ToList(), ChatHiddenOutput.ToList());
             var stored = await Task.Run(() => AgentSessionSpill<SessionBody>.Write(body));
             if (!canPark())
             {
@@ -83,6 +86,7 @@ namespace TxtAIEditor.Controls
             PromptText = string.Empty;
             OutputText = string.Empty;
             ChatPrompts = new();
+            ChatHiddenOutput = new();
             ActivityText = string.Empty;
             SessionHistoryText = string.Empty;
             ModelSessionHistoryText = string.Empty;
@@ -102,6 +106,7 @@ namespace TxtAIEditor.Controls
             PromptText = body.PromptText;
             OutputText = body.OutputText;
             ChatPrompts = body.ChatPrompts;
+            ChatHiddenOutput = body.ChatHiddenOutput;
             ActivityText = body.ActivityText;
             SessionHistoryText = body.SessionHistoryText;
             ModelSessionHistoryText = body.ModelSessionHistoryText;
@@ -254,6 +259,7 @@ namespace TxtAIEditor.Controls
         public string PromptText { get; set; } = string.Empty;
         public string OutputText { get; set; } = string.Empty;
         public List<AgentChatPrompt> ChatPrompts { get; set; } = new();
+        public List<AgentChatOutputRange> ChatHiddenOutput { get; set; } = new();
         public string ActivityText { get; set; } = string.Empty;
         public string SessionHistoryText { get; set; } = string.Empty;
         public string ModelSessionHistoryText { get; set; } = string.Empty;
@@ -273,6 +279,7 @@ namespace TxtAIEditor.Controls
                 PromptText = session.PromptText,
                 OutputText = session.OutputText,
                 ChatPrompts = session.ChatPrompts.ToList(),
+                ChatHiddenOutput = session.ChatHiddenOutput.ToList(),
                 ActivityText = session.ActivityText,
                 SessionHistoryText = session.SessionHistoryText,
                 ModelSessionHistoryText = session.ModelSessionHistoryText,

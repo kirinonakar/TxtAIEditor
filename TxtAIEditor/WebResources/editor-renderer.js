@@ -43,7 +43,7 @@ import {
 import { isPointOnScrollContainerScrollbar, revealPendingInputCaret } from './editor-caret.js';
 import { createFullHtmlLivePreviewRenderer } from './editor-html-live-preview.js';
 import { renderEditableMarkdownLine, renderGroupedEditableMarkdown, usesMarkdownPreviewEditing, usesMarkdownTableEditing } from './editor-markdown-preview-edit.js';
-import { blockContainsInlineMath, containsInlineMath } from './markdown-preview-renderer.js';
+import { blockContainsInlineMath, containsInlineMath, isChartFence, isRenderedCodeFence } from './markdown-preview-renderer.js';
 import { syncMarkdownTableUi } from './editor-markdown-table-ui.js';
 import { syncMarkdownListLineNumbers } from './editor-markdown-list-gutter.js';
 import { livePreviewLayoutRange, patchLivePreviewRows } from './editor-live-preview-render-state.js';
@@ -51,7 +51,7 @@ import { livePreviewLayoutRange, patchLivePreviewRows } from './editor-live-prev
 function createEditorRenderer({
     findEditablePreviewBlockContaining,
     getCaretOffset,
-    renderMermaidBlocks,
+    renderPreviewEmbeds,
     renderPreviewLineAt,
     setCaret
 }) {
@@ -321,7 +321,7 @@ function createEditorRenderer({
             (sourceLine > 0 && !editablePreviewBlock && containsInlineMath(getCachedLine(sourceLine)));
         const hasMathDecoration = !!viewport.querySelector('.md-preview-math-decoration');
         const stablePreviewLayout = editInPreview && !hasInlineMathSource && !hasMathDecoration && (!editablePreviewBlock || ['list', 'table', 'paragraph'].includes(editablePreviewBlock.kind) ||
-            (editablePreviewBlock.kind === 'code' && !['math', 'latex', 'mermaid'].includes(editablePreviewBlock.language?.toLowerCase())));
+            (editablePreviewBlock.kind === 'code' && !isRenderedCodeFence(editablePreviewBlock.language)));
         const focusRenderKey = renderFullDocument || stablePreviewLayout ? '' : `${activeLine || 0}:${state.editingLine || 0}`;
         const searchRenderKey = JSON.stringify([searchController.query, searchController.documentVersion, searchController.matches.length,
             searchController.activeMatch?.lineNumber, searchController.activeMatch?.indexOfMatch, searchController.activeMatch?.matchLength]);
@@ -428,11 +428,11 @@ function createEditorRenderer({
                 : isEditablePreviewBlockLine ? editablePreviewBlock : null;
             const standaloneMath = !detectedPreviewBlock && containsInlineMath(text);
             const isRenderedBlockLine = detectedPreviewBlock?.kind === 'math' ||
-                (detectedPreviewBlock?.kind === 'code' && ['math', 'latex', 'mermaid'].includes(detectedPreviewBlock.language?.toLowerCase())) ||
+                (detectedPreviewBlock?.kind === 'code' && isRenderedCodeFence(detectedPreviewBlock.language)) ||
                 hasInlineMathInBlock(detectedPreviewBlock) || standaloneMath;
             const renderedSourceBlock = isEditablePreviewBlockLine &&
                 (inlineMathInSourceBlock || editablePreviewBlock.kind === 'math' || (editablePreviewBlock.kind === 'code' &&
-                    ['math', 'latex', 'mermaid'].includes(editablePreviewBlock.language?.toLowerCase())))
+                    isRenderedCodeFence(editablePreviewBlock.language)))
                 ? editablePreviewBlock : standaloneMath && line === sourceLine ? { startLine: line, endLine: line } : null;
             const isRenderedSourceLine = !!renderedSourceBlock;
             const shouldShowSource = line === sourceLine ||
@@ -489,6 +489,7 @@ function createEditorRenderer({
             const livePreviewOptions = {
                 ...previewBlockOptions,
                 mode: 'markdown',
+                renderCharts: true,
                 baseHref: state.livePreviewBaseHref || '',
                 localResourceVersion: state.livePreviewLocalResourceVersion || '0',
                 failedImageSources: livePreviewFailedImages,
@@ -508,8 +509,9 @@ function createEditorRenderer({
                 const preview = renderPreviewLineAt(renderedSourceBlock.startLine, state.lineCount, getCachedLine,
                     { ...livePreviewOptions, sourceLine: 0 }, { val: 0 });
                 if (!preview.pending && !preview.source) {
-                    const previewClass = renderedSourceBlock.language?.toLowerCase() === 'mermaid'
-                        ? 'md-preview-mermaid-decoration' : 'md-preview-math-decoration';
+                    const language = renderedSourceBlock.language?.toLowerCase();
+                    const previewClass = isChartFence(language) ? 'md-preview-chart-decoration'
+                        : language === 'mermaid' ? 'md-preview-mermaid-decoration' : 'md-preview-math-decoration';
                     previewDecoration = `<div class="md-preview-block-decoration ${previewClass}" contenteditable="false" aria-hidden="true">${preview.html}</div>`;
                 }
             }
@@ -719,7 +721,12 @@ function createEditorRenderer({
         } else {
             measureRenderedRows(true);
         }
-        if (!preserveComposition) renderMermaidBlocks(viewport, () => measureRenderedRows(true, true));
+        if (!preserveComposition) {
+            void renderPreviewEmbeds(viewport, () => measureRenderedRows(true, true), {
+                errorLabel: state.chartErrorLabel,
+                shouldDefer: () => imeController.isComposing
+            });
+        }
 
         if (!preserveComposition && pendingInlineLivePreviewFocus) {
             focusPendingInlineLivePreviewLine();

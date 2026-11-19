@@ -177,7 +177,7 @@ namespace TxtAIEditor.Composition
 
             var agentChat = new AgentChatTabController(ui.PreviewGrid.AgentPane, ui.EditorWorkspace,
                 viewModel, documents, shell.TabNavigation, commonServices.SettingsService,
-                callbacks.GetLocalizedString, shell.Dialog.ShowErrorMessage);
+                callbacks.GetLocalizedString, shell.Dialog.ShowErrorMessage, preview.WebViewShortcut.Handle);
             var agent = new AgentController(
                 agentServices.LlmService,
                 commonServices.SettingsService,

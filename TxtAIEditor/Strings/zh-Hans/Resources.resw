@@ -3784,6 +3784,9 @@
   <data name="SaveDialogJupyterFileFilter" xml:space="preserve">
     <value>Jupyter Notebook 文件</value>
   </data>
+  <data name="PreviewChartError" xml:space="preserve">
+    <value>无法显示图表。</value>
+  </data>
   <data name="PreviewCsvEmpty" xml:space="preserve">
     <value>空 CSV 文件。</value>
   </data>

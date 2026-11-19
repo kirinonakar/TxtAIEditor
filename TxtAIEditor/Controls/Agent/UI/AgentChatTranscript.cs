@@ -4,9 +4,11 @@ using System.Collections.Generic;
 namespace TxtAIEditor.Controls
 {
     internal sealed record AgentChatPrompt(int Start, int End, string Text);
+    internal sealed record AgentChatOutputRange(int Start, int End);
 
     internal sealed record AgentChatSnapshot(
-        string SessionId, string Output, IReadOnlyList<AgentChatPrompt> Prompts, bool CanSubmit);
+        string SessionId, string Output, IReadOnlyList<AgentChatPrompt> Prompts,
+        IReadOnlyList<AgentChatOutputRange> HiddenOutput, bool CanSubmit);
 
     internal static class AgentChatTranscript
     {

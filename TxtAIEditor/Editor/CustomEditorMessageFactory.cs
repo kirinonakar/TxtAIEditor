@@ -117,6 +117,7 @@ namespace TxtAIEditor.Editor
                 ("findNextTooltip", "EditorFindNextTooltip", "다음"),
                 ("findCloseTooltip", "EditorFindCloseTooltip", "닫기"),
                 ("editorLoadingText", "EditorLoadingText", "로딩 중..."),
+                ("chartErrorLabel", "PreviewChartError", "차트를 표시할 수 없습니다."),
                 ("longLineProtectionFormat", "EditorLongLineProtectionFormat", "... too long (전체 {0}자)"),
                 ("foldCollapseText", "EditorFoldCollapse", "접기"),
                 ("foldExpandText", "EditorFoldExpand", "펼치기"),
