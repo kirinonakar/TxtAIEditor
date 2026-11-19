@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
@@ -21,7 +22,6 @@ namespace TxtAIEditor.Controls
     internal sealed class AgentChatTabController : IDisposable
     {
         private const string ChatHost = "agent-chat.txtaieditor.local";
-        private const string ChatImageHost = "agent-chat-images.txtaieditor.local";
         private static readonly Uri ChatPage = new($"https://{ChatHost}/agent-chat.html");
         private static readonly JsonSerializerOptions MessageOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -42,7 +42,7 @@ namespace TxtAIEditor.Controls
         private TabViewItem? _item;
         private CoreWebView2? _readyWebView;
         private AgentChatSnapshot? _lastSnapshot;
-        private string? _imageBaseHref;
+        private string? _imageWorkspaceKey;
         private int _lastPromptCount;
         private int _lastHiddenCount;
         private int _lastHiddenEnd;
@@ -136,9 +136,6 @@ namespace TxtAIEditor.Controls
                 var core = webView.CoreWebView2;
                 core.SetVirtualHostNameToFolderMapping(ChatHost, PreviewWebResourceService.WebResourcesPath,
                     CoreWebView2HostResourceAccessKind.DenyCors);
-                core.AddWebResourceRequestedFilter($"https://{ChatImageHost}/*", CoreWebView2WebResourceContext.Image,
-                    CoreWebView2WebResourceRequestSourceKinds.Document);
-                core.WebResourceRequested += OnImageResourceRequested;
                 core.Settings.AreBrowserAcceleratorKeysEnabled = false;
                 core.Settings.AreDevToolsEnabled = false;
                 core.NavigationStarting += (_, eventArgs) => eventArgs.Cancel = !IsChatPage(eventArgs.Uri);
@@ -170,31 +167,49 @@ namespace TxtAIEditor.Controls
         private static bool IsChatPage(string? source) =>
             string.Equals(source, ChatPage.AbsoluteUri, StringComparison.Ordinal);
 
-        private void OnImageResourceRequested(CoreWebView2 core, CoreWebView2WebResourceRequestedEventArgs args)
+        private bool IsCurrentImageWorkspace(CoreWebView2 core, string workspaceKey) =>
+            core == _readyWebView && _imageWorkspaceKey == workspaceKey && IsChatPage(core.Source);
+
+        private async Task SendChatImageAsync(CoreWebView2 core, string workspaceKey, string requestId, string path)
         {
+            if (!IsCurrentImageWorkspace(core, workspaceKey) || _lastSnapshot?.WorkspaceRoot is not { Length: > 0 } root)
+            {
+                return;
+            }
+
             try
             {
-                if (core == _readyWebView && _imageBaseHref != null && _lastSnapshot?.WorkspaceRoot is { Length: > 0 } root)
+                if (ResolveImagePath(root, path) is { } image)
                 {
-                    string prefix = _imageBaseHref + "?path=";
-                    string requestUrl = args.Request.Uri;
-                    if (requestUrl.StartsWith(prefix, StringComparison.Ordinal) &&
-                        ResolveImagePath(root, Uri.UnescapeDataString(requestUrl[prefix.Length..])) is { } image)
+                    using var file = new FileStream(image.Path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete,
+                        bufferSize: 4096, options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+                    long length = file.Length;
+                    if (length > 0)
                     {
-                        var stream = new FileStream(image.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-                        args.Response = core.Environment.CreateWebResourceResponse(stream.AsRandomAccessStream(), 200, "OK",
-                            $"Content-Type: {image.ContentType}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff");
+                        using var buffer = core.Environment.CreateSharedBuffer((ulong)length);
+                        using (var destination = buffer.OpenStream().AsStreamForWrite())
+                        {
+                            await file.CopyToAsync(destination);
+                            await destination.FlushAsync();
+                        }
+                        if (IsCurrentImageWorkspace(core, workspaceKey))
+                        {
+                            core.PostSharedBufferToScript(buffer, CoreWebView2SharedBufferAccess.ReadOnly,
+                                JsonSerializer.Serialize(new { workspaceKey, requestId, path, contentType = image.ContentType }, MessageOptions));
+                        }
                         return;
                     }
                 }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or COMException)
             {
                 Debug.WriteLine(ex.Message);
             }
 
-            args.Response = core.Environment.CreateWebResourceResponse(PreviewWebResourceService.CreateEmptyResourceStream(),
-                404, "Not Found", "Content-Type: text/plain\r\nCache-Control: no-store");
+            if (IsCurrentImageWorkspace(core, workspaceKey))
+            {
+                Post(new { action = "imageUnavailable", workspaceKey, requestId, path });
+            }
         }
 
         private static (string Path, string ContentType)? ResolveImagePath(string root, string path)
@@ -289,6 +304,14 @@ namespace TxtAIEditor.Controls
                             Post(new { action = "copyResult", copyId, success });
                         }
                         break;
+                    case "loadImage":
+                        if (ReadString(message, "workspaceKey") is { } workspaceKey &&
+                            ReadString(message, "requestId") is { } requestId &&
+                            ReadString(message, "path") is { Length: > 0 } path)
+                        {
+                            _ = SendChatImageAsync(core, workspaceKey, requestId, path);
+                        }
+                        break;
                     case "submit":
                         string? sessionId = ReadString(message, "sessionId");
                         string? prompt = ReadString(message, "prompt");
@@ -372,7 +395,7 @@ namespace TxtAIEditor.Controls
             int offset = sameSession ? FindCommonPrefix(_lastSnapshot!.Output, snapshot.Output) : 0;
             if (imageWorkspaceChanged)
             {
-                _imageBaseHref = string.IsNullOrWhiteSpace(snapshot.WorkspaceRoot) ? null : $"https://{ChatImageHost}/{Guid.NewGuid():N}";
+                _imageWorkspaceKey = string.IsNullOrWhiteSpace(snapshot.WorkspaceRoot) ? null : Guid.NewGuid().ToString("N");
             }
             _lastSnapshot = snapshot;
             Post(new
@@ -384,7 +407,7 @@ namespace TxtAIEditor.Controls
                 prompts = shouldSendPrompts ? snapshot.Prompts : null,
                 pendingPrompts = shouldSendPendingPrompts ? snapshot.PendingPrompts : null,
                 hiddenOutput = shouldSendHiddenOutput ? snapshot.HiddenOutput : null,
-                imageBaseHref = _imageBaseHref,
+                imageWorkspaceKey = _imageWorkspaceKey,
                 snapshot.CanSubmit,
                 theme = settings.Theme,
                 usePele = settings.UsePele
@@ -452,7 +475,7 @@ namespace TxtAIEditor.Controls
             _item = null;
             _readyWebView = null;
             _lastSnapshot = null;
-            _imageBaseHref = null;
+            _imageWorkspaceKey = null;
         }
 
         public void Dispose()

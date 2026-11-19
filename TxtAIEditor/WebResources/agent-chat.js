@@ -21,11 +21,12 @@ const sectionHeader = /^\[(?:Agent tool call|assistant: (?:tool call|thinking|er
 const sectionEnd = /^\[End (?:global agent rules|retry detail|compressed context)\]/i;
 const markdownOptions = {
     allowHtml: false, deferOpenDiagrams: true, diagramLoadingText: '', renderCharts: true,
-    resolveImageUrl: resolveChatImageUrl
+    deferLocalImages: true, resolveImageUrl: resolveChatImageUrl
 };
 
 const drafts = new Map();
 const pending = new Map();
+const imageLoads = new Map();
 let promptRanges = [];
 let pendingPrompts = [];
 let hiddenOutput = [];
@@ -34,7 +35,8 @@ let jumpLinks = [];
 let selectedJump = null;
 let output = '';
 let sessionId = null;
-let imageBaseHref = null;
+let imageWorkspaceKey = null;
+let nextImageRequestId = 0;
 let composerSessionId = null;
 let canSubmit = false;
 let composing = false;
@@ -62,15 +64,64 @@ function scrollToEnd() {
 function resolveChatImageUrl(source) {
     if (/^data:image\//i.test(source)) return source;
     const scheme = /^[a-z][a-z0-9+.-]*:/i.exec(source)?.[0].toLowerCase();
-    if (!imageBaseHref || source.startsWith('//') ||
+    if (!imageWorkspaceKey || source.startsWith('//') ||
         (scheme && scheme !== 'file:' && !/^[a-z]:[\\/]/i.test(source))) return '';
-    return `${imageBaseHref}?path=${encodeURIComponent(source)}`;
+    return source;
+}
+
+function syncChatImages() {
+    const visiblePaths = new Set();
+    for (const img of messages.querySelectorAll('img[data-preview-image-source]')) {
+        const path = img.dataset.previewImageSource;
+        visiblePaths.add(path);
+        let load = imageLoads.get(path);
+        if (!load) {
+            load = { requestId: String(++nextImageRequestId) };
+            imageLoads.set(path, load);
+            host.postMessage({ action: 'loadImage', workspaceKey: imageWorkspaceKey, requestId: load.requestId, path });
+        }
+        if (load.failed) replaceChatImageWithAlt(img);
+        else if (load.url && img.getAttribute('src') !== load.url) {
+            img.src = load.url;
+            img.hidden = false;
+        }
+    }
+    for (const [path, load] of imageLoads) {
+        if (visiblePaths.has(path)) continue;
+        if (load.url) URL.revokeObjectURL(load.url);
+        imageLoads.delete(path);
+    }
+}
+
+function replaceChatImageWithAlt(img) {
+    img.replaceWith(document.createTextNode(img.alt || ''));
+}
+
+function getImageLoad({ workspaceKey, requestId, path }) {
+    const load = imageLoads.get(path);
+    return imageWorkspaceKey === workspaceKey && load?.requestId === requestId ? load : null;
 }
 
 history.addEventListener('scroll', () => {
     followOutput = history.scrollHeight - history.scrollTop - history.clientHeight < 44;
 });
 messages.addEventListener('load', scrollToEnd, true);
+messages.addEventListener('error', event => {
+    if (event.target.dataset?.previewImageSource) replaceChatImageWithAlt(event.target);
+}, true);
+
+host.addEventListener('sharedbufferreceived', event => {
+    const bytes = event.getBuffer();
+    try {
+        const data = event.additionalData;
+        const load = data && getImageLoad(data);
+        if (!load || load.url) return;
+        load.url = URL.createObjectURL(new Blob([bytes], { type: data.contentType }));
+        syncChatImages();
+    } finally {
+        host.releaseBuffer(bytes);
+    }
+});
 
 function findInlineLogTag(line) {
     let codeSpanWidth = 0;
@@ -178,13 +229,15 @@ function renderAssistant(view, text) {
 
     for (const [index, block] of blocks.entries()) {
         let node = content.children[index];
-        if (node && node.blockHtml === block.html && node.activity === block.activity) continue;
+        const workspace = block.html?.includes('data-preview-image-source=') ? imageWorkspaceKey : null;
+        if (node && node.blockHtml === block.html && node.activity === block.activity && node.imageWorkspace === workspace) continue;
         if (!node) {
             node = document.createElement('div');
             content.append(node);
         }
         node.blockHtml = block.html;
         node.activity = block.activity;
+        node.imageWorkspace = workspace;
         node.className = block.activity === undefined ? 'block' : 'activity';
         if (block.activity === undefined) node.innerHTML = block.html;
         else node.textContent = block.activity;
@@ -265,6 +318,7 @@ function renderConversation(offset, renderAll) {
     for (const text of pendingPrompts) targets.push(show('user', null, null, text));
     for (; index < messageViews.length; index++) messageViews[index].node.remove();
     messageViews = nextViews;
+    syncChatImages();
     return targets;
 }
 
@@ -334,8 +388,14 @@ function syncComposer() {
 
 function update(message) {
     const switched = sessionId !== message.sessionId;
-    const imageWorkspaceChanged = imageBaseHref !== message.imageBaseHref;
-    imageBaseHref = message.imageBaseHref;
+    const imageWorkspaceChanged = imageWorkspaceKey !== message.imageWorkspaceKey;
+    if (imageWorkspaceChanged) {
+        for (const load of imageLoads.values()) {
+            if (load.url) URL.revokeObjectURL(load.url);
+        }
+        imageLoads.clear();
+        imageWorkspaceKey = message.imageWorkspaceKey;
+    }
     if (switched) {
         sessionId = message.sessionId;
         messages.replaceChildren();
@@ -445,6 +505,15 @@ host.addEventListener('message', ({ data }) => {
         case 'update':
             update(data);
             break;
+        case 'imageUnavailable': {
+            const load = getImageLoad(data);
+            if (load) {
+                load.failed = true;
+                syncChatImages();
+                scrollToEnd();
+            }
+            break;
+        }
         case 'font': {
             const style = document.documentElement.style;
             style.setProperty('--chat-font-family', JSON.stringify(data.family));

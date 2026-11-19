@@ -267,10 +267,13 @@ function renderMarkdownImage(alt, target, options = {}) {
 }
 
 function renderPreviewImage(alt, source, options, imageTitle = '') {
+    const title = imageTitle ? ` title="${escapeAttribute(imageTitle)}"` : '';
+    if (options.deferLocalImages && !/^data:image\//i.test(source)) {
+        return `<img hidden data-preview-image-source="${escapeAttribute(source)}" alt="${escapeAttribute(alt)}"${title} decoding="async">`;
+    }
     const imageKey = previewImageKey(source, options);
     if (options.failedImageSources?.has(imageKey)) return escapeHtml(alt);
     const src = resolvePreviewResourceUrl(source, options);
-    const title = imageTitle ? ` title="${escapeAttribute(imageTitle)}"` : '';
     return `<img src="${escapeAttribute(src)}" alt="${escapeAttribute(alt)}"${title} decoding="async" data-preview-image-key="${escapeAttribute(imageKey)}">`;
 }
 
