@@ -452,8 +452,7 @@ namespace TxtAIEditor.Controls
                     row.Item.Title,
                     row.Item.CanSelect,
                     row.Item.IsRunning,
-                    isChild = row.Branch is AgentPaneSessionMenuCoordinator.SessionTreeBranch.Child or
-                        AgentPaneSessionMenuCoordinator.SessionTreeBranch.LastChild
+                    branch = row.Branch.ToString()
                 });
             Post(new { action = "sessions", items = rows });
             _lastSessionItems = items;

@@ -262,9 +262,34 @@ body {
 .turn-number { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; }
 .turn-excerpt { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
-.session-link { grid-template-columns: minmax(0, 1fr) auto; }
+#sessions {
+    --session-gap: 4px;
+    gap: var(--session-gap);
+}
+
+.session-link { position: relative; grid-template-columns: minmax(0, 1fr) auto; }
 .session-link[aria-current] { font-weight: 600; }
-.session-link.session-child { padding-inline-start: 18px; }
+.session-link:is([data-branch="Child"], [data-branch="LastChild"]) { padding-inline-start: 18px; }
+.session-connector {
+    display: none;
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 7px;
+    inline-size: 8px;
+    pointer-events: none;
+}
+.session-link:is([data-branch="Parent"], [data-branch="Child"], [data-branch="LastChild"]) .session-connector { display: block; }
+.session-connector::before, .session-connector::after {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0;
+    background: var(--muted);
+}
+.session-connector::before { inset-block: 0 calc(-1 * var(--session-gap)); inline-size: 1px; }
+.session-connector::after { inset-block-start: 50%; inset-inline-end: 0; block-size: 1px; }
+.session-link[data-branch="Parent"] .session-connector::before { inset-block-start: 100%; }
+.session-link[data-branch="Parent"] .session-connector::after { display: none; }
+.session-link[data-branch="LastChild"] .session-connector::before { inset-block-end: calc(50% - 1px); }
 .session-link.session-running::after {
     content: '';
     width: 6px;
