@@ -14,7 +14,7 @@ namespace TxtAIEditor.Controls
     {
         private const string ChatRenderingGuidance = """
             [Chat rendering]
-            Use when helpful: LaTeX $...$ inline or $$ on separate lines for display math; ```mermaid for diagrams; ```svg for self-contained <svg> with a viewBox; ![[path.svg]] for workspace-relative SVG files.
+            Use when helpful: LaTeX $...$ inline or $$ on separate lines; ```mermaid for diagrams; ```svg for self-contained SVG with viewBox. Workspace images: ![alt](path.png) or ![[path.svg]].
             ```chart: YAML with type, labels, series [{title,data}], optional beginAtZero. ```advanced-chart: Chart.js 4 JSON with type, data, optional options.
             Either chart fence: type=function with expression (e.g. a*sin(x)) or series [{title,expression}], params {name:{value,min,max,step}} for sliders, optional xMin/xMax and yMin/yMax. linear-function takes a,b. Advanced line/function also supports data.datasets[].expression.
             """;

@@ -262,7 +262,8 @@ function resolvePreviewSrcset(value, options = {}) {
 function renderMarkdownImage(alt, target, options = {}) {
     const parsed = parseMarkdownImageTarget(target);
     if (!isSafeMediaUrl(parsed.src)) return escapeHtml(`![${alt}](${target})`);
-    return renderPreviewImage(alt, parsed.src, options, parsed.title);
+    const url = options.resolveImageUrl ? options.resolveImageUrl(parsed.src) : parsed.src;
+    return url ? renderPreviewImage(alt, url, options, parsed.title) : escapeHtml(alt);
 }
 
 function renderPreviewImage(alt, source, options, imageTitle = '') {
@@ -279,7 +280,7 @@ function renderMarkdownSvgFile(target, options = {}) {
     const fileName = path.split(/[\\/]/).at(-1);
     if (!/\.svg$/i.test(fileName) || !isSafeMediaUrl(source)) return null;
 
-    const url = options.resolveSvgFileUrl ? options.resolveSvgFileUrl(source) : source;
+    const url = options.resolveImageUrl ? options.resolveImageUrl(source) : source;
     return url ? renderPreviewImage(fileName, url, options) : null;
 }
 

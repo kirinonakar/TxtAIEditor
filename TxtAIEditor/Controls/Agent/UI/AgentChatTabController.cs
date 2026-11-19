@@ -21,7 +21,7 @@ namespace TxtAIEditor.Controls
     internal sealed class AgentChatTabController : IDisposable
     {
         private const string ChatHost = "agent-chat.txtaieditor.local";
-        private const string ChatSvgHost = "agent-chat-svg.txtaieditor.local";
+        private const string ChatImageHost = "agent-chat-images.txtaieditor.local";
         private static readonly Uri ChatPage = new($"https://{ChatHost}/agent-chat.html");
         private static readonly JsonSerializerOptions MessageOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -42,7 +42,7 @@ namespace TxtAIEditor.Controls
         private TabViewItem? _item;
         private CoreWebView2? _readyWebView;
         private AgentChatSnapshot? _lastSnapshot;
-        private string? _svgBaseHref;
+        private string? _imageBaseHref;
         private int _lastPromptCount;
         private int _lastHiddenCount;
         private int _lastHiddenEnd;
@@ -136,9 +136,9 @@ namespace TxtAIEditor.Controls
                 var core = webView.CoreWebView2;
                 core.SetVirtualHostNameToFolderMapping(ChatHost, PreviewWebResourceService.WebResourcesPath,
                     CoreWebView2HostResourceAccessKind.DenyCors);
-                core.AddWebResourceRequestedFilter($"https://{ChatSvgHost}/*", CoreWebView2WebResourceContext.Image,
+                core.AddWebResourceRequestedFilter($"https://{ChatImageHost}/*", CoreWebView2WebResourceContext.Image,
                     CoreWebView2WebResourceRequestSourceKinds.Document);
-                core.WebResourceRequested += OnSvgResourceRequested;
+                core.WebResourceRequested += OnImageResourceRequested;
                 core.Settings.AreBrowserAcceleratorKeysEnabled = false;
                 core.Settings.AreDevToolsEnabled = false;
                 core.NavigationStarting += (_, eventArgs) => eventArgs.Cancel = !IsChatPage(eventArgs.Uri);
@@ -170,20 +170,20 @@ namespace TxtAIEditor.Controls
         private static bool IsChatPage(string? source) =>
             string.Equals(source, ChatPage.AbsoluteUri, StringComparison.Ordinal);
 
-        private void OnSvgResourceRequested(CoreWebView2 core, CoreWebView2WebResourceRequestedEventArgs args)
+        private void OnImageResourceRequested(CoreWebView2 core, CoreWebView2WebResourceRequestedEventArgs args)
         {
             try
             {
-                if (core == _readyWebView && _svgBaseHref != null && _lastSnapshot?.WorkspaceRoot is { Length: > 0 } root)
+                if (core == _readyWebView && _imageBaseHref != null && _lastSnapshot?.WorkspaceRoot is { Length: > 0 } root)
                 {
-                    string prefix = _svgBaseHref + "?path=";
+                    string prefix = _imageBaseHref + "?path=";
                     string requestUrl = args.Request.Uri;
                     if (requestUrl.StartsWith(prefix, StringComparison.Ordinal) &&
-                        ResolveSvgPath(root, Uri.UnescapeDataString(requestUrl[prefix.Length..])) is { } path)
+                        ResolveImagePath(root, Uri.UnescapeDataString(requestUrl[prefix.Length..])) is { } image)
                     {
-                        var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                        var stream = new FileStream(image.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
                         args.Response = core.Environment.CreateWebResourceResponse(stream.AsRandomAccessStream(), 200, "OK",
-                            "Content-Type: image/svg+xml\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff");
+                            $"Content-Type: {image.ContentType}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff");
                         return;
                     }
                 }
@@ -197,7 +197,7 @@ namespace TxtAIEditor.Controls
                 404, "Not Found", "Content-Type: text/plain\r\nCache-Control: no-store");
         }
 
-        private static string? ResolveSvgPath(string root, string path)
+        private static (string Path, string ContentType)? ResolveImagePath(string root, string path)
         {
             if (path.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
             {
@@ -210,7 +210,7 @@ namespace TxtAIEditor.Controls
                 path = Uri.UnescapeDataString(suffix >= 0 ? path[..suffix] : path);
             }
 
-            if (!string.Equals(Path.GetExtension(path), ".svg", StringComparison.OrdinalIgnoreCase) ||
+            if (!PreviewWebResourceService.GetContentType(path).StartsWith("image/", StringComparison.Ordinal) ||
                 (Path.IsPathRooted(path) && !Path.IsPathFullyQualified(path))) return null;
 
             string fullPath = Path.GetFullPath(path, root);
@@ -219,7 +219,8 @@ namespace TxtAIEditor.Controls
             AgentWorkspaceFileResolver.VerifyPinnedWorkspace(root);
             string resolved = AgentWorkspaceFileResolver.ResolvePhysicalPath(fullPath, confinedTo: root);
             AgentWorkspaceFileResolver.VerifyPhysicalPath(resolved);
-            return string.Equals(Path.GetExtension(resolved), ".svg", StringComparison.OrdinalIgnoreCase) ? resolved : null;
+            string contentType = PreviewWebResourceService.GetContentType(resolved);
+            return contentType.StartsWith("image/", StringComparison.Ordinal) ? (resolved, contentType) : null;
         }
 
         private void ReceiveMessage(OpenedTab tab, CoreWebView2 core, CoreWebView2WebMessageReceivedEventArgs args)
@@ -351,7 +352,7 @@ namespace TxtAIEditor.Controls
             }
 
             bool sameSession = _lastSnapshot?.SessionId == snapshot.SessionId;
-            bool svgWorkspaceChanged = !sameSession || _lastSnapshot?.WorkspaceRoot != snapshot.WorkspaceRoot;
+            bool imageWorkspaceChanged = !sameSession || _lastSnapshot?.WorkspaceRoot != snapshot.WorkspaceRoot;
             bool shouldSendPrompts = !sameSession || !ReferenceEquals(_lastSnapshot?.Prompts, snapshot.Prompts) ||
                 _lastPromptCount != snapshot.Prompts.Count;
             bool shouldSendPendingPrompts = !sameSession ||
@@ -361,7 +362,7 @@ namespace TxtAIEditor.Controls
             bool shouldSendHiddenOutput = !sameSession || !ReferenceEquals(_lastSnapshot?.HiddenOutput, snapshot.HiddenOutput) ||
                 _lastHiddenCount != hiddenCount || _lastHiddenEnd != hiddenEnd;
             bool outputChanged = !sameSession || !ReferenceEquals(_lastSnapshot?.Output, snapshot.Output);
-            if (!svgWorkspaceChanged && !shouldSendPrompts && !shouldSendPendingPrompts && !shouldSendHiddenOutput && !outputChanged &&
+            if (!imageWorkspaceChanged && !shouldSendPrompts && !shouldSendPendingPrompts && !shouldSendHiddenOutput && !outputChanged &&
                 _lastSnapshot?.CanSubmit == snapshot.CanSubmit &&
                 _lastTheme == settings.Theme && _lastUsePele == settings.UsePele)
             {
@@ -369,9 +370,9 @@ namespace TxtAIEditor.Controls
             }
 
             int offset = sameSession ? FindCommonPrefix(_lastSnapshot!.Output, snapshot.Output) : 0;
-            if (svgWorkspaceChanged)
+            if (imageWorkspaceChanged)
             {
-                _svgBaseHref = string.IsNullOrWhiteSpace(snapshot.WorkspaceRoot) ? null : $"https://{ChatSvgHost}/{Guid.NewGuid():N}";
+                _imageBaseHref = string.IsNullOrWhiteSpace(snapshot.WorkspaceRoot) ? null : $"https://{ChatImageHost}/{Guid.NewGuid():N}";
             }
             _lastSnapshot = snapshot;
             Post(new
@@ -383,7 +384,7 @@ namespace TxtAIEditor.Controls
                 prompts = shouldSendPrompts ? snapshot.Prompts : null,
                 pendingPrompts = shouldSendPendingPrompts ? snapshot.PendingPrompts : null,
                 hiddenOutput = shouldSendHiddenOutput ? snapshot.HiddenOutput : null,
-                svgBaseHref = _svgBaseHref,
+                imageBaseHref = _imageBaseHref,
                 snapshot.CanSubmit,
                 theme = settings.Theme,
                 usePele = settings.UsePele
@@ -451,7 +452,7 @@ namespace TxtAIEditor.Controls
             _item = null;
             _readyWebView = null;
             _lastSnapshot = null;
-            _svgBaseHref = null;
+            _imageBaseHref = null;
         }
 
         public void Dispose()
