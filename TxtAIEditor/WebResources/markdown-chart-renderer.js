@@ -9,7 +9,11 @@ const charts = new Map();
 const pending = new WeakSet();
 const forbiddenKeys = new Set(['__proto__', 'constructor', 'prototype']);
 const functionPlotKey = Symbol('function plot');
-const lineColors = ['#2684c7', '#d1433f', '#19877b', '#8757b9', '#b9691b', '#668331', '#a34996', '#198297'];
+const chartColors = ['#2684c7', '#d1433f', '#19877b', '#8757b9', '#b9691b', '#668331', '#a34996', '#198297'];
+const chartElements = new Map([
+    ['bar', 'bar'], ['pie', 'arc'], ['doughnut', 'arc'], ['polarArea', 'arc'],
+    ['line', 'line'], ['radar', 'line'], ['scatter', 'line']
+]);
 let chartLibrary;
 let removalObserver;
 
@@ -65,7 +69,7 @@ function createFunctionChart(input, linear, options = {}, data = {}) {
         const style = datasets[datasetIndex];
         renderedDatasets[datasetIndex] = {
             label: curve.label, pointRadius: 0, borderWidth: 2, spanGaps: false,
-            ...(index >= lineColors.length && { borderDash: [6, 4] }),
+            ...(index >= chartColors.length && { borderDash: [6, 4] }),
             ...style, xAxisID: 'x', yAxisID: 'y', indexAxis: 'x'
         };
     });
@@ -262,21 +266,37 @@ function addFunctionControls(block, frame, canvas, chart, graph) {
     if (graph.parameters.size > 0) block.insertBefore(controls, frame);
 }
 
-function applyLineColors({ type, data, options }) {
-    const line = options.elements?.line;
+function applyChartColors({ type, data, options }) {
     data.datasets.forEach((dataset, index) => {
         if (!isRecord(dataset)) return;
         const kind = dataset.type ?? type;
+        const elementKind = chartElements.get(kind);
         const defaults = options.datasets?.[kind];
-        const scatterLine = kind === 'scatter' && (dataset.showLine ?? defaults?.showLine ?? options.showLine);
-        if (kind !== 'line' && kind !== 'radar' && !scatterLine) return;
+        if (!elementKind || (kind === 'scatter' && !(dataset.showLine ?? defaults?.showLine ?? options.showLine))) return;
 
-        const configuredBorder = dataset.borderColor ?? defaults?.borderColor ?? line?.borderColor ?? options.borderColor;
+        const element = options.elements?.[elementKind];
+        const configuredFill = dataset.backgroundColor ?? defaults?.backgroundColor ?? element?.backgroundColor ?? options.backgroundColor;
+        if (elementKind === 'arc') {
+            if (configuredFill == null) {
+                const values = isRecord(dataset.data) ? Object.keys(dataset.data) : dataset.data;
+                dataset.backgroundColor = Array.from({ length: values?.length ?? 0 },
+                    (_, slice) => chartColors[slice % chartColors.length]);
+            }
+            return;
+        }
+
+        const color = chartColors[index % chartColors.length];
+        const configuredBorder = dataset.borderColor ?? defaults?.borderColor ?? element?.borderColor ?? options.borderColor;
+        if (elementKind === 'bar') {
+            if (configuredFill == null) {
+                dataset.backgroundColor = color;
+                if (configuredBorder == null) dataset.borderColor = color;
+            }
+            return;
+        }
         if (configuredBorder != null) return;
 
-        const color = lineColors[index % lineColors.length];
         dataset.borderColor = color;
-        const configuredFill = dataset.backgroundColor ?? defaults?.backgroundColor ?? line?.backgroundColor ?? options.backgroundColor;
         if (configuredFill == null) dataset.backgroundColor = `${color}40`;
     });
 }
@@ -285,7 +305,7 @@ function drawChart(block, Chart, config, appearance) {
     const [color, borderColor, font] = appearance;
     const options = config.options ??= {};
     // Apply series colors before setting the theme border shared by Chart.js and the grid.
-    applyLineColors(config);
+    applyChartColors(config);
     options.color ??= color;
     options.borderColor ??= borderColor;
     options.font = { family: font, ...options.font };
