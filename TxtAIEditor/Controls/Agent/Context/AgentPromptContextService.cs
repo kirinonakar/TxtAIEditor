@@ -14,9 +14,9 @@ namespace TxtAIEditor.Controls
     {
         private const string ChatChartGuidance = """
             [Chat charts]
-            Use standalone Markdown fences. ```chart takes YAML with type, labels, series [{title,data}], and optional beginAtZero. ```advanced-chart takes Chart.js 4 JSON with type, data, options.
-            Both support type "function" with expression like "a*sin(x)" and slider parameters like {"a":{"value":1,"min":0,"max":5,"step":0.1}}. Use explicit * and ^, built-in math, and optional xMin/xMax and yMin/yMax. "linear-function" takes a and b.
-            Advanced JSON can style the function via data.datasets[0] and configure built-in tooltips, legends and interaction via options.
+            Open chart blocks with ```chart for YAML (type, labels, series [{title,data}], optional beginAtZero) or ```advanced-chart for Chart.js 4 JSON (type, data, options).
+            Both support type "function" with expression "a*sin(x)" or series [{title,expression}]. Slider parameters (alias params) use {"a":{"value":1,"min":0,"max":5,"step":0.1}}. Use *, ^, and math functions like abs(x). Bounds xMin/xMax and yMin/yMax are optional. "linear-function" takes a,b.
+            Advanced JSON type "line" or "function" can define curves in data.datasets [{label,expression,...style}]. Use built-in tooltip, legend and interaction options.
             """;
 
         private readonly AgentPane _agentPane;

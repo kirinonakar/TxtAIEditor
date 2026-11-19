@@ -3219,7 +3219,7 @@
     <value>바로가기</value>
   </data>
   <data name="AgentStreamToTab" xml:space="preserve">
-    <value>탭에 스트리밍</value>
+    <value>채팅 탭</value>
   </data>
   <data name="ExplorerFilterPlaceholder" xml:space="preserve">
     <value>파일명 필터 (하위 폴더 포함)...</value>

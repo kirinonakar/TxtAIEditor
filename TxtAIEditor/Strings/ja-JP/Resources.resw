@@ -3219,7 +3219,7 @@
     <value>ジャンプ</value>
   </data>
   <data name="AgentStreamToTab" xml:space="preserve">
-    <value>タブにストリーミング</value>
+    <value>チャットタブ</value>
   </data>
   <data name="ExplorerFilterPlaceholder" xml:space="preserve">
     <value>ファイル名でフィルター (サブフォルダを含む)...</value>

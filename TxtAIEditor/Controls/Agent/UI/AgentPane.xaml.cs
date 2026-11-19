@@ -276,9 +276,9 @@ namespace TxtAIEditor.Controls
             AgentContextStatsText.Text = getString("AgentContextStatsDefault", "현재 탭과 선택 영역을 맥락으로 사용");
             AgentPlanningModeCheckBox.Content = getString("AgentIncludeActiveFile", "계획 모드 (Planning mode)");
             AgentSubagentsCheckBox.Content = getString("AgentUseSubagents", "서브에이전트");
-            string streamToTabText = getString("AgentStreamToTab", "탭에 스트리밍");
-            ToolTipService.SetToolTip(AgentStreamToTabToggleButton, streamToTabText);
-            AutomationProperties.SetName(AgentStreamToTabToggleButton, streamToTabText);
+            string chatTabText = getString("AgentStreamToTab", "채팅 탭");
+            ToolTipService.SetToolTip(AgentStreamToTabToggleButton, chatTabText);
+            AutomationProperties.SetName(AgentStreamToTabToggleButton, chatTabText);
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
             ToolTipService.SetToolTip(AgentMcpButton, getString("AgentMcpButtonTooltip", "MCP 서버"));
             AgentMcpTitleText.Text = getString("AgentMcpTitle", "MCP");

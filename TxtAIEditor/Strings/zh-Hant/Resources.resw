@@ -3219,7 +3219,7 @@
     <value>跳轉</value>
   </data>
   <data name="AgentStreamToTab" xml:space="preserve">
-    <value>串流至 Tab</value>
+    <value>聊天分頁</value>
   </data>
   <data name="ExplorerFilterPlaceholder" xml:space="preserve">
     <value>按名稱過濾（包括子資料夾）...</value>

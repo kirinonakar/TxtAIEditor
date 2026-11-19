@@ -9,6 +9,7 @@ const charts = new Map();
 const pending = new WeakSet();
 const forbiddenKeys = new Set(['__proto__', 'constructor', 'prototype']);
 const functionPlotKey = Symbol('function plot');
+const lineColors = ['#2684c7', '#d1433f', '#19877b', '#8757b9', '#b9691b', '#668331', '#a34996', '#198297'];
 let chartLibrary;
 let removalObserver;
 
@@ -33,8 +34,8 @@ function validateChartData(value, depth = 0, budget = { remaining: 24000 }) {
 }
 
 function applyFunctionData(target, graph) {
-    const { points, yRange } = sampleFunctionPlot(graph);
-    target.data.datasets[0].data = points;
+    const { datasets, yRange } = sampleFunctionPlot(graph);
+    datasets.forEach((points, index) => { target.data.datasets[graph.curveIndexes[index]].data = points; });
     target.options.scales.y.min = yRange.min;
     target.options.scales.y.max = yRange.max;
 }
@@ -51,17 +52,29 @@ function createFunctionChart(input, linear, options = {}, data = {}) {
     const { x = {}, y = {} } = scales;
     if (!isRecord(x) || !isRecord(y)) throw new Error('Expected x and y axis options');
     const { xMin = x.min, xMax = x.max, yMin = y.min, yMax = y.max } = input;
-    const graph = createFunctionPlot({ ...input, xMin, xMax, yMin, yMax }, linear);
-    const [curveStyle, ...otherDatasets] = datasets;
+    const expressionIndexes = !linear && input.expression === undefined && input.series === undefined
+        ? datasets.flatMap((dataset, index) => Object.hasOwn(dataset, 'expression') ? [index] : []) : [];
+    const series = expressionIndexes.length
+        ? expressionIndexes.map(index => ({ title: datasets[index].label, expression: datasets[index].expression }))
+        : input.series;
+    const graph = createFunctionPlot({ ...input, series, xMin, xMax, yMin, yMax }, linear);
+    graph.curveIndexes = expressionIndexes.length ? expressionIndexes : graph.curves.map((_, index) => index);
+    const renderedDatasets = datasets.slice();
+    graph.curves.forEach((curve, index) => {
+        const datasetIndex = graph.curveIndexes[index];
+        const style = datasets[datasetIndex];
+        renderedDatasets[datasetIndex] = {
+            label: curve.label, pointRadius: 0, borderWidth: 2, spanGaps: false,
+            ...(index >= lineColors.length && { borderDash: [6, 4] }),
+            ...style, xAxisID: 'x', yAxisID: 'y', indexAxis: 'x'
+        };
+    });
 
     const config = {
         type: 'line',
         data: {
             ...data,
-            datasets: [{
-                label: graph.equation, pointRadius: 0, borderWidth: 2, spanGaps: false,
-                ...curveStyle, xAxisID: 'x', yAxisID: 'y', indexAxis: 'x'
-            }, ...otherDatasets]
+            datasets: renderedDatasets
         },
         options: {
             ...options,
@@ -70,9 +83,9 @@ function createFunctionChart(input, linear, options = {}, data = {}) {
                 x: { type: 'linear', title: { display: true, text: 'x' }, ...x, ...graph.xRange },
                 y: { title: { display: true, text: 'y' }, ...y }
             },
-            plugins: plugins === false ? false : {
+            plugins: input.type === 'line' || plugins === false ? plugins : {
                 ...plugins,
-                legend: plugins?.legend ?? { display: false },
+                legend: plugins?.legend ?? { display: graph.curves.length > 1 },
                 tooltip: plugins?.tooltip ?? { enabled: false }
             }
         },
@@ -128,20 +141,37 @@ function fromBasicChart(input) {
     return { type, data: { labels: input.labels || [], datasets }, options };
 }
 
+async function loadChartYaml(source) {
+    const { load, CORE_SCHEMA } = await import('./chart/js-yaml.esm.min.js');
+    let lines;
+    for (let repairs = 0; ; repairs++) {
+        try {
+            return load(source, { schema: CORE_SCHEMA, maxDepth: 32 });
+        } catch (error) {
+            // Recover bare |…| only on the line rejected by YAML, leaving valid block scalars intact.
+            const mark = error.mark;
+            if (!mark || repairs >= 32) throw error;
+            lines ??= source.split(/\r\n?|\n/);
+            const match = /^([ ]*(?:-[ \t]+)?(?:title|expression):[ \t]*)(\|.*)$/.exec(lines[mark.line] || '');
+            if (!match || mark.column <= match[1].length) throw error;
+            const value = match[2].replace(/[ \t]+#.*$/, '').trimEnd();
+            if (value.indexOf('|', 1) < 0) throw error;
+            lines[mark.line] = match[1] + JSON.stringify(value);
+            source = lines.join('\n');
+        }
+    }
+}
+
 export async function parseMarkdownChart(language, source) {
     if (!isChartFence(language) || source.length > 100_000) throw new Error('Invalid chart code block');
     const basic = language.toLowerCase() === 'chart';
-    let input;
-    if (basic) {
-        const { load, CORE_SCHEMA } = await import('./chart/js-yaml.esm.min.js');
-        input = load(source, { schema: CORE_SCHEMA, maxDepth: 32 });
-    } else {
-        input = JSON.parse(source);
-    }
+    const input = basic ? await loadChartYaml(source) : JSON.parse(source);
     if (!isRecord(input)) throw new Error('Expected a chart configuration object');
     validateChartData(input);
     const type = typeof input.type === 'string' ? input.type.toLowerCase() : '';
-    if (type === 'function' || type === 'linear-function') {
+    const expressionLine = !basic && type === 'line' && Array.isArray(input.data?.datasets) &&
+        input.data.datasets.some(dataset => isRecord(dataset) && Object.hasOwn(dataset, 'expression'));
+    if (type === 'function' || type === 'linear-function' || expressionLine) {
         return createFunctionChart(input, type === 'linear-function',
             basic ? undefined : input.options, basic ? undefined : input.data);
     }
@@ -185,8 +215,8 @@ function observeChartRemoval() {
 }
 
 function addFunctionControls(block, frame, canvas, chart, graph) {
-    const title = document.createElement('div');
-    title.className = 'chart-function-equation';
+    const title = graph.curves.length === 1 ? document.createElement('div') : null;
+    if (title) title.className = 'chart-function-equation';
     const controls = document.createElement('div');
     controls.className = 'chart-function-controls';
     controls.setAttribute('contenteditable', 'false');
@@ -197,7 +227,7 @@ function addFunctionControls(block, frame, canvas, chart, graph) {
     const number = new Intl.NumberFormat(undefined, { maximumSignificantDigits: 6 });
     const updateEquation = () => {
         const equation = graph.formatEquation(number);
-        title.textContent = equation;
+        if (title) title.textContent = equation;
         canvas.setAttribute('aria-label', equation);
     };
 
@@ -228,13 +258,34 @@ function addFunctionControls(block, frame, canvas, chart, graph) {
     }
 
     updateEquation();
-    block.insertBefore(title, frame);
+    if (title) block.insertBefore(title, frame);
     if (graph.parameters.size > 0) block.insertBefore(controls, frame);
+}
+
+function applyLineColors({ type, data, options }) {
+    const line = options.elements?.line;
+    data.datasets.forEach((dataset, index) => {
+        if (!isRecord(dataset)) return;
+        const kind = dataset.type ?? type;
+        const defaults = options.datasets?.[kind];
+        const scatterLine = kind === 'scatter' && (dataset.showLine ?? defaults?.showLine ?? options.showLine);
+        if (kind !== 'line' && kind !== 'radar' && !scatterLine) return;
+
+        const configuredBorder = dataset.borderColor ?? defaults?.borderColor ?? line?.borderColor ?? options.borderColor;
+        if (configuredBorder != null) return;
+
+        const color = lineColors[index % lineColors.length];
+        dataset.borderColor = color;
+        const configuredFill = dataset.backgroundColor ?? defaults?.backgroundColor ?? line?.backgroundColor ?? options.backgroundColor;
+        if (configuredFill == null) dataset.backgroundColor = `${color}40`;
+    });
 }
 
 function drawChart(block, Chart, config, appearance) {
     const [color, borderColor, font] = appearance;
     const options = config.options ??= {};
+    // Apply series colors before setting the theme border shared by Chart.js and the grid.
+    applyLineColors(config);
     options.color ??= color;
     options.borderColor ??= borderColor;
     options.font = { family: font, ...options.font };

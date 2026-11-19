@@ -21,10 +21,13 @@ function compileExpression(expression, parameters) {
 
     function primary() {
         const token = tokens[position++];
-        if (token === '(') {
+        if (token === '(' || token === '|') {
             const expression = sum();
-            if (!take(')')) throw new Error('Expected a closing parenthesis');
-            return expression;
+            const absolute = token === '|';
+            if (!take(absolute ? '|' : ')')) {
+                throw new Error(absolute ? 'Expected a closing absolute-value bar' : 'Expected a closing parenthesis');
+            }
+            return absolute ? x => Math.abs(expression(x)) : expression;
         }
         if (token && numberLiteral.test(token)) {
             const value = Number(token);
@@ -133,15 +136,13 @@ export function createFunctionPlot(input, linear) {
             Math.max(Math.abs(b.min), Math.abs(b.max));
         yRange ??= readRange(-yLimit, yLimit);
         return {
-            equation: 'y = ax + b', parameters: new Map([['a', a], ['b', b]]), xRange, yRange,
-            intervals: 1, evaluate: x => a.value * x + b.value,
+            curves: [{ label: 'y = ax + b', evaluate: x => a.value * x + b.value }],
+            parameters: new Map([['a', a], ['b', b]]), xRange, yRange, intervals: 1,
             formatEquation: number => `y = ${number.format(a.value)}x ${b.value < 0 ? '−' : '+'} ${number.format(Math.abs(b.value))}`
         };
     }
 
-    const expression = typeof input.expression === 'string' ? input.expression.trim().replace(/^y\s*=\s*/, '') : '';
-    if (!expression || expression.length > 512) throw new Error('Expected an expression of at most 512 characters');
-    const definitions = input.parameters ?? {};
+    const definitions = input.parameters ?? input.params ?? {};
     if (typeof definitions !== 'object' || Array.isArray(definitions) || Object.keys(definitions).length > 12) {
         throw new Error('Expected a mapping of up to 12 parameters');
     }
@@ -152,17 +153,31 @@ export function createFunctionPlot(input, linear) {
         }
         parameters.set(name, readParameter(definition));
     }
-    const equation = `y = ${expression}`;
+
+    const series = input.series === undefined ? [input] : input.series;
+    if (!Array.isArray(series) || !series.length || series.length > 16) {
+        throw new Error('Expected 1 to 16 function series');
+    }
+    const curves = series.map(entry => {
+        const expression = typeof entry?.expression === 'string'
+            ? entry.expression.trim().replace(/^y\s*=\s*/, '') : '';
+        if (!expression || expression.length > 512) throw new Error('Expected an expression of at most 512 characters');
+        const equation = `y = ${expression}`;
+        return {
+            equation,
+            label: typeof entry.title === 'string' && entry.title.trim() ? entry.title : equation,
+            evaluate: compileExpression(expression, parameters)
+        };
+    });
     return {
-        equation, parameters, xRange, yRange, intervals: 400,
-        evaluate: compileExpression(expression, parameters),
-        formatEquation: () => equation
+        curves, parameters, xRange, yRange, intervals: 400,
+        formatEquation: () => curves.map(curve => curve.equation).join(', ')
     };
 }
 
 function autoYRange(points) {
     const values = points.map(point => point.y).filter(Number.isFinite).sort((a, b) => a - b);
-    if (!values.length) return { min: -1, max: 1 };
+    if (!values.length) return null;
     const last = values.length - 1;
     const low = values[Math.floor(last * 0.025)];
     const high = values[Math.ceil(last * 0.975)];
@@ -174,18 +189,20 @@ function autoYRange(points) {
     return { min: min - padding, max: max + padding };
 }
 
-export function sampleFunctionPlot(graph) {
-    const { min, max } = graph.xRange;
+function sampleCurve({ xRange: { min, max }, intervals }, curve) {
     const valueAt = x => {
-        const y = graph.evaluate(x);
+        const y = curve.evaluate(x);
         return Number.isFinite(4 * y) ? y : null;
     };
-    const points = Array.from({ length: graph.intervals + 1 }, (_, index) => {
-        const x = index === graph.intervals ? max : min + (max - min) * (index / graph.intervals);
+    const points = Array.from({ length: intervals + 1 }, (_, index) => {
+        const x = index === intervals ? max : min + (max - min) * (index / intervals);
         return { x, y: valueAt(x) };
     });
-    const yRange = graph.yRange ?? autoYRange(points);
-    if (graph.intervals === 1) return { points, yRange };
+    return { points, valueAt };
+}
+
+function breakAtPoles({ points, valueAt }, yRange) {
+    if (points.length <= 2) return points;
 
     const connected = [points[0]];
     const jumpThreshold = (yRange.max - yRange.min) * 0.6;
@@ -203,5 +220,16 @@ export function sampleFunctionPlot(graph) {
         }
         connected.push(point);
     }
-    return { points: connected, yRange };
+    return connected;
+}
+
+export function sampleFunctionPlot(graph) {
+    const samples = graph.curves.map(curve => sampleCurve(graph, curve));
+    const yRange = graph.yRange ?? samples
+        .map(sample => autoYRange(sample.points))
+        .filter(Boolean)
+        .reduce((combined, range) => combined
+            ? { min: Math.min(combined.min, range.min), max: Math.max(combined.max, range.max) }
+            : range, null) ?? { min: -1, max: 1 };
+    return { datasets: samples.map(sample => breakAtPoles(sample, yRange)), yRange };
 }

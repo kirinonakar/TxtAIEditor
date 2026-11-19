@@ -346,8 +346,6 @@
                           Height="28"
                           IsChecked="False"
                           VerticalAlignment="Center"
-                          ToolTipService.ToolTip="탭에 스트리밍"
-                          AutomationProperties.Name="탭에 스트리밍"
                           Style="{StaticResource AgentToggleButtonStyle}">
                 <FontIcon Glyph="&#xE8A7;" FontSize="12" RenderTransformOrigin="0.5,0.5">
                     <FontIcon.RenderTransform>

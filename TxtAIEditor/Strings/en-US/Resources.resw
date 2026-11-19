@@ -3219,7 +3219,7 @@ Plan: {0}</value>
     <value>Jump to</value>
   </data>
   <data name="AgentStreamToTab" xml:space="preserve">
-    <value>Stream to Tab</value>
+    <value>Chat Tab</value>
   </data>
   <data name="ExplorerFilterPlaceholder" xml:space="preserve">
     <value>Filter by name (includes subfolders)...</value>
