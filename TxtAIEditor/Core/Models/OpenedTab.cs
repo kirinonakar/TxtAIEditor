@@ -14,6 +14,7 @@ namespace TxtAIEditor.Core.Models
         public string Id { get; } = Guid.NewGuid().ToString();
         public string TabId => Id;
         internal bool IsDiffView { get; init; }
+        internal bool IsAgentChat { get; init; }
 
         private EditorDocument? _document;
         public string? DocumentId => _document?.DocumentId;
@@ -305,7 +306,7 @@ namespace TxtAIEditor.Core.Models
             SetOrigin(new ArchiveEntryOrigin(archivePath, entryPath));
         }
 
-        public bool IsReadOnlyViewer => IsImageViewer || IsMediaViewer || IsPdfViewer || IsDocxViewer || IsOfficeDocumentViewer || IsHexViewer || IsReadOnlyTextFile || IsNotebookViewer;
+        public bool IsReadOnlyViewer => IsImageViewer || IsMediaViewer || IsPdfViewer || IsDocxViewer || IsOfficeDocumentViewer || IsHexViewer || IsReadOnlyTextFile || IsNotebookViewer || IsAgentChat;
         public string? EncryptionPassword { get; set; }
 
         private bool _isEncrypted = false;

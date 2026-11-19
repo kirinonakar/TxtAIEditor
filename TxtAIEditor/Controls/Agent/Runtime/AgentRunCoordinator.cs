@@ -173,7 +173,9 @@ namespace TxtAIEditor.Controls
                 _selectionContextController.CaptureActiveTabForRun(_openSessionController.IsCurrentSessionRunning()));
         }
 
-        public async Task RunAgentAsync()
+        public Task RunAgentAsync() => RunAgentAsync(null, null);
+
+        private async Task RunAgentAsync(string? chatPrompt, Action? onStarted)
         {
             string sessionId = _currentSessionIdProvider();
             var activeOpenSession = _openSessionController.EnsureSession(sessionId);
@@ -185,7 +187,7 @@ namespace TxtAIEditor.Controls
   
             var settings = _settingsService.CurrentSettings;
 
-            string userInstruction = _agentPane.Prompt.Text?.Trim() ?? string.Empty;
+            string userInstruction = (chatPrompt ?? _agentPane.Prompt.Text)?.Trim() ?? string.Empty;
             bool requestedPlanningMode = _agentPane.PlanningMode;
             bool useSubagents = _agentPane.UseSubagents;
             if (requestedPlanningMode && string.IsNullOrWhiteSpace(userInstruction))
@@ -243,7 +245,10 @@ namespace TxtAIEditor.Controls
             }
             _openSessionController.UpdateSessionTitle(activeOpenSession, userInstruction);
             activeOpenSession.PromptText = _agentPane.Prompt.Text ?? string.Empty;
-            _agentPane.ClearPromptForRun();
+            if (chatPrompt == null)
+            {
+                _agentPane.ClearPromptForRun();
+            }
             activeOpenSession.UpdatedAt = DateTime.Now;
             activeOpenSession.WorkspaceRoot = _runWorkspaceResolver.Resolve(
                 preservedWorkspaceRoot,
@@ -255,9 +260,9 @@ namespace TxtAIEditor.Controls
                 runContext.PinnedWorkspaceRoot = activeOpenSession.ApprovedPlanWorkspacePin;
             }
             runContext.RewindSnapshot = rewindSnapshot;
-            runContext.StreamToTab = _agentPane.StreamToTab;
             runContext.IsPlanningMode = requestedPlanningMode;
             runContext.PendingPlanPath = pendingPlanPath;
+            onStarted?.Invoke();
             await ExecuteRunAsync(activeOpenSession, runContext, conversationTurn, useSubagents);
         }
 
@@ -374,7 +379,7 @@ namespace TxtAIEditor.Controls
             {
                 await _runOutputController.ClearRunActivityAsync(runContext, _getString("AgentActivityStarting", "시작 중"));
                 await _runOutputController.BeginRunOutputBlockAsync(runContext, _runTextFormatter.BuildRunHeader(
-                    isSubagent ? userInstruction : _promptContextService.BuildInstructionDisplay(userInstruction), isSubagent));
+                    isSubagent ? userInstruction : _promptContextService.BuildInstructionDisplay(userInstruction), isSubagent), userInstruction);
                 await _runOutputController.AppendRunActivityAsync(runContext, _getString("AgentActivityCollectingContext", "맥락 수집 중"));
                 runContext.ToolCancellationToken.ThrowIfCancellationRequested();
                 runContext.PinnedWorkspaceRoot ??= AgentWorkspaceFileResolver.ResolveWorkspaceDirectory(runContext.WorkspaceRoot);
@@ -428,7 +433,6 @@ namespace TxtAIEditor.Controls
                         workerSessions.Values.Select(session => (session.Id, session.Title)));
                 }
 
-                runContext.StreamToTabTargetTabId = currentRunActiveTab?.Id;
                 _fileToolController.SetRunContext(currentRunSelectionSnapshot, currentRunActiveTab, useCapturedContextOnly: isSubagent);
                 string currentWorkspaceContext = await _promptContextService.BuildWorkspaceContextAsync(
                     conversationTurn,
@@ -500,7 +504,7 @@ namespace TxtAIEditor.Controls
 
                         string followUpHeader = _runTextFormatter.BuildRunHeader(
                             isSubagent ? queuedFollowUpPrompt : _promptContextService.BuildInstructionDisplay(queuedFollowUpPrompt), isSubagent);
-                        await _runOutputController.AppendRunOutputLineAsync(runContext, followUpHeader);
+                        await _runOutputController.AppendRunOutputLineAsync(runContext, followUpHeader, queuedFollowUpPrompt);
                     }
 
                     AgentModelRequest request = await _modelRequestBuilder.BuildAsync(
@@ -800,14 +804,6 @@ namespace TxtAIEditor.Controls
                             _getString("AgentActivityHistorySaveFailedFormat", "히스토리 저장 실패: {0}"), ex.Message));
                     }
                 }
-                try
-                {
-                    await _uiDispatcher.RunAsync(async () => await _runOutputController.FinishStreamToTabAsync(runContext));
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed to finish streaming agent output: {ex.Message}");
-                }
                 if (runContext.RewindSnapshot is { } snapshot)
                 {
                     await activeOpenSession.RewindSnapshots.ArchiveAsync(snapshot);
@@ -981,11 +977,48 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
-            context.FollowUps.TryQueue(trimmedPrompt);
+            QueueFollowUpPrompt(context, trimmedPrompt);
+        }
+
+        public async Task SubmitChatPromptAsync(string sessionId, string prompt, Action<bool> completed)
+        {
+            if (_runningSessions.TryGetValue(sessionId, out AgentRunContext? context))
+            {
+                completed(QueueFollowUpPrompt(context, prompt));
+                return;
+            }
+
+            bool started = false;
+            try
+            {
+                await RunAgentAsync(prompt, () =>
+                {
+                    started = true;
+                    completed(true);
+                });
+            }
+            catch (Exception ex)
+            {
+                _showError(_getString("AgentErrorTitle", "Agent 오류"), ex.Message);
+            }
+            finally
+            {
+                if (!started) completed(false);
+            }
+        }
+
+        private bool QueueFollowUpPrompt(AgentRunContext context, string prompt)
+        {
+            if (!context.FollowUps.TryQueue(prompt))
+            {
+                return false;
+            }
+
             string queuedNotice = _getString(
                 "AgentFollowUpQueued",
                 "추가 지시가 대기 중입니다. 다음 도구 호출이 끝나면 전송됩니다.");
             _ = _runOutputController.AppendRunActivityAsync(context, queuedNotice);
+            return true;
         }
 
         public void StopAgent()

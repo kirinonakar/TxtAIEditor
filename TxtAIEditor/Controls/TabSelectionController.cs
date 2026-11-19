@@ -109,50 +109,52 @@ namespace TxtAIEditor.Controls
 
         private async Task HandleSelectionChangedAsync(TabViewItem activeTabItem)
         {
-            _agentCommands.ClearSelectionContext();
+            var tab = activeTabItem.Tag is string tabId
+                ? _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId)
+                : null;
+            if (tab?.IsAgentChat != true)
+            {
+                _agentCommands.ClearSelectionContext();
+            }
             _selectionStatsText.Text = _getString("SelectionNoneBlocked", "선택 영역: 없음 (전체 파일의 경우 파일 추가 사용)");
 
-            if (activeTabItem.Tag is string tabId)
+            if (tab != null)
             {
-                var tab = _viewModel.Tabs.FirstOrDefault(t => t.Id == tabId);
-                if (tab != null)
+                FocusDocumentViewer(activeTabItem, tab);
+                _dispatcherQueue.TryEnqueue(
+                    DispatcherQueuePriority.Low,
+                    () => FocusDocumentViewer(activeTabItem, tab));
+
+                _statusBarController.UpdateFileStats(tab);
+                _statusBarController.UpdateTotalLines(tab);
+                _statusBarController.UpdateSelectionStats(null);
+
+                _updateLivePreview(tab);
+
+                _updateLanguageUi(tab);
+                _syncCsvTableModeUi(tab);
+                _statusBarController.SyncEncodingCombo(tab);
+                _statusBarController.SyncLineEndingText(tab);
+
+                if (tab.IsPendingReload)
                 {
-                    FocusDocumentViewer(activeTabItem, tab);
-                    _dispatcherQueue.TryEnqueue(
-                        DispatcherQueuePriority.Low,
-                        () => FocusDocumentViewer(activeTabItem, tab));
-
-                    _statusBarController.UpdateFileStats(tab);
-                    _statusBarController.UpdateTotalLines(tab);
-                    _statusBarController.UpdateSelectionStats(null);
-
-                    _updateLivePreview(tab);
-
-                    _updateLanguageUi(tab);
-                    _syncCsvTableModeUi(tab);
-                    _statusBarController.SyncEncodingCombo(tab);
-                    _statusBarController.SyncLineEndingText(tab);
-
-                    if (tab.IsPendingReload)
+                    tab.IsPendingReload = false;
+                    if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
                     {
-                        tab.IsPendingReload = false;
-                        if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup) && bridgeGroup.Bridge != null)
+                        _editorSessions.TryGetValue(tab.Id, out var session);
+                        if (session != null)
                         {
-                            _editorSessions.TryGetValue(tab.Id, out var session);
-                            if (session != null)
-                            {
-                                await bridgeGroup.Bridge.ResynchronizeModelAsync(session);
-                            }
+                            await bridgeGroup.Bridge.ResynchronizeModelAsync(session);
                         }
                     }
-
-                    if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup2) && bridgeGroup2.Bridge != null)
-                    {
-                        await bridgeGroup2.Bridge.RequestSelectionAsync();
-                    }
-
-                    _tocController.RefreshToc(tab);
                 }
+
+                if (_tabBridges.TryGetValue(tab.Id, out var bridgeGroup2) && bridgeGroup2.Bridge != null)
+                {
+                    await bridgeGroup2.Bridge.RequestSelectionAsync();
+                }
+
+                _tocController.RefreshToc(tab);
             }
             _updateWindowTitle();
         }

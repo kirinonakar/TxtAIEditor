@@ -3197,6 +3197,12 @@
    <data name="AgentExtractDocumentOutputExistsNoteFormat" xml:space="preserve">
      <value>注: 指定された出力ファイルが既に存在するため、上書きせず新しいファイルとして保存しました: {0}</value>
    </data>
+  <data name="AgentChatTabTitle" xml:space="preserve">
+    <value>エージェント チャット</value>
+  </data>
+  <data name="AgentChatTurnNavigation" xml:space="preserve">
+    <value>指示へ移動</value>
+  </data>
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>タブにストリーミング</value>
   </data>

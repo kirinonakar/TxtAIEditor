@@ -103,6 +103,7 @@ namespace TxtAIEditor.Controls
             session.OutputText = string.IsNullOrEmpty(snapshot.OutputText)
                 ? _displayText.OutputPlaceholder
                 : snapshot.OutputText;
+            session.ChatPrompts = snapshot.ChatPrompts;
             session.ActivityText = string.IsNullOrWhiteSpace(snapshot.ActivityText)
                 ? _displayText.ActivityIdle
                 : snapshot.ActivityText;

@@ -258,7 +258,8 @@ namespace TxtAIEditor.Controls
         public static string Format(
             string historyText,
             bool verbose,
-            Func<string, string, string>? getString = null)
+            Func<string, string, string>? getString = null,
+            List<AgentChatPrompt>? chatPrompts = null)
         {
             if (string.IsNullOrEmpty(historyText))
             {
@@ -267,11 +268,27 @@ namespace TxtAIEditor.Controls
 
             if (verbose)
             {
-                return NormalizeSubagentSpacing(historyText, getString);
+                string verboseOutput = NormalizeSubagentSpacing(historyText, getString);
+                if (chatPrompts != null)
+                {
+                    string[] verboseLines = verboseOutput.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+                    int[] lineStarts = AgentChatTranscript.GetLineStarts(verboseOutput, verboseLines.Length);
+                    NormalizeStructuredUserTurns(verboseLines, getString, (start, end, _, prompt) =>
+                        chatPrompts.Add(new AgentChatPrompt(lineStarts[start], lineStarts[end], prompt)));
+                }
+                return verboseOutput;
             }
 
             var lines = historyText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            lines = NormalizeStructuredUserTurns(lines, getString);
+            var fullPrompts = new Dictionary<string, Queue<string>>(StringComparer.Ordinal);
+            lines = NormalizeStructuredUserTurns(lines, getString, chatPrompts == null ? null : (_, _, header, prompt) =>
+            {
+                if (!fullPrompts.TryGetValue(header, out var values))
+                {
+                    fullPrompts[header] = values = new Queue<string>();
+                }
+                values.Enqueue(prompt);
+            });
             var result = new StringBuilder();
             bool inToolCall = false;
             bool toolCallSyntaxReached = false;
@@ -688,7 +705,12 @@ namespace TxtAIEditor.Controls
                 FlushPendingToolResult(IsPendingToolResultFailed());
             }
 
-            return NormalizeSubagentSpacing(result.ToString().TrimEnd(), getString, stripProgressMarkers: true);
+            string output = NormalizeSubagentSpacing(result.ToString().TrimEnd(), getString, stripProgressMarkers: true);
+            if (chatPrompts != null)
+            {
+                AgentChatTranscript.ReadFormattedPrompts(output, fullPrompts, chatPrompts);
+            }
+            return output;
         }
 
         private static string NormalizeSubagentSpacing(
@@ -788,7 +810,8 @@ namespace TxtAIEditor.Controls
 
         private static string[] NormalizeStructuredUserTurns(
             string[] lines,
-            Func<string, string, string>? getString)
+            Func<string, string, string>? getString,
+            Action<int, int, string, string>? recordPrompt = null)
         {
             var normalized = new List<string>(lines.Length);
             for (int i = 0; i < lines.Length; i++)
@@ -816,6 +839,18 @@ namespace TxtAIEditor.Controls
                 if (isUserRoleLine && i + 1 < lines.Length &&
                     lines[i + 1].StartsWith(AgentSessionLabels.OrchestratorPrompt, StringComparison.OrdinalIgnoreCase))
                 {
+                    if (recordPrompt != null)
+                    {
+                        int boundary = i + 2;
+                        while (boundary < lines.Length && !IsStructuredUserTurnBoundary(lines[boundary]))
+                        {
+                            boundary++;
+                        }
+                        string header = lines[i + 1];
+                        string instruction = (AgentChatTranscript.ReadPromptHeader(header) + "\n" +
+                            string.Join("\n", lines, i + 2, boundary - i - 2)).Trim();
+                        recordPrompt(i, boundary, header, instruction);
+                    }
                     continue;
                 }
 
@@ -847,10 +882,13 @@ namespace TxtAIEditor.Controls
                     }
 
                     normalized.Add(lines[i]);
+                    recordPrompt?.Invoke(i, end, lines[i], inlinePrompt);
                     continue;
                 }
 
-                normalized.Add(BuildUserPromptDisplayLine(lines, i + 1, end, getString, inlinePrompt));
+                string displayLine = BuildUserPromptDisplayLine(lines, i + 1, end, getString, inlinePrompt, out string fullPrompt);
+                normalized.Add(displayLine);
+                recordPrompt?.Invoke(i, end, displayLine, fullPrompt);
                 i = end - 1;
             }
 
@@ -862,7 +900,8 @@ namespace TxtAIEditor.Controls
             int start,
             int end,
             Func<string, string, string>? getString,
-            string inlinePrompt = "")
+            string inlinePrompt,
+            out string fullPrompt)
         {
             var presetNames = new List<string>();
             var skillNames = new List<string>();
@@ -955,6 +994,7 @@ namespace TxtAIEditor.Controls
 
             string labelPrefix = labels.Count == 0 ? string.Empty : $"[{string.Join(" · ", labels)}]";
             string promptText = string.Join(Environment.NewLine, promptLines).Trim();
+            fullPrompt = string.IsNullOrWhiteSpace(promptText) ? labelPrefix : promptText;
             string prompt = string.IsNullOrWhiteSpace(promptText)
                 ? string.Empty
                 : AgentRunTextFormatter.TruncateUserPrompt(promptText);

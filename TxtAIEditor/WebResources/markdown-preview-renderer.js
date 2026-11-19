@@ -5,15 +5,17 @@ let diagramRenderer = 'mermaid';
 let diagramTheme = 'Dark';
 let diagramRevision = 0;
 let diagramFontKey = '';
+let strictDiagrams = false;
 const diagramDependencies = new Map();
 
-function configureDiagramRenderer(usePele, theme = 'Dark', fontFamily = '', fontSize = 0) {
+function configureDiagramRenderer(usePele, theme = 'Dark', fontFamily = '', fontSize = 0, strict = false) {
     const renderer = usePele ? 'pele' : 'mermaid';
     const fontKey = JSON.stringify([fontFamily, fontSize]);
-    if (diagramRenderer === renderer && diagramTheme === theme && diagramFontKey === fontKey) return;
+    if (diagramRenderer === renderer && diagramTheme === theme && diagramFontKey === fontKey && strictDiagrams === strict) return;
     diagramRenderer = renderer;
     diagramTheme = theme;
     diagramFontKey = fontKey;
+    strictDiagrams = strict;
     diagramRevision++;
     initializeMermaid(theme);
 }
@@ -415,7 +417,7 @@ function inlineMarkdown(text, options = {}) {
     out = stashCodeSpans(out, stash);
     out = out.replace(/!\[([^\]]*)\]\(([^)]*)\)/g, (_, alt, target) => stash(renderMarkdownImage(alt, target, options)));
     out = stashInlineMath(out, stash, mathFragments);
-    out = stashHtmlTags(out, stash);
+    if (options.allowHtml !== false) out = stashHtmlTags(out, stash);
     // Block parsing has already treated an escaped list marker as plain text.
     out = out.replace(/^([ \t]*\d+)\\([.)])(?=[ \t])/, '$1$2');
     out = escapeHtml(out);
@@ -509,7 +511,7 @@ function collectFencedCodeBlock(startLine, maxLine, getLine, options = {}) {
             return { pending: true, endLine: line, extendRangeEnd: line };
         }
         if (isFencedCodeClose(text, fence)) {
-            return { code: parts.join('\n'), language: fence.language, endLine: line };
+            return { code: parts.join('\n'), language: fence.language, endLine: line, closed: true };
         }
         parts.push(text);
     }
@@ -517,15 +519,15 @@ function collectFencedCodeBlock(startLine, maxLine, getLine, options = {}) {
     return { code: parts.join('\n'), language: fence.language, endLine: maxLine };
 }
 
-function renderFencedCodeBlock(block) {
+function renderFencedCodeBlock(block, options = {}) {
     const lang = (block.language || '').toLowerCase();
-    if (lang === 'mermaid') {
+    if (lang === 'mermaid' && (block.closed || !options.deferOpenDiagrams)) {
         const cachedSvg = diagramRenderer === 'mermaid' ? mermaidCache.get(block.code) : null;
         const attributes = `data-diagram-version="${diagramRevision}" data-code="${escapeAttribute(block.code)}"`;
         if (cachedSvg) {
             return `<div class="mermaid-block rendered" ${attributes}>${cachedSvg}</div>`;
         }
-        return `<div class="mermaid-block" ${attributes}>Rendering...</div>`;
+        return `<div class="mermaid-block" ${attributes}>${escapeHtml(options.diagramLoadingText ?? 'Rendering...')}</div>`;
     }
     if (lang === 'latex' || lang === 'math') {
         return renderLatexLine(block.code);
@@ -1146,16 +1148,16 @@ function renderListContinuationParagraph(lines, startIndex, parentIndent, option
             if (isFencedCodeClose(paragraphs[codeIndex], firstFence)) {
                 const sourceIndexes = paragraphIndexes.slice(0, codeIndex + 1);
                 const sourceNumbers = sourceIndexes.map(index => Number(options.sourceStartLine || 1) + index);
-                const codeBlock = { code: code.join('\n'), language: firstFence.language, endLine: sourceNumbers.at(-1) };
+                const codeBlock = { code: code.join('\n'), language: firstFence.language, endLine: sourceNumbers.at(-1), closed: true };
                 return {
-                    html: options.editableCodeBlock?.(codeBlock, sourceNumbers[0], sourceIndexes.map(index => lines[index]), sourceNumbers) ?? renderFencedCodeBlock(codeBlock),
+                    html: options.editableCodeBlock?.(codeBlock, sourceNumbers[0], sourceIndexes.map(index => lines[index]), sourceNumbers) ?? renderFencedCodeBlock(codeBlock, options),
                     nextIndex: paragraphIndexes[codeIndex] + 1
                 };
             }
             code.push(paragraphs[codeIndex]);
         }
         return {
-            html: renderFencedCodeBlock({ code: code.join('\n'), language: firstFence.language }),
+            html: renderFencedCodeBlock({ code: code.join('\n'), language: firstFence.language }, options),
             nextIndex: startIndex + codeIndex
         };
     }
@@ -1289,7 +1291,7 @@ function renderMarkdownLine(line, options = {}) {
         return `<${listInfo.type}${startAttr}${markerClass}${indentStyle}><li${itemClass}>${itemHtml}</li></${listInfo.type}>`;
     }
     const singleLineHtml = /^<([A-Za-z][A-Za-z0-9:-]*)(?:\s[^<>]*?)?>[\s\S]*<\/\1\s*>$/.exec(trimmed);
-    if (singleLineHtml) return sanitizeHtml(trimmed, options);
+    if (singleLineHtml && options.allowHtml !== false) return sanitizeHtml(trimmed, options);
     return `<p>${inlineMarkdown(raw, options)}</p>`;
 }
 
@@ -1345,10 +1347,10 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
             return block;
         }
         if (block) {
-            return { html: options.editableCodeBlock?.(block, lineNumber) ?? renderFencedCodeBlock(block), endLine: block.endLine };
+            return { html: options.editableCodeBlock?.(block, lineNumber) ?? renderFencedCodeBlock(block, options), endLine: block.endLine };
         }
     }
-    if (htmlBlockTagName(line)) {
+    if (options.allowHtml !== false && htmlBlockTagName(line)) {
         const block = collectHtmlBlock(lineNumber, maxLine, getLine);
         if (block?.pending) {
             return block;
@@ -1542,7 +1544,7 @@ function initializeMermaid(theme = diagramTheme) {
     if (typeof mermaid !== 'undefined') {
         mermaid.initialize({
             startOnLoad: false,
-            securityLevel: 'loose',
+            securityLevel: strictDiagrams ? 'strict' : 'loose',
             theme: String(theme || '').toLowerCase() === 'light' ? 'default' : 'dark'
         });
     }

@@ -175,13 +175,16 @@ namespace TxtAIEditor.Composition
                         : null
             };
 
+            var agentChat = new AgentChatTabController(ui.PreviewGrid.AgentPane, ui.EditorWorkspace,
+                viewModel, documents, shell.TabNavigation, commonServices.SettingsService,
+                callbacks.GetLocalizedString, shell.Dialog.ShowErrorMessage);
             var agent = new AgentController(
                 agentServices.LlmService,
                 commonServices.SettingsService,
                 agentServices.CredentialService,
                 ui.PreviewGrid.AgentPane,
-                shell.TabNavigation.GetActiveTab,
-                () => viewModel.Tabs.ToList(),
+                agentChat.GetActiveDocument,
+                () => viewModel.Tabs.Where(tab => !tab.IsAgentChat).ToList(),
                 editor.TabTextContext.GetText,
                 editor.ActiveEditorInsertion.InsertTextAsync,
                 (title, content) => CreateGeneratedTab(
@@ -245,12 +248,14 @@ namespace TxtAIEditor.Composition
                     editor.TabDirtyState.MarkTabDirty(tab);
                     callbacks.UpdateWindowTitle();
                     return true;
-                },
-                beginStreamIntoActiveEditorAsync: editor.ActiveEditorInsertion.BeginStreamAsync,
-                streamTextIntoActiveEditorAsync: editor.ActiveEditorInsertion.InsertStreamTextAsync,
-                endStreamIntoActiveEditorAsync: editor.ActiveEditorInsertion.EndStreamAsync);
+                });
 
-            window.Closed += (_, _) => agent.CloseMcpSessions();
+            agentChat.Connect(agent, tabBridges);
+            window.Closed += (_, _) =>
+            {
+                agentChat.Dispose();
+                agent.CloseMcpSessions();
+            };
 
             return new MainWindowAgentControllers(llmAssistant, agent);
         }

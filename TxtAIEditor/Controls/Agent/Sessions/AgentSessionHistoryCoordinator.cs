@@ -314,9 +314,8 @@ namespace TxtAIEditor.Controls
             }
 
             _agentPane.HideHtmlCodeBlocks = _settingsService.CurrentSettings.LlmAgentVerbose == false;
-            string formatted = AgentHistoryFormatter.Format(text, _settingsService.CurrentSettings.LlmAgentVerbose, _getString);
-            session.OutputText = formatted;
-            _agentPane.ResetOutput(formatted);
+            _openSessionController.FormatSessionOutput(session);
+            _agentPane.ResetOutput(session.OutputText);
         }
     }
 }

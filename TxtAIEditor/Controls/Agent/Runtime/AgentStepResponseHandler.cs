@@ -154,21 +154,20 @@ namespace TxtAIEditor.Controls
                     if (!string.IsNullOrWhiteSpace(visiblePrefix))
                     {
                         visibleTextFlushed = true;
-                        await runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, visiblePrefix);
-                        await runOutputController.EndStreamedAnswerAsync(runContext);
+                        await runOutputController.AppendRunOutputTextAsync(runContext, visiblePrefix);
                     }
                 }
             }
             else if (!planningMode && !deferAnswer && !responseRequiresToolHandling && heldPotentialToolCallText && !visibleTextFlushed && !string.IsNullOrEmpty(cleanResponse))
             {
                 visibleTextFlushed = true;
-                await runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, cleanResponse);
+                await runOutputController.AppendRunOutputTextAsync(runContext, cleanResponse);
             }
             else if (!planningMode && !deferAnswer && printedLength < endLength)
             {
                 string remainingText = cleanResponse.Substring(printedLength, endLength - printedLength);
                 visibleTextFlushed = true;
-                await runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, remainingText);
+                await runOutputController.AppendRunOutputTextAsync(runContext, remainingText);
             }
 
             runContext.ToolCancellationToken.ThrowIfCancellationRequested();
@@ -293,16 +292,12 @@ namespace TxtAIEditor.Controls
 
                 if (!visibleTextFlushed && !string.IsNullOrWhiteSpace(response))
                 {
-                    await runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, response);
+                    await runOutputController.AppendRunOutputTextAsync(runContext, response);
                 }
 
                 retries.Reset(AgentRetryReason.ToolCallFormat);
                 runContext.LastAnswerText = AgentRunTextFormatter.BuildLastAnswerText(response, cleanResponse, runContext.LlmSettings.LlmAgentVerbose);
                 await runOutputController.AppendRunActivityAsync(runContext, getString("AgentActivityFinalAnswer", "최종 응답 작성 완료"));
-                if (runContext.StreamToTab)
-                {
-                    await runOutputController.EndStreamedAnswerAsync(runContext);
-                }
 
                 string finalAnswerLog = AgentThinkingTranscriptFormatter.BuildFinalAnswerLog(
                     responseForTranscript,

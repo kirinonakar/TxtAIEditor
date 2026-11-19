@@ -27,7 +27,7 @@ namespace TxtAIEditor.Controls
     {
         private sealed record SessionBody(string PromptText, string OutputText, string ActivityText,
             string SessionHistoryText, string ModelSessionHistoryText, string LastAnswerText,
-            List<AgentAttachmentState> Attachments);
+            List<AgentAttachmentState> Attachments, List<AgentChatPrompt> ChatPrompts);
 
         private AgentSessionSpill<SessionBody>? _storedBody;
 
@@ -39,6 +39,7 @@ namespace TxtAIEditor.Controls
         public bool UseSubagents { get; set; }
         public string PromptText { get; set; } = string.Empty;
         public string OutputText { get; set; } = string.Empty;
+        public List<AgentChatPrompt> ChatPrompts { get; set; } = new();
         public bool NeedsHistoryFormatting { get; set; }
         public string ActivityText { get; set; } = string.Empty;
         public string SessionHistoryText { get; set; } = string.Empty;
@@ -70,7 +71,7 @@ namespace TxtAIEditor.Controls
         public async Task ParkBodyAsync(Func<bool> canPark)
         {
             var body = new SessionBody(PromptText, OutputText, ActivityText,
-                SessionHistoryText, ModelSessionHistoryText, LastAnswerText, Attachments.ToList());
+                SessionHistoryText, ModelSessionHistoryText, LastAnswerText, Attachments.ToList(), ChatPrompts.ToList());
             var stored = await Task.Run(() => AgentSessionSpill<SessionBody>.Write(body));
             if (!canPark())
             {
@@ -81,6 +82,7 @@ namespace TxtAIEditor.Controls
             _storedBody = stored;
             PromptText = string.Empty;
             OutputText = string.Empty;
+            ChatPrompts = new();
             ActivityText = string.Empty;
             SessionHistoryText = string.Empty;
             ModelSessionHistoryText = string.Empty;
@@ -99,6 +101,7 @@ namespace TxtAIEditor.Controls
             var body = _storedBody.Read();
             PromptText = body.PromptText;
             OutputText = body.OutputText;
+            ChatPrompts = body.ChatPrompts;
             ActivityText = body.ActivityText;
             SessionHistoryText = body.SessionHistoryText;
             ModelSessionHistoryText = body.ModelSessionHistoryText;
@@ -152,9 +155,6 @@ namespace TxtAIEditor.Controls
         public List<AgentFileEditPreview> SessionEdits { get; set; } = new();
         public int InitialEditCount { get; init; }
         public AgentSessionRewindSnapshot? RewindSnapshot { get; set; }
-        public bool StreamToTabActive { get; set; }
-        public bool StreamToTab { get; set; }
-        public string? StreamToTabTargetTabId { get; set; }
         public string LastAnswerText { get; set; } = string.Empty;
         public string WorkspaceRoot { get; set; } = string.Empty;
         public string? PinnedWorkspaceRoot { get; set; }
@@ -253,6 +253,7 @@ namespace TxtAIEditor.Controls
         public string Title { get; set; } = string.Empty;
         public string PromptText { get; set; } = string.Empty;
         public string OutputText { get; set; } = string.Empty;
+        public List<AgentChatPrompt> ChatPrompts { get; set; } = new();
         public string ActivityText { get; set; } = string.Empty;
         public string SessionHistoryText { get; set; } = string.Empty;
         public string ModelSessionHistoryText { get; set; } = string.Empty;
@@ -271,6 +272,7 @@ namespace TxtAIEditor.Controls
                 Title = session.Title,
                 PromptText = session.PromptText,
                 OutputText = session.OutputText,
+                ChatPrompts = session.ChatPrompts.ToList(),
                 ActivityText = session.ActivityText,
                 SessionHistoryText = session.SessionHistoryText,
                 ModelSessionHistoryText = session.ModelSessionHistoryText,

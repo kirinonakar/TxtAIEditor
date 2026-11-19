@@ -142,7 +142,7 @@ namespace TxtAIEditor.Controls
                     stepReasoningBuilder.Append(reasoningChunk);
                     runContext.StreamingReasoningText = stepReasoningBuilder.ToString();
                     UpdateInFlightReasoningTokens(reasoningChunk);
-                    await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, reasoningChunk);
+                    await _runOutputController.AppendRunOutputTextAsync(runContext, reasoningChunk);
                     await RefreshContextStatsAsync();
                 };
             }
@@ -421,14 +421,9 @@ namespace TxtAIEditor.Controls
                                 if (!suppressStreamingText)
                                 {
                                     visibleTextFlushed = true;
-                                    await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, textToPrint);
+                                    await _runOutputController.AppendRunOutputTextAsync(runContext, textToPrint);
                                 }
                                 printedLength = toolCallIndex;
-                            }
-
-                            if (!suppressStreamingText)
-                            {
-                                await _runOutputController.EndStreamedAnswerAsync(runContext);
                             }
 
                             if (!runContext.LlmSettings.LlmAgentVerbose)
@@ -461,7 +456,7 @@ namespace TxtAIEditor.Controls
                                 if (!suppressStreamingText)
                                 {
                                     visibleTextFlushed = true;
-                                    await _runOutputController.AppendOutputTextAndStreamToTabAsync(runContext, textToPrint);
+                                    await _runOutputController.AppendRunOutputTextAsync(runContext, textToPrint);
                                 }
                                 printedLength = safeLength;
                             }

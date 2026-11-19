@@ -233,7 +233,6 @@ namespace TxtAIEditor.Controls
         }
         public CheckBox SubagentsCheckBox => AgentSubagentsCheckBox;
         public ToggleButton StreamToTabToggleButton => AgentStreamToTabToggleButton;
-        public bool StreamToTab => AgentStreamToTabToggleButton.IsChecked == true;
 
         public bool HideHtmlCodeBlocks
         {
@@ -437,15 +436,9 @@ private Style? _accentRunButtonStyle;
             _outputController.AppendOutputText(text);
         }
 
-        public void AppendOutputLine(string line)
-        {
-            _outputController.AppendOutputLine(line);
-        }
+        public int AppendOutputLine(string line) => _outputController.AppendOutputLine(line);
 
-        public void BeginOutputBlock(string title)
-        {
-            _outputController.BeginOutputBlock(title);
-        }
+        public int BeginOutputBlock(string title) => _outputController.BeginOutputBlock(title);
 
         public void BeginThinkingActivity(string label, Func<string>? liveLabel = null)
         {

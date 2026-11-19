@@ -3197,6 +3197,12 @@ Plan: {0}</value>
    <data name="AgentExtractDocumentOutputExistsNoteFormat" xml:space="preserve">
      <value>note: requested output existed, so the converted text was saved to a new file instead of overwriting: {0}</value>
   </data>
+  <data name="AgentChatTabTitle" xml:space="preserve">
+    <value>Agent Chat</value>
+  </data>
+  <data name="AgentChatTurnNavigation" xml:space="preserve">
+    <value>Jump to instruction</value>
+  </data>
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>Stream to Tab</value>
   </data>

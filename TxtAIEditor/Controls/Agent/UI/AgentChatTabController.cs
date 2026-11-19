@@ -1,0 +1,323 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Diagnostics;
+using System.Text.Json;
+using System.Threading.Tasks;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
+using TxtAIEditor.Core.Interfaces;
+using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
+using TxtAIEditor.Editor;
+using TxtAIEditor.ViewModels;
+
+namespace TxtAIEditor.Controls
+{
+    internal sealed class AgentChatTabController : IDisposable
+    {
+        private const string ChatHost = "agent-chat.txtaieditor.local";
+        private static readonly Uri ChatPage = new($"https://{ChatHost}/agent-chat.html");
+        private static readonly JsonSerializerOptions MessageOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+        private readonly AgentPane _pane;
+        private readonly EditorWorkspacePane _workspace;
+        private readonly MainWindowViewModel _viewModel;
+        private readonly ITabCloseCommands _documents;
+        private readonly TabNavigationController _navigation;
+        private readonly ISettingsService _settings;
+        private readonly Func<string, string, string> _getString;
+        private readonly Action<string, string> _showError;
+        private readonly DispatcherQueueTimer _refreshTimer;
+        private AgentController? _agent;
+        private IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)>? _tabBridges;
+        private OpenedTab? _lastDocument;
+        private OpenedTab? _tab;
+        private TabViewItem? _item;
+        private CoreWebView2? _readyWebView;
+        private AgentChatSnapshot? _lastSnapshot;
+        private int _lastPromptCount;
+        private string? _lastTheme;
+        private bool _lastUsePele;
+
+        public AgentChatTabController(AgentPane pane, EditorWorkspacePane workspace, MainWindowViewModel viewModel,
+            ITabCloseCommands documents, TabNavigationController navigation, ISettingsService settings,
+            Func<string, string, string> getString, Action<string, string> showError)
+        {
+            _pane = pane;
+            _workspace = workspace;
+            _viewModel = viewModel;
+            _documents = documents;
+            _navigation = navigation;
+            _settings = settings;
+            _getString = getString;
+            _showError = showError;
+            _refreshTimer = pane.DispatcherQueue.CreateTimer();
+            _refreshTimer.Interval = TimeSpan.FromMilliseconds(100);
+            _refreshTimer.Tick += (_, _) => Refresh();
+        }
+
+        public void Connect(AgentController agent,
+            IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges)
+        {
+            _agent = agent;
+            _tabBridges = tabBridges;
+            _pane.StreamToTabToggleButton.Checked += OnChecked;
+            _pane.StreamToTabToggleButton.Unchecked += OnUnchecked;
+            _viewModel.Tabs.CollectionChanged += OnTabsChanged;
+        }
+
+        public OpenedTab? GetActiveDocument()
+        {
+            var active = _navigation.GetActiveTab();
+            if (active?.IsAgentChat == true)
+            {
+                return _lastDocument is { } previous && _navigation.IsOpen(previous) ? previous : null;
+            }
+
+            if (active != null && !active.IsDiffView)
+            {
+                _lastDocument = active;
+            }
+            return active;
+        }
+
+        private async void OnChecked(object sender, RoutedEventArgs args)
+        {
+            if (_tab != null || _tabBridges == null)
+            {
+                return;
+            }
+
+            GetActiveDocument();
+            var tab = new OpenedTab { Title = _getString("AgentChatTabTitle", "Agent 채팅"), IsAgentChat = true };
+            var webView = new WebView2
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                DefaultBackgroundColor = WebViewAppearanceService.ResolveEditorBackgroundColor(_settings.CurrentSettings)
+            };
+            var tabView = _navigation.GetCurrentActiveTabView();
+            var item = new TabViewItem { Header = tab.Title, Content = webView, Tag = tab.Id };
+            _tab = tab;
+            _item = item;
+            _tabBridges[tab.Id] = (webView, null!);
+            _viewModel.Tabs.Add(tab);
+            _workspace.DisableTabItemTransitions();
+            tabView.TabItems.Add(item);
+            tabView.SelectedItem = item;
+
+            try
+            {
+                var environment = await WebViewEnvironmentProvider.GetSharedAsync();
+                if (_tab != tab)
+                {
+                    return;
+                }
+                await webView.EnsureCoreWebView2Async(environment);
+                if (_tab != tab)
+                {
+                    return;
+                }
+
+                var core = webView.CoreWebView2;
+                core.SetVirtualHostNameToFolderMapping(ChatHost, PreviewWebResourceService.WebResourcesPath,
+                    CoreWebView2HostResourceAccessKind.DenyCors);
+                core.Settings.AreBrowserAcceleratorKeysEnabled = false;
+                core.Settings.AreDevToolsEnabled = false;
+                core.NavigationStarting += (_, eventArgs) => eventArgs.Cancel = !IsChatPage(eventArgs.Uri);
+                core.NewWindowRequested += async (_, eventArgs) =>
+                {
+                    eventArgs.Handled = true;
+                    if (eventArgs.IsUserInitiated && Uri.TryCreate(eventArgs.Uri, UriKind.Absolute, out var target) &&
+                        target.Scheme is "https" or "http")
+                    {
+                        await Windows.System.Launcher.LaunchUriAsync(target);
+                    }
+                };
+                core.WebMessageReceived += (_, eventArgs) => ReceiveMessage(tab, core, eventArgs);
+                core.NavigationCompleted += (_, eventArgs) =>
+                {
+                    if (!eventArgs.IsSuccess)
+                    {
+                        HandleLoadFailure(tab, eventArgs.WebErrorStatus.ToString());
+                    }
+                };
+                webView.Source = ChatPage;
+            }
+            catch (Exception ex)
+            {
+                HandleLoadFailure(tab, ex.Message);
+            }
+        }
+
+        private static bool IsChatPage(string? source) =>
+            string.Equals(source, ChatPage.AbsoluteUri, StringComparison.Ordinal);
+
+        private void ReceiveMessage(OpenedTab tab, CoreWebView2 core, CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            if (_tab != tab || !IsChatPage(args.Source))
+            {
+                return;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(args.WebMessageAsJson);
+                var message = document.RootElement;
+                if (message.ValueKind != JsonValueKind.Object)
+                {
+                    return;
+                }
+
+                switch (ReadString(message, "action"))
+                {
+                    case "ready":
+                        _readyWebView = core;
+                        _lastSnapshot = null;
+                        Post(new
+                        {
+                            action = "labels",
+                            title = _getString("AgentChatTabTitle", "Agent 채팅"),
+                            turns = _getString("AgentChatTurnNavigation", "지시 바로가기"),
+                            prompt = _getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력..."),
+                            send = _getString("AgentSendButton", "전송")
+                        });
+                        Refresh();
+                        _refreshTimer.Start();
+                        break;
+                    case "submit":
+                        string? sessionId = ReadString(message, "sessionId");
+                        string? prompt = ReadString(message, "prompt");
+                        if (sessionId != null && prompt != null && _agent != null)
+                        {
+                            _agent.SubmitChatPrompt(sessionId, prompt, accepted =>
+                            {
+                                if (_tab == tab && _readyWebView == core)
+                                {
+                                    Post(new { action = "submitResult", sessionId, accepted });
+                                    Refresh();
+                                }
+                            });
+                        }
+                        break;
+                }
+            }
+            catch (JsonException ex)
+            {
+                Debug.WriteLine(ex);
+            }
+        }
+
+        private static string? ReadString(JsonElement message, string property) =>
+            message.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
+
+        private void Refresh()
+        {
+            if (_readyWebView == null || _agent == null)
+            {
+                return;
+            }
+
+            GetActiveDocument();
+            var snapshot = _agent.GetChatSnapshot();
+            var settings = _settings.CurrentSettings;
+            bool sameSession = _lastSnapshot?.SessionId == snapshot.SessionId;
+            bool shouldSendPrompts = !sameSession || !ReferenceEquals(_lastSnapshot?.Prompts, snapshot.Prompts) ||
+                _lastPromptCount != snapshot.Prompts.Count;
+            bool outputChanged = !sameSession || !ReferenceEquals(_lastSnapshot?.Output, snapshot.Output);
+            if (!shouldSendPrompts && !outputChanged && _lastSnapshot?.CanSubmit == snapshot.CanSubmit &&
+                _lastTheme == settings.Theme && _lastUsePele == settings.UsePele)
+            {
+                return;
+            }
+
+            int offset = sameSession ? FindCommonPrefix(_lastSnapshot!.Output, snapshot.Output) : 0;
+            Post(new
+            {
+                action = "update",
+                snapshot.SessionId,
+                offset,
+                text = snapshot.Output[offset..],
+                prompts = shouldSendPrompts ? snapshot.Prompts : null,
+                snapshot.CanSubmit,
+                theme = settings.Theme,
+                usePele = settings.UsePele
+            });
+            _lastSnapshot = snapshot;
+            _lastPromptCount = snapshot.Prompts.Count;
+            _lastTheme = settings.Theme;
+            _lastUsePele = settings.UsePele;
+        }
+
+        private static int FindCommonPrefix(string previous, string current)
+        {
+            if (ReferenceEquals(previous, current))
+            {
+                return previous.Length;
+            }
+            int offset = previous.AsSpan().CommonPrefixLength(current.AsSpan());
+            return offset > 0 && char.IsHighSurrogate(previous[offset - 1]) ? offset - 1 : offset;
+        }
+
+        private void Post<T>(T message) =>
+            _readyWebView?.PostWebMessageAsJson(JsonSerializer.Serialize(message, MessageOptions));
+
+        private void HandleLoadFailure(OpenedTab tab, string details)
+        {
+            if (_tab == tab)
+            {
+                _pane.StreamToTabToggleButton.IsChecked = false;
+                _showError(tab.Title, details);
+            }
+        }
+
+        private void OnUnchecked(object sender, RoutedEventArgs args)
+        {
+            if (_tab is { } tab && _item is { } item)
+            {
+                Reset();
+                _documents.CloseAndCleanup(tab, item);
+            }
+        }
+
+        private void OnTabsChanged(object? sender, NotifyCollectionChangedEventArgs args)
+        {
+            if (_tab is not { } tab || _viewModel.Tabs.Contains(tab))
+            {
+                return;
+            }
+
+            // Reordering temporarily removes a model before reinserting it.
+            _pane.DispatcherQueue.TryEnqueue(() =>
+            {
+                if (_tab == tab && !_viewModel.Tabs.Contains(tab))
+                {
+                    Reset();
+                    _pane.StreamToTabToggleButton.IsChecked = false;
+                }
+            });
+        }
+
+        private void Reset()
+        {
+            _refreshTimer.Stop();
+            _tab = null;
+            _item = null;
+            _readyWebView = null;
+            _lastSnapshot = null;
+        }
+
+        public void Dispose()
+        {
+            Reset();
+            _pane.StreamToTabToggleButton.Checked -= OnChecked;
+            _pane.StreamToTabToggleButton.Unchecked -= OnUnchecked;
+            _viewModel.Tabs.CollectionChanged -= OnTabsChanged;
+        }
+    }
+}

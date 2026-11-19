@@ -3197,6 +3197,12 @@
    <data name="AgentExtractDocumentOutputExistsNoteFormat" xml:space="preserve">
      <value>注意：请求的输出已存在，因此转换后的文本被保存到新文件而不是覆盖：{0}</value>
   </data>
+  <data name="AgentChatTabTitle" xml:space="preserve">
+    <value>智能体聊天</value>
+  </data>
+  <data name="AgentChatTurnNavigation" xml:space="preserve">
+    <value>跳转到指令</value>
+  </data>
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>串流至 Tab</value>
   </data>

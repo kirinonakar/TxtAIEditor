@@ -322,6 +322,7 @@ namespace TxtAIEditor.Controls
             session.UseSubagents = item.Role == AgentSessionRole.Orchestrator;
             session.PromptText = string.Empty;
             session.OutputText = string.Empty;
+            session.ChatPrompts = new();
             session.NeedsHistoryFormatting = true;
             session.ActivityText = _getString("AgentHistoryLoadedActivity", "세션 히스토리 로드됨");
             session.SessionHistoryText = item.SessionHistoryText;
@@ -355,8 +356,7 @@ namespace TxtAIEditor.Controls
                 RestoreSessionBody(session);
                 if (session.NeedsHistoryFormatting)
                 {
-                    session.OutputText = AgentHistoryFormatter.Format(session.SessionHistoryText,
-                        _settingsService.CurrentSettings.LlmAgentVerbose, _getString);
+                    FormatSessionOutput(session);
                     session.NeedsHistoryFormatting = false;
                 }
             }
@@ -836,23 +836,44 @@ namespace TxtAIEditor.Controls
                 currentSession.RewindSnapshots.Count > 0);
         }
 
-        public async Task BeginRunOutputBlockAsync(AgentRunContext context, string title)
+        internal bool CanSubmitChatPrompt =>
+            FindOpenSession(_currentSessionIdProvider()) is { IsRewinding: false } session &&
+            session.Role != AgentSessionRole.Subagent && !IsPendingClose(session.Id);
+
+        internal AgentChatSnapshot GetChatSnapshot()
+        {
+            var session = EnsureSession(_currentSessionIdProvider());
+            string output = _agentPane.GetRawOutputText();
+            return new AgentChatSnapshot(session.Id, session.ChatPrompts.Count == 0 ? NormalizePlaceholderOutput(output) : output,
+                session.ChatPrompts, CanSubmitChatPrompt);
+        }
+
+        internal void FormatSessionOutput(AgentOpenSessionState session)
+        {
+            session.ChatPrompts = new();
+            session.OutputText = AgentHistoryFormatter.Format(session.SessionHistoryText,
+                _settingsService.CurrentSettings.LlmAgentVerbose, _getString, session.ChatPrompts);
+        }
+
+        public async Task BeginRunOutputBlockAsync(AgentRunContext context, string title, string prompt)
         {
             await FlushQueuedRunOutputTextAsync(context);
             await RunOnUIThreadAsync(() =>
             {
                 var session = EnsureSession(context.SessionId);
+                int start;
                 if (IsSessionVisible(context.SessionId))
                 {
-                    _agentPane.BeginOutputBlock(title);
+                    start = _agentPane.BeginOutputBlock(title);
                     session.OutputText = _agentPane.GetRawOutputText();
                     SyncVisibleThinkingStateToSession(session);
                 }
                 else
                 {
                     CompleteThinkingInSession(session);
-                    AppendOutputLineToSession(session, title);
+                    start = AppendOutputLineToSession(session, title);
                 }
+                RecordChatPrompt(session, start, title, prompt);
             });
         }
 
@@ -909,22 +930,27 @@ namespace TxtAIEditor.Controls
             return Task.CompletedTask;
         }
 
-        public async Task AppendRunOutputLineAsync(AgentRunContext context, string line)
+        public async Task AppendRunOutputLineAsync(AgentRunContext context, string line, string? prompt = null)
         {
             await FlushQueuedRunOutputTextAsync(context);
             await RunOnUIThreadAsync(() =>
             {
                 var session = EnsureSession(context.SessionId);
+                int start;
                 if (IsSessionVisible(context.SessionId))
                 {
-                    _agentPane.AppendOutputLine(line);
+                    start = _agentPane.AppendOutputLine(line);
                     session.OutputText = _agentPane.GetRawOutputText();
                     SyncVisibleThinkingStateToSession(session);
                 }
                 else
                 {
                     CompleteThinkingInSession(session);
-                    AppendOutputLineToSession(session, line);
+                    start = AppendOutputLineToSession(session, line);
+                }
+                if (prompt != null)
+                {
+                    RecordChatPrompt(session, start, line, prompt);
                 }
             });
         }
@@ -995,20 +1021,6 @@ namespace TxtAIEditor.Controls
                     CompleteThinkingInSession(session);
                 }
             });
-        }
-
-        public async Task AppendRunOutputTextAndExecuteAsync(
-            AgentRunContext context,
-            string text,
-            Func<Task> afterAppendAsync)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-
-            QueueRunOutputText(context, text);
-            await afterAppendAsync();
         }
 
         public void AppendActivityToCurrentSession(string message)
@@ -1333,7 +1345,13 @@ namespace TxtAIEditor.Controls
                 session.SessionEdits.Count == 0;
         }
 
-        private void AppendOutputLineToSession(AgentOpenSessionState session, string line)
+        private static void RecordChatPrompt(AgentOpenSessionState session, int start, string header, string prompt)
+        {
+            session.ChatPrompts.Add(new AgentChatPrompt(start, session.OutputText.Length,
+                string.IsNullOrWhiteSpace(prompt) ? AgentChatTranscript.ReadPromptHeader(header) : prompt));
+        }
+
+        private int AppendOutputLineToSession(AgentOpenSessionState session, string line)
         {
             string text = NormalizePlaceholderOutput(session.OutputText);
             if (!string.IsNullOrEmpty(text) && !text.EndsWith(Environment.NewLine, StringComparison.Ordinal))
@@ -1343,6 +1361,7 @@ namespace TxtAIEditor.Controls
 
             session.OutputText = text + line + Environment.NewLine;
             session.UpdatedAt = DateTime.Now;
+            return text.Length;
         }
 
         public void AppendOutputTextToSession(AgentOpenSessionState session, string text)

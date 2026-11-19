@@ -171,7 +171,7 @@ namespace TxtAIEditor.Controls
             QueueOutputText(text);
         }
 
-        public void AppendOutputLine(string line)
+        public int AppendOutputLine(string line)
         {
             FlushAllPendingOutputText();
             CompleteThinkingLine();
@@ -182,11 +182,13 @@ namespace TxtAIEditor.Controls
                 AppendText(OutputLineBreak);
             }
 
+            int start = _rawOutputText.Length;
             AppendText(line + OutputLineBreak);
             ScrollOutputToEnd();
+            return start;
         }
 
-        public void BeginOutputBlock(string title)
+        public int BeginOutputBlock(string title)
         {
             FlushAllPendingOutputText();
             CompleteThinkingLine();
@@ -199,8 +201,10 @@ namespace TxtAIEditor.Controls
                     : OutputLineBreak + OutputLineBreak);
             }
 
+            int start = _rawOutputText.Length;
             AppendText(title + OutputLineBreak);
             ScrollOutputToEnd(true);
+            return start;
         }
 
         public void BeginThinkingActivity(string label, Func<string>? liveLabel)

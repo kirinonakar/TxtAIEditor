@@ -88,9 +88,6 @@ namespace TxtAIEditor.Controls
             Func<string, Task>? navigateToFolderAsync,
             Func<OpenedTab, string?, Task<bool>>? saveTabAsync,
             Func<OpenedTab, string, Task<bool>>? editTabAsync,
-            Func<string?, Task<bool>>? beginStreamIntoActiveEditorAsync,
-            Func<string?, string, Task<bool>>? streamTextIntoActiveEditorAsync,
-            Func<string?, Task>? endStreamIntoActiveEditorAsync,
             AgentControllerCompositionCallbacks callbacks)
         {
             var uiDispatcher = new AgentUiDispatcher(agentPane.DispatcherQueue);
@@ -214,12 +211,7 @@ namespace TxtAIEditor.Controls
                 currentSessionIdProvider,
                 () => fileTools.WorkspaceRoot,
                 getString);
-            var runOutputController = new AgentRunOutputController(
-                openSessionController,
-                insertIntoActiveEditorAsync,
-                beginStreamIntoActiveEditorAsync,
-                streamTextIntoActiveEditorAsync,
-                endStreamIntoActiveEditorAsync);
+            var runOutputController = new AgentRunOutputController(openSessionController);
             var responseStreamService = new AgentResponseStreamService(
                 llmService,
                 agentPane,
@@ -335,7 +327,7 @@ namespace TxtAIEditor.Controls
                 async action => await uiDispatcher.RunAsync(action),
                 async action => await uiDispatcher.RunAsync(action),
                 runOutputController.AppendRunActivityAsync,
-                runOutputController.AppendRunOutputLineAsync,
+                (context, line) => runOutputController.AppendRunOutputLineAsync(context, line),
                 showError,
                 getString);
             var toolExecutionController = new AgentToolExecutionController(

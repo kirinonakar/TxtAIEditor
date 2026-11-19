@@ -62,10 +62,7 @@ namespace TxtAIEditor.Controls
             Action<string>? closeTabById = null,
             Func<string, Task>? navigateToFolderAsync = null,
             Func<OpenedTab, string?, Task<bool>>? saveTabAsync = null,
-            Func<OpenedTab, string, Task<bool>>? editTabAsync = null,
-            Func<string?, Task<bool>>? beginStreamIntoActiveEditorAsync = null,
-            Func<string?, string, Task<bool>>? streamTextIntoActiveEditorAsync = null,
-            Func<string?, Task>? endStreamIntoActiveEditorAsync = null)
+            Func<OpenedTab, string, Task<bool>>? editTabAsync = null)
         {
             _agentPane = agentPane;
             _settingsService = settingsService;
@@ -103,9 +100,6 @@ namespace TxtAIEditor.Controls
                 navigateToFolderAsync,
                 saveTabAsync,
                 editTabAsync,
-                beginStreamIntoActiveEditorAsync,
-                streamTextIntoActiveEditorAsync,
-                endStreamIntoActiveEditorAsync,
                 new AgentControllerCompositionCallbacks(
                     IsCurrentSessionRunning,
                     UpdateContextStats,
@@ -210,6 +204,20 @@ namespace TxtAIEditor.Controls
         }
 
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEditController.SessionEdits;
+
+        internal AgentChatSnapshot GetChatSnapshot() => _openSessionController.GetChatSnapshot();
+
+        internal void SubmitChatPrompt(string sessionId, string prompt, Action<bool> completed)
+        {
+            if (_currentSessionId != sessionId || string.IsNullOrWhiteSpace(prompt) ||
+                !_openSessionController.CanSubmitChatPrompt || _runCoordinator == null)
+            {
+                completed(false);
+                return;
+            }
+
+            _ = _runCoordinator.SubmitChatPromptAsync(sessionId, prompt.Trim(), completed);
+        }
 
         private void RestoreSessionHistoryState(
             string sessionHistoryText,
