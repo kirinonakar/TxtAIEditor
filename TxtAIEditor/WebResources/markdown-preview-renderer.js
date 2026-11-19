@@ -376,7 +376,10 @@ function replaceInlineMath(value, render) {
         .replace(/\\\[([\s\S]+?)\\\]/g, (_, expr) => render(expr, true))
         .replace(/\\\(([\s\S]+?)\\\)/g, (_, expr) => render(expr, false))
         .replace(/\$\$([\s\S]+?)\$\$/g, (_, expr) => render(expr, true))
-        .replace(/(^|[^\w\\])\$([^$\n]+?)\$/g, (_, prefix, expr) => `${prefix}${render(expr, false)}`);
+        // Single-dollar delimiters touch the expression. A dollar followed by
+        // a digit can open math but cannot close it, as in "$83, $1.5T".
+        .replace(/(^|[^\w\\$])\$(?![\s$])((?:\\[^\r\n]|[^\\$\r\n])+?)(?<!\s)\$(?![\d$])/g,
+            (_, prefix, expr) => `${prefix}${render(expr, false)}`);
 }
 
 function stashInlineMath(value, stash, mathFragments, normalizeExpression) {
