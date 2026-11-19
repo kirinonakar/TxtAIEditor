@@ -64,7 +64,6 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 *   **Supported Chart Types:** Bar, line, pie, doughnut, polar area, radar, bubble and scatter charts, with per-series colors and titles, stacking, horizontal bars, legends and axis options.
 *   **Function Graphs:** Plot mathematical expressions with `type: function` / `type: linear-function`, or by adding an `expression` to a line dataset. Curves are sampled over the `xMin`/`xMax`/`yMin`/`yMax` range, and multiple curves can share a single graph.
 *   **Rendered Inline Everywhere:** The chart block collapses into the rendered graph directly inside the editor canvas (and returns to raw source when edited), and the same graph also renders in the live preview panel, in the Agent chat tab, and in printed/PDF output. Charts repaint automatically when the theme changes.
-*   **Safe Parsing:** Chart sources are size- and depth-limited and validated before rendering, and invalid blocks display a localized error label instead of breaking the view.
 
 ### 🖼️ Integrated Media & Document Viewer
 *   **Unified Viewer Workflow:** Open and inspect images, office documents, audio, and video files directly from the Explorer or editor tabs alongside your project files.
