@@ -3216,7 +3216,7 @@ Plan: {0}</value>
     <value>Copy failed</value>
   </data>
   <data name="AgentChatTurnNavigation" xml:space="preserve">
-    <value>Jump to instruction</value>
+    <value>Jump to</value>
   </data>
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>Stream to Tab</value>

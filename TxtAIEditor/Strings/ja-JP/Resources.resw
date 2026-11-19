@@ -3216,7 +3216,7 @@
     <value>コピーに失敗</value>
   </data>
   <data name="AgentChatTurnNavigation" xml:space="preserve">
-    <value>指示へ移動</value>
+    <value>ジャンプ</value>
   </data>
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>タブにストリーミング</value>

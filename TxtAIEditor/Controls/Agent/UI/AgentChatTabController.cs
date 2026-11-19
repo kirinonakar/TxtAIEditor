@@ -186,7 +186,7 @@ namespace TxtAIEditor.Controls
                         {
                             action = "labels",
                             title = _getString("AgentChatTabTitle", "Agent 채팅"),
-                            turns = _getString("AgentChatTurnNavigation", "지시 바로가기"),
+                            turns = _getString("AgentChatTurnNavigation", "바로가기"),
                             prompt = _getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력..."),
                             send = _getString("AgentSendButton", "전송"),
                             copy = _getString("EditorContextMenuCopy", "복사"),

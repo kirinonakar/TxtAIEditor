@@ -3216,7 +3216,7 @@
     <value>复制失败</value>
   </data>
   <data name="AgentChatTurnNavigation" xml:space="preserve">
-    <value>跳转到指令</value>
+    <value>跳转</value>
   </data>
   <data name="AgentStreamToTab" xml:space="preserve">
     <value>串流至 Tab</value>
