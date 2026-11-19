@@ -24,7 +24,7 @@ namespace TxtAIEditor.Controls
         private const int SessionRowHeight = 36;
         private const int SubagentIndent = 20;
 
-        private enum SessionTreeBranch { None, Parent, Child, LastChild }
+        internal enum SessionTreeBranch { None, Parent, Child, LastChild }
 
         private readonly FrameworkElement _resourceOwner;
         private readonly StackPanel _historyListPanel;
@@ -109,6 +109,8 @@ namespace TxtAIEditor.Controls
             _openSessionItems = items;
             RebuildOpenSessionMenu();
         }
+
+        internal IReadOnlyList<AgentOpenSessionItemViewModel> OpenSessionItems => _openSessionItems;
 
         public void RebuildOpenSessionMenu()
         {
@@ -258,7 +260,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static IEnumerable<(T Item, SessionTreeBranch Branch)> GetSessionTreeRows<T>(
+        internal static IEnumerable<(T Item, SessionTreeBranch Branch)> GetSessionTreeRows<T>(
             IReadOnlyList<T> items, Func<T, string> getId, Func<T, string?> getParentId)
         {
             var parentIds = items

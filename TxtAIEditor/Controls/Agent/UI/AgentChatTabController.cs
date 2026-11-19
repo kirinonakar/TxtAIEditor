@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -42,6 +43,7 @@ namespace TxtAIEditor.Controls
         private TabViewItem? _item;
         private CoreWebView2? _readyWebView;
         private AgentChatSnapshot? _lastSnapshot;
+        private IReadOnlyList<AgentOpenSessionItemViewModel>? _lastSessionItems;
         private string? _imageWorkspaceKey;
         private int _lastPromptCount;
         private int _lastHiddenCount;
@@ -259,12 +261,17 @@ namespace TxtAIEditor.Controls
                     case "ready":
                         _readyWebView = core;
                         _lastSnapshot = null;
+                        _lastSessionItems = null;
                         _lastFont = null;
                         Post(new
                         {
                             action = "labels",
                             title = _getString("AgentChatTabTitle", "Agent 채팅"),
                             turns = _getString("AgentChatTurnNavigation", "바로가기"),
+                            sessions = _getString("AgentOpenSessionsTitle", "열린 세션"),
+                            emptySessions = _getString("AgentOpenSessionsEmptyText", "열린 세션 없음"),
+                            untitledSession = _getString("AgentOpenSessionUntitled", "새 세션"),
+                            runningSession = _getString("AgentOpenSessionRunningSuffix", "실행 중"),
                             prompt = _getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력..."),
                             send = _getString("AgentSendButton", "전송"),
                             copy = _getString("EditorContextMenuCopy", "복사"),
@@ -310,6 +317,19 @@ namespace TxtAIEditor.Controls
                             ReadString(message, "path") is { Length: > 0 } path)
                         {
                             _ = SendChatImageAsync(core, workspaceKey, requestId, path);
+                        }
+                        break;
+                    case "selectSession":
+                        if (ReadString(message, "sessionId") is { Length: > 0 } sessionToSelect)
+                        {
+                            _pane.DispatcherQueue.TryEnqueue(() =>
+                            {
+                                if (_tab == tab && _readyWebView == core && _navigation.GetActiveTab() == tab)
+                                {
+                                    _pane.SelectOpenSession(sessionToSelect);
+                                    Refresh();
+                                }
+                            });
                         }
                         break;
                     case "submit":
@@ -365,6 +385,7 @@ namespace TxtAIEditor.Controls
             }
 
             GetActiveDocument();
+            RefreshOpenSessions();
             var snapshot = _agent.GetChatSnapshot();
             var settings = _settings.CurrentSettings;
             var font = (Family: settings.AgentChatFontFamily, Size: settings.AgentChatFontSize);
@@ -417,6 +438,25 @@ namespace TxtAIEditor.Controls
             _lastHiddenEnd = hiddenEnd;
             _lastTheme = settings.Theme;
             _lastUsePele = settings.UsePele;
+        }
+
+        private void RefreshOpenSessions()
+        {
+            var items = _pane.OpenSessionItems;
+            if (ReferenceEquals(_lastSessionItems, items)) return;
+
+            var rows = AgentPaneSessionMenuCoordinator.GetSessionTreeRows(items, item => item.Id, item => item.OrchestratorSessionId)
+                .Select(row => new
+                {
+                    row.Item.Id,
+                    row.Item.Title,
+                    row.Item.CanSelect,
+                    row.Item.IsRunning,
+                    isChild = row.Branch is AgentPaneSessionMenuCoordinator.SessionTreeBranch.Child or
+                        AgentPaneSessionMenuCoordinator.SessionTreeBranch.LastChild
+                });
+            Post(new { action = "sessions", items = rows });
+            _lastSessionItems = items;
         }
 
         private static int FindCommonPrefix(string previous, string current)
@@ -475,6 +515,7 @@ namespace TxtAIEditor.Controls
             _item = null;
             _readyWebView = null;
             _lastSnapshot = null;
+            _lastSessionItems = null;
             _imageWorkspaceKey = null;
         }
 

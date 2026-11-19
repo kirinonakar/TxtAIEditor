@@ -8,6 +8,9 @@ const history = document.getElementById('history');
 const messages = document.getElementById('messages');
 const turns = document.getElementById('turns');
 const turnTitle = document.getElementById('turn-title');
+const sessions = document.getElementById('sessions');
+const sessionsTitle = document.getElementById('sessions-title');
+const sessionsEmpty = document.getElementById('sessions-empty');
 const copyAllButton = document.getElementById('copy-all');
 const copyAllText = document.getElementById('copy-all-text');
 const copyAllIcon = document.getElementById('copy-all-icon');
@@ -27,15 +30,19 @@ const markdownOptions = {
 const drafts = new Map();
 const pending = new Map();
 const imageLoads = new Map();
+const sessionButtons = new Map();
 let promptRanges = [];
 let pendingPrompts = [];
 let hiddenOutput = [];
 let messageViews = [];
 let jumpLinks = [];
 let selectedJump = null;
+let selectedSession = null;
 let jumpSyncFrame = 0;
 let output = '';
 let sessionId = null;
+let untitledSessionLabel = '';
+let runningSessionLabel = '';
 let imageWorkspaceKey = null;
 let nextImageRequestId = 0;
 let composerSessionId = null;
@@ -245,8 +252,14 @@ function renderAssistant(view, text) {
         node.activity = block.activity;
         node.imageWorkspace = workspace;
         node.className = block.activity === undefined ? 'block' : 'activity';
-        if (block.activity === undefined) node.innerHTML = block.html;
-        else node.textContent = block.activity;
+        if (block.activity === undefined) {
+            node.innerHTML = block.html;
+            for (const cell of node.querySelectorAll('th, td')) {
+                if (cell.textContent.trim().length <= 3) cell.classList.add('short-cell');
+            }
+        } else {
+            node.textContent = block.activity;
+        }
     }
     while (content.children.length > blocks.length) content.lastElementChild.remove();
     void renderPreviewEmbeds(content, scrollToEnd, { errorLabel: chartErrorLabel });
@@ -362,12 +375,16 @@ function queueCurrentJumpSync() {
         if (!current) return;
 
         current.setAttribute('aria-current', 'location');
-        const top = turns.getBoundingClientRect().top + turns.clientTop;
-        const bottom = top + turns.clientHeight;
-        const button = current.getBoundingClientRect();
-        if (button.top < top) turns.scrollTop += button.top - top;
-        else if (button.bottom > bottom) turns.scrollTop += button.bottom - bottom;
+        revealSidebarButton(turns, current);
     });
+}
+
+function revealSidebarButton(list, button) {
+    const top = list.getBoundingClientRect().top + list.clientTop;
+    const bottom = top + list.clientHeight;
+    const bounds = button.getBoundingClientRect();
+    if (bounds.top < top) list.scrollTop += bounds.top - top;
+    else if (bounds.bottom > bottom) list.scrollTop += bounds.bottom - bottom;
 }
 
 function showJumpLinks(targets) {
@@ -399,6 +416,55 @@ function showJumpLinks(targets) {
         jumpLinks[index] = { target, excerpt, button };
     }
     while (jumpLinks.length > visibleTargets.length) jumpLinks.pop().button.remove();
+}
+
+function syncSessionSelection() {
+    const current = sessionButtons.get(sessionId);
+    if (selectedSession === current) return;
+    selectedSession?.removeAttribute('aria-current');
+    selectedSession = current;
+    if (current) {
+        current.setAttribute('aria-current', 'true');
+        revealSidebarButton(sessions, current);
+    }
+}
+
+function showSessions(items) {
+    const visibleIds = new Set(items.map(item => item.id));
+    for (const [id, button] of sessionButtons) {
+        if (visibleIds.has(id)) continue;
+        button.remove();
+        sessionButtons.delete(id);
+    }
+
+    let cursor = sessions.firstElementChild;
+    for (const { id, title, canSelect, isRunning, isChild } of items) {
+        let button = sessionButtons.get(id);
+        if (!button) {
+            button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'session-link';
+            const name = document.createElement('span');
+            name.className = 'session-name';
+            button.append(name);
+            button.addEventListener('click', () => {
+                if (sessionId !== id) host.postMessage({ action: 'selectSession', sessionId: id });
+            });
+            sessionButtons.set(id, button);
+        }
+        const name = title || untitledSessionLabel;
+        const label = isRunning ? `${name} (${runningSessionLabel})` : name;
+        if (button.firstElementChild.textContent !== name) button.firstElementChild.textContent = name;
+        button.title = label;
+        button.setAttribute('aria-label', label);
+        button.disabled = !canSelect;
+        button.classList.toggle('session-child', isChild);
+        button.classList.toggle('session-running', isRunning);
+        if (button !== cursor) sessions.insertBefore(button, cursor);
+        cursor = button.nextElementSibling;
+    }
+    sessionsEmpty.hidden = items.length > 0;
+    syncSessionSelection();
 }
 
 function setCopyAllLabel(label, icon = '⧉') {
@@ -444,6 +510,7 @@ function update(message) {
     }
     if (switched) {
         sessionId = message.sessionId;
+        syncSessionSelection();
         messages.replaceChildren();
         turns.replaceChildren();
         messageViews = [];
@@ -532,6 +599,10 @@ host.addEventListener('message', ({ data }) => {
             document.title = data.title;
             history.setAttribute('aria-label', data.title);
             turnTitle.textContent = data.turns;
+            sessionsTitle.textContent = data.sessions;
+            sessionsEmpty.textContent = data.emptySessions;
+            untitledSessionLabel = data.untitledSession;
+            runningSessionLabel = data.runningSession;
             promptBox.placeholder = data.prompt;
             promptBox.setAttribute('aria-label', data.prompt);
             sendButton.title = data.send;
@@ -550,6 +621,9 @@ host.addEventListener('message', ({ data }) => {
             break;
         case 'update':
             update(data);
+            break;
+        case 'sessions':
+            showSessions(data.items);
             break;
         case 'imageUnavailable': {
             const load = getImageLoad(data);

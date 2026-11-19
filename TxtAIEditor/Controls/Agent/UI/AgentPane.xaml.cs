@@ -148,7 +148,7 @@ namespace TxtAIEditor.Controls
                 {
                     HistorySelected = id => HistorySelected?.Invoke(this, id),
                     HistoryDeleted = id => HistoryDeleted?.Invoke(this, id),
-                    OpenSessionSelected = id => OpenSessionSelected?.Invoke(this, id),
+                    OpenSessionSelected = SelectOpenSession,
                     OpenSessionClosed = id => OpenSessionClosed?.Invoke(this, id)
                 });
             _reviewController = new AgentPaneReviewController(
@@ -1007,6 +1007,10 @@ private Style? _accentRunButtonStyle;
         {
             _sessionMenuCoordinator.UpdateOpenSessionItems(items);
         }
+
+        internal IReadOnlyList<AgentOpenSessionItemViewModel> OpenSessionItems => _sessionMenuCoordinator.OpenSessionItems;
+
+        internal void SelectOpenSession(string sessionId) => OpenSessionSelected?.Invoke(this, sessionId);
 
     }
 }
