@@ -169,8 +169,9 @@ export function createFunctionPlot(input, linear) {
         throw new Error('Expected 1 to 16 function series');
     }
     const curves = series.map(entry => {
-        const expression = typeof entry?.expression === 'string'
-            ? entry.expression.trim().replace(/^y\s*=\s*/, '') : '';
+        const source = entry?.expression;
+        const expression = typeof source === 'string' ? source.trim().replace(/^y\s*=\s*/, '')
+            : Number.isFinite(source) ? String(source) : '';
         if (!expression || expression.length > 512) throw new Error('Expected an expression of at most 512 characters');
         const equation = `y = ${expression}`;
         return {

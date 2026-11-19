@@ -44,6 +44,30 @@ function applyFunctionData(target, graph) {
     target.options.scales.y.max = yRange.max;
 }
 
+const functionOriginAxes = {
+    id: 'txtai-function-origin',
+    beforeDatasetsDraw(chart) {
+        const { ctx, chartArea: { left, right, top, bottom }, scales: { x, y } } = chart;
+        ctx.save();
+        ctx.strokeStyle = chart.options.color;
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        if (x.min < 0 && x.max > 0) {
+            const zeroX = x.getPixelForValue(0);
+            ctx.moveTo(zeroX, top);
+            ctx.lineTo(zeroX, bottom);
+        }
+        if (y.min < 0 && y.max > 0) {
+            const zeroY = y.getPixelForValue(0);
+            ctx.moveTo(left, zeroY);
+            ctx.lineTo(right, zeroY);
+        }
+        ctx.stroke();
+        ctx.restore();
+    }
+};
+
 function createFunctionChart(input, linear, options = {}, data = {}) {
     if (!isRecord(options) || !isRecord(data)) {
         throw new Error('Expected Chart.js options and data objects for a function chart');
@@ -176,8 +200,10 @@ export async function parseMarkdownChart(language, source) {
     const expressionLine = !basic && type === 'line' && Array.isArray(input.data?.datasets) &&
         input.data.datasets.some(dataset => isRecord(dataset) && Object.hasOwn(dataset, 'expression'));
     if (type === 'function' || type === 'linear-function' || expressionLine) {
-        return createFunctionChart(input, type === 'linear-function',
+        const config = createFunctionChart(input, type === 'linear-function',
             basic ? undefined : input.options, basic ? undefined : input.data);
+        if (basic) config.plugins = [functionOriginAxes];
+        return config;
     }
     if (basic) return fromBasicChart(input);
     if (typeof input.type !== 'string' || !isRecord(input.data) || !Array.isArray(input.data.datasets) ||
