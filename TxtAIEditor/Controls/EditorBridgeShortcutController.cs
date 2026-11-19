@@ -18,6 +18,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<Task> _toggleLeftPanelAsync;
         private readonly Func<Task> _toggleRightPanelAsync;
         private readonly Action _togglePreviewWidth;
+        private readonly Action _toggleChatTab;
         private readonly Action _openNewTab;
         private readonly Action _saveFile;
         private readonly Action _saveFileAs;
@@ -45,6 +46,7 @@ namespace TxtAIEditor.Controls
             Func<Task> toggleLeftPanelAsync,
             Func<Task> toggleRightPanelAsync,
             Action togglePreviewWidth,
+            Action toggleChatTab,
             Action openNewTab,
             Action saveFile,
             Action saveFileAs,
@@ -70,6 +72,7 @@ namespace TxtAIEditor.Controls
             _toggleLeftPanelAsync = toggleLeftPanelAsync;
             _toggleRightPanelAsync = toggleRightPanelAsync;
             _togglePreviewWidth = togglePreviewWidth;
+            _toggleChatTab = toggleChatTab;
             _openNewTab = openNewTab;
             _saveFile = saveFile;
             _saveFileAs = saveFileAs;
@@ -124,6 +127,9 @@ namespace TxtAIEditor.Controls
                     break;
                 case "expandRightPanel":
                     _togglePreviewWidth();
+                    break;
+                case "toggleChatTab":
+                    _toggleChatTab();
                     break;
                 case "newTab":
                     _openNewTab();

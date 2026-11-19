@@ -1494,6 +1494,7 @@
             const shortcut = shortcutNameFromKeyboardEvent(event);
             if (!shortcut) return;
             event.preventDefault();
+            if (event.repeat && shortcut === 'toggleChatTab') return;
             post({ type: 'shortcut', name: shortcut });
         }
 

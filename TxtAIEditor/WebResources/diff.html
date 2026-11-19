@@ -548,6 +548,9 @@
                 if (ctrl && key === '3') {
                     event.preventDefault();
                     post({ type: 'shortcut', name: 'expandRightPanel' });
+                } else if (ctrl && key === '4' && !event.altKey && !event.shiftKey) {
+                    event.preventDefault();
+                    if (!event.repeat) post({ type: 'shortcut', name: 'toggleChatTab' });
                 } else if (ctrl && key === 'w') {
                     event.preventDefault();
                     post({ type: 'shortcut', name: 'closeTab' });

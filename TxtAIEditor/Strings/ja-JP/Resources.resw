@@ -1499,6 +1499,9 @@
   <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
     <value>右パネルの拡大</value>
   </data>
+  <data name="ShortcutDescToggleChatTab" xml:space="preserve">
+    <value>チャットタブを開く／閉じる</value>
+  </data>
   <data name="ShortcutDescMaximize" xml:space="preserve">
     <value>ウィンドウ最大化の切り替え</value>
   </data>

@@ -1499,6 +1499,9 @@
   <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
     <value>展開右側面板</value>
   </data>
+  <data name="ShortcutDescToggleChatTab" xml:space="preserve">
+    <value>開啟或關閉聊天分頁</value>
+  </data>
   <data name="ShortcutDescMaximize" xml:space="preserve">
     <value>切換最大化視窗</value>
   </data>

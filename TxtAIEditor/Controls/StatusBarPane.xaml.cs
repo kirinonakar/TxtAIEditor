@@ -1,5 +1,6 @@
 using System;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
@@ -26,6 +27,7 @@ namespace TxtAIEditor.Controls
 
         public ToggleButton LeftPanelToggleButton => LeftPanelToggle;
         public ToggleButton RightPanelToggleButton => RightPanelToggle;
+        public ToggleButton ChatTabToggleButton => ChatTabToggle;
         public Button ExpandPreviewBtn => ExpandPreviewButton;
         public TextBlock LineText => StatusLine;
         public TextBlock LineLabelText => StatusLineLabel;
@@ -55,6 +57,9 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(LeftPanelToggle, getString("StatusLeftPanelTooltip", "좌측 패널") + " (Ctrl+1)");
             ToolTipService.SetToolTip(RightPanelToggle, getString("StatusRightPanelTooltip", "우측 패널") + " (Ctrl+2)");
             ToolTipService.SetToolTip(ExpandPreviewButton, getString("ExpandPreviewTooltip", "프리뷰 늘리기") + " (Ctrl+3)");
+            string chatTabText = getString("AgentStreamToTab", "채팅 탭");
+            ToolTipService.SetToolTip(ChatTabToggle, chatTabText + " (Ctrl+4)");
+            AutomationProperties.SetName(ChatTabToggle, chatTabText);
             ToolTipService.SetToolTip(LineNumberButton, getString("StatusGoToLineTooltip", "클릭하여 줄 이동"));
             ToolTipService.SetToolTip(LineEndingButton, getString("StatusLineEndingTooltip", "클릭하여 줄 끝 방식 변경"));
             ToolTipService.SetToolTip(LanguageButton, getString("StatusLanguageTooltip", "파일 유형 변경"));

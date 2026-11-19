@@ -187,15 +187,25 @@
                           VerticalAlignment="Center"/>
             </StackPanel>
 
-            <Button x:Name="ExpandPreviewButton"
-                    Grid.Column="4"
-                    Height="22" Width="26" Padding="0"
-                    Click="HandleExpandPreviewClick"
-                    ToolTipService.ToolTip="프리뷰 늘리기"
-                    CornerRadius="3"
-                    HorizontalAlignment="Center" VerticalAlignment="Center">
-                <FontIcon Glyph="&#xE1BF;" FontSize="11"/>
-            </Button>
+            <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <ToggleButton x:Name="ChatTabToggle"
+                              Style="{StaticResource SidebarToggleButtonStyle}">
+                    <FontIcon Glyph="&#xE8A7;" FontSize="11" RenderTransformOrigin="0.5,0.5">
+                        <FontIcon.RenderTransform>
+                            <ScaleTransform ScaleX="-1"/>
+                        </FontIcon.RenderTransform>
+                    </FontIcon>
+                </ToggleButton>
+
+                <Button x:Name="ExpandPreviewButton"
+                        Height="22" Width="26" Padding="0"
+                        Click="HandleExpandPreviewClick"
+                        ToolTipService.ToolTip="프리뷰 늘리기"
+                        CornerRadius="3"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE1BF;" FontSize="11"/>
+                </Button>
+            </StackPanel>
 
             <ToggleButton x:Name="RightPanelToggle"
                           Grid.Column="5"

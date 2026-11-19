@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.Web.WebView2.Core;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
@@ -27,6 +28,7 @@ namespace TxtAIEditor.Controls
         private static readonly JsonSerializerOptions MessageOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
         private readonly AgentPane _pane;
+        private readonly ToggleButton _statusBarChatToggle;
         private readonly EditorWorkspacePane _workspace;
         private readonly MainWindowViewModel _viewModel;
         private readonly ITabCloseCommands _documents;
@@ -52,11 +54,12 @@ namespace TxtAIEditor.Controls
         private bool _lastUsePele;
         private (string Family, double Size)? _lastFont;
 
-        public AgentChatTabController(AgentPane pane, EditorWorkspacePane workspace, MainWindowViewModel viewModel,
+        public AgentChatTabController(AgentPane pane, ToggleButton statusBarChatToggle, EditorWorkspacePane workspace, MainWindowViewModel viewModel,
             ITabCloseCommands documents, TabNavigationController navigation, ISettingsService settings,
             Func<string, string, string> getString, Action<string, string> showError, Action<string> handleShortcut)
         {
             _pane = pane;
+            _statusBarChatToggle = statusBarChatToggle;
             _workspace = workspace;
             _viewModel = viewModel;
             _documents = documents;
@@ -77,6 +80,8 @@ namespace TxtAIEditor.Controls
             _tabBridges = tabBridges;
             _pane.StreamToTabToggleButton.Checked += OnChecked;
             _pane.StreamToTabToggleButton.Unchecked += OnUnchecked;
+            _statusBarChatToggle.IsChecked = _pane.StreamToTabToggleButton.IsChecked;
+            _statusBarChatToggle.Click += OnStatusBarChatToggleClick;
             _viewModel.Tabs.CollectionChanged += OnTabsChanged;
         }
 
@@ -97,6 +102,9 @@ namespace TxtAIEditor.Controls
 
         public bool IsOpen => _tab != null;
 
+        private void OnStatusBarChatToggleClick(object sender, RoutedEventArgs args) =>
+            _pane.StreamToTabToggleButton.IsChecked = _statusBarChatToggle.IsChecked == true;
+
         private async void OnChecked(object sender, RoutedEventArgs args)
         {
             if (_tab != null || _tabBridges == null)
@@ -104,6 +112,7 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            _statusBarChatToggle.IsChecked = true;
             GetActiveDocument();
             var tab = new OpenedTab { Title = _getString("AgentChatTabTitle", "Agent 채팅"), IsAgentChat = true };
             var webView = new WebView2
@@ -495,6 +504,7 @@ namespace TxtAIEditor.Controls
 
         private void OnUnchecked(object sender, RoutedEventArgs args)
         {
+            _statusBarChatToggle.IsChecked = false;
             if (_tab is { } tab && _item is { } item)
             {
                 Reset();
@@ -536,6 +546,7 @@ namespace TxtAIEditor.Controls
             Reset();
             _pane.StreamToTabToggleButton.Checked -= OnChecked;
             _pane.StreamToTabToggleButton.Unchecked -= OnUnchecked;
+            _statusBarChatToggle.Click -= OnStatusBarChatToggleClick;
             _viewModel.Tabs.CollectionChanged -= OnTabsChanged;
         }
     }

@@ -339,6 +339,8 @@ namespace TxtAIEditor.Controls
                 name = 'toggleRightPanel';
             } else if (key === '3' || code === 'Digit3' || code === 'Numpad3') {
                 name = 'expandRightPanel';
+            } else if (!shift && (key === '4' || code === 'Digit4' || code === 'Numpad4')) {
+                name = 'toggleChatTab';
             } else if (key === 'n' || code === 'KeyN') {
                 name = 'newTab';
             } else if (key === 's' || code === 'KeyS') {
@@ -362,7 +364,7 @@ namespace TxtAIEditor.Controls
         if (event.stopImmediatePropagation) {
             event.stopImmediatePropagation();
         }
-        post(name);
+        if (!event.repeat || name !== 'toggleChatTab') post(name);
     }
 
     window.addEventListener('keydown', handleKeyDown, true);

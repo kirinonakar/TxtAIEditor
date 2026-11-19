@@ -40,6 +40,8 @@ namespace TxtAIEditor.Controls
 
         void TogglePreviewWidth();
 
+        void ToggleChatTab();
+
         void CloseActiveTab();
 
         void MoveActiveTabLeft();

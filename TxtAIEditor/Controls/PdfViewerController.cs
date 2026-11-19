@@ -26,6 +26,7 @@ namespace TxtAIEditor.Controls
         private const int Number1VirtualKey = 0x31;
         private const int Number2VirtualKey = 0x32;
         private const int Number3VirtualKey = 0x33;
+        private const int Number4VirtualKey = 0x34;
         private const int F3VirtualKey = 0x72;
         private const int F4VirtualKey = 0x73;
         private const int F7VirtualKey = 0x76;
@@ -370,6 +371,7 @@ namespace TxtAIEditor.Controls
                 Number1VirtualKey => "toggleLeftPanel",
                 Number2VirtualKey => "toggleRightPanel",
                 Number3VirtualKey => "expandRightPanel",
+                Number4VirtualKey when !shift => "toggleChatTab",
                 FindVirtualKey when shift => "searchAll",
                 SaveVirtualKey when shift => "saveAs",
                 SaveVirtualKey => "save",

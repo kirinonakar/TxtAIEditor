@@ -15,6 +15,7 @@ function shortcutNameFromKeyboardEvent(event) {
     if (key === '1') return 'toggleLeftPanel';
     if (key === '2') return 'toggleRightPanel';
     if (key === '3') return 'expandRightPanel';
+    if (key === '4' && !event.altKey && !event.shiftKey) return 'toggleChatTab';
     if (key === 'n') return 'newTab';
     if (key === 's') return event.shiftKey ? 'saveAs' : 'save';
     if (key === 'o') return 'open';
@@ -146,6 +147,7 @@ function htmlPreviewFrameBridge() {
             if (key === '1') shortcut = 'toggleLeftPanel';
             else if (key === '2') shortcut = 'toggleRightPanel';
             else if (key === '3') shortcut = 'expandRightPanel';
+            else if (key === '4' && !event.altKey && !event.shiftKey) shortcut = 'toggleChatTab';
             else if (key === 'n') shortcut = 'newTab';
             else if (key === 's') shortcut = event.shiftKey ? 'saveAs' : 'save';
             else if (key === 'o') shortcut = 'open';
@@ -158,6 +160,7 @@ function htmlPreviewFrameBridge() {
         if (!shortcut) return;
         event.preventDefault();
         event.stopImmediatePropagation();
+        if (event.repeat && shortcut === 'toggleChatTab') return;
         window.parent.postMessage({
             source: 'txtaieditor-html-preview',
             type: 'shortcut',

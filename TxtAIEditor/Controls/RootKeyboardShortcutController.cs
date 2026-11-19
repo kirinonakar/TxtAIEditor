@@ -29,6 +29,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _toggleLivePreview;
         private readonly Action _toggleExplorerTreeMode;
         private readonly Action _togglePreviewWidth;
+        private readonly Action _toggleChatTab;
         private readonly Action _toggleMaximize;
         private readonly Action _toggleWordWrap;
 
@@ -55,6 +56,7 @@ namespace TxtAIEditor.Controls
             Action toggleLivePreview,
             Action toggleExplorerTreeMode,
             Action togglePreviewWidth,
+            Action toggleChatTab,
             Action toggleMaximize,
             Action toggleWordWrap)
         {
@@ -80,6 +82,7 @@ namespace TxtAIEditor.Controls
             _toggleLivePreview = toggleLivePreview;
             _toggleExplorerTreeMode = toggleExplorerTreeMode;
             _togglePreviewWidth = togglePreviewWidth;
+            _toggleChatTab = toggleChatTab;
             _toggleMaximize = toggleMaximize;
             _toggleWordWrap = toggleWordWrap;
         }
@@ -177,6 +180,15 @@ namespace TxtAIEditor.Controls
             {
                 e.Handled = true;
                 _togglePreviewWidth();
+            }
+            else if (e.Key == Windows.System.VirtualKey.Number4 && !shift &&
+                (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Menu) & Windows.UI.Core.CoreVirtualKeyStates.Down) == 0)
+            {
+                e.Handled = true;
+                if (!e.KeyStatus.WasKeyDown)
+                {
+                    _toggleChatTab();
+                }
             }
             else if (shift && e.Key == Windows.System.VirtualKey.F)
             {

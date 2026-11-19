@@ -567,6 +567,11 @@ export function bindKeyboardEvents({ openFindPanel, cancelDragInteraction }) {
                 post({ type: 'shortcut', name: 'expandRightPanel' });
                 return;
             }
+            if (key === '4' && !event.altKey && !event.shiftKey) {
+                event.preventDefault();
+                if (!event.repeat) post({ type: 'shortcut', name: 'toggleChatTab' });
+                return;
+            }
             if (key === 'n') {
                 event.preventDefault();
                 post({ type: 'shortcut', name: 'newTab' });

@@ -67,6 +67,9 @@ namespace TxtAIEditor.Controls
                 case "expandRightPanel":
                     _commands.TogglePreviewWidth();
                     break;
+                case "toggleChatTab":
+                    _commands.ToggleChatTab();
+                    break;
                 case "closeTab":
                     _commands.CloseActiveTab();
                     break;

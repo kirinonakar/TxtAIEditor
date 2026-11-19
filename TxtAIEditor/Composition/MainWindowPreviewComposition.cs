@@ -69,7 +69,7 @@ namespace TxtAIEditor.Composition
             MainWindowPreviewCompositionCallbacks callbacks)
         {
             var webViewShortcut = new WebViewShortcutController(
-                new PreviewWebViewShortcutCommands(callbacks, stickyNoteMode));
+                new PreviewWebViewShortcutCommands(callbacks, stickyNoteMode, ui.PreviewGrid.AgentPane.ToggleChatTab));
 
             var previewScrollSync = new PreviewScrollSyncController(
                 ui.EditorWorkspace,
@@ -156,13 +156,16 @@ namespace TxtAIEditor.Composition
         {
             private readonly MainWindowPreviewCompositionCallbacks _callbacks;
             private readonly StickyNoteModeController _stickyNoteMode;
+            private readonly Action _toggleChatTab;
 
             public PreviewWebViewShortcutCommands(
                 MainWindowPreviewCompositionCallbacks callbacks,
-                StickyNoteModeController stickyNoteMode)
+                StickyNoteModeController stickyNoteMode,
+                Action toggleChatTab)
             {
                 _callbacks = callbacks;
                 _stickyNoteMode = stickyNoteMode;
+                _toggleChatTab = toggleChatTab;
             }
 
             public void Find() => _callbacks.FindRequested();
@@ -202,6 +205,8 @@ namespace TxtAIEditor.Composition
             public void ToggleWordWrap() => _callbacks.ToggleWordWrapRequested();
 
             public void TogglePreviewWidth() => _callbacks.TogglePreviewWidthRequested();
+
+            public void ToggleChatTab() => _toggleChatTab();
 
             public void CloseActiveTab() => _callbacks.CloseActiveTabRequested();
 

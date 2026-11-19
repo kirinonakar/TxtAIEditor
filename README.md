@@ -165,6 +165,7 @@ TxtAIEditor is designed for speed and productivity, packing standard IDE shortcu
 | `Ctrl + 1` | Toggle Left Panel |
 | `Ctrl + 2` | Toggle Right Panel |
 | `Ctrl + 3` | Expand Right Panel |
+| `Ctrl + 4` | Toggle Chat Tab |
 | `` Ctrl + ` `` | Toggle Terminal |
 | `Ctrl + Z` | Undo |
 | `Ctrl + Y` | Redo |

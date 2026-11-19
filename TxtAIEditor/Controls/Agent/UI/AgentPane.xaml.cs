@@ -233,6 +233,7 @@ namespace TxtAIEditor.Controls
         }
         public CheckBox SubagentsCheckBox => AgentSubagentsCheckBox;
         public ToggleButton StreamToTabToggleButton => AgentStreamToTabToggleButton;
+        internal void ToggleChatTab() => AgentStreamToTabToggleButton.IsChecked = AgentStreamToTabToggleButton.IsChecked != true;
 
         public bool HideHtmlCodeBlocks
         {
@@ -277,7 +278,7 @@ namespace TxtAIEditor.Controls
             AgentPlanningModeCheckBox.Content = getString("AgentIncludeActiveFile", "계획 모드 (Planning mode)");
             AgentSubagentsCheckBox.Content = getString("AgentUseSubagents", "서브에이전트");
             string chatTabText = getString("AgentStreamToTab", "채팅 탭");
-            ToolTipService.SetToolTip(AgentStreamToTabToggleButton, chatTabText);
+            ToolTipService.SetToolTip(AgentStreamToTabToggleButton, chatTabText + " (Ctrl+4)");
             AutomationProperties.SetName(AgentStreamToTabToggleButton, chatTabText);
             AgentPromptInput.PlaceholderText = getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력...");
             ToolTipService.SetToolTip(AgentMcpButton, getString("AgentMcpButtonTooltip", "MCP 서버"));

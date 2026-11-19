@@ -1499,6 +1499,9 @@
   <data name="ShortcutDescExpandRightPanel" xml:space="preserve">
     <value>우측 패널 확장</value>
   </data>
+  <data name="ShortcutDescToggleChatTab" xml:space="preserve">
+    <value>채팅 탭 열기/닫기</value>
+  </data>
   <data name="ShortcutDescMaximize" xml:space="preserve">
     <value>창 최대화 토글</value>
   </data>

@@ -239,6 +239,7 @@ namespace TxtAIEditor.Composition
                 callbacks.ToggleLivePreview,
                 callbacks.ToggleExplorerTreeMode,
                 callbacks.TogglePreviewWidth,
+                ui.PreviewGrid.AgentPane.ToggleChatTab,
                 callbacks.ToggleMaximize,
                 callbacks.ToggleWordWrap);
 

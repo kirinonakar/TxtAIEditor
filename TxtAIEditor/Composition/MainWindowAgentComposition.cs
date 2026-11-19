@@ -175,7 +175,7 @@ namespace TxtAIEditor.Composition
                         : null
             };
 
-            var agentChat = new AgentChatTabController(ui.PreviewGrid.AgentPane, ui.EditorWorkspace,
+            var agentChat = new AgentChatTabController(ui.PreviewGrid.AgentPane, ui.StatusBar.ChatTabToggleButton, ui.EditorWorkspace,
                 viewModel, documents, shell.TabNavigation, commonServices.SettingsService,
                 callbacks.GetLocalizedString, shell.Dialog.ShowErrorMessage, preview.WebViewShortcut.Handle);
             var agent = new AgentController(

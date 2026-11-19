@@ -126,6 +126,7 @@ namespace TxtAIEditor.Composition
                 callbacks.ToggleLeftPanelAsync,
                 callbacks.ToggleRightPanelAsync,
                 callbacks.TogglePreviewWidthRequested,
+                ui.PreviewGrid.AgentPane.ToggleChatTab,
                 callbacks.OpenNewTabRequested,
                 callbacks.SaveActiveRequested,
                 callbacks.SaveActiveAsRequested,

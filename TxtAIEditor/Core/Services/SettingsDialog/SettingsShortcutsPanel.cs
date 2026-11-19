@@ -111,6 +111,7 @@ namespace TxtAIEditor.Core.Services
                 ("Ctrl + 1", getString("ShortcutDescLeftPanel", "좌측 패널 토글")),
                 ("Ctrl + 2", getString("ShortcutDescRightPanel", "우측 패널 토글")),
                 ("Ctrl + 3", getString("ShortcutDescExpandRightPanel", "우측 패널 확장")),
+                ("Ctrl + 4", getString("ShortcutDescToggleChatTab", "채팅 탭 열기/닫기")),
                 ("Ctrl + `", getString("ShortcutDescTerminal", "터미널 토글")),
                 ("Ctrl + Z", getString("ShortcutDescUndo", "실행 취소")),
                 ("Ctrl + Y", getString("ShortcutDescRedo", "다시 실행")),
