@@ -335,10 +335,13 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(AgentSelectedPresetScrollRightButton, getString("AgentSelectedChipsScrollRightTooltip", "선택 칩 오른쪽으로 스크롤"));
             ToolTipService.SetToolTip(AgentSelectedPresetClearAllButton, getString("AgentSelectedChipsClearAllTooltip", "모든 선택 칩 삭제"));
 
-            AgentDiffApproveButton.Content = getString("AgentDiffApplyButton", "승인");
             AgentDiffCancelButton.Content = getString("AgentDiffCancelButton", "취소");
-            AgentDiffConfirmHeader.Text = getString("AgentDiffConfirmHeaderDefault", "파일 변경 확인");
-            AgentDiffConfirmDescription.Text = getString("AgentDiffConfirmDescriptionDefault", "파일을 수정하시겠습니까?");
+            if (AgentDiffConfirmPanel.Visibility != Visibility.Visible)
+            {
+                AgentDiffApproveButton.Content = getString("AgentDiffApplyButton", "승인");
+                AgentDiffConfirmHeader.Text = getString("AgentDiffConfirmHeaderDefault", "파일 변경 확인");
+                AgentDiffConfirmDescription.Text = getString("AgentDiffConfirmDescriptionDefault", "파일을 수정하시겠습니까?");
+            }
             AgentModifiedFilesHeader.Text = getString("AgentModifiedFilesHeader", "변경됨 (클릭 시 비교)");
             AgentModifiedFilesDescription.Text = getString("AgentModifiedFilesDescription", "수정된 파일 목록입니다. 되돌리려면 우측 아이콘을 클릭하세요.");
             ToolTipService.SetToolTip(AgentModifiedFilesCloseButton, getString("AgentModifiedFilesCloseTooltip", "목록 닫기"));
@@ -943,6 +946,13 @@ private Style? _accentRunButtonStyle;
             _reviewController.ShowDiffConfirm(header, description);
         }
 
+        internal void ShowExternalReadConfirm(string header, string description, string approveText)
+        {
+            AgentDiffApproveButton.Content = approveText;
+            AgentDiffConfirmDescription.IsTextSelectionEnabled = true;
+            _reviewController.ShowDiffConfirm(header, description);
+        }
+
         public void ShowPowerShellConfirm(string header, string description, string command)
         {
             _reviewController.ShowPowerShellConfirm(header, description, command);
@@ -951,6 +961,8 @@ private Style? _accentRunButtonStyle;
         public void HideDiffConfirm()
         {
             _reviewController.HideDiffConfirm();
+            AgentDiffApproveButton.Content = _getString?.Invoke("AgentDiffApplyButton", "승인") ?? "승인";
+            AgentDiffConfirmDescription.IsTextSelectionEnabled = false;
         }
 
         public void UpdateModifiedFiles(IReadOnlyList<AgentFileEditPreview> edits)

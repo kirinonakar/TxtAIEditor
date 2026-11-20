@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.UI.Xaml.Controls;
 using TxtAIEditor.Core.Interfaces;
 
 namespace TxtAIEditor.Controls
@@ -17,8 +16,6 @@ namespace TxtAIEditor.Controls
         private readonly Action<string> _appendActivity;
         private readonly Func<string, string, string> _getString;
         private readonly Func<AgentRunContext?> _activeRunContextProvider;
-        private readonly Action? _beforeDialog;
-        private readonly Action? _afterDialog;
         private readonly SemaphoreSlim _approvalGate = new(1, 1);
         private TaskCompletionSource<bool>? _diffApprovalTcs;
         private string? _approvalSessionId;
@@ -31,9 +28,7 @@ namespace TxtAIEditor.Controls
             Func<Func<Task<bool>>, Task<bool>> runOnUIThreadAsync,
             Action<string> appendActivity,
             Func<string, string, string> getString,
-            Func<AgentRunContext?> activeRunContextProvider,
-            Action? beforeDialog,
-            Action? afterDialog)
+            Func<AgentRunContext?> activeRunContextProvider)
         {
             _settingsService = settingsService;
             _agentPane = agentPane;
@@ -43,8 +38,6 @@ namespace TxtAIEditor.Controls
             _appendActivity = appendActivity;
             _getString = getString;
             _activeRunContextProvider = activeRunContextProvider;
-            _beforeDialog = beforeDialog;
-            _afterDialog = afterDialog;
         }
 
         public void ApprovePending()
@@ -141,52 +134,24 @@ namespace TxtAIEditor.Controls
 
         public Task<bool> ConfirmExternalReadAsync(string fullPath, CancellationToken cancellationToken)
         {
-            return _runOnUIThreadAsync(async () =>
+            string? sessionId = _activeRunContextProvider()?.SessionId;
+            return _runOnUIThreadAsync(() =>
             {
-                await _approvalGate.WaitAsync(cancellationToken);
-                try
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_agentPane.XamlRoot == null)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var xamlRoot = _agentPane.XamlRoot;
-                    if (xamlRoot == null)
-                    {
-                        return false;
-                    }
-
-                    var dialog = new ContentDialog
-                    {
-                        XamlRoot = xamlRoot,
-                        RequestedTheme = _agentPane.ActualTheme,
-                        Title = _getString("AgentExternalReadTitle", "외부 파일 읽기 허가"),
-                        Content = new TextBlock
-                        {
-                            Text = string.Format(_getString("AgentExternalReadDescriptionFormat", "작업 폴더 밖에 있는 이 파일을 에이전트가 읽도록 허용하시겠습니까?\n\n{0}"), fullPath),
-                            TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
-                            IsTextSelectionEnabled = true
-                        },
-                        PrimaryButtonText = _getString("AgentExternalReadAllowOnce", "이번만 허용"),
-                        CloseButtonText = _getString("CommonCancel", "취소"),
-                        DefaultButton = ContentDialogButton.Close
-                    };
-
-                    _beforeDialog?.Invoke();
-                    try
-                    {
-                        var dispatcher = _agentPane.DispatcherQueue;
-                        using var registration = cancellationToken.Register(() => dispatcher.TryEnqueue(() => dialog.Hide()));
-                        ContentDialogResult result = await dialog.ShowAsync();
-                        cancellationToken.ThrowIfCancellationRequested();
-                        return result == ContentDialogResult.Primary;
-                    }
-                    finally
-                    {
-                        _afterDialog?.Invoke();
-                    }
+                    return Task.FromResult(false);
                 }
-                finally
+
+                return WaitForApprovalAsync(() =>
                 {
-                    _approvalGate.Release();
-                }
+                    string header = _getString("AgentExternalReadTitle", "외부 파일 읽기 허가");
+                    string description = string.Format(
+                        _getString("AgentExternalReadDescriptionFormat", "작업 폴더 밖에 있는 이 파일을 에이전트가 읽도록 허용하시겠습니까?\n\n{0}"),
+                        fullPath);
+                    string approveText = _getString("AgentExternalReadAllowOnce", "이번만 허용");
+                    _agentPane.ShowExternalReadConfirm(header, description, approveText);
+                }, sessionId, cancellationToken);
             });
         }
 

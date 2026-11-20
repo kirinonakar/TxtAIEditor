@@ -317,9 +317,7 @@ namespace TxtAIEditor.Controls
                 async action => await uiDispatcher.RunAsync(action),
                 callbacks.AppendActivity,
                 getString,
-                callbacks.GetActiveRunContext,
-                beforeDialog,
-                afterDialog);
+                callbacks.GetActiveRunContext);
             var planController = new AgentPlanController(
                 callbacks.GetActiveRunContext,
                 confirmationController,

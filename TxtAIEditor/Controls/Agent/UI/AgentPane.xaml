@@ -600,11 +600,15 @@
                                Text="파일 변경 확인"
                                FontWeight="SemiBold"
                                FontSize="12"/>
-                    <TextBlock x:Name="AgentDiffConfirmDescription"
-                               Text="파일을 수정하시겠습니까?"
-                               FontSize="11"
-                               TextWrapping="Wrap"
-                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                    <ScrollViewer MaxHeight="96"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <TextBlock x:Name="AgentDiffConfirmDescription"
+                                   Text="파일을 수정하시겠습니까?"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                    </ScrollViewer>
                     <Border x:Name="AgentPowerShellCommandPanel"
                             Background="{ThemeResource AgentOutputBackground}"
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
