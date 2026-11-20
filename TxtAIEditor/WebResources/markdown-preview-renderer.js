@@ -737,10 +737,34 @@ function htmlBlockTagName(line) {
     ].includes(tag) ? tag : '';
 }
 
+function createHtmlTableEndDetector() {
+    // Skip comments and quoted attributes when looking for nested table tags.
+    // The last alternative carries a partial comment or tag to the next line.
+    const markupPattern = /<!--[\s\S]*?-->|<(\/?)([a-z][\w:-]*)(?=[\s/>])(?:[^<>"']|"[^"]*"|'[^']*')*>|(<!--[\s\S]*|<\/?[a-z][\s\S]*)/gi;
+    let depth = 0;
+    let partialMarkup = '';
+
+    return text => {
+        const markup = partialMarkup + text;
+        partialMarkup = '';
+        for (const [, closing, tag, partial] of markup.matchAll(markupPattern)) {
+            if (partial) {
+                partialMarkup = `${partial}\n`;
+                break;
+            }
+            if (tag?.toLowerCase() !== 'table') continue;
+            depth += closing ? -1 : 1;
+            if (depth === 0) return true;
+        }
+        return false;
+    };
+}
+
 function collectHtmlBlock(startLine, maxLine, getLine) {
     const tag = htmlBlockTagName(getLine(startLine));
     if (!tag) return null;
     const closePattern = new RegExp(`</${tag}\\s*>`, 'i');
+    const isBlockEnd = tag === 'table' ? createHtmlTableEndDetector() : text => closePattern.test(text);
     const parts = [];
     for (let line = startLine; line <= maxLine; line++) {
         const text = getLine(line);
@@ -748,7 +772,7 @@ function collectHtmlBlock(startLine, maxLine, getLine) {
             return { pending: true, endLine: line, extendRangeEnd: line };
         }
         parts.push(text);
-        if (closePattern.test(text)) return { html: parts.join('\n'), endLine: line };
+        if (isBlockEnd(text)) return { html: parts.join('\n'), endLine: line };
     }
     return { html: parts.join('\n'), endLine: maxLine };
 }
