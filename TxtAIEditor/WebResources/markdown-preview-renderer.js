@@ -457,7 +457,11 @@ function inlineMarkdown(text, options = {}) {
     });
     out = out.replace(/!\[([^\]]*)\]\(([^)]*)\)/g, (_, alt, target) => stash(renderMarkdownImage(alt, target, options)));
     out = stashInlineMath(out, stash, mathFragments, options.normalizeInlineMath);
-    if (options.allowHtml !== false) out = stashHtmlTags(out, stash);
+    if (options.allowHtml !== false) {
+        out = stashHtmlTags(out, stash);
+    } else if (options.allowUnderline) {
+        out = out.replace(/(?<!\\)<\/?u>/gi, tag => stash(tag.toLowerCase()));
+    }
     // Block parsing has already treated an escaped list marker as plain text.
     out = out.replace(/^([ \t]*\d+)\\([.)])(?=[ \t])/, '$1$2');
     out = escapeHtml(out);

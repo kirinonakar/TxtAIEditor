@@ -25,7 +25,7 @@ const logHeader = /^\[(?:Agent run\]|LLM API:|Tool (?:result|completed|failed)[:
 const sectionHeader = /^\[(?:Agent tool call|assistant: (?:tool call|thinking|error)|tool: .+ (?:arguments|result)|Tool result: .+|Global agent rules|Retry detail: .+|Compressed context used for subsequent model requests)\]/i;
 const sectionEnd = /^\[End (?:global agent rules|retry detail|compressed context)\]/i;
 const markdownOptions = {
-    allowHtml: false, deferOpenDiagrams: true, diagramLoadingText: '', renderCharts: true,
+    allowHtml: false, allowUnderline: true, deferOpenDiagrams: true, diagramLoadingText: '', renderCharts: true,
     deferLocalImages: true, resolveImageUrl: resolveChatImageUrl
 };
 
