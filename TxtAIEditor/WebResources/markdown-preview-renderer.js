@@ -465,6 +465,9 @@ function inlineMarkdown(text, options = {}) {
     // Block parsing has already treated an escaped list marker as plain text.
     out = out.replace(/^([ \t]*\d+)\\([.)])(?=[ \t])/, '$1$2');
     out = escapeHtml(out);
+    // Preserve Markdown-escaped angle brackets as visible text, while keeping
+    // them HTML-escaped so tags and autolinks cannot be created.
+    out = out.replace(/\\(&lt;|&gt;)/g, '$1');
     out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_, label, href) => {
         return `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${label}</a>`;
     });
@@ -503,38 +506,6 @@ function fencedCodeInfo(line) {
     };
 }
 
-function isBareFence(line, fence) {
-    const trimmed = String(line || '').trim();
-    return !!fence &&
-        trimmed.length >= fence.length &&
-        [...trimmed].every(ch => ch === fence.marker);
-}
-
-function isMarkdownBlockBoundary(line) {
-    const trimmed = String(line || '').trim();
-    return /^#{1,6}\s+/.test(trimmed) ||
-        /^>\s?/.test(trimmed) ||
-        /^[-*+]\s+/.test(trimmed) ||
-        /^\d+[.)]\s+/.test(trimmed) ||
-        /^(\|.*\|)$/.test(trimmed);
-}
-
-function isAmbiguousBareFenceClose(lineNumber, getLine, fence) {
-    if (!isBareFence(getLine(lineNumber), fence)) return false;
-
-    const previous = getLine(lineNumber - 1);
-    if (previous === undefined || !String(previous || '').trim()) return false;
-
-    for (let line = lineNumber + 1; ; line++) {
-        const text = getLine(line);
-        if (text === undefined) return false;
-        if (!String(text || '').trim()) continue;
-        const nextFence = fencedCodeInfo(text);
-        if (nextFence) return !isFencedCodeClose(text, fence);
-        return isMarkdownBlockBoundary(text);
-    }
-}
-
 function isFencedCodeClose(line, fence) {
     const trimmed = (line || '').trim();
     if (!trimmed || !trimmed.startsWith(fence.marker.repeat(fence.length))) return false;
@@ -547,7 +518,6 @@ function isFencedCodeClose(line, fence) {
 function collectFencedCodeBlock(startLine, maxLine, getLine, options = {}) {
     const fence = fencedCodeInfo(getLine(startLine));
     if (!fence) return null;
-    if (isAmbiguousBareFenceClose(startLine, getLine, fence)) return null;
     const parts = [];
     for (let line = startLine + 1; line <= maxLine; line++) {
         const text = getLine(line);

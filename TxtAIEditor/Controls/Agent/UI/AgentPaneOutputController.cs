@@ -43,6 +43,7 @@ namespace TxtAIEditor.Controls
         private bool _tailNeedsAnchor;
         private bool _aligningTail;
         private double _lastVerticalOffset;
+        private double _lastScrollableHeight;
         private DispatcherTimer? _outputFlushTimer;
         private string _explicitSelectedOutputText = string.Empty;
         private RichTextBlock? _selectionBlock;
@@ -73,6 +74,7 @@ namespace TxtAIEditor.Controls
             _outputPages = outputPages;
             _outputScrollViewer = outputScrollViewer;
             _resourceOwner = resourceOwner;
+            _lastScrollableHeight = _outputScrollViewer.ScrollableHeight;
             _pointerPressedHandler = OnOutputPointerPressed;
             _pointerMovedHandler = OnOutputPointerMoved;
             _pointerReleasedHandler = OnOutputPointerReleased;
@@ -335,19 +337,22 @@ namespace TxtAIEditor.Controls
             if (_tailNeedsAnchor || _aligningTail)
             {
                 _lastVerticalOffset = offset;
+                _lastScrollableHeight = maxOffset;
                 return;
             }
 
-            if (offset >= maxOffset - 5.0 && _outputPages.TryGetElement(_pages.LastPage) != null)
+            bool contentExtentChanged = Math.Abs(maxOffset - _lastScrollableHeight) > 1.0;
+            if (offset >= maxOffset - 5.0)
             {
                 _userScrolledUp = false;
             }
-            else if (offset < _lastVerticalOffset - 1.0)
+            else if (!contentExtentChanged && offset < _lastVerticalOffset - 1.0)
             {
                 _userScrolledUp = true;
             }
 
             _lastVerticalOffset = offset;
+            _lastScrollableHeight = maxOffset;
         }
 
         private int UpdatePages()

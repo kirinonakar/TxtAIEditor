@@ -151,9 +151,39 @@ function findInlineLogTag(line) {
     return null;
 }
 
+function hasEscapedMarkdownBlockSyntax(text) {
+    return String(text ?? '').split(/\r\n?/).some(line => {
+        const trimmed = line.trimStart();
+        return /^\\#{1,6}\s/.test(trimmed) ||
+            /^\\[-*+]\s/.test(trimmed) ||
+            /^\\\|/.test(trimmed) ||
+            /^\\(?=`{3,}|~{3,})/.test(trimmed) ||
+            /^\d+\\[.)]\s/.test(trimmed);
+    });
+}
+
+function unescapeMarkdownPunctuation(line) {
+    return line.replace(/\\([\s\S])/g, (match, character) => {
+        const code = character.charCodeAt(0);
+        const isPunctuation = (code >= 33 && code <= 47) || (code >= 58 && code <= 64) ||
+            (code >= 91 && code <= 96) || (code >= 123 && code <= 126);
+        return isPunctuation ? character : match;
+    });
+}
+
+function decodeEscapedMarkdownLine(line, preserveLeadingQuote = false) {
+    const literalQuote = preserveLeadingQuote ? /^(\s*)\\>/.exec(line) : null;
+    const withoutContinuation = line.endsWith('\\') ? line.slice(0, -1) : line;
+    let decoded = unescapeMarkdownPunctuation(withoutContinuation);
+    // An escaped leading > is literal text, not a Markdown blockquote.
+    if (literalQuote) decoded = `${literalQuote[1]}\\${decoded.slice(literalQuote[1].length)}`;
+    return decoded;
+}
+
 function assistantBlocks(text) {
     const blocks = [];
     const markdown = [];
+    const decodeEscapedMarkdown = hasEscapedMarkdownBlockSyntax(text);
     let lines = [];
     function flushMarkdown() {
         let first = 0;
@@ -174,8 +204,9 @@ function assistantBlocks(text) {
     let logTag = null;
     for (let line of text.replace(/\r\n?/g, '\n').split('\n')) {
         if (fence) {
-            lines.push(line);
-            if (isFencedCodeClose(line, fence)) fence = null;
+            const fenceLine = decodeEscapedMarkdown ? decodeEscapedMarkdownLine(line) : line;
+            lines.push(fenceLine);
+            if (isFencedCodeClose(fenceLine, fence)) fence = null;
             continue;
         }
         const label = line.trimStart();
@@ -206,6 +237,9 @@ function assistantBlocks(text) {
             continue;
         }
 
+        if (decodeEscapedMarkdown) {
+            line = decodeEscapedMarkdownLine(line, true);
+        }
         fence = logTag ? null : fencedCodeInfo(line);
         if (!fence) {
             // Keep prose before or after native inline reasoning and tool-call payloads.
