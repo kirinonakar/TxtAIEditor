@@ -49,7 +49,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 - search_replace(path, search, replacement, [useRegex], [matchCase], [wholeWord], [maxReplacements], [startLine], [endLine]) for text replacements. Zero maxReplacements replaces all matches.
                 - apply_patch(patch, [path]) for structured edits. Every hunk needs @@ -oldStart,oldCount +newStart,newCount @@. For multiple existing files, omit path and put *** Update File: relative/path sections between *** Begin Patch and *** End Patch. End the patch at that marker.
                 - replace_range(path, startLine, endLine, newText, expectedStartLine, expectedEndLine) requires both original boundaries, with \n for multiline boundaries. Line correction is limited to ±3 lines.
-                - insert_to_file(path, content, insert_after, insert_before) requires both anchors, each with at least two unique context lines.
+                - insert_to_file(path, content, insert_after, insert_before) requires both anchors, and each anchor must supply at least 2 non-blank lines; a single-line anchor is rejected even when it is unique. Use search_replace or apply_patch when you cannot supply 2 lines on both sides.
                 - insert_text(content), create_tab(title, content), edit_tab(title, content), save_tab([title], [path]), open_file(path). Use a title or ID to target an existing tab.
                 - web_search(query, [numResults]), web_fetch(urls). Search for current facts or unfamiliar APIs, prefer primary sources, and cite URLs.
                 - Use the exact MCP aliases and arguments from the current native tool catalog or [Enabled MCP servers] section.

@@ -1083,9 +1083,14 @@ namespace TxtAIEditor.Controls
                 return "insert_to_file failed: both before and after context must be provided.";
             }
 
-            if (TrimBoundaryBlankLines(normalizedBefore).Length < 2 || TrimBoundaryBlankLines(normalizedAfter).Length < 2)
+            bool insertAfterTooShort = TrimBoundaryBlankLines(normalizedBefore).Length < 2;
+            bool insertBeforeTooShort = TrimBoundaryBlankLines(normalizedAfter).Length < 2;
+            if (insertAfterTooShort || insertBeforeTooShort)
             {
-                return "insert_to_file failed: insert_after and insert_before must each contain at least 2 context lines.";
+                string offending = insertAfterTooShort && insertBeforeTooShort
+                    ? "insert_after and insert_before"
+                    : insertAfterTooShort ? "insert_after" : "insert_before";
+                return $"insert_to_file failed: {offending} must contain at least 2 non-blank context lines (both anchors are required, each with 2 or more lines).";
             }
 
             int insertIndex = FindInsertionPoint(fileContent, normalizedBefore, normalizedAfter);

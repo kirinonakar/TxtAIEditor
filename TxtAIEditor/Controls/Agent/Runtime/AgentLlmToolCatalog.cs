@@ -308,7 +308,7 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "insert_to_file",
-                    Description = "Insert text between two anchors.",
+                    Description = "Insert text between two anchors. Both anchors are required and each must contain at least 2 non-blank lines.",
                     Parameters = new
                     {
                         type = "object",
@@ -316,8 +316,8 @@ namespace TxtAIEditor.Controls
                         {
                             path = new { type = "string", description = "Workspace-relative path." },
                             content = new { type = "string" },
-                            insert_after = new { type = "string", description = "2+ unique lines before the insertion." },
-                            insert_before = new { type = "string", description = "2+ unique lines after the insertion." }
+                            insert_after = new { type = "string", description = "Required. 2+ non-blank lines immediately before the insertion; a single-line anchor is rejected even when unique." },
+                            insert_before = new { type = "string", description = "Required. 2+ non-blank lines immediately after the insertion; a single-line anchor is rejected even when unique." }
                         },
                         required = new[] { "path", "content", "insert_after", "insert_before" }
                     }
