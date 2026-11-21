@@ -3225,7 +3225,7 @@
     <value>复制全部</value>
   </data>
   <data name="AgentChatBranchFromHere" xml:space="preserve">
-    <value>从此处分支</value>
+    <value>分支</value>
   </data>
   <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
     <value>{0}（分支）</value>

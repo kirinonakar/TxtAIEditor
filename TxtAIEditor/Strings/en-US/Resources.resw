@@ -3225,7 +3225,7 @@ Plan: {0}</value>
     <value>Copy all</value>
   </data>
   <data name="AgentChatBranchFromHere" xml:space="preserve">
-    <value>Branch from here</value>
+    <value>Branch</value>
   </data>
   <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
     <value>{0} (branch)</value>

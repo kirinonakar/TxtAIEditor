@@ -3225,7 +3225,7 @@
     <value>すべてコピー</value>
   </data>
   <data name="AgentChatBranchFromHere" xml:space="preserve">
-    <value>この地点から分岐</value>
+    <value>ブランチ</value>
   </data>
   <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
     <value>{0}（ブランチ）</value>

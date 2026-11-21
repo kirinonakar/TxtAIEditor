@@ -3225,7 +3225,7 @@
     <value>전체 복사</value>
   </data>
   <data name="AgentChatBranchFromHere" xml:space="preserve">
-    <value>이 지점에서 브랜치</value>
+    <value>브랜치</value>
   </data>
   <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
     <value>{0} (브랜치)</value>
