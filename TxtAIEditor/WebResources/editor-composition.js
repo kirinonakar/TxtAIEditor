@@ -846,6 +846,16 @@ function finishColumnComposition(element, lineNumber) {
 
     function onBypassKeyDown(e) {
         if (!isBypassCompositionActive) {
+            // Copy must reach the document-level shortcut handler. Swallowing it
+            // here leaves the clipboard untouched because nothing is re-dispatched
+            // (the textarea itself is the active element) and this host keeps
+            // focus while a live preview selection is dragged, since pointerdown
+            // prevents the focus change. Pass it through without committing text
+            // or moving focus so the existing selection is copied.
+            if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey &&
+                (e.code === 'KeyC' || String(e.key || '').toLowerCase() === 'c')) {
+                return;
+            }
             const val = textareaBypassNode.value;
             
             if (bypassSelection) {

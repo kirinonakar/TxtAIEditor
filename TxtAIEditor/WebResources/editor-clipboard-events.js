@@ -1,7 +1,9 @@
 import {
     activeEditableElement,
+    csvTableMode,
     selectedText,
-    state
+    state,
+    writeClipboardText
 } from './editor-core.js';
 import { hasCustomSelection, normalizeSelection } from './editor-selection.js';
 import {
@@ -10,9 +12,34 @@ import {
     replaceSelectionWith
 } from './editor-commands.js';
 import { hideAutocomplete } from './editor-autocomplete.js';
+import { markdownTableSelection } from './editor-markdown-table-ui.js';
 
 export function bindClipboardEvents() {
     let suppressNativePasteUntil = 0;
+
+    // Rendered live preview content (for example a raw HTML table) keeps the
+    // selection in the preview DOM while focus may still sit on another host
+    // such as the IME bypass textarea. A keydown listener that host installs can
+    // consume Ctrl+C before the document shortcut handler runs, so the keydown
+    // is handled in the capture phase and the clipboard is written directly.
+    document.addEventListener('keydown', event => {
+        if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+        if (event.code !== 'KeyC' && String(event.key || '').toLowerCase() !== 'c') return;
+        // CSV tables and the hex editor own their copy shortcuts.
+        if (csvTableMode.isEnabled || state.language === 'hex') return;
+        // Markdown table cell selections copy tab separated cells.
+        if (markdownTableSelection()) return;
+        const target = event.target;
+        if (target && target.id !== 'ime-bypass-textarea' &&
+            (target.closest?.('#find-panel') || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+            return;
+        }
+        const text = selectedText();
+        if (!text) return;
+        event.preventDefault();
+        void writeClipboardText(text);
+    }, true);
+
     document.addEventListener('copy', event => {
         if (event.target && (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.closest('#find-panel'))) {
             if (event.target.id !== 'ime-bypass-textarea') return;

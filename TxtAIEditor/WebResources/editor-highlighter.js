@@ -1188,7 +1188,101 @@ function renderSearchMatchesForLine(lineNumber, text, matches, activeMatch, supp
 // offsets stored in searchController refer to the source text, not to the
 // rendered HTML. Re-run the active query against the rendered text nodes
 // so search terms keep their shading inside live preview rows.
-function wrapSourcePreviewSearchMatches(html, lineNumber) {
+function matchesInSourceRange(startLine, endLine) {
+    const matches = [];
+    for (let line = startLine; line <= endLine; line++) {
+        for (const match of searchController.matchesByLine.get(line) || []) {
+            matches.push(match);
+        }
+    }
+    return matches.sort((a, b) => Number(a.lineNumber) - Number(b.lineNumber) ||
+        Number(a.indexOfMatch) - Number(b.indexOfMatch));
+}
+
+// A raw HTML block such as <table> is painted from the whole source block at
+// once, so its text nodes have no per-line editing host and source offsets
+// cannot be mapped onto them. Highlight those blocks by scanning the rendered
+// text for the active query, which keeps find shading inside the table.
+function wrapRenderedBlockSearchMatches(template, nodes, startLine, endLine) {
+    const query = searchController.query;
+    if (!query || !nodes.length) return template.innerHTML;
+
+    const rangeMatches = matchesInSourceRange(startLine, endLine);
+    if (!rangeMatches.length) return template.innerHTML;
+
+    const active = searchController.activeMatch;
+    const activeOrdinal = active
+        ? rangeMatches.findIndex(match =>
+            Number(match.lineNumber) === active.lineNumber &&
+            Number(match.indexOfMatch) === active.indexOfMatch)
+        : -1;
+
+    let regex = null;
+    if (searchController.regex) {
+        try {
+            regex = new RegExp(query, searchController.matchCase ? 'g' : 'gi');
+        } catch (error) {
+            return template.innerHTML;
+        }
+    }
+
+    const needle = searchController.matchCase ? query : query.toLowerCase();
+    const skippedContainers = 'svg, math, script, style';
+    let occurrence = -1;
+
+    for (const textNode of nodes) {
+        const text = textNode.nodeValue || '';
+        if (!text) continue;
+        if (textNode.parentElement?.closest?.(skippedContainers)) continue;
+
+        const fragment = document.createDocumentFragment();
+        const appendMark = (start, length) => {
+            occurrence++;
+            const mark = document.createElement('mark');
+            mark.className = occurrence === activeOrdinal
+                ? 'search-match active-match'
+                : 'search-match';
+            mark.textContent = text.slice(start, start + length);
+            fragment.appendChild(mark);
+        };
+
+        let position = 0;
+        if (regex) {
+            regex.lastIndex = 0;
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+                if (match[0].length === 0) {
+                    regex.lastIndex++;
+                    continue;
+                }
+                if (match.index > position) {
+                    fragment.appendChild(document.createTextNode(text.slice(position, match.index)));
+                }
+                appendMark(match.index, match[0].length);
+                position = match.index + match[0].length;
+            }
+        } else {
+            const haystack = searchController.matchCase ? text : text.toLowerCase();
+            let index = haystack.indexOf(needle, position);
+            while (index >= 0) {
+                if (index > position) {
+                    fragment.appendChild(document.createTextNode(text.slice(position, index)));
+                }
+                appendMark(index, query.length);
+                position = index + query.length;
+                index = haystack.indexOf(needle, position);
+            }
+        }
+
+        if (fragment.childNodes.length === 0) continue;
+        if (position < text.length) fragment.appendChild(document.createTextNode(text.slice(position)));
+        textNode.replaceWith(fragment);
+    }
+
+    return template.innerHTML;
+}
+
+function wrapSourcePreviewSearchMatches(html, lineNumber, endLine = lineNumber) {
     const template = document.createElement('template');
     template.innerHTML = html;
     template.content.querySelectorAll('mark.search-match').forEach(mark => mark.replaceWith(...mark.childNodes));
@@ -1196,6 +1290,12 @@ function wrapSourcePreviewSearchMatches(html, lineNumber) {
     const nodes = [];
     let node;
     while ((node = walker.nextNode())) nodes.push(node);
+    // Whole-block renders such as a raw HTML <table> own no per-line editing
+    // host, so map the query onto their rendered text instead of source offsets.
+    const fieldless = nodes.filter(textNode => !textNode.parentElement?.closest('.line-text[data-line]'));
+    if (endLine > lineNumber && fieldless.length === nodes.length) {
+        return wrapRenderedBlockSearchMatches(template, nodes, lineNumber, endLine);
+    }
     const offsets = new Map();
     for (const textNode of nodes) {
         const field = textNode.parentElement?.closest('.line-text[data-line]');
@@ -1239,7 +1339,7 @@ function wrapPreviewHtmlSearchMatches(html, lineNumber, endLine, sourcePreservin
     if (!query || !html || searchController.matches.length === 0) {
         return html;
     }
-    if (sourcePreserving) return wrapSourcePreviewSearchMatches(html, lineNumber);
+    if (sourcePreserving) return wrapSourcePreviewSearchMatches(html, lineNumber, endLine ?? lineNumber);
 
     const active = searchController.activeMatch;
     let activeOrdinal = -1;
