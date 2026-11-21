@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
+using TxtAIEditor.Core.Services;
 using TxtAIEditor.Editor;
 
 namespace TxtAIEditor.Controls
@@ -70,7 +71,8 @@ namespace TxtAIEditor.Controls
         {
             return filePath?.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) == true ||
                    filePath?.EndsWith(".hwpx", StringComparison.OrdinalIgnoreCase) == true ||
-                   filePath?.EndsWith(".doc", StringComparison.OrdinalIgnoreCase) == true;
+                   filePath?.EndsWith(".doc", StringComparison.OrdinalIgnoreCase) == true ||
+                   (filePath?.EndsWith(".hwp", StringComparison.OrdinalIgnoreCase) == true && Rdocs2mdConverter.IsAvailable);
         }
     }
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Controls
 {
@@ -116,6 +117,10 @@ namespace TxtAIEditor.Controls
             ".ipynb"
         };
 
+        // .hwp has no built-in reader, so it is offered only when rdocs2md.exe can convert it.
+        private static readonly string[] Rdocs2mdConvertibleFileExtensions =
+            Rdocs2mdConverter.IsAvailable ? new[] { ".hwp" } : Array.Empty<string>();
+
         public static readonly string[] PickerFileExtensions =
             TextFileExtensions
                 .Concat(ImageFileExtensions)
@@ -124,6 +129,7 @@ namespace TxtAIEditor.Controls
                 .Concat(PdfFileExtensions)
                 .Concat(OfficeDocumentFileExtensions)
                 .Concat(NotebookFileExtensions)
+                .Concat(Rdocs2mdConvertibleFileExtensions)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
@@ -167,7 +173,8 @@ namespace TxtAIEditor.Controls
             string extension = Path.GetExtension(filePath);
             return extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) ||
                    extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".doc", StringComparison.OrdinalIgnoreCase);
+                   extension.Equals(".doc", StringComparison.OrdinalIgnoreCase) ||
+                   (extension.Equals(".hwp", StringComparison.OrdinalIgnoreCase) && Rdocs2mdConverter.IsAvailable);
         }
 
         private static bool HasExtension(string filePath, IEnumerable<string> extensions)

@@ -162,7 +162,11 @@ namespace TxtAIEditor.Controls
                 if (tab.IsDocxViewer)
                 {
                     var documentService = new DocumentTextExtractionService();
-                    string extractedText = await documentService.ExtractTextAsync(tab.FilePath, 50_000_000);
+                    // Keep rdocs2md Markdown layout intact on reload as well.
+                    string extractedText = await documentService.ExtractTextAsync(
+                        tab.FilePath,
+                        50_000_000,
+                        normalize: !Rdocs2mdConverter.SupportsExtension(tab.FilePath));
                     var docxModel = TextModelFactory.FromText(extractedText);
                     ApplyTabReloadState(tab, docxModel, "UTF-8", false);
 

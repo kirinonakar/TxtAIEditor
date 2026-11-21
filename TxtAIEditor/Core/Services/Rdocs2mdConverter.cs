@@ -23,11 +23,40 @@ namespace TxtAIEditor.Core.Services
             ".odt", ".ods", ".odp", ".rtf", ".epub"
         };
 
-        private static readonly Lazy<string?> ResolvedExecutablePath = new Lazy<string?>(FindExecutablePath, LazyThreadSafetyMode.ExecutionAndPublication);
+        private static readonly Lazy<string?> ResolvedExecutablePath = new Lazy<string?>(FindExecutablePathSafely, LazyThreadSafetyMode.ExecutionAndPublication);
 
-        public static bool IsAvailable => ResolvedExecutablePath.Value is not null;
+        // Availability checks also run from static initializers, so they must never throw.
+        public static bool IsAvailable
+        {
+            get
+            {
+                try
+                {
+                    return ResolvedExecutablePath.Value is not null;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"rdocs2md availability check failed: {ex.Message}");
+                    return false;
+                }
+            }
+        }
 
-        public static string? ExecutablePath => ResolvedExecutablePath.Value;
+        public static string? ExecutablePath
+        {
+            get
+            {
+                try
+                {
+                    return ResolvedExecutablePath.Value;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"rdocs2md path resolution failed: {ex.Message}");
+                    return null;
+                }
+            }
+        }
 
         public static bool SupportsExtension(string filePath)
         {
@@ -36,13 +65,21 @@ namespace TxtAIEditor.Core.Services
                 return false;
             }
 
-            return SupportedExtensions.Contains(Path.GetExtension(filePath));
+            try
+            {
+                return SupportedExtensions.Contains(Path.GetExtension(filePath));
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException)
+            {
+                Debug.WriteLine($"rdocs2md extension check failed for {filePath}: {ex.Message}");
+                return false;
+            }
         }
 
         public static async Task<string> ConvertToMarkdownAsync(string filePath, CancellationToken cancellationToken = default)
         {
-            string? executablePath = ResolvedExecutablePath.Value;
-            if (string.IsNullOrWhiteSpace(executablePath) || string.IsNullOrWhiteSpace(filePath))
+            string? executablePath = ExecutablePath;
+            if (string.IsNullOrWhiteSpace(executablePath) || string.IsNullOrWhiteSpace(filePath) || !SafeFileExists(executablePath))
             {
                 return string.Empty;
             }
@@ -62,9 +99,18 @@ namespace TxtAIEditor.Core.Services
             startInfo.ArgumentList.Add("md");
 
             using var process = new Process { StartInfo = startInfo };
-            if (!process.Start())
+            try
             {
-                throw new InvalidOperationException("Could not start rdocs2md.exe.");
+                if (!process.Start())
+                {
+                    Debug.WriteLine("rdocs2md.exe did not start; skipped document conversion.");
+                    return string.Empty;
+                }
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is IOException || ex is UnauthorizedAccessException)
+            {
+                Debug.WriteLine($"Failed to start rdocs2md.exe: {ex.Message}");
+                return string.Empty;
             }
 
             Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
@@ -117,6 +163,32 @@ namespace TxtAIEditor.Core.Services
             }
 
             return null;
+        }
+
+        private static string? FindExecutablePathSafely()
+        {
+            try
+            {
+                return FindExecutablePath();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"rdocs2md lookup failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static bool SafeFileExists(string path)
+        {
+            try
+            {
+                return File.Exists(path);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to probe {path}: {ex.Message}");
+                return false;
+            }
         }
 
         private static IEnumerable<string> EnumerateCandidatePaths()

@@ -360,7 +360,9 @@ namespace TxtAIEditor.Controls
         private async Task<OpenedTab> OpenReadOnlyDocumentFileAsync(string filePath)
         {
             var documentService = new DocumentTextExtractionService();
-            string extractedText = await documentService.ExtractTextAsync(filePath, 50_000_000);
+            // rdocs2md Markdown keeps meaningful indentation and headings, so skip whitespace normalization.
+            bool keepConvertedMarkdown = Rdocs2mdConverter.SupportsExtension(filePath);
+            string extractedText = await documentService.ExtractTextAsync(filePath, 50_000_000, normalize: !keepConvertedMarkdown);
             return _openNewTab(new FileTabOpenRequest
             {
                 FilePath = filePath,
