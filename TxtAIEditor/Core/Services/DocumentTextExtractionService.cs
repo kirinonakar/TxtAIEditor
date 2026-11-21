@@ -53,16 +53,19 @@ namespace TxtAIEditor.Core.Services
             cancellationToken.ThrowIfCancellationRequested();
             progress?.Report(1);
             string extension = Path.GetExtension(filePath).ToLowerInvariant();
-            if (skipProtectedDocuments && extension != ".pdf" && OfficeSearchProtection.IsEncrypted(filePath, cancellationToken))
-            {
-                throw new InvalidDataException("Encrypted Office documents are skipped during folder search.");
-            }
 
+            // HWP 5 is an OLE compound document, so the Office encryption probe below would treat it
+            // as an encrypted container. Try rdocs2md first so such formats stay searchable.
             string? markdown = await TryConvertWithRdocs2mdAsync(filePath, extension, cancellationToken).ConfigureAwait(false);
             if (markdown is not null)
             {
                 progress?.Report(98);
                 return Truncate(normalize ? NormalizeExtractedText(markdown) : markdown, maxChars);
+            }
+
+            if (skipProtectedDocuments && extension != ".pdf" && OfficeSearchProtection.IsEncrypted(filePath, cancellationToken))
+            {
+                throw new InvalidDataException("Encrypted Office documents are skipped during folder search.");
             }
 
             string tempFilePath = string.Empty;
