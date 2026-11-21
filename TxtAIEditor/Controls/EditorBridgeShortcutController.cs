@@ -158,6 +158,11 @@ namespace TxtAIEditor.Controls
                 case "print":
                     _print();
                     break;
+                case "find":
+                    // Forwarded from the HTML live preview iframe, where Ctrl+F
+                    // cannot reach the editor's own find panel.
+                    _ = bridge.TriggerFindAsync();
+                    break;
                 case "searchAll":
                     _focusSearchPanel();
                     break;

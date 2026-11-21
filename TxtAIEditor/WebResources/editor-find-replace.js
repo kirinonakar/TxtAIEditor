@@ -20,6 +20,11 @@ import {
     state
 } from './editor-core.js';
 import { focusLine } from './editor-commands.js';
+import {
+    isFullHtmlLivePreviewActive,
+    postHtmlLivePreviewFind,
+    resetHtmlLivePreviewFind
+} from './editor-html-live-preview.js';
 
 export function createFindReplaceController({ revealLine }) {
     let findDebounceTimer = 0;
@@ -110,6 +115,7 @@ function executeReplaceAll() {
 function closeFindPanel() {
     findPanel.hidden = true;
     searchController.clearResults();
+    resetHtmlLivePreviewFind();
     queueRender(true);
     focusLine(state.currentLine, Math.max(0, state.currentColumn - 1));
 }
@@ -121,6 +127,7 @@ function requestFindAll() {
             documentVersion: state.documentVersion,
             clearPendingNavigation: true
         });
+        resetHtmlLivePreviewFind();
         queueRender(true);
         return;
     }
@@ -132,11 +139,34 @@ function requestFindAll() {
         isRegex: searchController.regex,
         currentLine: state.currentLine || 1
     });
+
+    // The HTML live preview paints matches inside its sandboxed iframe, so the
+    // query has to be forwarded there as well.
+    if (isFullHtmlLivePreviewActive()) {
+        postHtmlLivePreviewFind({
+            query,
+            matchCase: searchController.matchCase,
+            isRegex: searchController.regex,
+            direction: 0
+        });
+    }
 }
 
 function requestFind(reverse = false) {
     const query = findInput.value;
     if (!query) return;
+
+    if (isFullHtmlLivePreviewActive()) {
+        // Navigation must follow the matches painted in the preview frame, not
+        // the source-text matches of the hidden editor viewport.
+        postHtmlLivePreviewFind({
+            query,
+            matchCase: searchController.matchCase,
+            isRegex: searchController.regex,
+            direction: reverse ? -1 : 1
+        });
+        return;
+    }
 
     if (!searchController.hasFreshResults(query, state.documentVersion)) {
         searchController.queueNavigation({

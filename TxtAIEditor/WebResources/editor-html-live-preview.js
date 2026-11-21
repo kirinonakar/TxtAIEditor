@@ -2,6 +2,45 @@ import { htmlLivePreview, viewport } from './editor-dom.js';
 import { post, requestMissingLines, state, viewportController } from './editor-core.js';
 import { buildHtmlPreviewFrameBridgeScript } from './html-preview-frame-bridge.js';
 
+// The preview document lives in a sandboxed iframe without same-origin access,
+// so find requests are forwarded by message and the last one is replayed after
+// every reload of the preview document.
+let pendingPreviewFind = null;
+
+function postPreviewFindToFrame(request) {
+    const target = htmlLivePreview.contentWindow;
+    if (!target) return;
+
+    const query = String(request?.query || '');
+    try {
+        target.postMessage({
+            source: 'txtaieditor-host',
+            action: query ? 'previewFind' : 'previewFindClear',
+            query,
+            matchCase: !!request?.matchCase,
+            isRegex: !!request?.isRegex,
+            direction: Number(request?.direction || 0),
+            activeIndex: Number.isInteger(request?.activeIndex) ? request.activeIndex : -1
+        }, '*');
+    } catch (error) { }
+}
+
+function postHtmlLivePreviewFind({ query, matchCase, isRegex, direction, activeIndex }) {
+    pendingPreviewFind = {
+        query: String(query || ''),
+        matchCase: !!matchCase,
+        isRegex: !!isRegex,
+        direction: Number(direction || 0),
+        activeIndex: Number.isInteger(activeIndex) ? activeIndex : -1
+    };
+    postPreviewFindToFrame(pendingPreviewFind);
+}
+
+function resetHtmlLivePreviewFind() {
+    pendingPreviewFind = null;
+    postPreviewFindToFrame(null);
+}
+
 function escapeAttribute(value) {
     return String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -56,13 +95,33 @@ function createFullHtmlLivePreviewRenderer() {
     window.addEventListener('message', event => {
         const message = event.data;
         if (event.source !== htmlLivePreview.contentWindow ||
-            message?.source !== 'txtaieditor-html-preview' ||
-            message?.type !== 'shortcut' ||
+            message?.source !== 'txtaieditor-html-preview') {
+            return;
+        }
+
+        if (message.type === 'previewFindState') {
+            if (pendingPreviewFind && pendingPreviewFind.query === String(message.query || '')) {
+                const activeIndex = Number(message.activeIndex);
+                if (Number.isInteger(activeIndex) && activeIndex >= 0) {
+                    pendingPreviewFind.activeIndex = activeIndex;
+                }
+            }
+            return;
+        }
+
+        if (message.type !== 'shortcut' ||
             !message.name ||
             String(message.name).toLowerCase() === 'f7') {
             return;
         }
         post({ type: 'shortcut', name: String(message.name) });
+    });
+
+    // A rebuilt preview document drops its highlights, so replay the last find
+    // request once the frame has loaded again.
+    htmlLivePreview.addEventListener('load', () => {
+        if (!pendingPreviewFind || !isFullHtmlLivePreviewActive()) return;
+        postPreviewFindToFrame(pendingPreviewFind);
     });
 
     function deactivate() {
@@ -131,5 +190,7 @@ export {
     buildHtmlPreviewDocument,
     createFullHtmlLivePreviewRenderer,
     isFullDocumentLivePreviewLanguage,
-    isFullHtmlLivePreviewActive
+    isFullHtmlLivePreviewActive,
+    postHtmlLivePreviewFind,
+    resetHtmlLivePreviewFind
 };

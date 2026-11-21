@@ -70,10 +70,165 @@ function htmlPreviewFrameBridge() {
     installStorageFallback('localStorage');
     installStorageFallback('sessionStorage');
 
+    // Find support. The preview document runs in a sandboxed iframe without
+    // same-origin access, so the host posts the find query here and this script
+    // paints every hit with the CSS Custom Highlight API.
+    const findHighlight = 'txtaieditor-find-match';
+    const activeFindHighlight = 'txtaieditor-find-active';
+    let findRanges = [];
+    let findActiveIndex = -1;
+    let findQueryKey = '';
+
+    function clearFindHighlights() {
+        findRanges = [];
+        findActiveIndex = -1;
+        findQueryKey = '';
+        if (window.CSS && CSS.highlights) {
+            CSS.highlights.delete(findHighlight);
+            CSS.highlights.delete(activeFindHighlight);
+        }
+    }
+
+    function ensureFindStyles() {
+        if (document.getElementById('txtaieditor-find-style')) return;
+        const style = document.createElement('style');
+        style.id = 'txtaieditor-find-style';
+        style.textContent = '::highlight(' + findHighlight + '){background:#ffd43b;color:#212529;}' +
+            '::highlight(' + activeFindHighlight + '){background:#fd7e14;color:#ffffff;}';
+        (document.head || document.documentElement).appendChild(style);
+    }
+
+    function collectFindTextNodes() {
+        const nodes = [];
+        if (!document.body) return nodes;
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+                const parent = node.parentElement;
+                if (!parent || parent.closest('script,style,noscript,template,title')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+        let node = walker.nextNode();
+        while (node) {
+            nodes.push(node);
+            node = walker.nextNode();
+        }
+        return nodes;
+    }
+
+    function buildFindRanges(query, matchCase, isRegex) {
+        const ranges = [];
+        let matcher;
+        try {
+            const pattern = isRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            matcher = new RegExp(pattern, matchCase ? 'g' : 'gi');
+        } catch (error) {
+            return ranges;
+        }
+
+        // Matches are collected per text node: hits never cross element bounds,
+        // which is acceptable for a rendered document preview.
+        for (const node of collectFindTextNodes()) {
+            const text = node.nodeValue;
+            matcher.lastIndex = 0;
+            let match = matcher.exec(text);
+            while (match) {
+                const length = match[0].length;
+                if (length === 0) {
+                    matcher.lastIndex += 1;
+                } else {
+                    const range = document.createRange();
+                    range.setStart(node, match.index);
+                    range.setEnd(node, match.index + length);
+                    ranges.push(range);
+                    if (ranges.length >= 5000) return ranges;
+                }
+                match = matcher.exec(text);
+            }
+        }
+        return ranges;
+    }
+
+    function scrollActiveFindRangeIntoView() {
+        const range = findRanges[findActiveIndex];
+        if (!range || !range.startContainer.isConnected) return;
+        const element = range.startContainer.parentElement;
+        if (!element) return;
+        element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+    }
+
+    function applyFindState(data) {
+        const query = String(data.query || '');
+        if (!query) {
+            clearFindHighlights();
+            return;
+        }
+        if (!window.CSS || !CSS.highlights || typeof Highlight !== 'function') {
+            return;
+        }
+
+        ensureFindStyles();
+        const matchCase = !!data.matchCase;
+        const isRegex = !!data.isRegex;
+        const direction = Number(data.direction || 0);
+        const requestedIndex = Number(data.activeIndex);
+        const queryKey = [query, matchCase ? 1 : 0, isRegex ? 1 : 0].join('\u0000');
+
+        if (queryKey !== findQueryKey) {
+            findQueryKey = queryKey;
+            findRanges = buildFindRanges(query, matchCase, isRegex);
+            if (findRanges.length === 0) {
+                findActiveIndex = -1;
+            } else if (Number.isInteger(requestedIndex) && requestedIndex >= 0 &&
+                requestedIndex < findRanges.length) {
+                findActiveIndex = requestedIndex;
+            } else {
+                findActiveIndex = direction < 0 ? findRanges.length - 1 : 0;
+            }
+        } else if (findRanges.length > 0) {
+            if (direction > 0) {
+                findActiveIndex = (findActiveIndex + 1) % findRanges.length;
+            } else if (direction < 0) {
+                findActiveIndex = (findActiveIndex - 1 + findRanges.length) % findRanges.length;
+            } else if (findActiveIndex < 0) {
+                findActiveIndex = 0;
+            }
+        }
+
+        CSS.highlights.set(findHighlight, new Highlight(...findRanges));
+        if (findActiveIndex >= 0 && findActiveIndex < findRanges.length) {
+            CSS.highlights.set(activeFindHighlight, new Highlight(findRanges[findActiveIndex]));
+        } else {
+            CSS.highlights.delete(activeFindHighlight);
+        }
+        scrollActiveFindRangeIntoView();
+
+        try {
+            window.parent.postMessage({
+                source: 'txtaieditor-html-preview',
+                type: 'previewFindState',
+                query,
+                count: findRanges.length,
+                activeIndex: findActiveIndex
+            }, '*');
+        } catch (error) { }
+    }
+
     window.addEventListener('message', event => {
-        if (event.source === window.parent &&
-            event.data?.source === 'txtaieditor-host' && event.data.action === 'print') {
+        if (event.source !== window.parent) return;
+
+        const data = event.data;
+        if (!data || data.source !== 'txtaieditor-host') return;
+
+        if (data.action === 'print') {
             window.print();
+        } else if (data.action === 'previewFind') {
+            applyFindState(data);
+        } else if (data.action === 'previewFindClear') {
+            clearFindHighlights();
         }
     });
 
