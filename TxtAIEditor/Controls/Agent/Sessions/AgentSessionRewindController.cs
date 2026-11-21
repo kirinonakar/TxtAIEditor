@@ -92,6 +92,68 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        /// <summary>
+        /// 지정한 출력 위치 이전 상태까지 스냅샷을 연속으로 되돌린다.
+        /// </summary>
+        public async Task<bool> RewindToOffsetAsync(int outputOffset)
+        {
+            string sessionId = _currentSessionIdProvider();
+            if (_sessionEditController.IsReviewSessionRunning(sessionId))
+            {
+                return false;
+            }
+
+            try
+            {
+                using IDisposable lease = await _toolExecutionSessionGate.EnterExclusiveAsync();
+                if (_currentSessionIdProvider() != sessionId || _sessionEditController.IsReviewSessionRunning(sessionId))
+                {
+                    return false;
+                }
+
+                _saveActiveOpenSessionFromUI();
+
+                var session = _ensureOpenSession(sessionId);
+                if (session.RewindSnapshots.Count == 0)
+                {
+                    return false;
+                }
+
+                bool rewound = false;
+                session.IsRewinding = true;
+                try
+                {
+                    while (session.RewindSnapshots.Count > 0 &&
+                        session.RewindSnapshots.ReadLatest().OutputText.Length > outputOffset)
+                    {
+                        AgentSessionRewindSnapshot snapshot = session.RewindSnapshots.ReadLatest();
+                        await _sessionEditController.RevertRunAsync(sessionId, snapshot);
+                        session.RewindSnapshots.RemoveLatest(snapshot);
+                        RestoreOpenSessionFromSnapshot(session, snapshot);
+                        rewound = true;
+                    }
+
+                    if (rewound)
+                    {
+                        await PersistRewoundSessionHistoryAsync(session);
+                    }
+                }
+                finally
+                {
+                    _finishRewinding(session);
+                }
+
+                return rewound;
+            }
+            catch (Exception ex)
+            {
+                _showError(
+                    _getString("AgentSessionRewindErrorTitle", "세션 되감기 오류"),
+                    string.Format(_getString("AgentSessionRewindErrorFormat", "세션을 되감는 중 오류가 발생했습니다: {0}"), ex.Message));
+                return false;
+            }
+        }
+
         private void RestoreOpenSessionFromSnapshot(
             AgentOpenSessionState session,
             AgentSessionRewindSnapshot snapshot)

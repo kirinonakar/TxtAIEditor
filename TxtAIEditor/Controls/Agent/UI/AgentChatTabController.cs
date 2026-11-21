@@ -337,6 +337,10 @@ namespace TxtAIEditor.Controls
                             copy = _getString("EditorContextMenuCopy", "복사"),
                             copyAll = _getString("AgentChatCopyAll", "전체 복사"),
                             branch = _getString("AgentChatBranchFromHere", "브랜치"),
+                            edit = _getString("AgentChatEditPrompt", "편집"),
+                            editSend = _getString("AgentChatEditSend", "보내기"),
+                            cancel = _getString("CommonCancel", "취소"),
+                            rewind = _getString("AgentChatRewindToHere", "되감기"),
                             userRole = _getString("AgentChatUserRole", "사용자 지시"),
                             assistantRole = _getString("AgentChatAssistantRole", "AI 답변"),
                             copied = _getString("AgentChatCopied", "복사됨"),
@@ -380,6 +384,37 @@ namespace TxtAIEditor.Controls
                             branchOffset.TryGetInt32(out int branchOffsetValue))
                         {
                             QueueSessionAction(tab, core, () => branchAgent.BranchChatSession(branchSessionId, branchOffsetValue));
+                        }
+                        break;
+                    case "editPrompt":
+                        if (_agent is { } editAgent &&
+                            ReadString(message, "sessionId") is { Length: > 0 } editSessionId &&
+                            ReadString(message, "prompt") is { Length: > 0 } editedPrompt &&
+                            TryReadOffset(message, out int editOffset))
+                        {
+                            editAgent.ResendChatPrompt(editSessionId, editOffset, editedPrompt, accepted =>
+                            {
+                                if (_tab != tab || _readyWebView != core)
+                                {
+                                    return;
+                                }
+
+                                if (!accepted)
+                                {
+                                    // Roll the optimistic bubble text back to the host state.
+                                    _lastSnapshot = null;
+                                }
+
+                                Refresh();
+                            });
+                        }
+                        break;
+                    case "rewindPrompt":
+                        if (_agent is { } rewindAgent &&
+                            ReadString(message, "sessionId") is { Length: > 0 } rewindSessionId &&
+                            TryReadOffset(message, out int rewindOffset))
+                        {
+                            QueueSessionAction(tab, core, () => _ = RewindPromptAsync(tab, core, rewindAgent, rewindSessionId, rewindOffset));
                         }
                         break;
                     case "loadImage":
@@ -442,6 +477,27 @@ namespace TxtAIEditor.Controls
                 ? value.GetString()
                 : null;
 
+        private static bool TryReadOffset(JsonElement message, out int offset)
+        {
+            if (message.TryGetProperty("offset", out var value) && value.ValueKind == JsonValueKind.Number &&
+                value.TryGetInt32(out offset))
+            {
+                return true;
+            }
+
+            offset = 0;
+            return false;
+        }
+
+        private async Task RewindPromptAsync(OpenedTab tab, CoreWebView2 core, AgentController agent, string sessionId, int offset)
+        {
+            await agent.RewindChatPromptAsync(sessionId, offset);
+            if (_tab == tab && _readyWebView == core)
+            {
+                Refresh();
+            }
+        }
+
         private static bool TryCopyText(string text)
         {
             try
@@ -490,6 +546,7 @@ namespace TxtAIEditor.Controls
             bool outputChanged = !sameSession || !ReferenceEquals(_lastSnapshot?.Output, snapshot.Output);
             if (!imageWorkspaceChanged && !shouldSendPrompts && !shouldSendPendingPrompts && !shouldSendHiddenOutput && !outputChanged &&
                 _lastSnapshot?.CanSubmit == snapshot.CanSubmit &&
+                _lastSnapshot?.CanRewind == snapshot.CanRewind &&
                 _lastTheme == settings.Theme && _lastUsePele == settings.UsePele)
             {
                 return;
@@ -512,6 +569,7 @@ namespace TxtAIEditor.Controls
                 hiddenOutput = shouldSendHiddenOutput ? snapshot.HiddenOutput : null,
                 imageWorkspaceKey = _imageWorkspaceKey,
                 snapshot.CanSubmit,
+                snapshot.CanRewind,
                 theme = settings.Theme,
                 usePele = settings.UsePele
             });

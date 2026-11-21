@@ -231,6 +231,39 @@ namespace TxtAIEditor.Controls
             return _openSessionController.BranchSession(outputOffset);
         }
 
+        internal void ResendChatPrompt(string sessionId, int outputOffset, string prompt, Action<bool> completed)
+        {
+            if (!string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal) || string.IsNullOrWhiteSpace(prompt) ||
+                !_openSessionController.CanSubmitChatPrompt)
+            {
+                completed(false);
+                return;
+            }
+
+            _ = ResendChatPromptAsync(outputOffset, prompt.Trim(), completed);
+        }
+
+        internal Task<bool> RewindChatPromptAsync(string sessionId, int outputOffset)
+        {
+            if (!string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal))
+            {
+                return Task.FromResult(false);
+            }
+
+            return _sessionRewindController.RewindToOffsetAsync(outputOffset);
+        }
+
+        private async Task ResendChatPromptAsync(int outputOffset, string prompt, Action<bool> completed)
+        {
+            if (!await _sessionRewindController.RewindToOffsetAsync(outputOffset))
+            {
+                completed(false);
+                return;
+            }
+
+            SubmitChatPrompt(_currentSessionId, prompt, completed);
+        }
+
         private void RestoreSessionHistoryState(
             string sessionHistoryText,
             double sessionHistoryTokenCount,

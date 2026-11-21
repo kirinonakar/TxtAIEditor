@@ -3242,6 +3242,15 @@ Plan: {0}</value>
   <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
     <value>{0} (branch)</value>
   </data>
+  <data name="AgentChatEditPrompt" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="AgentChatEditSend" xml:space="preserve">
+    <value>Send</value>
+  </data>
+  <data name="AgentChatRewindToHere" xml:space="preserve">
+    <value>Rewind</value>
+  </data>
   <data name="AgentChatUserRole" xml:space="preserve">
     <value>User</value>
   </data>

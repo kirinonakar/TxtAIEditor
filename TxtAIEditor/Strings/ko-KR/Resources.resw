@@ -3242,6 +3242,15 @@
   <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
     <value>{0} (브랜치)</value>
   </data>
+  <data name="AgentChatEditPrompt" xml:space="preserve">
+    <value>편집</value>
+  </data>
+  <data name="AgentChatEditSend" xml:space="preserve">
+    <value>보내기</value>
+  </data>
+  <data name="AgentChatRewindToHere" xml:space="preserve">
+    <value>되감기</value>
+  </data>
   <data name="AgentChatUserRole" xml:space="preserve">
     <value>사용자 지시</value>
   </data>

@@ -1026,9 +1026,11 @@ namespace TxtAIEditor.Controls
         {
             var session = EnsureSession(_currentSessionIdProvider());
             string output = _agentPane.GetRawOutputText();
+            bool canRewind = !IsCurrentSessionRunning() && !HasPendingSubagentShutdown(session.Id) &&
+                session.RewindSnapshots.Count > 0;
             return new AgentChatSnapshot(session.Id, session.WorkspaceRoot,
                 session.ChatPrompts.Count == 0 ? NormalizePlaceholderOutput(output) : output,
-                session.ChatPrompts, session.PendingChatPrompts, session.ChatHiddenOutput, CanSubmitChatPrompt);
+                session.ChatPrompts, session.PendingChatPrompts, session.ChatHiddenOutput, CanSubmitChatPrompt, canRewind);
         }
 
         internal void FormatSessionOutput(AgentOpenSessionState session)

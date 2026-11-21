@@ -102,6 +102,34 @@ body {
 .message-copy:disabled { opacity: .45; cursor: default; }
 
 .message-branch { margin-left: .35rem; }
+.message-edit { margin-left: .35rem; }
+.message-rewind { margin-left: .35rem; }
+
+.message-editor {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: .35rem;
+    margin-top: .4rem;
+    max-width: 100%;
+}
+
+.message-editor[hidden] { display: none; }
+
+.message-editor-input {
+    width: min(620px, 100%);
+    min-height: 2.6rem;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--card);
+    color: var(--foreground);
+    font: inherit;
+    resize: vertical;
+}
+
+.message-editor-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.message-editor-actions { display: flex; gap: .35rem; }
 
 .assistant p { margin: 0 0 .7em; }
 .assistant .message-content > :last-child > :last-child { margin-bottom: 0; }

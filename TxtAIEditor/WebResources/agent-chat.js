@@ -68,6 +68,12 @@ let sessionCopyId = null;
 let sessionCopyFeedbackTimer;
 let nextCopyId = 0;
 let canBranch = false;
+let canRewind = false;
+let sessionItems = [];
+let editLabel = '';
+let editSendLabel = '';
+let editCancelLabel = '';
+let rewindLabel = '';
 
 function scrollToEnd() {
     if (followOutput) history.scrollTop = history.scrollHeight;
@@ -315,25 +321,37 @@ function createMessageView(role, start) {
     copyButton.textContent = copyLabel;
     copyButton.setAttribute('aria-live', 'polite');
     copyButton.hidden = true;
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.className = 'message-copy message-edit';
+    editButton.hidden = true;
+    const rewindButton = document.createElement('button');
+    rewindButton.type = 'button';
+    rewindButton.className = 'message-copy message-rewind';
+    rewindButton.hidden = true;
     const branchButton = document.createElement('button');
     branchButton.type = 'button';
     branchButton.className = 'message-copy message-branch';
     branchButton.hidden = true;
-    node.append(content, copyButton, branchButton);
+    node.append(content, copyButton, editButton, rewindButton, branchButton);
 
     const view = {
-        node, content, role, start, copyButton, branchButton, copyId: String(++nextCopyId), copyText: ''
+        node, content, role, start, copyButton, editButton, rewindButton, branchButton,
+        copyId: String(++nextCopyId), copyText: '', editing: false, editor: null
     };
     copyButton.addEventListener('click', () => {
         if (view.copyText) {
             host.postMessage({ action: 'copy', copyId: view.copyId, text: view.copyText });
         }
     });
+    editButton.addEventListener('click', () => beginEdit(view));
+    rewindButton.addEventListener('click', () => rewindTo(view));
     branchButton.addEventListener('click', () => {
         if (view.role !== 'assistant' || view.end == null || !sessionId) return;
         host.postMessage({ action: 'branch', sessionId, offset: view.end });
     });
     syncBranchButton(view);
+    syncEditButtons(view);
     return view;
 }
 
@@ -343,6 +361,140 @@ function syncBranchButton(view) {
     view.branchButton.title = branchLabel;
     view.branchButton.setAttribute('aria-label', branchLabel);
     view.branchButton.hidden = !visible;
+}
+
+function isCurrentSessionRunning() {
+    return sessionItems.some(item => item.id === sessionId && item.isRunning);
+}
+
+function setMessageButton(button, label, visible) {
+    if (!label || !visible) {
+        button.hidden = true;
+        return;
+    }
+    if (button.textContent !== label) {
+        button.textContent = label;
+        button.title = label;
+        button.setAttribute('aria-label', label);
+    }
+    button.hidden = false;
+}
+
+function syncEditButtons(view) {
+    const running = isCurrentSessionRunning();
+    const editable = view.role === 'user' && view.start != null && !!view.copyText && canSubmit && !running && !view.editing;
+    const rewindable = view.role === 'user' && view.start != null && canRewind && !running && !view.editing;
+    setMessageButton(view.editButton, editLabel, editable);
+    setMessageButton(view.rewindButton, rewindLabel, rewindable);
+}
+
+function rewindTo(view) {
+    if (view.role !== 'user' || view.start == null || !sessionId) return;
+    host.postMessage({ action: 'rewindPrompt', sessionId, offset: view.start });
+}
+
+function beginEdit(view) {
+    if (view.role !== 'user' || view.start == null || view.editing) return;
+    const editor = ensureEditor(view);
+    view.editing = true;
+    editor.input.value = view.copyText;
+    editor.node.hidden = false;
+    view.content.hidden = true;
+    resizeEditorInput(editor.input);
+    syncEditButtons(view);
+    syncEditorButtons(view);
+    editor.input.focus();
+    editor.input.setSelectionRange(editor.input.value.length, editor.input.value.length);
+}
+
+function endEdit(view) {
+    if (!view.editing) return;
+    view.editing = false;
+    if (view.editor) view.editor.node.hidden = true;
+    view.content.hidden = false;
+    view.copyButton.hidden = !view.copyText;
+    syncEditButtons(view);
+}
+
+function ensureEditor(view) {
+    if (view.editor) return view.editor;
+    const node = document.createElement('div');
+    node.className = 'message-editor';
+    node.hidden = true;
+    const input = document.createElement('textarea');
+    input.className = 'message-editor-input';
+    input.rows = 2;
+    input.spellcheck = false;
+    const actions = document.createElement('div');
+    actions.className = 'message-editor-actions';
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.className = 'message-copy';
+    const sendButton = document.createElement('button');
+    sendButton.type = 'button';
+    sendButton.className = 'message-copy message-editor-send';
+    actions.append(cancelButton, sendButton);
+    node.append(input, actions);
+    view.node.append(node);
+
+    const editor = { node, input, cancelButton, sendButton, composing: false };
+    view.editor = editor;
+    cancelButton.addEventListener('click', () => endEdit(view));
+    sendButton.addEventListener('click', () => submitEdit(view));
+    input.addEventListener('input', () => {
+        resizeEditorInput(input);
+        syncEditorButtons(view);
+    });
+    input.addEventListener('compositionstart', () => { editor.composing = true; });
+    input.addEventListener('compositionend', () => { editor.composing = false; });
+    input.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            endEdit(view);
+            return;
+        }
+        if (event.key !== 'Enter' || event.shiftKey || event.isComposing || editor.composing || event.keyCode === 229) return;
+        event.preventDefault();
+        submitEdit(view);
+    });
+    syncEditorButtons(view);
+    return editor;
+}
+
+function syncEditorButtons(view) {
+    const editor = view.editor;
+    if (!editor) return;
+    if (editor.cancelButton.textContent !== editCancelLabel) {
+        editor.cancelButton.textContent = editCancelLabel;
+        editor.cancelButton.title = editCancelLabel;
+        editor.cancelButton.setAttribute('aria-label', editCancelLabel);
+    }
+    if (editor.sendButton.textContent !== editSendLabel) {
+        editor.sendButton.textContent = editSendLabel;
+        editor.sendButton.title = editSendLabel;
+        editor.sendButton.setAttribute('aria-label', editSendLabel);
+    }
+    editor.sendButton.disabled = !editor.input.value.trim();
+}
+
+function resizeEditorInput(input) {
+    input.style.height = 'auto';
+    input.style.height = `${input.scrollHeight}px`;
+}
+
+function submitEdit(view) {
+    const editor = view.editor;
+    if (!editor || !sessionId || view.start == null) return;
+    const prompt = editor.input.value.trim();
+    if (!prompt) {
+        editor.input.focus();
+        return;
+    }
+    const offset = view.start;
+    view.copyText = prompt;
+    view.content.textContent = prompt;
+    endEdit(view);
+    host.postMessage({ action: 'editPrompt', sessionId, offset, prompt });
 }
 
 function renderConversation(offset, renderAll) {
@@ -372,10 +524,11 @@ function renderConversation(offset, renderAll) {
             else messages.append(view.node);
         }
         if (role === 'user') {
-            if (view.copyText !== userText) view.content.textContent = userText;
+            if (!view.editing && view.copyText !== userText) view.content.textContent = userText;
             view.copyText = userText;
-            view.copyButton.hidden = !userText;
+            view.copyButton.hidden = view.editing || !userText;
             view.node.hidden = !userText;
+            syncEditButtons(view);
         } else if (!reusable || renderAll || view.end !== end || offset < end) {
             renderAssistant(view, preamble + visibleOutput(start, end));
         }
@@ -488,6 +641,7 @@ function syncSessionSelection() {
 }
 
 function showSessions(items) {
+    sessionItems = items;
     const visibleIds = new Set(items.map(item => item.id));
     for (const [id, button] of sessionButtons) {
         if (visibleIds.has(id)) continue;
@@ -626,10 +780,12 @@ function update(message) {
         if (switched || message.prompts || message.pendingPrompts) showJumpLinks(targets);
     }
     canSubmit = message.canSubmit;
+    canRewind = message.canRewind === true;
     if (canBranch !== canSubmit) {
         canBranch = canSubmit;
         for (const view of messageViews) syncBranchButton(view);
     }
+    for (const view of messageViews) syncEditButtons(view);
     syncComposer();
     scrollToEnd();
 }
@@ -705,10 +861,18 @@ host.addEventListener('message', ({ data }) => {
             copyFailedLabel = data.copyFailed;
             copyAllLabel = data.copyAll;
             branchLabel = data.branch;
+            editLabel = data.edit;
+            editSendLabel = data.editSend;
+            editCancelLabel = data.cancel;
+            rewindLabel = data.rewind;
             userRoleLabel = data.userRole;
             assistantRoleLabel = data.assistantRole;
             setCopyAllLabel(copyAllLabel);
-            for (const view of messageViews) syncBranchButton(view);
+            for (const view of messageViews) {
+                syncBranchButton(view);
+                syncEditButtons(view);
+                syncEditorButtons(view);
+            }
             break;
         case 'update':
             update(data);

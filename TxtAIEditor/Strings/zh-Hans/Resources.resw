@@ -3242,6 +3242,15 @@
   <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
     <value>{0}（分支）</value>
   </data>
+  <data name="AgentChatEditPrompt" xml:space="preserve">
+    <value>编辑</value>
+  </data>
+  <data name="AgentChatEditSend" xml:space="preserve">
+    <value>发送</value>
+  </data>
+  <data name="AgentChatRewindToHere" xml:space="preserve">
+    <value>回退</value>
+  </data>
   <data name="AgentChatUserRole" xml:space="preserve">
     <value>用户指令</value>
   </data>

@@ -3242,6 +3242,15 @@
   <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
     <value>{0}（ブランチ）</value>
   </data>
+  <data name="AgentChatEditPrompt" xml:space="preserve">
+    <value>編集</value>
+  </data>
+  <data name="AgentChatEditSend" xml:space="preserve">
+    <value>送信</value>
+  </data>
+  <data name="AgentChatRewindToHere" xml:space="preserve">
+    <value>巻き戻し</value>
+  </data>
   <data name="AgentChatUserRole" xml:space="preserve">
     <value>ユーザー指示</value>
   </data>
