@@ -129,7 +129,16 @@ namespace TxtAIEditor.Controls
                 GetActiveDocument();
                 _workspace.ActiveTabView = tabView;
                 tabView.SelectedItem = item;
-                (item.Content as WebView2)?.Focus(FocusState.Programmatic);
+                // Move focus after the tab activation completes. Moving WebView2 focus while the
+                // activation is still being processed can leave the TSF/IME host bound to the
+                // previous document, so Korean input falls back to alphanumeric typing.
+                _pane.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+                {
+                    if (_tab == tab && _navigation.GetActiveTab() == tab)
+                    {
+                        (item.Content as WebView2)?.Focus(FocusState.Programmatic);
+                    }
+                });
             }
             UpdateToggleState();
         }

@@ -565,8 +565,13 @@ function syncComposer() {
             composerSessionId = sessionId;
             promptBox.value = drafts.get(sessionId) ?? '';
         }
-        composer.hidden = !canSubmit;
-        promptBox.disabled = !canSubmit;
+        // Disabling or hiding a focused textarea tears down the WebView2 IME host, which can drop
+        // a Korean IME back to alphanumeric mode mid-typing. Defer the state change until the
+        // composer loses focus; the send button and submit handler still block unusable prompts.
+        if (document.activeElement !== promptBox) {
+            composer.hidden = !canSubmit;
+            promptBox.disabled = !canSubmit;
+        }
     }
     sendButton.disabled = !canSubmit || composerSessionId !== sessionId ||
         pending.has(sessionId) || (!composing && !promptBox.value.trim());
@@ -641,6 +646,7 @@ promptBox.addEventListener('compositionend', () => {
     composing = false;
     requestAnimationFrame(syncComposer);
 });
+promptBox.addEventListener('blur', () => requestAnimationFrame(syncComposer));
 window.addEventListener('keydown', event => {
     if (event.defaultPrevented || event.isComposing || composing || event.keyCode === 229) return;
     if (event.key === 'F7') {
