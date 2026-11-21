@@ -393,7 +393,7 @@ function syncEditButtons(view) {
 
 function rewindTo(view) {
     if (view.role !== 'user' || view.start == null || !sessionId) return;
-    host.postMessage({ action: 'rewindPrompt', sessionId, offset: view.start });
+    host.postMessage({ action: 'rewindPrompt', sessionId, offset: view.start, prompt: view.copyText ?? '' });
 }
 
 function beginEdit(view) {
@@ -734,6 +734,18 @@ function syncComposer() {
         pending.has(sessionId) || (!composing && !promptBox.value.trim());
 }
 
+function prefillComposer(text) {
+    if (!text || composing) return;
+    drafts.set(sessionId, text);
+    composerSessionId = sessionId;
+    promptBox.value = text;
+    syncComposer();
+    if (canSubmit && !promptBox.disabled) {
+        promptBox.focus();
+        promptBox.setSelectionRange(text.length, text.length);
+    }
+}
+
 function update(message) {
     const switched = sessionId !== message.sessionId;
     const imageWorkspaceChanged = imageWorkspaceKey !== message.imageWorkspaceKey;
@@ -922,6 +934,10 @@ host.addEventListener('message', ({ data }) => {
                 if (composerSessionId === data.sessionId) promptBox.value = '';
             }
             syncComposer();
+            break;
+        }
+        case 'rewindResult': {
+            if (data.rewound && data.sessionId === sessionId) prefillComposer(data.prompt);
             break;
         }
     }

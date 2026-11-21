@@ -412,9 +412,11 @@ namespace TxtAIEditor.Controls
                     case "rewindPrompt":
                         if (_agent is { } rewindAgent &&
                             ReadString(message, "sessionId") is { Length: > 0 } rewindSessionId &&
+                            ReadString(message, "prompt") is { } rewindPromptText &&
                             TryReadOffset(message, out int rewindOffset))
                         {
-                            QueueSessionAction(tab, core, () => _ = RewindPromptAsync(tab, core, rewindAgent, rewindSessionId, rewindOffset));
+                            QueueSessionAction(tab, core, () => _ = RewindPromptAsync(
+                                tab, core, rewindAgent, rewindSessionId, rewindOffset, rewindPromptText));
                         }
                         break;
                     case "loadImage":
@@ -489,13 +491,22 @@ namespace TxtAIEditor.Controls
             return false;
         }
 
-        private async Task RewindPromptAsync(OpenedTab tab, CoreWebView2 core, AgentController agent, string sessionId, int offset)
+        private async Task RewindPromptAsync(
+            OpenedTab tab, CoreWebView2 core, AgentController agent, string sessionId, int offset, string prompt)
         {
-            await agent.RewindChatPromptAsync(sessionId, offset);
-            if (_tab == tab && _readyWebView == core)
+            bool rewound = await agent.RewindChatPromptAsync(sessionId, offset);
+            if (_tab != tab || _readyWebView != core)
             {
-                Refresh();
+                return;
             }
+
+            if (rewound)
+            {
+                // Let the composer pick up the rewound instruction so it can be edited and resent.
+                Post(new { action = "rewindResult", sessionId, prompt, rewound });
+            }
+
+            Refresh();
         }
 
         private static bool TryCopyText(string text)
