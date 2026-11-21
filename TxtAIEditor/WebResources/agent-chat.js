@@ -339,7 +339,7 @@ function createMessageView(role, start) {
     node.append(content, actions);
 
     const view = {
-        node, content, role, start, copyButton, editButton, rewindButton, branchButton,
+        node, content, actions, role, start, copyButton, editButton, rewindButton, branchButton,
         copyId: String(++nextCopyId), copyText: '', editing: false, editor: null
     };
     copyButton.addEventListener('click', () => {
@@ -403,6 +403,11 @@ function beginEdit(view) {
     editor.input.value = view.copyText;
     editor.node.hidden = false;
     view.content.hidden = true;
+    // Keep the copy action on the same row as cancel/send instead of above the editor.
+    if (view.copyText) {
+        editor.actions.prepend(view.copyButton);
+        view.copyButton.hidden = false;
+    }
     resizeEditorInput(editor.input);
     syncEditButtons(view);
     syncEditorButtons(view);
@@ -413,7 +418,10 @@ function beginEdit(view) {
 function endEdit(view) {
     if (!view.editing) return;
     view.editing = false;
-    if (view.editor) view.editor.node.hidden = true;
+    if (view.editor) {
+        view.editor.node.hidden = true;
+        view.actions.insertBefore(view.copyButton, view.editButton);
+    }
     view.content.hidden = false;
     view.copyButton.hidden = !view.copyText;
     syncEditButtons(view);
@@ -440,7 +448,7 @@ function ensureEditor(view) {
     node.append(input, actions);
     view.node.append(node);
 
-    const editor = { node, input, cancelButton, sendButton, composing: false };
+    const editor = { node, input, actions, cancelButton, sendButton, composing: false };
     view.editor = editor;
     cancelButton.addEventListener('click', () => endEdit(view));
     sendButton.addEventListener('click', () => submitEdit(view));
@@ -529,7 +537,7 @@ function renderConversation(offset, renderAll) {
         if (role === 'user') {
             if (!view.editing && view.copyText !== userText) view.content.textContent = userText;
             view.copyText = userText;
-            view.copyButton.hidden = view.editing || !userText;
+            view.copyButton.hidden = !userText;
             view.node.hidden = !userText;
             syncEditButtons(view);
         } else if (!reusable || renderAll || view.end !== end || offset < end) {
