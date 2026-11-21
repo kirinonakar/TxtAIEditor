@@ -333,7 +333,10 @@ function createMessageView(role, start) {
     branchButton.type = 'button';
     branchButton.className = 'message-copy message-branch';
     branchButton.hidden = true;
-    node.append(content, copyButton, editButton, rewindButton, branchButton);
+    const actions = document.createElement('div');
+    actions.className = 'message-actions';
+    actions.append(copyButton, editButton, rewindButton, branchButton);
+    node.append(content, actions);
 
     const view = {
         node, content, role, start, copyButton, editButton, rewindButton, branchButton,
