@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,6 +20,12 @@ namespace TxtAIEditor.Controls
         private readonly SemaphoreSlim _approvalGate = new(1, 1);
         private TaskCompletionSource<bool>? _diffApprovalTcs;
         private string? _approvalSessionId;
+
+        // External read approvals last for the run's session so repeated read_file
+        // calls on the same file (for example different line ranges) do not prompt again.
+        private readonly object _externalReadApprovalLock = new();
+        private readonly HashSet<string> _approvedExternalReadPaths = new(StringComparer.OrdinalIgnoreCase);
+        private string? _approvedExternalReadSessionId;
 
         public AgentConfirmationController(
             ISettingsService settingsService,
@@ -132,10 +139,15 @@ namespace TxtAIEditor.Controls
             });
         }
 
-        public Task<bool> ConfirmExternalReadAsync(string fullPath, CancellationToken cancellationToken)
+        public async Task<bool> ConfirmExternalReadAsync(string fullPath, CancellationToken cancellationToken)
         {
             string? sessionId = _activeRunContextProvider()?.SessionId;
-            return _runOnUIThreadAsync(() =>
+            if (IsExternalReadApprovedForSession(sessionId, fullPath))
+            {
+                return true;
+            }
+
+            bool approved = await _runOnUIThreadAsync(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (_agentPane.XamlRoot == null)
@@ -147,12 +159,52 @@ namespace TxtAIEditor.Controls
                 {
                     string header = _getString("AgentExternalReadTitle", "외부 파일 읽기 허가");
                     string description = string.Format(
-                        _getString("AgentExternalReadDescriptionFormat", "작업 폴더 밖에 있는 이 파일을 에이전트가 읽도록 허용하시겠습니까?\n\n{0}"),
+                        _getString("AgentExternalReadDescriptionFormat", "작업 폴더 밖에 있는 이 파일을 에이전트가 읽도록 허용하시겠습니까? 이 세션에서는 같은 파일을 다시 묻지 않습니다.\n\n{0}"),
                         fullPath);
-                    string approveText = _getString("AgentExternalReadAllowOnce", "이번만 허용");
+                    string approveText = _getString("AgentExternalReadAllowSession", "이 세션 동안 허용");
                     _agentPane.ShowExternalReadConfirm(header, description, approveText);
                 }, sessionId, cancellationToken);
-            });
+            }).ConfigureAwait(false);
+
+            if (approved)
+            {
+                RememberExternalReadApproval(sessionId, fullPath);
+            }
+
+            return approved;
+        }
+
+        private bool IsExternalReadApprovedForSession(string? sessionId, string fullPath)
+        {
+            if (string.IsNullOrEmpty(sessionId) || string.IsNullOrEmpty(fullPath))
+            {
+                return false;
+            }
+
+            lock (_externalReadApprovalLock)
+            {
+                return string.Equals(sessionId, _approvedExternalReadSessionId, StringComparison.Ordinal) &&
+                    _approvedExternalReadPaths.Contains(fullPath);
+            }
+        }
+
+        private void RememberExternalReadApproval(string? sessionId, string fullPath)
+        {
+            if (string.IsNullOrEmpty(sessionId) || string.IsNullOrEmpty(fullPath))
+            {
+                return;
+            }
+
+            lock (_externalReadApprovalLock)
+            {
+                if (!string.Equals(sessionId, _approvedExternalReadSessionId, StringComparison.Ordinal))
+                {
+                    _approvedExternalReadPaths.Clear();
+                    _approvedExternalReadSessionId = sessionId;
+                }
+
+                _approvedExternalReadPaths.Add(fullPath);
+            }
         }
 
         public async Task<bool> ConfirmPowerShellAsync(string command)

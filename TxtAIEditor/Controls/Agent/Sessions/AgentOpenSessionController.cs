@@ -566,6 +566,185 @@ namespace TxtAIEditor.Controls
             RestoreSession(session);
         }
 
+        /// <summary>
+        /// 현재 세션의 대화를 지정한 출력 위치까지만 이어받는 새 세션을 만든다.
+        /// </summary>
+        public bool BranchSession(int outputOffset)
+        {
+            string sourceId = _currentSessionIdProvider();
+            var source = EnsureSession(sourceId);
+            if (source.IsRewinding || source.Role == AgentSessionRole.Subagent ||
+                _runningSessions.ContainsKey(sourceId) || IsPendingClose(sourceId))
+            {
+                return false;
+            }
+
+            SaveActiveFromUI();
+            int branchOffset = Math.Min(outputOffset, source.OutputText.Length);
+            if (branchOffset <= 0 || string.IsNullOrWhiteSpace(NormalizePlaceholderOutput(source.OutputText)))
+            {
+                return false;
+            }
+
+            var branch = CreateBlankSession();
+            branch.Role = source.Role;
+            branch.UseSubagents = source.UseSubagents;
+            branch.Selections = source.Selections.Copy();
+            branch.WorkspaceRoot = source.WorkspaceRoot;
+            if (source.LlmSettings != null)
+            {
+                branch.LlmSettings = CloneSessionSettings(source.LlmSettings);
+            }
+
+            if (branchOffset >= source.OutputText.Length)
+            {
+                CopySessionBodyForBranch(source, branch);
+            }
+            else if (FindBranchSnapshot(source, branchOffset) is { } snapshot)
+            {
+                CopySnapshotBodyForBranch(snapshot, branch);
+            }
+            else
+            {
+                CopyTruncatedBodyForBranch(source, branch, branchOffset);
+            }
+
+            branch.Title = BuildBranchSessionTitle(source.Title);
+            branch.ActivityText = _displayText.ActivityIdle;
+            branch.UpdatedAt = DateTime.Now;
+            _sessionEditController.SetLiveEdits(branch.Id, branch.SessionEdits);
+            _openSessions.Insert(0, branch);
+            RestoreSession(branch);
+            return true;
+        }
+
+        private static void CopySessionBodyForBranch(AgentOpenSessionState source, AgentOpenSessionState branch)
+        {
+            branch.OutputText = source.OutputText;
+            branch.ChatPrompts = source.ChatPrompts.ToList();
+            branch.ChatHiddenOutput = source.ChatHiddenOutput.ToList();
+            branch.SessionHistoryText = source.SessionHistoryText;
+            branch.ModelSessionHistoryText = source.ModelSessionHistoryText;
+            branch.LastAnswerText = source.LastAnswerText;
+            branch.SessionHistoryTokenCount = source.SessionHistoryTokenCount;
+            branch.CurrentRunTranscriptTokens = source.CurrentRunTranscriptTokens;
+            branch.Attachments = AgentSessionRewindSnapshot.CloneAttachments(source.Attachments);
+            branch.SessionEdits = AgentSessionRewindSnapshot.CloneEdits(source.SessionEdits);
+        }
+
+        private void CopySnapshotBodyForBranch(AgentSessionRewindSnapshot snapshot, AgentOpenSessionState branch)
+        {
+            branch.OutputText = string.IsNullOrEmpty(snapshot.OutputText) ? _displayText.OutputPlaceholder : snapshot.OutputText;
+            branch.ChatPrompts = snapshot.ChatPrompts.ToList();
+            branch.ChatHiddenOutput = snapshot.ChatHiddenOutput.ToList();
+            branch.SessionHistoryText = snapshot.SessionHistoryText;
+            branch.ModelSessionHistoryText = snapshot.ModelSessionHistoryText;
+            branch.LastAnswerText = snapshot.LastAnswerText;
+            branch.SessionHistoryTokenCount = snapshot.SessionHistoryTokenCount;
+            branch.CurrentRunTranscriptTokens = snapshot.CurrentRunTranscriptTokens;
+            branch.Attachments = snapshot.CloneAttachments();
+            branch.SessionEdits = AgentSessionRewindSnapshot.CloneEdits(snapshot.SessionEdits);
+            if (!string.IsNullOrWhiteSpace(snapshot.WorkspaceRoot))
+            {
+                branch.WorkspaceRoot = snapshot.WorkspaceRoot;
+            }
+        }
+
+        private void CopyTruncatedBodyForBranch(AgentOpenSessionState source, AgentOpenSessionState branch, int branchOffset)
+        {
+            branch.OutputText = source.OutputText[..branchOffset];
+            var prompts = new List<AgentChatPrompt>();
+            foreach (var prompt in source.ChatPrompts)
+            {
+                if (prompt.Start >= branchOffset)
+                {
+                    break;
+                }
+                prompts.Add(prompt.End > branchOffset ? prompt with { End = branchOffset } : prompt);
+            }
+
+            branch.ChatPrompts = prompts;
+            branch.ChatHiddenOutput = source.ChatHiddenOutput
+                .Where(range => range.Start < branchOffset)
+                .Select(range => range.End > branchOffset ? range with { End = branchOffset } : range)
+                .ToList();
+            branch.SessionHistoryText = TruncateHistoryForBranch(source.SessionHistoryText, source.ChatPrompts, prompts.Count);
+            // Historical sessions have no rewind snapshots; rebuild the model history from the truncated transcript.
+            branch.ModelSessionHistoryText = string.Empty;
+            branch.LastAnswerText = AgentHistoryController.ExtractLastAgentResponse(branch.SessionHistoryText);
+            branch.SessionHistoryTokenCount = AgentTokenEstimator.Estimate(branch.SessionHistoryText);
+            branch.CurrentRunTranscriptTokens = 0;
+            branch.Attachments = AgentSessionRewindSnapshot.CloneAttachments(source.Attachments);
+            branch.SessionEdits = AgentSessionRewindSnapshot.CloneEdits(source.SessionEdits);
+        }
+
+        private AgentSessionRewindSnapshot? FindBranchSnapshot(AgentOpenSessionState session, int branchOffset)
+        {
+            for (int index = session.RewindSnapshots.Count - 1; index >= 0; index--)
+            {
+                var snapshot = session.RewindSnapshots.ReadAt(index);
+                if (snapshot.ChatPrompts.Count == 0)
+                {
+                    // Rewind snapshots are appended in run order, so earlier entries are empty as well.
+                    return null;
+                }
+                if (NormalizePlaceholderOutput(snapshot.OutputText).Length <= branchOffset)
+                {
+                    return snapshot;
+                }
+            }
+
+            return null;
+        }
+
+        private static string TruncateHistoryForBranch(
+            string history, IReadOnlyList<AgentChatPrompt> prompts, int keepCount)
+        {
+            if (string.IsNullOrEmpty(history) || keepCount <= 0 || keepCount >= prompts.Count)
+            {
+                return history;
+            }
+
+            int position = 0;
+            for (int index = 0; index < keepCount; index++)
+            {
+                string kept = prompts[index].Text?.Trim() ?? string.Empty;
+                if (kept.Length == 0)
+                {
+                    continue;
+                }
+
+                int found = history.IndexOf(kept, position, StringComparison.Ordinal);
+                if (found < 0)
+                {
+                    return history;
+                }
+                position = found + kept.Length;
+            }
+
+            string dropped = prompts[keepCount].Text?.Trim() ?? string.Empty;
+            int dropIndex = dropped.Length == 0 ? position : history.IndexOf(dropped, position, StringComparison.Ordinal);
+            if (dropIndex < 0)
+            {
+                return history;
+            }
+
+            // Cut at the turn marker that precedes the dropped prompt.
+            int marker = dropIndex > 0 ? history.LastIndexOf("[user]", dropIndex - 1, StringComparison.Ordinal) : -1;
+            int cut = marker >= 0 ? marker : dropIndex;
+            return cut > 0 ? history[..cut].TrimEnd() : history;
+        }
+
+        private string BuildBranchSessionTitle(string title)
+        {
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return string.Empty;
+            }
+
+            return string.Format(_getString("AgentChatBranchSessionTitleFormat", "{0} (브랜치)"), title);
+        }
+
         public void CloseSession(string sessionId)
         {
             var session = FindOpenSession(sessionId);
@@ -923,6 +1102,59 @@ namespace TxtAIEditor.Controls
                     SyncVisibleThinkingStateToSession(session);
                 }
             });
+        }
+
+        public async Task AppendRunNoticeAsync(AgentRunContext context, string message)
+        {
+            await FlushQueuedRunOutputTextAsync(context);
+            await RunOnUIThreadAsync(() =>
+            {
+                var session = FindOpenSession(context.SessionId);
+                if (session == null)
+                {
+                    return;
+                }
+
+                string timestamp = DateTime.Now.ToString("HH:mm:ss");
+                string line = $"{timestamp}  {message}";
+                if (IsSessionVisible(context.SessionId))
+                {
+                    // 진행 중인 thinking/도구 호출 상태 라인을 유지한 채 안내 라인만 덧붙인다.
+                    _agentPane.AppendActivityPreservingThinking(message);
+                    session.OutputText = _agentPane.GetRawOutputText();
+                    session.ActivityText = _agentPane.Activity.Text ?? string.Empty;
+                    SyncVisibleThinkingStateToSession(session);
+                    return;
+                }
+
+                InsertActivityLineBeforeThinkingInSession(session, line);
+                session.ActivityText = string.IsNullOrWhiteSpace(session.ActivityText) ||
+                    _displayText.IsActivityIdle(session.ActivityText)
+                    ? line
+                    : session.ActivityText + Environment.NewLine + line;
+            });
+        }
+
+        private void InsertActivityLineBeforeThinkingInSession(AgentOpenSessionState session, string line)
+        {
+            string text = NormalizePlaceholderOutput(session.OutputText);
+            int insertAt = session.ThinkingLineActive && session.ThinkingLineStart >= 0 &&
+                session.ThinkingLineStart <= text.Length
+                ? session.ThinkingLineStart
+                : text.Length;
+            string head = text.Substring(0, insertAt);
+            string thinkingLine = text.Substring(insertAt);
+            string prefix = !string.IsNullOrEmpty(head) && !EndsWithLineBreak(head)
+                ? Environment.NewLine
+                : string.Empty;
+            string inserted = prefix + line + Environment.NewLine;
+
+            session.OutputText = head + inserted + thinkingLine;
+            if (session.ThinkingLineActive)
+            {
+                session.ThinkingLineStart += inserted.Length;
+            }
+            session.UpdatedAt = DateTime.Now;
         }
 
         public Task AppendRunOutputTextAsync(AgentRunContext context, string text, bool hideInChat = false)

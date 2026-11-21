@@ -61,11 +61,13 @@ let copyLabel = '';
 let copiedLabel = '';
 let copyFailedLabel = '';
 let copyAllLabel = '';
+let branchLabel = '';
 let userRoleLabel = '';
 let assistantRoleLabel = '';
 let sessionCopyId = null;
 let sessionCopyFeedbackTimer;
 let nextCopyId = 0;
+let canBranch = false;
 
 function scrollToEnd() {
     if (followOutput) history.scrollTop = history.scrollHeight;
@@ -275,6 +277,7 @@ function renderAssistant(view, text) {
     view.copyText = copyText;
     view.copyButton.hidden = !copyText;
     view.node.hidden = !blocks.length;
+    syncBranchButton(view);
 
     for (const [index, block] of blocks.entries()) {
         let node = content.children[index];
@@ -312,15 +315,34 @@ function createMessageView(role, start) {
     copyButton.textContent = copyLabel;
     copyButton.setAttribute('aria-live', 'polite');
     copyButton.hidden = true;
-    node.append(content, copyButton);
+    const branchButton = document.createElement('button');
+    branchButton.type = 'button';
+    branchButton.className = 'message-copy message-branch';
+    branchButton.hidden = true;
+    node.append(content, copyButton, branchButton);
 
-    const view = { node, content, role, start, copyButton, copyId: String(++nextCopyId), copyText: '' };
+    const view = {
+        node, content, role, start, copyButton, branchButton, copyId: String(++nextCopyId), copyText: ''
+    };
     copyButton.addEventListener('click', () => {
         if (view.copyText) {
             host.postMessage({ action: 'copy', copyId: view.copyId, text: view.copyText });
         }
     });
+    branchButton.addEventListener('click', () => {
+        if (view.role !== 'assistant' || view.end == null || !sessionId) return;
+        host.postMessage({ action: 'branch', sessionId, offset: view.end });
+    });
+    syncBranchButton(view);
     return view;
+}
+
+function syncBranchButton(view) {
+    const visible = view.role === 'assistant' && canBranch && !!branchLabel && !view.node.hidden;
+    view.branchButton.textContent = branchLabel;
+    view.branchButton.title = branchLabel;
+    view.branchButton.setAttribute('aria-label', branchLabel);
+    view.branchButton.hidden = !visible;
 }
 
 function renderConversation(offset, renderAll) {
@@ -595,6 +617,10 @@ function update(message) {
         if (switched || message.prompts || message.pendingPrompts) showJumpLinks(targets);
     }
     canSubmit = message.canSubmit;
+    if (canBranch !== canSubmit) {
+        canBranch = canSubmit;
+        for (const view of messageViews) syncBranchButton(view);
+    }
     syncComposer();
     scrollToEnd();
 }
@@ -668,9 +694,11 @@ host.addEventListener('message', ({ data }) => {
             copiedLabel = data.copied;
             copyFailedLabel = data.copyFailed;
             copyAllLabel = data.copyAll;
+            branchLabel = data.branch;
             userRoleLabel = data.userRole;
             assistantRoleLabel = data.assistantRole;
             setCopyAllLabel(copyAllLabel);
+            for (const view of messageViews) syncBranchButton(view);
             break;
         case 'update':
             update(data);

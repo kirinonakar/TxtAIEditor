@@ -2684,10 +2684,10 @@ Plan: {0}</value>
     <value>Allow access to an external file</value>
   </data>
   <data name="AgentExternalReadDescriptionFormat" xml:space="preserve">
-    <value>Allow the agent to read this file outside the workspace?&#10;&#10;{0}</value>
+    <value>Allow the agent to read this file outside the workspace? The same file will not be asked again in this session.&#10;&#10;{0}</value>
   </data>
-  <data name="AgentExternalReadAllowOnce" xml:space="preserve">
-    <value>Allow once</value>
+  <data name="AgentExternalReadAllowSession" xml:space="preserve">
+    <value>Allow for this session</value>
   </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell Execution Confirmation</value>
@@ -3223,6 +3223,12 @@ Plan: {0}</value>
   </data>
   <data name="AgentChatCopyAll" xml:space="preserve">
     <value>Copy all</value>
+  </data>
+  <data name="AgentChatBranchFromHere" xml:space="preserve">
+    <value>Branch from here</value>
+  </data>
+  <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
+    <value>{0} (branch)</value>
   </data>
   <data name="AgentChatUserRole" xml:space="preserve">
     <value>User</value>

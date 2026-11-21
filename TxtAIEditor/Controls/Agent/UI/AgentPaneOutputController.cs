@@ -190,6 +190,34 @@ namespace TxtAIEditor.Controls
             return start;
         }
 
+        public void AppendActivityLinePreservingThinking(string line)
+        {
+            FlushAllPendingOutputText();
+            ClearOutputPlaceholder();
+            if (!_thinkingLineActive ||
+                _thinkingLineStart < 0 ||
+                _thinkingLineStart > _rawOutputText.Length)
+            {
+                AppendOutputLine(line);
+                return;
+            }
+
+            // 진행 중인 thinking/도구 호출 상태 라인은 그대로 두고 안내 라인만 위에 삽입한다.
+            string thinkingLine = _rawOutputText.Substring(_thinkingLineStart);
+            string head = _rawOutputText.Substring(0, _thinkingLineStart);
+            string prefix = !string.IsNullOrEmpty(head) && !EndsWithLineBreak(head)
+                ? OutputLineBreak
+                : string.Empty;
+            string inserted = prefix + line + OutputLineBreak;
+
+            _pageReindexOffset = Math.Min(_pageReindexOffset, _thinkingLineStart);
+            _rawOutputText = head + inserted + thinkingLine;
+            _outputLength = _rawOutputText.Length;
+            _thinkingLineStart += inserted.Length;
+            RenderFullOutputText();
+            ScrollOutputToEnd();
+        }
+
         public int BeginOutputBlock(string title)
         {
             FlushAllPendingOutputText();

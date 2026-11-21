@@ -2684,10 +2684,10 @@
     <value>外部ファイルの読み取り許可</value>
   </data>
   <data name="AgentExternalReadDescriptionFormat" xml:space="preserve">
-    <value>エージェントがワークスペース外にあるこのファイルを読み取ることを許可しますか？&#10;&#10;{0}</value>
+    <value>エージェントがワークスペース外にあるこのファイルを読み取ることを許可しますか？同じファイルはこのセッション中に再度確認しません。&#10;&#10;{0}</value>
   </data>
-  <data name="AgentExternalReadAllowOnce" xml:space="preserve">
-    <value>今回のみ許可</value>
+  <data name="AgentExternalReadAllowSession" xml:space="preserve">
+    <value>このセッション中は許可</value>
   </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell 実行の確認</value>
@@ -3223,6 +3223,12 @@
   </data>
   <data name="AgentChatCopyAll" xml:space="preserve">
     <value>すべてコピー</value>
+  </data>
+  <data name="AgentChatBranchFromHere" xml:space="preserve">
+    <value>この地点から分岐</value>
+  </data>
+  <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
+    <value>{0}（ブランチ）</value>
   </data>
   <data name="AgentChatUserRole" xml:space="preserve">
     <value>ユーザー指示</value>

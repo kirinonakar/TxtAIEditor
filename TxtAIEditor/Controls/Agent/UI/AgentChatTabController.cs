@@ -325,6 +325,7 @@ namespace TxtAIEditor.Controls
                             send = _getString("AgentSendButton", "전송"),
                             copy = _getString("EditorContextMenuCopy", "복사"),
                             copyAll = _getString("AgentChatCopyAll", "전체 복사"),
+                            branch = _getString("AgentChatBranchFromHere", "이 지점에서 브랜치"),
                             userRole = _getString("AgentChatUserRole", "사용자 지시"),
                             assistantRole = _getString("AgentChatAssistantRole", "AI 답변"),
                             copied = _getString("AgentChatCopied", "복사됨"),
@@ -358,6 +359,16 @@ namespace TxtAIEditor.Controls
                         {
                             bool success = _navigation.GetActiveTab() == tab && TryCopyText(text);
                             Post(new { action = "copyResult", copyId, success });
+                        }
+                        break;
+                    case "branch":
+                        if (_agent is { } branchAgent &&
+                            ReadString(message, "sessionId") is { Length: > 0 } branchSessionId &&
+                            message.TryGetProperty("offset", out var branchOffset) &&
+                            branchOffset.ValueKind == JsonValueKind.Number &&
+                            branchOffset.TryGetInt32(out int branchOffsetValue))
+                        {
+                            QueueSessionAction(tab, core, () => branchAgent.BranchChatSession(branchSessionId, branchOffsetValue));
                         }
                         break;
                     case "loadImage":

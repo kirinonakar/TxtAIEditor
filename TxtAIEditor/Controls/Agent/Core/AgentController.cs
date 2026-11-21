@@ -221,6 +221,16 @@ namespace TxtAIEditor.Controls
             _ = _runCoordinator.SubmitChatPromptAsync(sessionId, prompt.Trim(), completed);
         }
 
+        internal bool BranchChatSession(string sessionId, int outputOffset)
+        {
+            if (!string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return _openSessionController.BranchSession(outputOffset);
+        }
+
         private void RestoreSessionHistoryState(
             string sessionHistoryText,
             double sessionHistoryTokenCount,

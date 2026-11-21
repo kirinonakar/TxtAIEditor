@@ -101,6 +101,8 @@ body {
 .message-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .message-copy:disabled { opacity: .45; cursor: default; }
 
+.message-branch { margin-left: .35rem; }
+
 .assistant p { margin: 0 0 .7em; }
 .assistant .message-content > :last-child > :last-child { margin-bottom: 0; }
 .assistant h1, .assistant h2, .assistant h3 { line-height: 1.3; }

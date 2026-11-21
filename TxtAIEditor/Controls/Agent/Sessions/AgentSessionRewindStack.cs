@@ -61,6 +61,12 @@ namespace TxtAIEditor.Controls
             return entry.Live ?? entry.Disk!.Read();
         }
 
+        public AgentSessionRewindSnapshot ReadAt(int index)
+        {
+            var entry = _entries[index];
+            return entry.Live ?? entry.Disk!.Read();
+        }
+
         public void RemoveLatest(AgentSessionRewindSnapshot snapshot)
         {
             _entries[^1].Disk?.Dispose();

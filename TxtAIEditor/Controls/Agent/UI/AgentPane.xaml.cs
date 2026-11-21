@@ -429,14 +429,27 @@ private Style? _accentRunButtonStyle;
         {
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
             AppendOutputLine($"{timestamp}  {message}");
+            AppendActivityTextLine(timestamp, message);
+        }
+
+        public void AppendActivityPreservingThinking(string message)
+        {
+            string timestamp = DateTime.Now.ToString("HH:mm:ss");
+            _outputController.AppendActivityLinePreservingThinking($"{timestamp}  {message}");
+            AppendActivityTextLine(timestamp, message);
+        }
+
+        private void AppendActivityTextLine(string timestamp, string message)
+        {
+            string line = $"{timestamp}  {message}";
             if (string.IsNullOrWhiteSpace(AgentActivityText.Text) ||
                 _displayText.IsActivityIdle(AgentActivityText.Text))
             {
-                AgentActivityText.Text = $"{timestamp}  {message}";
+                AgentActivityText.Text = line;
             }
             else
             {
-                AgentActivityText.Text += Environment.NewLine + $"{timestamp}  {message}";
+                AgentActivityText.Text += Environment.NewLine + line;
             }
 
             AgentActivityText.SelectionStart = AgentActivityText.Text.Length;

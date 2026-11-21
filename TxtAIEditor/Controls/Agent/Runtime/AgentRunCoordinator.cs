@@ -1033,7 +1033,7 @@ namespace TxtAIEditor.Controls
             string queuedNotice = _getString(
                 "AgentFollowUpQueued",
                 "추가 지시가 대기 중입니다. 다음 도구 호출이 끝나면 전송됩니다.");
-            _ = _runOutputController.AppendRunActivityAsync(context, queuedNotice);
+            _ = _runOutputController.AppendRunNoticeAsync(context, queuedNotice);
             return true;
         }
 

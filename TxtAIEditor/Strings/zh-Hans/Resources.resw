@@ -2684,10 +2684,10 @@
     <value>允许读取外部文件</value>
   </data>
   <data name="AgentExternalReadDescriptionFormat" xml:space="preserve">
-    <value>是否允许代理读取这个位于工作区之外的文件？&#10;&#10;{0}</value>
+    <value>是否允许代理读取这个位于工作区之外的文件？在同一会话中不会再次询问此文件。&#10;&#10;{0}</value>
   </data>
-  <data name="AgentExternalReadAllowOnce" xml:space="preserve">
-    <value>仅允许一次</value>
+  <data name="AgentExternalReadAllowSession" xml:space="preserve">
+    <value>本会话内允许</value>
   </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell 执行确认</value>
@@ -3223,6 +3223,12 @@
   </data>
   <data name="AgentChatCopyAll" xml:space="preserve">
     <value>复制全部</value>
+  </data>
+  <data name="AgentChatBranchFromHere" xml:space="preserve">
+    <value>从此处分支</value>
+  </data>
+  <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
+    <value>{0}（分支）</value>
   </data>
   <data name="AgentChatUserRole" xml:space="preserve">
     <value>用户指令</value>

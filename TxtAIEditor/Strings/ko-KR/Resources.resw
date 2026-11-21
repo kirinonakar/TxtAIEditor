@@ -2684,10 +2684,10 @@
     <value>외부 파일 읽기 허가</value>
   </data>
   <data name="AgentExternalReadDescriptionFormat" xml:space="preserve">
-    <value>작업 폴더 밖에 있는 이 파일을 에이전트가 읽도록 허용하시겠습니까?&#10;&#10;{0}</value>
+    <value>작업 폴더 밖에 있는 이 파일을 에이전트가 읽도록 허용하시겠습니까? 이 세션에서는 같은 파일을 다시 묻지 않습니다.&#10;&#10;{0}</value>
   </data>
-  <data name="AgentExternalReadAllowOnce" xml:space="preserve">
-    <value>이번만 허용</value>
+  <data name="AgentExternalReadAllowSession" xml:space="preserve">
+    <value>이 세션 동안 허용</value>
   </data>
   <data name="AgentPowerShellConfirmHeader" xml:space="preserve">
     <value>PowerShell 실행 확인</value>
@@ -3223,6 +3223,12 @@
   </data>
   <data name="AgentChatCopyAll" xml:space="preserve">
     <value>전체 복사</value>
+  </data>
+  <data name="AgentChatBranchFromHere" xml:space="preserve">
+    <value>이 지점에서 브랜치</value>
+  </data>
+  <data name="AgentChatBranchSessionTitleFormat" xml:space="preserve">
+    <value>{0} (브랜치)</value>
   </data>
   <data name="AgentChatUserRole" xml:space="preserve">
     <value>사용자 지시</value>

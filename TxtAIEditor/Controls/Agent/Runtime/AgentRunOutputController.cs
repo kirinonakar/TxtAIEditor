@@ -28,6 +28,11 @@ namespace TxtAIEditor.Controls
             return _openSessionController.AppendRunActivityAsync(context, message);
         }
 
+        public Task AppendRunNoticeAsync(AgentRunContext context, string message)
+        {
+            return _openSessionController.AppendRunNoticeAsync(context, message);
+        }
+
         public async Task AppendSubagentProgressAsync(AgentRunContext context, string message)
         {
             try
