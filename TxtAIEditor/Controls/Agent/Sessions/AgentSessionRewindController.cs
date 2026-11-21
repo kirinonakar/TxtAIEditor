@@ -123,14 +123,21 @@ namespace TxtAIEditor.Controls
                 session.IsRewinding = true;
                 try
                 {
-                    while (session.RewindSnapshots.Count > 0 &&
-                        session.RewindSnapshots.ReadLatest().OutputText.Length > outputOffset)
+                    while (session.RewindSnapshots.Count > 0)
                     {
                         AgentSessionRewindSnapshot snapshot = session.RewindSnapshots.ReadLatest();
+                        // Snapshots hold the state from before their run, so the run that owns the
+                        // requested point ends at or before the offset. Restore that boundary
+                        // snapshot too, otherwise only the first prompt is rewindable.
+                        bool isTarget = snapshot.OutputText.Length <= outputOffset;
                         await _sessionEditController.RevertRunAsync(sessionId, snapshot);
                         session.RewindSnapshots.RemoveLatest(snapshot);
                         RestoreOpenSessionFromSnapshot(session, snapshot);
                         rewound = true;
+                        if (isTarget)
+                        {
+                            break;
+                        }
                     }
 
                     if (rewound)
