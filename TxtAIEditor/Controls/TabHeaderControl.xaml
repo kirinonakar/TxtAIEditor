@@ -17,6 +17,7 @@
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <FontIcon x:Name="RemoteIcon"
@@ -54,8 +55,16 @@
                    Margin="0,0,4,0"
                    Opacity="0"
                    Foreground="#D83C3C" />
+        <FontIcon x:Name="AgentChatIcon"
+                  Grid.Column="4"
+                  Glyph="&#xE15F;"
+                  FontSize="12"
+                  VerticalAlignment="Center"
+                  Margin="0,0,6,0"
+                  Visibility="Collapsed"
+                  Opacity="1" />
         <TextBlock x:Name="TitleText"
-                   Grid.Column="4"
+                   Grid.Column="5"
                    MinWidth="0"
                    HorizontalAlignment="Stretch"
                    VerticalAlignment="Center"

@@ -60,6 +60,7 @@ namespace TxtAIEditor.Controls
             UpdateLockIcon();
             UpdateArchiveIcon();
             UpdateRemoteIcon();
+            UpdateAgentChatIcon();
             UpdateExternalPathIndicator();
 
             _tab.PropertyChanged += OnTabPropertyChanged;
@@ -203,6 +204,13 @@ namespace TxtAIEditor.Controls
         private void UpdateRemoteIcon()
         {
             RemoteIcon.Visibility = _tab?.IsRemoteFile == true
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void UpdateAgentChatIcon()
+        {
+            AgentChatIcon.Visibility = _tab?.IsAgentChat == true
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }

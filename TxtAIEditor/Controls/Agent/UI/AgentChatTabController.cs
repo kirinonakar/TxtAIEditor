@@ -168,7 +168,9 @@ namespace TxtAIEditor.Controls
                 DefaultBackgroundColor = WebViewAppearanceService.ResolveEditorBackgroundColor(_settings.CurrentSettings)
             };
             var tabView = _navigation.GetCurrentActiveTabView();
-            var item = new TabViewItem { Header = tab.Title, Content = webView, Tag = tab.Id };
+            var tabHeader = new TabHeaderControl();
+            tabHeader.Configure(tab, _getString("EncryptedTabTooltip", "암호화됨"));
+            var item = new TabViewItem { Header = tabHeader, Content = webView, Tag = tab.Id };
             _tab = tab;
             _item = item;
             _tabBridges[tab.Id] = (webView, null!);
