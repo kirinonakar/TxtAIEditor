@@ -143,7 +143,7 @@ namespace TxtAIEditor.Controls
                 new LlmTool
                 {
                     Name = "extract_document",
-                    Description = "Extract PDF, Word, PowerPoint, Excel, or HWPX content to TXT or CSV. Set sheet to convert one spreadsheet sheet to CSV.",
+                    Description = "Extract PDF, Word, PowerPoint, Excel, or HWPX content to TXT or CSV. Set sheet to convert spreadsheet sheets to CSV.",
                     Parameters = new
                     {
                         type = "object",
@@ -152,7 +152,7 @@ namespace TxtAIEditor.Controls
                             path = new { type = "string", description = "Document path. Reads outside the workspace require approval unless the document is attached." },
                             outputPath = new { type = "string", description = "Workspace destination. Omit for automatic naming." },
                             maxChars = new { type = "integer", description = "Default 5000000." },
-                            sheet = new { type = "string", description = "Spreadsheet only (.xlsx, .xls). Sheet name to convert to CSV; separate multiple names with commas." }
+                            sheet = new { type = "string", description = "Spreadsheet only (.xlsx, .xls). Sheet names or 1-based sheet numbers (3 = third sheet) to convert to CSV; separate multiple values with commas; ranges like 2-4 are accepted. Pure numbers are read as sheet numbers." }
                         },
                         required = new[] { "path" }
                     }

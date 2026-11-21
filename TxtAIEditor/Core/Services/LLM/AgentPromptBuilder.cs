@@ -90,10 +90,10 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             if (Rdocs2mdConverter.IsAvailable)
             {
-                return "- extract_document(path, [outputPath], [maxChars], [sheet]) extracts PDF, DOCX, PPTX, XLSX, HWPX, HWP, EPUB, DOC, XLS, or PPT and saves Markdown (.md). Pass sheet (a worksheet name, or a comma-separated list) to save only those spreadsheets as CSV (.csv). Read the generated TXT/CSV/MD in ranges. Scanned PDFs may need OCR.";
+                return "- extract_document(path, [outputPath], [maxChars], [sheet]) extracts PDF, DOCX, PPTX, XLSX, HWPX, HWP, EPUB, DOC, XLS, or PPT and saves Markdown (.md). Pass sheet (worksheet names or 1-based sheet numbers such as 3, comma-separated, ranges like 2-4 allowed) to save only those spreadsheets as CSV (.csv). Read the generated TXT/CSV/MD in ranges. Scanned PDFs may need OCR.";
             }
 
-            return "- extract_document(path, [outputPath], [maxChars], [sheet]) extracts PDF, DOCX, PPTX, XLSX, HWPX, DOC, XLS, or PPT. Pass sheet (a worksheet name, or a comma-separated list) to save only those spreadsheet sheets as CSV (.csv). Read the generated TXT/CSV in ranges. Scanned PDFs may need OCR.";
+            return "- extract_document(path, [outputPath], [maxChars], [sheet]) extracts PDF, DOCX, PPTX, XLSX, HWPX, DOC, XLS, or PPT. Pass sheet (worksheet names or 1-based sheet numbers such as 3, comma-separated, ranges like 2-4 allowed) to save only those spreadsheet sheets as CSV (.csv). Read the generated TXT/CSV in ranges. Scanned PDFs may need OCR.";
         }
 
         public static string BuildUserContent(

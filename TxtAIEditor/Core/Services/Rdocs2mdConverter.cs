@@ -83,15 +83,16 @@ namespace TxtAIEditor.Core.Services
 
         public static async Task<string> ConvertToMarkdownAsync(string filePath, CancellationToken cancellationToken = default)
         {
-            return await ConvertAsync(filePath, "md", sheetName: null, cancellationToken).ConfigureAwait(false);
+            return await ConvertAsync(filePath, "md", sheetName: null, sectionRange: null, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Converts a workbook to CSV. When <paramref name="sheetName"/> is set, only that worksheet is converted.
+        /// Converts a workbook to CSV. When <paramref name="sheetName"/> is set, only that worksheet is converted;
+        /// <paramref name="sectionRange"/> selects 1-based sheet numbers instead (e.g. "3" or "2-4").
         /// </summary>
-        public static async Task<string> ConvertToCsvAsync(string filePath, string? sheetName, CancellationToken cancellationToken = default)
+        public static async Task<string> ConvertToCsvAsync(string filePath, string? sheetName, string? sectionRange, CancellationToken cancellationToken = default)
         {
-            return await ConvertAsync(filePath, "csv", sheetName, cancellationToken).ConfigureAwait(false);
+            return await ConvertAsync(filePath, "csv", sheetName, sectionRange, cancellationToken).ConfigureAwait(false);
         }
 
         public static bool IsSpreadsheetExtension(string filePath)
@@ -112,7 +113,7 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static async Task<string> ConvertAsync(string filePath, string format, string? sheetName, CancellationToken cancellationToken)
+        private static async Task<string> ConvertAsync(string filePath, string format, string? sheetName, string? sectionRange, CancellationToken cancellationToken)
         {
             string? executablePath = ExecutablePath;
             if (string.IsNullOrWhiteSpace(executablePath) || string.IsNullOrWhiteSpace(filePath) || !SafeFileExists(executablePath))
@@ -137,6 +138,11 @@ namespace TxtAIEditor.Core.Services
             {
                 startInfo.ArgumentList.Add("--sheet");
                 startInfo.ArgumentList.Add(sheetName);
+            }
+            else if (!string.IsNullOrWhiteSpace(sectionRange))
+            {
+                startInfo.ArgumentList.Add("--pages");
+                startInfo.ArgumentList.Add(sectionRange);
             }
 
             using var process = new Process { StartInfo = startInfo };

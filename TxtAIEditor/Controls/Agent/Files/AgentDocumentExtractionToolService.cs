@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -87,7 +88,7 @@ namespace TxtAIEditor.Controls
             bool isTempFile = false;
             string targetPathForExtraction = fullPath;
             string extension = Path.GetExtension(fullPath).ToLowerInvariant();
-            IReadOnlyList<string> requestedSheets = SplitSheetNames(sheet);
+            IReadOnlyList<string> requestedSheets = SplitSheetSelection(sheet);
             bool useRdocs2mdSheets = requestedSheets.Count > 0 &&
                 Rdocs2mdConverter.IsAvailable &&
                 Rdocs2mdConverter.IsSpreadsheetExtension(fullPath);
@@ -265,7 +266,7 @@ namespace TxtAIEditor.Controls
             if (sheetNames.Count > 0)
             {
                 IReadOnlyList<ExtractedSpreadsheetSheet> matchedSheets = sheets
-                    .Where(candidate => sheetNames.Any(name => string.Equals(name, candidate.Name, StringComparison.OrdinalIgnoreCase)))
+                    .Where(candidate => MatchesSheetSelection(candidate, sheetNames))
                     .ToList();
                 if (matchedSheets.Count == 0)
                 {
@@ -273,7 +274,7 @@ namespace TxtAIEditor.Controls
                         _getString("AgentExtractDocumentSheetNotFoundFormat", "extract_document failed: sheet '{0}' was not found in {1}. Available sheets: {2}."),
                         string.Join(", ", sheetNames),
                         relativePath,
-                        string.Join(", ", sheets.Select(candidate => candidate.Name)));
+                        string.Join(", ", sheets.Select(candidate => $"{candidate.Index}: {candidate.Name}")));
                 }
 
                 sheets = matchedSheets;
@@ -343,12 +344,25 @@ namespace TxtAIEditor.Controls
             bool splitSheets = sheetNames.Count > 1;
             for (int index = 0; index < sheetNames.Count; index++)
             {
-                string sheetName = sheetNames[index];
+                string selection = sheetNames[index];
+                string? sheetName = null;
+                string? sectionRange = null;
+                int suffixNumber = index + 1;
+                if (TryParseSheetNumber(selection, out int sheetNumber))
+                {
+                    sectionRange = sheetNumber.ToString(CultureInfo.InvariantCulture);
+                    suffixNumber = sheetNumber;
+                }
+                else
+                {
+                    sheetName = selection;
+                }
+
                 string csvContent;
                 try
                 {
                     csvContent = Truncate(
-                        await Rdocs2mdConverter.ConvertToCsvAsync(fullPath, sheetName, _cancellationToken()).ConfigureAwait(false),
+                        await Rdocs2mdConverter.ConvertToCsvAsync(fullPath, sheetName, sectionRange, _cancellationToken()).ConfigureAwait(false),
                         maxChars);
                 }
                 catch (Exception ex)
@@ -367,7 +381,7 @@ namespace TxtAIEditor.Controls
                 }
 
                 string targetFullPath = splitSheets
-                    ? AddSheetSuffix(baseTargetFullPath, index + 1)
+                    ? AddSheetSuffix(baseTargetFullPath, suffixNumber)
                     : baseTargetFullPath;
                 await WriteExtractedContentAsync(builder, targetFullPath, csvContent).ConfigureAwait(false);
             }
@@ -405,17 +419,88 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private static IReadOnlyList<string> SplitSheetNames(string sheet)
+        private const int MaxExpandedSheetSelections = 500;
+
+        // Accepts sheet names, 1-based sheet numbers, and inclusive number ranges such as "2-4".
+        private static IReadOnlyList<string> SplitSheetSelection(string selection)
         {
-            if (string.IsNullOrWhiteSpace(sheet))
+            if (string.IsNullOrWhiteSpace(selection))
             {
                 return Array.Empty<string>();
             }
 
-            return sheet
-                .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            var expanded = new List<string>();
+            foreach (string token in selection.Split(
+                new[] { ',', ';' },
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!TryExpandSheetRange(token, expanded))
+                {
+                    expanded.Add(token);
+                }
+            }
+
+            return expanded
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+        }
+
+        private static bool TryExpandSheetRange(string token, List<string> expanded)
+        {
+            int separatorIndex = token.IndexOf('-');
+            if (separatorIndex <= 0 || separatorIndex == token.Length - 1)
+            {
+                return false;
+            }
+
+            if (!TryParseSheetNumber(token.Substring(0, separatorIndex), out int start) ||
+                !TryParseSheetNumber(token.Substring(separatorIndex + 1), out int end))
+            {
+                return false;
+            }
+
+            if (start > end)
+            {
+                (start, end) = (end, start);
+            }
+
+            for (int number = start; number <= end && expanded.Count < MaxExpandedSheetSelections; number++)
+            {
+                expanded.Add(number.ToString(CultureInfo.InvariantCulture));
+            }
+
+            return true;
+        }
+
+        private static bool TryParseSheetNumber(string value, out int sheetNumber)
+        {
+            sheetNumber = 0;
+            return !string.IsNullOrWhiteSpace(value) &&
+                int.TryParse(value.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out sheetNumber) &&
+                sheetNumber > 0;
+        }
+
+        private static bool MatchesSheetSelection(ExtractedSpreadsheetSheet candidate, IReadOnlyList<string> selections)
+        {
+            foreach (string selection in selections)
+            {
+                if (TryParseSheetNumber(selection, out int sheetNumber))
+                {
+                    if (candidate.Index == sheetNumber)
+                    {
+                        return true;
+                    }
+
+                    continue;
+                }
+
+                if (string.Equals(selection, candidate.Name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static string AddSheetSuffix(string fullPath, int sheetIndex)
