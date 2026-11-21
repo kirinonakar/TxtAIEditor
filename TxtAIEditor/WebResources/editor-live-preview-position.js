@@ -30,6 +30,11 @@ export function createLivePreviewPositionResolver({
         if (!targetNode) {
             return { line: defaultLine, column: 0, element };
         }
+        // The pointer column must use the same text-node offsets the selection
+        // overlays walk when they paint the drag shading. Block-level heuristics
+        // (cell padding pipes, list markers, merged paragraph runs) drifted away
+        // from the mouse position.
+        const embeddedColumn = embeddedLineColumn(element, targetNode, targetOffset);
 
         const block = typeof findEditablePreviewBlockContaining === 'function'
             ? findEditablePreviewBlockContaining(
@@ -41,6 +46,7 @@ export function createLivePreviewPositionResolver({
             : null;
 
         if (!block) {
+            if (embeddedColumn) return { line: embeddedColumn.line, column: embeddedColumn.column, element };
             const rawLineText = state.cache.get(defaultLine) || '';
             const htmlLineText = element.textContent || '';
             const offset = getTextOffsetInElement(element, targetNode, targetOffset);
@@ -139,12 +145,31 @@ export function createLivePreviewPositionResolver({
             finalColumn = 0;
         }
 
-        return { line: clickedLine, column: finalColumn, element };
+        return embeddedColumn
+            ? { line: embeddedColumn.line, column: embeddedColumn.column, element }
+            : { line: clickedLine, column: finalColumn, element };
     } catch (e) {
         console.error('getPreciseLivePreviewPosition error:', e);
         return { line: defaultLine, column: 0, element };
     }
 };
+}
+
+function embeddedLineColumn(element, targetNode, targetOffset) {
+    const kind = element?.dataset?.markdownPreviewLine || '';
+    // Code fences and multi-line HTML containers resolve their own line/column.
+    if (!kind || /^(?:code|code-fence|code-empty|math|html)$/.test(kind)) return null;
+
+    const line = Number(element.dataset.line || 0);
+    const rawLineText = state.cache.get(line);
+    if (!line || rawLineText === undefined || rawLineText === null || !targetNode) return null;
+    if (targetNode !== element && !element.contains(targetNode)) return null;
+
+    const textLength = element.textContent?.length || 0;
+    const offset = targetNode === element
+        ? (targetOffset <= 0 ? 0 : textLength)
+        : getTextOffsetInElement(element, targetNode, targetOffset);
+    return { line, column: Math.max(0, Math.min(offset, rawLineText.length)) };
 }
 
 function getTextOffsetInElement(container, targetNode, targetOffset) {
