@@ -265,9 +265,7 @@ namespace TxtAIEditor.Controls
 
             if (sheetNames.Count > 0)
             {
-                IReadOnlyList<ExtractedSpreadsheetSheet> matchedSheets = sheets
-                    .Where(candidate => MatchesSheetSelection(candidate, sheetNames))
-                    .ToList();
+                IReadOnlyList<ExtractedSpreadsheetSheet> matchedSheets = SelectSheets(sheets, sheetNames);
                 if (matchedSheets.Count == 0)
                 {
                     return string.Format(
@@ -345,25 +343,12 @@ namespace TxtAIEditor.Controls
             for (int index = 0; index < sheetNames.Count; index++)
             {
                 string selection = sheetNames[index];
-                string? sheetName = null;
-                string? sectionRange = null;
-                int suffixNumber = index + 1;
-                if (TryParseSheetNumber(selection, out int sheetNumber))
-                {
-                    sectionRange = sheetNumber.ToString(CultureInfo.InvariantCulture);
-                    suffixNumber = sheetNumber;
-                }
-                else
-                {
-                    sheetName = selection;
-                }
+                int suffixNumber = TryParseSheetNumber(selection, out int selectedNumber) ? selectedNumber : index + 1;
 
                 string csvContent;
                 try
                 {
-                    csvContent = Truncate(
-                        await Rdocs2mdConverter.ConvertToCsvAsync(fullPath, sheetName, sectionRange, _cancellationToken()).ConfigureAwait(false),
-                        maxChars);
+                    csvContent = await ConvertSheetCsvAsync(fullPath, selection, maxChars).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -480,27 +465,74 @@ namespace TxtAIEditor.Controls
                 sheetNumber > 0;
         }
 
-        private static bool MatchesSheetSelection(ExtractedSpreadsheetSheet candidate, IReadOnlyList<string> selections)
+        // Sheet names win over numbers, so a numeric value selects the sheet with that name when one exists.
+        private static IReadOnlyList<ExtractedSpreadsheetSheet> SelectSheets(
+            IReadOnlyList<ExtractedSpreadsheetSheet> sheets,
+            IReadOnlyList<string> selections)
         {
+            var matched = new List<ExtractedSpreadsheetSheet>();
             foreach (string selection in selections)
             {
-                if (TryParseSheetNumber(selection, out int sheetNumber))
+                bool matchedByName = false;
+                foreach (ExtractedSpreadsheetSheet candidate in sheets)
                 {
-                    if (candidate.Index == sheetNumber)
+                    if (string.Equals(selection, candidate.Name, StringComparison.OrdinalIgnoreCase))
                     {
-                        return true;
+                        AddIfMissing(matched, candidate);
+                        matchedByName = true;
                     }
+                }
 
+                if (matchedByName || !TryParseSheetNumber(selection, out int sheetNumber))
+                {
                     continue;
                 }
 
-                if (string.Equals(selection, candidate.Name, StringComparison.OrdinalIgnoreCase))
+                foreach (ExtractedSpreadsheetSheet candidate in sheets)
                 {
-                    return true;
+                    if (candidate.Index == sheetNumber)
+                    {
+                        AddIfMissing(matched, candidate);
+                        break;
+                    }
                 }
             }
 
-            return false;
+            return matched;
+        }
+
+        private static void AddIfMissing(List<ExtractedSpreadsheetSheet> target, ExtractedSpreadsheetSheet sheet)
+        {
+            if (!target.Contains(sheet))
+            {
+                target.Add(sheet);
+            }
+        }
+
+        // Sheet names win over numbers: try the value as a sheet name, then fall back to a 1-based sheet number.
+        private async Task<string> ConvertSheetCsvAsync(string fullPath, string selection, int maxChars)
+        {
+            if (!TryParseSheetNumber(selection, out int sheetNumber))
+            {
+                return Truncate(
+                    await Rdocs2mdConverter.ConvertToCsvAsync(fullPath, selection, sectionRange: null, _cancellationToken()).ConfigureAwait(false),
+                    maxChars);
+            }
+
+            try
+            {
+                return Truncate(
+                    await Rdocs2mdConverter.ConvertToCsvAsync(fullPath, selection, sectionRange: null, _cancellationToken()).ConfigureAwait(false),
+                    maxChars);
+            }
+            catch (InvalidOperationException)
+            {
+                // No sheet uses this numeric name, so treat the value as a 1-based sheet number instead.
+            }
+
+            return Truncate(
+                await Rdocs2mdConverter.ConvertToCsvAsync(fullPath, sheetName: null, sectionRange: sheetNumber.ToString(CultureInfo.InvariantCulture), _cancellationToken()).ConfigureAwait(false),
+                maxChars);
         }
 
         private static string AddSheetSuffix(string fullPath, int sheetIndex)

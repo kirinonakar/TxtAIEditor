@@ -152,7 +152,7 @@ namespace TxtAIEditor.Controls
                             path = new { type = "string", description = "Document path. Reads outside the workspace require approval unless the document is attached." },
                             outputPath = new { type = "string", description = "Workspace destination. Omit for automatic naming." },
                             maxChars = new { type = "integer", description = "Default 5000000." },
-                            sheet = new { type = "string", description = "Spreadsheet only (.xlsx, .xls). Sheet names or 1-based sheet numbers (3 = third sheet) to convert to CSV; separate multiple values with commas; ranges like 2-4 are accepted. Pure numbers are read as sheet numbers." }
+                            sheet = new { type = "string", description = "Spreadsheet only (.xlsx, .xls). Sheet names or 1-based sheet numbers (3 = third sheet) to convert to CSV; separate multiple values with commas; ranges like 2-4 are accepted. A sheet name match wins over the sheet number." }
                         },
                         required = new[] { "path" }
                     }
