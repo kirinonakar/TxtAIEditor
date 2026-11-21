@@ -333,7 +333,11 @@ function createEditorRenderer({
         if (preservePointerPaint) {
             // Account for completed measurements without rebuilding unchanged
             // visible nodes, during the drag or on its following focus frame.
+            // The selection shading still has to follow the pointer while the
+            // rows stay untouched, otherwise a live preview drag only shows the
+            // highlight once the pointer is released.
             viewportController.acceptRangeKey(rangeKey);
+            if (!preserveComposition) drawEditableSelectionOverlays();
             return;
         }
         if (!csvTableMode.isEnabled || !isJsonCsvTableMode()) {
