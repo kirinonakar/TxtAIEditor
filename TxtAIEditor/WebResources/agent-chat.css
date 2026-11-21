@@ -310,13 +310,11 @@ body {
 .session-link[data-branch="Parent"] .session-connector::before { inset-block-start: 100%; }
 .session-link[data-branch="Parent"] .session-connector::after { display: none; }
 .session-link[data-branch="LastChild"] .session-connector::before { inset-block-end: calc(50% - 1px); }
-.session-link.session-running::after {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-}
+.session-status { display: none; width: 7px; height: 7px; border-radius: 50%; }
+.session-link.session-running .session-status,
+.session-link.session-unread .session-status { display: block; }
+.session-link.session-running .session-status { background: var(--accent); }
+.session-link.session-unread .session-status { background: #dc2626; }
 .session-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 #sessions-empty { margin: 0; color: var(--muted); font-size: .82rem; }
 

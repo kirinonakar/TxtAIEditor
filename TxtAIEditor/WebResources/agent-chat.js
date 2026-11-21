@@ -496,7 +496,7 @@ function showSessions(items) {
     }
 
     let cursor = sessions.firstElementChild;
-    for (const { id, title, canSelect, isRunning, branch } of items) {
+    for (const { id, title, canSelect, isRunning, completedNotificationCount, branch } of items) {
         let button = sessionButtons.get(id);
         if (!button) {
             button = document.createElement('button');
@@ -504,10 +504,13 @@ function showSessions(items) {
             button.className = 'session-link';
             const name = document.createElement('span');
             name.className = 'session-name';
+            const status = document.createElement('span');
+            status.className = 'session-status';
+            status.setAttribute('aria-hidden', 'true');
             const connector = document.createElement('span');
             connector.className = 'session-connector';
             connector.setAttribute('aria-hidden', 'true');
-            button.append(name, connector);
+            button.append(name, status, connector);
             button.addEventListener('click', () => {
                 if (sessionId !== id) host.postMessage({ action: 'selectSession', sessionId: id });
             });
@@ -521,6 +524,7 @@ function showSessions(items) {
         button.disabled = !canSelect;
         button.dataset.branch = branch;
         button.classList.toggle('session-running', isRunning);
+        button.classList.toggle('session-unread', completedNotificationCount > 0);
         if (button !== cursor) sessions.insertBefore(button, cursor);
         cursor = button.nextElementSibling;
     }

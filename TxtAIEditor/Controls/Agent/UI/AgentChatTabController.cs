@@ -523,6 +523,7 @@ namespace TxtAIEditor.Controls
                     row.Item.Title,
                     row.Item.CanSelect,
                     row.Item.IsRunning,
+                    row.Item.CompletedNotificationCount,
                     branch = row.Branch.ToString()
                 });
             Post(new { action = "sessions", items = rows });
