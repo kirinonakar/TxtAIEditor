@@ -3191,11 +3191,17 @@
    <data name="AgentExtractDocumentEmptyPath" xml:space="preserve">
      <value>extract_document 失敗: パスが空です。PDF、DOCX、PPTX、XLSX、HWPX、DOC、XLS、または PPT ファイルのパスを指定してください。</value>
    </data>
+   <data name="AgentExtractDocumentEmptyPathRdocs2md" xml:space="preserve">
+     <value>extract_document 失敗: パスが空です。PDF、DOCX、PPTX、XLSX、HWPX、HWP、EPUB、DOC、XLS、または PPT ファイルのパスを指定してください。</value>
+   </data>
    <data name="AgentExtractDocumentFailedFormat" xml:space="preserve">
      <value>extract_document 失敗: {0}</value>
    </data>
    <data name="AgentExtractDocumentUnsupportedTypeFormat" xml:space="preserve">
      <value>extract_document 失敗: サポートされていないファイル形式です: '{0}'。対応形式: .pdf, .docx, .pptx, .xlsx, .hwpx, .doc, .xls, .ppt。</value>
+   </data>
+   <data name="AgentExtractDocumentUnsupportedTypeFormatRdocs2md" xml:space="preserve">
+     <value>extract_document 失敗: サポートされていないファイル形式です: '{0}'。対応形式: .pdf, .docx, .pptx, .xlsx, .hwpx, .hwp, .epub, .doc, .xls, .ppt。</value>
    </data>
    <data name="AgentExtractDocumentReadFailedFormat" xml:space="preserve">
      <value>extract_document 失敗: {0} からテキストを抽出できません: {1}</value>

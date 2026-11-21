@@ -3191,11 +3191,17 @@
    <data name="AgentExtractDocumentEmptyPath" xml:space="preserve">
      <value>extract_document 실패: 경로가 비어 있습니다. PDF, DOCX, PPTX, XLSX, HWPX, DOC, XLS 또는 PPT 파일 경로를 입력해 주세요.</value>
    </data>
+   <data name="AgentExtractDocumentEmptyPathRdocs2md" xml:space="preserve">
+     <value>extract_document 실패: 경로가 비어 있습니다. PDF, DOCX, PPTX, XLSX, HWPX, HWP, EPUB, DOC, XLS 또는 PPT 파일 경로를 입력해 주세요.</value>
+   </data>
    <data name="AgentExtractDocumentFailedFormat" xml:space="preserve">
      <value>extract_document 실패: {0}</value>
    </data>
    <data name="AgentExtractDocumentUnsupportedTypeFormat" xml:space="preserve">
      <value>extract_document 실패: 지원하지 않는 파일 형식입니다: '{0}'. 지원 형식: .pdf, .docx, .pptx, .xlsx, .hwpx, .doc, .xls, .ppt.</value>
+   </data>
+   <data name="AgentExtractDocumentUnsupportedTypeFormatRdocs2md" xml:space="preserve">
+     <value>extract_document 실패: 지원하지 않는 파일 형식입니다: '{0}'. 지원 형식: .pdf, .docx, .pptx, .xlsx, .hwpx, .hwp, .epub, .doc, .xls, .ppt.</value>
    </data>
    <data name="AgentExtractDocumentReadFailedFormat" xml:space="preserve">
      <value>extract_document 실패: {0}에서 텍스트를 추출할 수 없습니다: {1}</value>

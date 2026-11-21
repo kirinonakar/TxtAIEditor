@@ -3191,11 +3191,17 @@
    <data name="AgentExtractDocumentEmptyPath" xml:space="preserve">
      <value>extract_document 失敗：路徑為空。提供 PDF、DOCX、PPTX、XLSX、HWPX、DOC、XLS 或 PPT 檔案路徑。</value>
    </data>
+   <data name="AgentExtractDocumentEmptyPathRdocs2md" xml:space="preserve">
+     <value>extract_document 失敗：路徑為空。提供 PDF、DOCX、PPTX、XLSX、HWPX、HWP、EPUB、DOC、XLS 或 PPT 檔案路徑。</value>
+   </data>
    <data name="AgentExtractDocumentFailedFormat" xml:space="preserve">
      <value>提取文檔失敗：{0}</value>
    </data>
    <data name="AgentExtractDocumentUnsupportedTypeFormat" xml:space="preserve">
      <value>extract_document 失敗：不支援的檔案類型「{0}」。支援的類型：.pdf、.docx、.pptx、.xlsx、.hwpx、.doc、.xls、.ppt。</value>
+   </data>
+   <data name="AgentExtractDocumentUnsupportedTypeFormatRdocs2md" xml:space="preserve">
+     <value>extract_document 失敗：不支援的檔案類型「{0}」。支援的類型：.pdf、.docx、.pptx、.xlsx、.hwpx、.hwp、.epub、.doc、.xls、.ppt。</value>
    </data>
    <data name="AgentExtractDocumentReadFailedFormat" xml:space="preserve">
      <value>extract_document 失敗：無法從 {0} 擷取文字：{1}</value>

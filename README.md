@@ -108,6 +108,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 
 ### 🤖 AI Agent
 *   **Complex Workspace Tasks:** Executes multi-step workspace tasks using tools (file I/O, terminal execution, web search/fetch, and document text extraction).
+*   **Markdown Document Conversion:** When `rdocs2md.exe` is available on `PATH`, the `extract_document` tool converts PDF, DOCX, PPTX, XLSX, HWPX, HWP, DOC, XLS, and PPT files to Markdown (`.md`), and the Explorer panel's folder-wide document content search reads HWP, HWPX, DOC, PPT, and XLS contents through `rdocs2md`.
 *   **Multisession Management:** Runs and manages parallel, fully isolated agent environments (workspace paths, settings, history, subagent, and background execution).
 *   **Agent Chat Tab:** Stream the live agent conversation into a dedicated editor tab with its own prompt composer, turn navigation, and inline Markdown, math, Mermaid and chart rendering.
 *   **Model Context Protocol (MCP) Support:** Dynamically connects HTTP or stdio MCP servers to expose custom tools to the agent, with built-in support for:
@@ -115,7 +116,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
     *   **ComfyUI Workflow Plugin:** Generate images directly from API JSON/parameters.
     *   **Plugin Manager:** Lists, searches, enables, or disables installed MCP servers, skills, and plugins by name. When you need something new, it can also install it by name or GitHub URL.
 *   **Custom Personas & Skills:** Supports custom personas/system instructions, and extensible local/custom skills (with auto-generation via `skill-creator`).
-*   **Recommended Extensions:** For full feature support, installing [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`), [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`), [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`), and [pdftotext](https://poppler.freedesktop.org/) is recommended.
+*   **Recommended Extensions:** For full feature support, installing [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`), [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`), [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`), [pdftotext](https://poppler.freedesktop.org/), and [rdocs2md](https://github.com/kirinonakar/rdocs2md) (`rdocs2md`) is recommended.
 
 ### 🌐 Remote Server Workspace (SSH, SFTP, FTPS, WebDAV, WSL)
 *   **Multi-Protocol Support:** Connect seamlessly to remote environments over SSH, SFTP, FTPS, WebDAV, or local Windows Subsystem for Linux (WSL) distributions.

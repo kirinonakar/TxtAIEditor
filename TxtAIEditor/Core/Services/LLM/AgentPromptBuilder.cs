@@ -43,7 +43,9 @@ namespace TxtAIEditor.Core.Services.LLM
                 - search_text(query, [glob], [maxResults]) for simple search, run_rg(arguments, [timeoutMs]) for regex or large searches, run_rga(arguments, [timeoutMs]) for specialized document search.
                 - read_file(path, [startLine], [lineCount]) uses 1-based lines. Read targeted ranges in large files and continue if relevant lines remain.
                 - read_image(path, [original]) accepts up to 25 MiB and proportionally scales down to a 2048 px longest side unless original is true. MCP image attachments retain original bytes and MIME type.
-                - extract_document(path, [outputPath], [maxChars]) extracts PDF, DOCX, PPTX, XLSX, or HWPX. Read the generated TXT/CSV in ranges. Scanned PDFs may need OCR.
+                """);
+            builder.AppendLine(BuildExtractDocumentToolLine());
+            builder.AppendLine("""
                 - File tools request user approval to read an unattached file outside the workspace. If the user declines, stop trying to read that file.
                 - create_file(path, content, [openAfterCreate]), overwrite_file(path, content), append_to_file(path, content), merge_files(targetPath, paths), split_file(path, linesPerFile or ranges of {path, startLine, endLine}).
                 - search_replace(path, search, replacement, [useRegex], [matchCase], [wholeWord], [maxReplacements], [startLine], [endLine]) for text replacements. Zero maxReplacements replaces all matches.
@@ -82,6 +84,16 @@ namespace TxtAIEditor.Core.Services.LLM
                     """);
             }
             return builder.ToString();
+        }
+
+        private static string BuildExtractDocumentToolLine()
+        {
+            if (Rdocs2mdConverter.IsAvailable)
+            {
+                return "- extract_document(path, [outputPath], [maxChars]) extracts PDF, DOCX, PPTX, XLSX, HWPX, HWP, EPUB, DOC, XLS, or PPT. rdocs2md.exe is available, so documents are converted with rdocs2md and saved as Markdown (.md). Read the generated TXT/CSV/MD in ranges. Scanned PDFs may need OCR.";
+            }
+
+            return "- extract_document(path, [outputPath], [maxChars]) extracts PDF, DOCX, PPTX, XLSX, HWPX, DOC, XLS, or PPT. Read the generated TXT/CSV in ranges. Scanned PDFs may need OCR.";
         }
 
         public static string BuildUserContent(

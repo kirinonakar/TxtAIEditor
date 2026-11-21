@@ -24,6 +24,11 @@ namespace TxtAIEditor.Core.Services
     {
         private static readonly ConcurrentDictionary<int, Process> RunningPdftotextProcesses = new();
 
+        private static readonly HashSet<string> Rdocs2mdPreferredExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".hwp", ".hwpx", ".doc", ".ppt", ".xls", ".epub"
+        };
+
         public static void KillRunningPdftotextProcesses()
         {
             foreach (Process process in RunningPdftotextProcesses.Values.ToList())
@@ -52,6 +57,14 @@ namespace TxtAIEditor.Core.Services
             {
                 throw new InvalidDataException("Encrypted Office documents are skipped during folder search.");
             }
+
+            string? markdown = await TryConvertWithRdocs2mdAsync(filePath, extension, cancellationToken).ConfigureAwait(false);
+            if (markdown is not null)
+            {
+                progress?.Report(98);
+                return Truncate(normalize ? NormalizeExtractedText(markdown) : markdown, maxChars);
+            }
+
             string tempFilePath = string.Empty;
             bool isTempFile = false;
 
@@ -117,9 +130,34 @@ namespace TxtAIEditor.Core.Services
                 extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase) ||
+                (extension.Equals(".hwp", StringComparison.OrdinalIgnoreCase) && Rdocs2mdConverter.IsAvailable) ||
+                (extension.Equals(".epub", StringComparison.OrdinalIgnoreCase) && Rdocs2mdConverter.IsAvailable) ||
                 extension.Equals(".doc", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".xls", StringComparison.OrdinalIgnoreCase) ||
                 extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static async Task<string?> TryConvertWithRdocs2mdAsync(string filePath, string extension, CancellationToken cancellationToken)
+        {
+            if (!Rdocs2mdPreferredExtensions.Contains(extension) || !Rdocs2mdConverter.IsAvailable)
+            {
+                return null;
+            }
+
+            try
+            {
+                string markdown = await Rdocs2mdConverter.ConvertToMarkdownAsync(filePath, cancellationToken).ConfigureAwait(false);
+                return string.IsNullOrWhiteSpace(markdown) ? null : markdown;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"rdocs2md conversion failed for {filePath}: {ex.Message}");
+                return null;
+            }
         }
 
         private async Task<string> ExtractPdfTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken, bool skipProtectedDocuments)

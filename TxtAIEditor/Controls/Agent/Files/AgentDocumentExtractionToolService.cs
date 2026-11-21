@@ -37,7 +37,9 @@ namespace TxtAIEditor.Controls
         {
             if (string.IsNullOrWhiteSpace(path))
             {
-                return _getString("AgentExtractDocumentEmptyPath", "extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, XLSX, or HWPX file path.");
+                return Rdocs2mdConverter.IsAvailable
+                    ? _getString("AgentExtractDocumentEmptyPathRdocs2md", "extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, XLSX, HWPX, HWP, EPUB, DOC, XLS, or PPT file path.")
+                    : _getString("AgentExtractDocumentEmptyPath", "extract_document failed: path is empty. Provide a PDF, DOCX, PPTX, XLSX, HWPX, DOC, XLS, or PPT file path.");
             }
 
             string fullPath;
@@ -58,7 +60,9 @@ namespace TxtAIEditor.Controls
             if (!DocumentTextExtractionService.IsSupportedExtension(fullPath))
             {
                 return string.Format(
-                    _getString("AgentExtractDocumentUnsupportedTypeFormat", "extract_document failed: unsupported file type '{0}'. Supported types: .pdf, .docx, .pptx, .xlsx, .hwpx."),
+                    Rdocs2mdConverter.IsAvailable
+                        ? _getString("AgentExtractDocumentUnsupportedTypeFormatRdocs2md", "extract_document failed: unsupported file type '{0}'. Supported types: .pdf, .docx, .pptx, .xlsx, .hwpx, .hwp, .epub, .doc, .xls, .ppt.")
+                        : _getString("AgentExtractDocumentUnsupportedTypeFormat", "extract_document failed: unsupported file type '{0}'. Supported types: .pdf, .docx, .pptx, .xlsx, .hwpx, .doc, .xls, .ppt."),
                     Path.GetExtension(fullPath));
             }
 
@@ -83,25 +87,26 @@ namespace TxtAIEditor.Controls
             bool isTempFile = false;
             string targetPathForExtraction = fullPath;
             string extension = Path.GetExtension(fullPath).ToLowerInvariant();
+            bool useMarkdown = Rdocs2mdConverter.SupportsExtension(fullPath);
 
             try
             {
                 try
                 {
                     _workspace.VerifyResolvedPath(fullPath);
-                    if (extension == ".doc")
+                    if (!useMarkdown && extension == ".doc")
                     {
                         tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(fullPath).ConfigureAwait(false);
                         targetPathForExtraction = tempFilePath;
                         isTempFile = true;
                     }
-                    else if (extension == ".xls")
+                    else if (!useMarkdown && extension == ".xls")
                     {
                         tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(fullPath).ConfigureAwait(false);
                         targetPathForExtraction = tempFilePath;
                         isTempFile = true;
                     }
-                    else if (extension == ".ppt")
+                    else if (!useMarkdown && extension == ".ppt")
                     {
                         tempFilePath = await OfficeDocumentConverter.ConvertToPptxAsync(fullPath).ConfigureAwait(false);
                         targetPathForExtraction = tempFilePath;
@@ -116,7 +121,7 @@ namespace TxtAIEditor.Controls
                         ex.Message);
                 }
 
-                if (Path.GetExtension(targetPathForExtraction).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+                if (!useMarkdown && Path.GetExtension(targetPathForExtraction).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
                 {
                     return await ExtractSpreadsheetAsync(targetPathForExtraction, relativePath, outputPath, limit, progress, path).ConfigureAwait(false);
                 }
@@ -125,7 +130,9 @@ namespace TxtAIEditor.Controls
                 try
                 {
                     _workspace.VerifyResolvedPath(targetPathForExtraction);
-                    text = await _documentTextExtractionService.ExtractTextAsync(targetPathForExtraction, limit, progress).ConfigureAwait(false);
+                    text = useMarkdown
+                        ? Truncate(await Rdocs2mdConverter.ConvertToMarkdownAsync(targetPathForExtraction, _cancellationToken()).ConfigureAwait(false), limit)
+                        : await _documentTextExtractionService.ExtractTextAsync(targetPathForExtraction, limit, progress).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -146,7 +153,7 @@ namespace TxtAIEditor.Controls
                 try
                 {
                     targetFullPath = string.IsNullOrWhiteSpace(outputPath)
-                        ? GetDefaultExtractedTextPath(fullPath)
+                        ? GetDefaultExtractedTextPath(fullPath, useMarkdown)
                         : _workspace.ResolveInsideWorkspace(outputPath);
                 }
                 catch (Exception ex)
@@ -154,7 +161,7 @@ namespace TxtAIEditor.Controls
                     return string.Format(_getString("AgentExtractDocumentFailedFormat", "extract_document failed: {0}"), ex.Message);
                 }
 
-                string defaultOutputExtension = GetDefaultExtractedTextExtension(fullPath);
+                string defaultOutputExtension = GetDefaultExtractedTextExtension(fullPath, useMarkdown);
                 if (string.IsNullOrWhiteSpace(Path.GetExtension(targetFullPath)))
                 {
                     targetFullPath += defaultOutputExtension;
@@ -241,7 +248,7 @@ namespace TxtAIEditor.Controls
             try
             {
                 baseTargetFullPath = string.IsNullOrWhiteSpace(outputPath)
-                    ? GetDefaultExtractedTextPath(fullPath)
+                    ? GetDefaultExtractedTextPath(fullPath, useMarkdown: false)
                     : _workspace.ResolveInsideWorkspace(outputPath);
             }
             catch (Exception ex)
@@ -303,10 +310,10 @@ namespace TxtAIEditor.Controls
             return Path.Combine(directory, $"{filenameWithoutExtension}_sheet{sheetIndex}{extension}");
         }
 
-        private string GetDefaultExtractedTextPath(string sourceFullPath)
+        private string GetDefaultExtractedTextPath(string sourceFullPath, bool useMarkdown)
         {
             string root = _workspace.ResolveWorkspaceRoot();
-            string fileName = Path.GetFileNameWithoutExtension(sourceFullPath) + GetDefaultExtractedTextExtension(sourceFullPath);
+            string fileName = Path.GetFileNameWithoutExtension(sourceFullPath) + GetDefaultExtractedTextExtension(sourceFullPath, useMarkdown);
             if (AgentWorkspaceFileResolver.IsInsideRoot(root, sourceFullPath))
             {
                 string directory = Path.GetDirectoryName(sourceFullPath) ?? root;
@@ -316,13 +323,23 @@ namespace TxtAIEditor.Controls
             return Path.Combine(root, fileName);
         }
 
-        private static string GetDefaultExtractedTextExtension(string sourceFullPath)
+        private static string GetDefaultExtractedTextExtension(string sourceFullPath, bool useMarkdown)
         {
+            if (useMarkdown)
+            {
+                return ".md";
+            }
+
             string extension = Path.GetExtension(sourceFullPath);
             return extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ||
                    extension.Equals(".xls", StringComparison.OrdinalIgnoreCase)
                 ? ".csv"
                 : ".txt";
+        }
+
+        private static string Truncate(string text, int maxChars)
+        {
+            return text.Length > maxChars ? text.Substring(0, maxChars) : text;
         }
     }
 }
