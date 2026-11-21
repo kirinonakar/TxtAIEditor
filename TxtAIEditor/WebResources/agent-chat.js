@@ -400,6 +400,7 @@ function beginEdit(view) {
     if (view.role !== 'user' || view.start == null || view.editing) return;
     const editor = ensureEditor(view);
     view.editing = true;
+    view.node.classList.add('editing');
     editor.input.value = view.copyText;
     editor.node.hidden = false;
     view.content.hidden = true;
@@ -418,6 +419,7 @@ function beginEdit(view) {
 function endEdit(view) {
     if (!view.editing) return;
     view.editing = false;
+    view.node.classList.remove('editing');
     if (view.editor) {
         view.editor.node.hidden = true;
         view.actions.insertBefore(view.copyButton, view.editButton);

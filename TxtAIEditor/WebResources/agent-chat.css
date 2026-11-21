@@ -114,13 +114,14 @@ body {
     align-items: flex-end;
     gap: .35rem;
     margin-top: .4rem;
+    width: 100%;
     max-width: 100%;
 }
 
 .message-editor[hidden] { display: none; }
 
 .message-editor-input {
-    width: min(620px, 100%);
+    width: 100%;
     min-height: 2.6rem;
     padding: 10px 14px;
     border: 1px solid var(--line);
@@ -129,6 +130,12 @@ body {
     color: var(--foreground);
     font: inherit;
     resize: vertical;
+}
+
+/* The editor needs the full conversation width, which the bubble cap would otherwise clip. */
+.user.editing {
+    width: 100%;
+    max-width: 100%;
 }
 
 .message-editor-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
