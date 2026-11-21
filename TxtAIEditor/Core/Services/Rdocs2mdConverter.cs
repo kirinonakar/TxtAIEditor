@@ -23,6 +23,11 @@ namespace TxtAIEditor.Core.Services
             ".odt", ".ods", ".odp", ".rtf", ".epub"
         };
 
+        private static readonly HashSet<string> SpreadsheetExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".xls", ".xlsx", ".xlsm", ".ods"
+        };
+
         private static readonly Lazy<string?> ResolvedExecutablePath = new Lazy<string?>(FindExecutablePathSafely, LazyThreadSafetyMode.ExecutionAndPublication);
 
         // Availability checks also run from static initializers, so they must never throw.
@@ -78,6 +83,37 @@ namespace TxtAIEditor.Core.Services
 
         public static async Task<string> ConvertToMarkdownAsync(string filePath, CancellationToken cancellationToken = default)
         {
+            return await ConvertAsync(filePath, "md", sheetName: null, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Converts a workbook to CSV. When <paramref name="sheetName"/> is set, only that worksheet is converted.
+        /// </summary>
+        public static async Task<string> ConvertToCsvAsync(string filePath, string? sheetName, CancellationToken cancellationToken = default)
+        {
+            return await ConvertAsync(filePath, "csv", sheetName, cancellationToken).ConfigureAwait(false);
+        }
+
+        public static bool IsSpreadsheetExtension(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return false;
+            }
+
+            try
+            {
+                return SpreadsheetExtensions.Contains(Path.GetExtension(filePath));
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException)
+            {
+                Debug.WriteLine($"rdocs2md spreadsheet check failed for {filePath}: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static async Task<string> ConvertAsync(string filePath, string format, string? sheetName, CancellationToken cancellationToken)
+        {
             string? executablePath = ExecutablePath;
             if (string.IsNullOrWhiteSpace(executablePath) || string.IsNullOrWhiteSpace(filePath) || !SafeFileExists(executablePath))
             {
@@ -96,7 +132,12 @@ namespace TxtAIEditor.Core.Services
             startInfo.ArgumentList.Add(filePath);
             startInfo.ArgumentList.Add("--stdout");
             startInfo.ArgumentList.Add("--format");
-            startInfo.ArgumentList.Add("md");
+            startInfo.ArgumentList.Add(format);
+            if (!string.IsNullOrWhiteSpace(sheetName))
+            {
+                startInfo.ArgumentList.Add("--sheet");
+                startInfo.ArgumentList.Add(sheetName);
+            }
 
             using var process = new Process { StartInfo = startInfo };
             try

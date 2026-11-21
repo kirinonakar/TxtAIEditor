@@ -16,12 +16,28 @@ import { markdownTableSelection } from './editor-markdown-table-ui.js';
 
 export function bindClipboardEvents() {
     let suppressNativePasteUntil = 0;
+    let lastRenderedSelectionText = '';
 
-    // Rendered live preview content (for example a raw HTML table) keeps the
-    // selection in the preview DOM while focus may still sit on another host
-    // such as the IME bypass textarea. A keydown listener that host installs can
-    // consume Ctrl+C before the document shortcut handler runs, so the keydown
-    // is handled in the capture phase and the clipboard is written directly.
+    // Rendered live preview content (for example a raw HTML table) is painted by
+    // the native DOM selection and does not map onto source offsets, so its text
+    // has to survive until the copy key arrives: pressing the modifier can clear
+    // the ranges first, which made Ctrl+C look like a plain deselect.
+    // A stale source-model selection can coexist with the visible preview
+    // selection, so remember the rendered text even while a custom selection
+    // reports itself. It is only used when selectedText() yields nothing.
+    const rememberRenderedSelection = () => {
+        const text = window.getSelection()?.toString() || '';
+        if (text) lastRenderedSelectionText = text;
+    };
+    document.addEventListener('selectionchange', rememberRenderedSelection);
+    document.addEventListener('pointerdown', () => { lastRenderedSelectionText = ''; }, true);
+    document.addEventListener('pointerup', rememberRenderedSelection, true);
+
+    // Rendered live preview content keeps the selection in the preview DOM while
+    // focus may still sit on another host such as the IME bypass textarea. A
+    // keydown listener that host installs can consume Ctrl+C before the document
+    // shortcut handler runs, so the keydown is handled in the capture phase and
+    // the clipboard is written directly.
     document.addEventListener('keydown', event => {
         if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
         if (event.code !== 'KeyC' && String(event.key || '').toLowerCase() !== 'c') return;
@@ -34,9 +50,12 @@ export function bindClipboardEvents() {
             (target.closest?.('#find-panel') || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
             return;
         }
-        const text = selectedText();
+        // Rendered preview blocks (a raw HTML table, for example) only exist as
+        // DOM text, so fall back to the visible selection before the cache.
+        const text = selectedText() || window.getSelection()?.toString() || lastRenderedSelectionText;
         if (!text) return;
         event.preventDefault();
+        event.stopImmediatePropagation();
         void writeClipboardText(text);
     }, true);
 

@@ -3203,6 +3203,12 @@ Plan: {0}</value>
    <data name="AgentExtractDocumentUnsupportedTypeFormatRdocs2md" xml:space="preserve">
      <value>extract_document failed: unsupported file type '{0}'. Supported types: .pdf, .docx, .pptx, .xlsx, .hwpx, .hwp, .epub, .doc, .xls, .ppt.</value>
    </data>
+   <data name="AgentExtractDocumentSheetUnsupportedFormat" xml:space="preserve">
+     <value>extract_document failed: sheet selection is supported only for Excel workbooks (.xlsx, .xls), not '{0}'.</value>
+   </data>
+   <data name="AgentExtractDocumentSheetNotFoundFormat" xml:space="preserve">
+     <value>extract_document failed: sheet '{0}' was not found in {1}. Available sheets: {2}.</value>
+   </data>
    <data name="AgentExtractDocumentReadFailedFormat" xml:space="preserve">
      <value>extract_document failed: could not extract text from {0}: {1}</value>
    </data>

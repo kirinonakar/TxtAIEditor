@@ -1676,7 +1676,11 @@ export function bindPointerSelectionEvents({
     document.addEventListener('keydown', event => {
         if ((event.key === 'Control' || event.key === 'Meta') && hasCustomSelection()) {
             cancelOpenableHoverValidation();
-            clearNativeSelection();
+            // Rendered live preview content (a raw HTML table, for example) is
+            // painted by the native DOM selection, which is the only copy source
+            // for those blocks. Dropping it here made Ctrl+C look like "just
+            // deselect", so keep ranges that still hold text.
+            if (!window.getSelection()?.toString()) clearNativeSelection();
         }
     });
 

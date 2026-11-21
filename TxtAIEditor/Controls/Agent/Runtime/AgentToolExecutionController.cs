@@ -194,7 +194,8 @@ namespace TxtAIEditor.Controls
                         "extract_document" => await _fileTools.ExtractDocumentAsync(
                             GetExtractDocumentInputPathArgument(arguments),
                             GetExtractDocumentOutputPathArgument(arguments),
-                            GetIntArgument(arguments, "maxChars", 5000000)),
+                            GetIntArgument(arguments, "maxChars", 5000000),
+                            GetFirstStringArgument(arguments, "sheet", "sheetName", "sheet_name", "worksheet")),
                         "create_file" => await _fileToolController.CreateFileAsync(arguments),
                         "overwrite_file" => await _fileToolController.OverwriteFileAsync(arguments),
                         "append_to_file" => await _fileToolController.AppendToFileAsync(arguments),

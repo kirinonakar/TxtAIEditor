@@ -3203,6 +3203,12 @@
    <data name="AgentExtractDocumentUnsupportedTypeFormatRdocs2md" xml:space="preserve">
      <value>extract_document 失敗：不支援的檔案類型「{0}」。支援的類型：.pdf、.docx、.pptx、.xlsx、.hwpx、.hwp、.epub、.doc、.xls、.ppt。</value>
    </data>
+   <data name="AgentExtractDocumentSheetUnsupportedFormat" xml:space="preserve">
+     <value>extract_document 失敗：僅支援在 Excel 活頁簿（.xlsx、.xls）中選取工作表，不支援「{0}」。</value>
+   </data>
+   <data name="AgentExtractDocumentSheetNotFoundFormat" xml:space="preserve">
+     <value>extract_document 失敗：在 {1} 中找不到工作表「{0}」。可用的工作表：{2}。</value>
+   </data>
    <data name="AgentExtractDocumentReadFailedFormat" xml:space="preserve">
      <value>extract_document 失敗：無法從 {0} 擷取文字：{1}</value>
    </data>

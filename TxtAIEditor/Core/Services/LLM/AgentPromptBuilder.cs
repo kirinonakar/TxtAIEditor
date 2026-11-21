@@ -90,10 +90,10 @@ namespace TxtAIEditor.Core.Services.LLM
         {
             if (Rdocs2mdConverter.IsAvailable)
             {
-                return "- extract_document(path, [outputPath], [maxChars]) extracts PDF, DOCX, PPTX, XLSX, HWPX, HWP, EPUB, DOC, XLS, or PPT. rdocs2md.exe is available, so documents are converted with rdocs2md and saved as Markdown (.md). Read the generated TXT/CSV/MD in ranges. Scanned PDFs may need OCR.";
+                return "- extract_document(path, [outputPath], [maxChars], [sheet]) extracts PDF, DOCX, PPTX, XLSX, HWPX, HWP, EPUB, DOC, XLS, or PPT and saves Markdown (.md). Pass sheet (a worksheet name, or a comma-separated list) to save only those spreadsheets as CSV (.csv). Read the generated TXT/CSV/MD in ranges. Scanned PDFs may need OCR.";
             }
 
-            return "- extract_document(path, [outputPath], [maxChars]) extracts PDF, DOCX, PPTX, XLSX, HWPX, DOC, XLS, or PPT. Read the generated TXT/CSV in ranges. Scanned PDFs may need OCR.";
+            return "- extract_document(path, [outputPath], [maxChars], [sheet]) extracts PDF, DOCX, PPTX, XLSX, HWPX, DOC, XLS, or PPT. Pass sheet (a worksheet name, or a comma-separated list) to save only those spreadsheet sheets as CSV (.csv). Read the generated TXT/CSV in ranges. Scanned PDFs may need OCR.";
         }
 
         public static string BuildUserContent(

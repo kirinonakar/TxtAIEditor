@@ -33,7 +33,7 @@ namespace TxtAIEditor.Controls
             _cancellationToken = cancellationToken;
         }
 
-        public async Task<string> ExtractDocumentAsync(string path, string outputPath, int maxChars)
+        public async Task<string> ExtractDocumentAsync(string path, string outputPath, int maxChars, string sheet)
         {
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -87,7 +87,24 @@ namespace TxtAIEditor.Controls
             bool isTempFile = false;
             string targetPathForExtraction = fullPath;
             string extension = Path.GetExtension(fullPath).ToLowerInvariant();
-            bool useMarkdown = Rdocs2mdConverter.SupportsExtension(fullPath);
+            IReadOnlyList<string> requestedSheets = SplitSheetNames(sheet);
+            bool useRdocs2mdSheets = requestedSheets.Count > 0 &&
+                Rdocs2mdConverter.IsAvailable &&
+                Rdocs2mdConverter.IsSpreadsheetExtension(fullPath);
+            bool useMarkdown = !useRdocs2mdSheets && Rdocs2mdConverter.SupportsExtension(fullPath);
+            if (useRdocs2mdSheets)
+            {
+                return await ExtractSheetsAsCsvAsync(fullPath, relativePath, outputPath, limit, requestedSheets, path).ConfigureAwait(false);
+            }
+
+            if (requestedSheets.Count > 0 &&
+                !extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) &&
+                !extension.Equals(".xls", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Format(
+                    _getString("AgentExtractDocumentSheetUnsupportedFormat", "extract_document failed: sheet selection is supported only for Excel workbooks (.xlsx, .xls), not '{0}'."),
+                    extension);
+            }
 
             try
             {
@@ -123,7 +140,7 @@ namespace TxtAIEditor.Controls
 
                 if (!useMarkdown && Path.GetExtension(targetPathForExtraction).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
                 {
-                    return await ExtractSpreadsheetAsync(targetPathForExtraction, relativePath, outputPath, limit, progress, path).ConfigureAwait(false);
+                    return await ExtractSpreadsheetAsync(targetPathForExtraction, relativePath, outputPath, limit, progress, requestedSheets, path).ConfigureAwait(false);
                 }
 
                 string text;
@@ -221,6 +238,7 @@ namespace TxtAIEditor.Controls
             string outputPath,
             int maxChars,
             IProgress<int> progress,
+            IReadOnlyList<string> sheetNames,
             string originalPath)
         {
             IReadOnlyList<ExtractedSpreadsheetSheet> sheets;
@@ -242,6 +260,23 @@ namespace TxtAIEditor.Controls
                 return string.Format(
                     _getString("AgentExtractDocumentNoTextFormat", "extract_document: no text extracted from {0}. If this is a scanned PDF or image-only document, OCR may be required."),
                     relativePath);
+            }
+
+            if (sheetNames.Count > 0)
+            {
+                IReadOnlyList<ExtractedSpreadsheetSheet> matchedSheets = sheets
+                    .Where(candidate => sheetNames.Any(name => string.Equals(name, candidate.Name, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+                if (matchedSheets.Count == 0)
+                {
+                    return string.Format(
+                        _getString("AgentExtractDocumentSheetNotFoundFormat", "extract_document failed: sheet '{0}' was not found in {1}. Available sheets: {2}."),
+                        string.Join(", ", sheetNames),
+                        relativePath,
+                        string.Join(", ", sheets.Select(candidate => candidate.Name)));
+                }
+
+                sheets = matchedSheets;
             }
 
             string baseTargetFullPath;
@@ -270,36 +305,117 @@ namespace TxtAIEditor.Controls
                 string targetFullPath = splitSheets
                     ? AddSheetSuffix(baseTargetFullPath, sheet.Index)
                     : baseTargetFullPath;
-                _workspace.VerifyWritablePath(targetFullPath);
-                string newContent = NormalizeNewlines(sheet.CsvContent);
-                bool targetAlreadyExists = File.Exists(targetFullPath);
-
-                if (targetAlreadyExists)
-                {
-                    string oldContent = NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath));
-                    if (string.Equals(newContent, oldContent, StringComparison.Ordinal))
-                    {
-                        builder.AppendLine($"{_getString("AgentExtractDocumentUnchangedPrefix", "extract_document unchanged:")} {_workspace.RelativePath(targetFullPath)}");
-                        continue;
-                    }
-
-                    targetFullPath = _workspace.GetAvailableSiblingPath(targetFullPath);
-                }
-
-                await AgentFileEditToolService.WriteNewWorkspaceFileAsync(_workspace, targetFullPath, newContent, Encoding.UTF8, _cancellationToken());
-                await _notifyFileModifiedAsync(targetFullPath);
-
-                string targetRelativePath = _workspace.RelativePath(targetFullPath);
-                builder.AppendLine($"{_getString("AgentExtractDocumentSavedPrefix", "extract_document saved:")} {targetRelativePath}");
-                if (targetAlreadyExists)
-                {
-                    builder.AppendLine(string.Format(
-                        _getString("AgentExtractDocumentOutputExistsNoteFormat", "note: requested output existed, so the converted text was saved to a new file instead of overwriting: {0}"),
-                        targetRelativePath));
-                }
+                await WriteExtractedContentAsync(builder, targetFullPath, sheet.CsvContent).ConfigureAwait(false);
             }
 
             return builder.ToString();
+        }
+
+        private async Task<string> ExtractSheetsAsCsvAsync(
+            string fullPath,
+            string relativePath,
+            string outputPath,
+            int maxChars,
+            IReadOnlyList<string> sheetNames,
+            string originalPath)
+        {
+            string baseTargetFullPath;
+            try
+            {
+                _workspace.VerifyResolvedPath(fullPath);
+                baseTargetFullPath = string.IsNullOrWhiteSpace(outputPath)
+                    ? GetDefaultExtractedTextPath(fullPath, useMarkdown: false, useCsv: true)
+                    : _workspace.ResolveInsideWorkspace(outputPath);
+            }
+            catch (Exception ex)
+            {
+                return string.Format(_getString("AgentExtractDocumentFailedFormat", "extract_document failed: {0}"), ex.Message);
+            }
+
+            if (string.IsNullOrWhiteSpace(Path.GetExtension(baseTargetFullPath)))
+            {
+                baseTargetFullPath += ".csv";
+            }
+
+            var builder = new StringBuilder();
+            builder.AppendLine($"{_getString("AgentExtractDocumentSourcePrefix", "source:")} {relativePath}");
+
+            bool splitSheets = sheetNames.Count > 1;
+            for (int index = 0; index < sheetNames.Count; index++)
+            {
+                string sheetName = sheetNames[index];
+                string csvContent;
+                try
+                {
+                    csvContent = Truncate(
+                        await Rdocs2mdConverter.ConvertToCsvAsync(fullPath, sheetName, _cancellationToken()).ConfigureAwait(false),
+                        maxChars);
+                }
+                catch (Exception ex)
+                {
+                    return string.Format(
+                        _getString("AgentExtractDocumentReadFailedFormat", "extract_document failed: could not extract text from {0}: {1}"),
+                        originalPath,
+                        ex.Message);
+                }
+
+                if (string.IsNullOrWhiteSpace(csvContent))
+                {
+                    return string.Format(
+                        _getString("AgentExtractDocumentNoTextFormat", "extract_document: no text extracted from {0}. If this is a scanned PDF or image-only document, OCR may be required."),
+                        relativePath);
+                }
+
+                string targetFullPath = splitSheets
+                    ? AddSheetSuffix(baseTargetFullPath, index + 1)
+                    : baseTargetFullPath;
+                await WriteExtractedContentAsync(builder, targetFullPath, csvContent).ConfigureAwait(false);
+            }
+
+            return builder.ToString();
+        }
+
+        private async Task WriteExtractedContentAsync(StringBuilder builder, string targetFullPath, string content)
+        {
+            _workspace.VerifyWritablePath(targetFullPath);
+            string newContent = NormalizeNewlines(content);
+            bool targetAlreadyExists = File.Exists(targetFullPath);
+            if (targetAlreadyExists)
+            {
+                string oldContent = NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath));
+                if (string.Equals(newContent, oldContent, StringComparison.Ordinal))
+                {
+                    builder.AppendLine($"{_getString("AgentExtractDocumentUnchangedPrefix", "extract_document unchanged:")} {_workspace.RelativePath(targetFullPath)}");
+                    return;
+                }
+
+                targetFullPath = _workspace.GetAvailableSiblingPath(targetFullPath);
+            }
+
+            await AgentFileEditToolService.WriteNewWorkspaceFileAsync(_workspace, targetFullPath, newContent, Encoding.UTF8, _cancellationToken());
+            await _notifyFileModifiedAsync(targetFullPath);
+
+            string targetRelativePath = _workspace.RelativePath(targetFullPath);
+            builder.AppendLine($"{_getString("AgentExtractDocumentSavedPrefix", "extract_document saved:")} {targetRelativePath}");
+            if (targetAlreadyExists)
+            {
+                builder.AppendLine(string.Format(
+                    _getString("AgentExtractDocumentOutputExistsNoteFormat", "note: requested output existed, so the converted text was saved to a new file instead of overwriting: {0}"),
+                    targetRelativePath));
+            }
+        }
+
+        private static IReadOnlyList<string> SplitSheetNames(string sheet)
+        {
+            if (string.IsNullOrWhiteSpace(sheet))
+            {
+                return Array.Empty<string>();
+            }
+
+            return sheet
+                .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         private static string AddSheetSuffix(string fullPath, int sheetIndex)
@@ -310,10 +426,10 @@ namespace TxtAIEditor.Controls
             return Path.Combine(directory, $"{filenameWithoutExtension}_sheet{sheetIndex}{extension}");
         }
 
-        private string GetDefaultExtractedTextPath(string sourceFullPath, bool useMarkdown)
+        private string GetDefaultExtractedTextPath(string sourceFullPath, bool useMarkdown, bool useCsv = false)
         {
             string root = _workspace.ResolveWorkspaceRoot();
-            string fileName = Path.GetFileNameWithoutExtension(sourceFullPath) + GetDefaultExtractedTextExtension(sourceFullPath, useMarkdown);
+            string fileName = Path.GetFileNameWithoutExtension(sourceFullPath) + GetDefaultExtractedTextExtension(sourceFullPath, useMarkdown, useCsv: useCsv);
             if (AgentWorkspaceFileResolver.IsInsideRoot(root, sourceFullPath))
             {
                 string directory = Path.GetDirectoryName(sourceFullPath) ?? root;
@@ -323,11 +439,16 @@ namespace TxtAIEditor.Controls
             return Path.Combine(root, fileName);
         }
 
-        private static string GetDefaultExtractedTextExtension(string sourceFullPath, bool useMarkdown)
+        private static string GetDefaultExtractedTextExtension(string sourceFullPath, bool useMarkdown, bool useCsv = false)
         {
             if (useMarkdown)
             {
                 return ".md";
+            }
+
+            if (useCsv)
+            {
+                return ".csv";
             }
 
             string extension = Path.GetExtension(sourceFullPath);

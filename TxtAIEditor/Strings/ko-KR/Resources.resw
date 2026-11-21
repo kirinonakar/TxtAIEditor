@@ -3203,6 +3203,12 @@
    <data name="AgentExtractDocumentUnsupportedTypeFormatRdocs2md" xml:space="preserve">
      <value>extract_document 실패: 지원하지 않는 파일 형식입니다: '{0}'. 지원 형식: .pdf, .docx, .pptx, .xlsx, .hwpx, .hwp, .epub, .doc, .xls, .ppt.</value>
    </data>
+   <data name="AgentExtractDocumentSheetUnsupportedFormat" xml:space="preserve">
+     <value>extract_document 실패: 시트 선택은 Excel 통합 문서(.xlsx, .xls)에서만 지원됩니다. '{0}' 형식은 지원하지 않습니다.</value>
+   </data>
+   <data name="AgentExtractDocumentSheetNotFoundFormat" xml:space="preserve">
+     <value>extract_document 실패: {1}에서 '{0}' 시트를 찾을 수 없습니다. 사용 가능한 시트: {2}.</value>
+   </data>
    <data name="AgentExtractDocumentReadFailedFormat" xml:space="preserve">
      <value>extract_document 실패: {0}에서 텍스트를 추출할 수 없습니다: {1}</value>
    </data>

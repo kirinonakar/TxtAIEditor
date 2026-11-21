@@ -124,7 +124,10 @@ namespace TxtAIEditor.Controls
             string explicitOutput = GetFirstStringArgument(arguments, "outputPath", "output_path", "targetPath", "target_path", "target", "output");
             if (!string.IsNullOrWhiteSpace(explicitOutput))
             {
-                return explicitOutput.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)
+                string explicitExtension = Path.GetExtension(explicitOutput);
+                return explicitExtension.Equals(".txt", StringComparison.OrdinalIgnoreCase) ||
+                       explicitExtension.Equals(".csv", StringComparison.OrdinalIgnoreCase) ||
+                       explicitExtension.Equals(".md", StringComparison.OrdinalIgnoreCase)
                     ? explicitOutput
                     : explicitOutput + ".txt";
             }

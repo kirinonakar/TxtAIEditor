@@ -3203,6 +3203,12 @@
    <data name="AgentExtractDocumentUnsupportedTypeFormatRdocs2md" xml:space="preserve">
      <value>extract_document 失敗: サポートされていないファイル形式です: '{0}'。対応形式: .pdf, .docx, .pptx, .xlsx, .hwpx, .hwp, .epub, .doc, .xls, .ppt。</value>
    </data>
+   <data name="AgentExtractDocumentSheetUnsupportedFormat" xml:space="preserve">
+     <value>extract_document 失敗: シートの選択は Excel ブック (.xlsx, .xls) でのみサポートされます。'{0}' はサポートされていません。</value>
+   </data>
+   <data name="AgentExtractDocumentSheetNotFoundFormat" xml:space="preserve">
+     <value>extract_document 失敗: {1} にシート '{0}' が見つかりません。使用可能なシート: {2}。</value>
+   </data>
    <data name="AgentExtractDocumentReadFailedFormat" xml:space="preserve">
      <value>extract_document 失敗: {0} からテキストを抽出できません: {1}</value>
    </data>

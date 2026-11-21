@@ -228,9 +228,9 @@ namespace TxtAIEditor.Controls
             return RunInBackgroundAsync(() => _images.ReadImageAsync(path, original, token), token);
         }
 
-        public Task<string> ExtractDocumentAsync(string path, string outputPath, int maxChars)
+        public Task<string> ExtractDocumentAsync(string path, string outputPath, int maxChars, string sheet)
         {
-            return RunInBackgroundAsync(() => _documents.ExtractDocumentAsync(path, outputPath, maxChars));
+            return RunInBackgroundAsync(() => _documents.ExtractDocumentAsync(path, outputPath, maxChars, sheet));
         }
 
         public Task<string> RunRgAsync(string arguments, int timeoutMs, CancellationToken cancellationToken = default)
