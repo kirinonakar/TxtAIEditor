@@ -270,6 +270,9 @@ namespace TxtAIEditor.Core.Models
         }
         public string? HexSourceFilePath { get; set; }
         public bool IsReadOnlyTextFile { get; set; } = false;
+        // Set when the tab holds HTML converted from an office document (rdocs2md), so the
+        // live preview can render it while the original file stays read-only.
+        public bool IsConvertedDocumentHtml { get; set; } = false;
         private DocumentOrigin _origin = UntitledOrigin.Instance;
         public DocumentOrigin Origin => _document?.Origin ?? _origin;
 
@@ -306,7 +309,7 @@ namespace TxtAIEditor.Core.Models
             SetOrigin(new ArchiveEntryOrigin(archivePath, entryPath));
         }
 
-        public bool IsReadOnlyViewer => IsImageViewer || IsMediaViewer || IsPdfViewer || IsDocxViewer || IsOfficeDocumentViewer || IsHexViewer || IsReadOnlyTextFile || IsNotebookViewer || IsAgentChat;
+        public bool IsReadOnlyViewer => IsImageViewer || IsMediaViewer || IsPdfViewer || IsDocxViewer || IsOfficeDocumentViewer || IsHexViewer || IsReadOnlyTextFile || IsConvertedDocumentHtml || IsNotebookViewer || IsAgentChat;
         public string? EncryptionPassword { get; set; }
 
         private bool _isEncrypted = false;

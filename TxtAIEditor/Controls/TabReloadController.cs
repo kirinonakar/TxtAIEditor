@@ -159,6 +159,25 @@ namespace TxtAIEditor.Controls
 
             try
             {
+                // Converted document tabs hold rdocs2md HTML rather than the document bytes,
+                // so reload converts the source again instead of reading it as text.
+                if (tab.IsConvertedDocumentHtml)
+                {
+                    string html = await Rdocs2mdConverter.ConvertToHtmlAsync(tab.FilePath);
+                    if (!string.IsNullOrWhiteSpace(html))
+                    {
+                        ApplyTabReloadState(tab, TextModelFactory.FromText(html), "UTF-8", false);
+                        if (_editorSessions.TryGetValue(tab.Id, out var convertedSession))
+                        {
+                            convertedSession.UpdateContentFromSync(html);
+                        }
+
+                        await ResynchronizeBridgeAsync(tab, html);
+                        CompleteDiskReload(tab);
+                    }
+                    return;
+                }
+
                 if (tab.IsDocxViewer)
                 {
                     var documentService = new DocumentTextExtractionService();

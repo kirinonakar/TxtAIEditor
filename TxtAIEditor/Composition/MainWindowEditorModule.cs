@@ -222,7 +222,8 @@ namespace TxtAIEditor.Composition
             bool encodingWasAutoDetected,
             ITextModel? textModel,
             bool isEncrypted,
-            string? encryptionPassword) =>
+            string? encryptionPassword,
+            string? language = null) =>
             Runtime.EditorTabOpen.OpenNewTab(
                 filePath,
                 content,
@@ -231,7 +232,8 @@ namespace TxtAIEditor.Composition
                 encodingWasAutoDetected,
                 textModel,
                 isEncrypted,
-                encryptionPassword);
+                encryptionPassword,
+                language: language);
 
         public Task<bool> PrepareTabForTransferAsync(OpenedTab tab) =>
             Runtime.EditorTabOpen.PrepareForTransferAsync(tab);

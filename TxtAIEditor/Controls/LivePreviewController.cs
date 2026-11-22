@@ -543,7 +543,9 @@ namespace TxtAIEditor.Controls
 
         private static bool IsReadOnlyViewerTab(OpenedTab tab)
         {
-            return tab.IsReadOnlyViewer ||
+            // Converted document tabs keep the source file read-only but hold rdocs2md HTML,
+            // which the live preview renders like any other HTML document.
+            return (!tab.IsConvertedDocumentHtml && tab.IsReadOnlyViewer) ||
                    string.Equals(tab.Language, "pdf", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(tab.Language, "image", StringComparison.OrdinalIgnoreCase) ||
                    (!string.IsNullOrWhiteSpace(tab.FilePath) &&

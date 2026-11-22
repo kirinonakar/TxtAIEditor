@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -18,6 +19,11 @@ namespace TxtAIEditor.Controls
     public sealed class FileTabLoadController
     {
         public Func<bool>? PreserveWorkspaceOnFileOpenProvider { get; set; }
+
+        /// <summary>
+        /// Invoked after a converted document tab opens so the window switches to live preview.
+        /// </summary>
+        public Action? EnableLivePreview { get; set; }
 
         private readonly IGitService _gitService;
         private readonly SecureNoteEncryptionService _secureNoteEncryptionService;
@@ -39,6 +45,13 @@ namespace TxtAIEditor.Controls
         private readonly Action _queueGitStatusRefresh;
         private readonly Action<string, string> _showErrorMessage;
         private readonly SemaphoreSlim _fileOpenSemaphore = new(1, 1);
+
+        // rdocs2md renders these formats as HTML, so they open in live preview mode instead of
+        // the Office viewer that needs an external converter.
+        private static readonly HashSet<string> Rdocs2mdHtmlPreviewExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".hwp", ".doc", ".xls", ".ppt"
+        };
 
         public FileTabLoadController(
             IGitService gitService,
@@ -134,6 +147,16 @@ namespace TxtAIEditor.Controls
                     var tab = _openPdfTab(filePath);
                     QueueGitRefreshIfNeeded(repoRoot);
                     return FileTabLoadResult.Opened(tab);
+                }
+
+                if (Rdocs2mdHtmlPreviewExtensions.Contains(extension) && Rdocs2mdConverter.SupportsExtension(filePath))
+                {
+                    var convertedTab = await TryOpenConvertedHtmlTabAsync(filePath);
+                    if (convertedTab != null)
+                    {
+                        QueueGitRefreshIfNeeded(repoRoot);
+                        return FileTabLoadResult.Opened(convertedTab);
+                    }
                 }
 
                 if (SupportedFileTypes.IsOfficeDocumentFile(filePath))
@@ -374,6 +397,46 @@ namespace TxtAIEditor.Controls
             });
         }
 
+        /// <summary>
+        /// Converts an office document to HTML with rdocs2md and opens the result in live preview
+        /// mode. Returns null when rdocs2md produced nothing so the caller can fall back to the
+        /// existing viewer.
+        /// </summary>
+        private async Task<OpenedTab?> TryOpenConvertedHtmlTabAsync(string filePath)
+        {
+            string html;
+            try
+            {
+                html = await Rdocs2mdConverter.ConvertToHtmlAsync(filePath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"rdocs2md HTML conversion failed for {filePath}: {ex.Message}");
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                return null;
+            }
+
+            var tab = _openNewTab(new FileTabOpenRequest
+            {
+                FilePath = filePath,
+                Content = html,
+                Language = "html",
+                EncodingName = "UTF-8",
+                EncodingWasAutoDetected = false,
+                TextModel = TextModelFactory.FromText(html),
+                IsReadOnly = true
+            });
+
+            tab.ContentKind = TabContentKind.ExtractedDocumentText;
+            tab.IsConvertedDocumentHtml = true;
+            EnableLivePreview?.Invoke();
+            return tab;
+        }
+
         private void QueueGitRefreshIfNeeded(string? repoRoot)
         {
             if (!string.IsNullOrEmpty(repoRoot))
@@ -469,6 +532,7 @@ namespace TxtAIEditor.Controls
         public string? FilePath { get; set; }
         public string Content { get; set; } = "";
         public bool IsReadOnly { get; set; }
+        public string? Language { get; set; }
         public string EncodingName { get; set; } = "UTF-8";
         public bool EncodingWasAutoDetected { get; set; } = true;
         public ITextModel? TextModel { get; set; }

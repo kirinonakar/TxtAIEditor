@@ -108,7 +108,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 
 ### 🤖 AI Agent
 *   **Complex Workspace Tasks:** Executes multi-step workspace tasks using tools (file I/O, terminal execution, web search/fetch, and document text extraction).
-*   **Markdown Document Conversion:** When `rdocs2md.exe` is available on `PATH`, the `extract_document` tool converts PDF, DOCX, PPTX, XLSX, HWPX, HWP, DOC, XLS, and PPT files to Markdown (`.md`), and the Explorer panel's folder-wide document content search reads HWP, HWPX, DOC, PPT, and XLS contents through `rdocs2md`.
+*   **Markdown Document Conversion:** When `rdocs2md.exe` is available on `PATH`, the `extract_document` tool converts PDF, DOCX, PPTX, XLSX, HWPX, HWP, EPUB, DOC, XLS, and PPT files to Markdown (`.md`), and the Explorer panel's folder-wide document content search reads PDF, HWP, HWPX, DOC, PPT, XLS, and EPUB contents through `rdocs2md`.
 *   **Multisession Management:** Runs and manages parallel, fully isolated agent environments (workspace paths, settings, history, subagent, and background execution).
 *   **Agent Chat Tab:** Stream the live agent conversation into a dedicated editor tab with its own prompt composer, turn navigation, and inline Markdown, math, Mermaid and chart rendering.
 *   **Model Context Protocol (MCP) Support:** Dynamically connects HTTP or stdio MCP servers to expose custom tools to the agent, with built-in support for:
@@ -117,6 +117,13 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
     *   **Plugin Manager:** Lists, searches, enables, or disables installed MCP servers, skills, and plugins by name. When you need something new, it can also install it by name or GitHub URL.
 *   **Custom Personas & Skills:** Supports custom personas/system instructions, and extensible local/custom skills (with auto-generation via `skill-creator`).
 *   **Recommended Extensions:** For full feature support, installing [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) (`pwsh`), [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`), [ripgrep-all](https://github.com/phiresky/ripgrep-all) (`rga`), [pdftotext](https://poppler.freedesktop.org/), and [rdocs2md](https://github.com/kirinonakar/rdocs2md) (`rdocs2md`) is recommended.
+
+### 🔄 rdocs2md Integration
+*   **Optional External Converter:** When [`rdocs2md`](https://github.com/kirinonakar/rdocs2md) (`rdocs2md.exe`) is available on `PATH` (or beside the application in its `Tools` folder), TxtAIEditor uses it as a universal document converter. When it is missing, the built-in readers and the Office conversion path behave exactly as before — no configuration is required in either case.
+*   **HTML Document Preview:** Opening an `.hwp`, `.doc`, `.xls`, or `.ppt` file converts it to a self-contained HTML document with `rdocs2md` and shows the result read-only in HTML live preview mode, so legacy formats render without an installed Office suite. If the conversion returns no output, the regular Office document viewer handles the file as a fallback.
+*   **Folder-Wide Content Search:** The Explorer panel's document content search converts `.pdf`, `.hwp`, `.hwpx`, `.doc`, `.ppt`, `.xls`, and `.epub` files to Markdown with `rdocs2md` and searches the result. PDFs resolve as `rdocs2md` → `pdftotext` → built-in PDF parser, so they stay searchable even when the tool is missing or cannot read a file, and the `rdocs2md` path also makes HWP 5 compound documents — which have no built-in reader — searchable.
+*   **Agent Document Extraction:** The Agent's `extract_document` tool converts supported documents (`.pdf`, `.docx`, `.pptx`, `.xlsx`, `.hwpx`, `.hwp`, `.epub`, `.doc`, `.xls`, `.ppt`) to Markdown (`.md`) with `rdocs2md`, and exports selected worksheet sheets to CSV (`.csv`).
+*   **Supported Extensions:** `.pdf`, `.hwp`, `.hwpx`, `.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx`, `.odt`, `.ods`, `.odp`, `.rtf`, `.epub`.
 
 ### 🌐 Remote Server Workspace (SSH, SFTP, FTPS, WebDAV, WSL)
 *   **Multi-Protocol Support:** Connect seamlessly to remote environments over SSH, SFTP, FTPS, WebDAV, or local Windows Subsystem for Linux (WSL) distributions.

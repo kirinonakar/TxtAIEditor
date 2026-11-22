@@ -87,6 +87,15 @@ namespace TxtAIEditor.Core.Services
         }
 
         /// <summary>
+        /// Converts a document to a self-contained HTML document. The editor shows the
+        /// result through its HTML live preview mode.
+        /// </summary>
+        public static async Task<string> ConvertToHtmlAsync(string filePath, CancellationToken cancellationToken = default)
+        {
+            return await ConvertAsync(filePath, "html", sheetName: null, sectionRange: null, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
         /// Converts a workbook to CSV. When <paramref name="sheetName"/> is set, only that worksheet is converted;
         /// <paramref name="sectionRange"/> selects 1-based sheet numbers instead (e.g. "3" or "2-4").
         /// </summary>

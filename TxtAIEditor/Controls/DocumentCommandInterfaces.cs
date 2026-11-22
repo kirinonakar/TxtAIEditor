@@ -13,6 +13,9 @@ namespace TxtAIEditor.Controls
     public interface ITabCloseCommands
     {
         void CloseAndCleanup(OpenedTab tab, TabViewItem tabItem);
+        void CloseRightTabs(TabViewItem tabItem, TabView tabView);
+        void CloseLeftTabs(TabViewItem tabItem, TabView tabView);
+        void CloseOtherTabs(TabViewItem tabItem, TabView tabView);
     }
 
     public interface IAutoSaveLifecycle

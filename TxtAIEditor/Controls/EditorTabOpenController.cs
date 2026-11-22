@@ -190,7 +190,8 @@ namespace TxtAIEditor.Controls
             ITextModel? textModel = null,
             bool isEncrypted = false,
             string? encryptionPassword = null,
-            int targetIndex = -1)
+            int targetIndex = -1,
+            string? language = null)
         {
             var documentParts = _editorTabDocumentFactory.Create(
                 filePath,
@@ -202,6 +203,13 @@ namespace TxtAIEditor.Controls
                 isEncrypted,
                 encryptionPassword);
             var tab = documentParts.Tab;
+            // Converted documents are opened as HTML, which drives the live preview mode.
+            if (!string.IsNullOrWhiteSpace(language))
+            {
+                tab.Language = language;
+                tab.IsLanguageManuallySelected = true;
+            }
+
             var session = documentParts.Session;
             ShareExistingFileDocument(tab, session);
             OpenEditorDocumentTab(tab, session, documentParts.IsReadOnly, updateLanguageUi: false, targetIndex: targetIndex);

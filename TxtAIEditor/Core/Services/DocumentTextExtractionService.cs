@@ -24,9 +24,11 @@ namespace TxtAIEditor.Core.Services
     {
         private static readonly ConcurrentDictionary<int, Process> RunningPdftotextProcesses = new();
 
+        // Documents converted with rdocs2md before the built-in extractors run. PDF keeps its
+        // pdftotext and built-in parser fallbacks, so it resolves as rdocs2md > pdftotext > built-in.
         private static readonly HashSet<string> Rdocs2mdPreferredExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            ".hwp", ".hwpx", ".doc", ".ppt", ".xls", ".epub"
+            ".pdf", ".hwp", ".hwpx", ".doc", ".ppt", ".xls", ".epub"
         };
 
         public static void KillRunningPdftotextProcesses()
@@ -55,7 +57,9 @@ namespace TxtAIEditor.Core.Services
             string extension = Path.GetExtension(filePath).ToLowerInvariant();
 
             // HWP 5 is an OLE compound document, so the Office encryption probe below would treat it
-            // as an encrypted container. Try rdocs2md first so such formats stay searchable.
+            // as an encrypted container. PDF text is also unreliable to rebuild by hand. Try rdocs2md
+            // first so both formats stay searchable, and let PDF fall back to pdftotext and the
+            // built-in parser when the tool is missing or fails.
             string? markdown = await TryConvertWithRdocs2mdAsync(filePath, extension, cancellationToken).ConfigureAwait(false);
             if (markdown is not null)
             {

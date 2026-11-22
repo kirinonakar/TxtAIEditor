@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.Web.WebView2.Core;
 using TxtAIEditor.Core.Interfaces;
 using TxtAIEditor.Core.Models;
@@ -171,6 +173,7 @@ namespace TxtAIEditor.Controls
             var tabHeader = new TabHeaderControl();
             tabHeader.Configure(tab, _getString("EncryptedTabTooltip", "암호화됨"));
             var item = new TabViewItem { Header = tabHeader, Content = webView, Tag = tab.Id };
+            item.RightTapped += OnChatTabRightTapped;
             _tab = tab;
             _item = item;
             _tabBridges[tab.Id] = (webView, null!);
@@ -631,6 +634,38 @@ namespace TxtAIEditor.Controls
                 CloseChatTab();
                 _showError(tab.Title, details);
             }
+        }
+
+        private void OnChatTabRightTapped(object sender, RightTappedRoutedEventArgs args)
+        {
+            if (sender is not TabViewItem item || _navigation.GetTabViewForItem(item) is not { } tabView)
+            {
+                return;
+            }
+
+            args.Handled = true;
+
+            var flyout = new MenuFlyout();
+
+            var closeRightItem = new MenuFlyoutItem { Text = _getString("TabMenuCloseRight", "오른쪽 탭 닫기"), Icon = new SymbolIcon(Symbol.Forward) };
+            closeRightItem.Click += (_, _) => _documents.CloseRightTabs(item, tabView);
+            flyout.Items.Add(closeRightItem);
+
+            var closeLeftItem = new MenuFlyoutItem { Text = _getString("TabMenuCloseLeft", "왼쪽 탭 닫기"), Icon = new SymbolIcon(Symbol.Back) };
+            closeLeftItem.Click += (_, _) => _documents.CloseLeftTabs(item, tabView);
+            flyout.Items.Add(closeLeftItem);
+
+            var closeOthersItem = new MenuFlyoutItem { Text = _getString("TabMenuCloseOthers", "다른 탭 닫기"), Icon = new SymbolIcon(Symbol.Cancel) };
+            closeOthersItem.Click += (_, _) => _documents.CloseOtherTabs(item, tabView);
+            flyout.Items.Add(closeOthersItem);
+
+            CursorResetHelper.AttachToFlyout(flyout, item);
+            CursorResetHelper.ResetToArrow(item);
+            flyout.ShowAt(item, new FlyoutShowOptions
+            {
+                Position = args.GetPosition(item)
+            });
+            CursorResetHelper.ResetToArrow(item);
         }
 
         private void CloseChatTab()
