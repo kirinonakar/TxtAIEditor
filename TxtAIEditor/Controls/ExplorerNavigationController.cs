@@ -1912,12 +1912,12 @@ namespace TxtAIEditor.Controls
                 case ExplorerItemSorter.SortMode.Size:
                     key = "ExplorerSortSize";
                     fallback = "크기순 정렬";
-                    glyph = "\uE011"; // Size
+                    glyph = "\uE010"; // Size
                     break;
                 case ExplorerItemSorter.SortMode.SizeReverse:
                     key = "ExplorerSortSizeReverse";
                     fallback = "크기 역순 정렬";
-                    glyph = "\uE010"; // Size (reverse)
+                    glyph = "\uE011"; // Size (reverse)
                     break;
                 case ExplorerItemSorter.SortMode.Extension:
                     key = "ExplorerSortExtension";
