@@ -337,6 +337,7 @@ namespace TxtAIEditor.Controls
                             runningSession = _getString("AgentOpenSessionRunningSuffix", "실행 중"),
                             prompt = _getString("AgentPromptPlaceholder", "Agent에게 맡길 작업 입력..."),
                             send = _getString("AgentSendButton", "전송"),
+                            stop = _getString("AgentStopButton", "중단"),
                             clear = _getString("AgentChatClearPrompt", "입력 지우기"),
                             copy = _getString("EditorContextMenuCopy", "복사"),
                             copyAll = _getString("AgentChatCopyAll", "전체 복사"),
@@ -442,6 +443,12 @@ namespace TxtAIEditor.Controls
                         break;
                     case "closeAllSessions":
                         QueueSessionAction(tab, core, _pane.RequestCloseAllSessions);
+                        break;
+                    case "stop":
+                        if (_agent is { } stopAgent && ReadString(message, "sessionId") is { Length: > 0 } stopSessionId)
+                        {
+                            QueueSessionAction(tab, core, () => stopAgent.StopChatPrompt(stopSessionId));
+                        }
                         break;
                     case "submit":
                         string? sessionId = ReadString(message, "sessionId");

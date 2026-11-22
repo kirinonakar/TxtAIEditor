@@ -289,7 +289,7 @@ function renderMarkdownSvgFile(target, options = {}) {
 
 function renderSvgFence(source) {
     const svgNamespace = 'http://www.w3.org/2000/svg';
-    const svg = new DOMParser().parseFromString(source.trim(), 'image/svg+xml').documentElement;
+    const svg = new DOMParser().parseFromString(normalizeSvgEntities(source).trim(), 'image/svg+xml').documentElement;
     if (svg?.localName !== 'svg' || (svg.namespaceURI && svg.namespaceURI !== svgNamespace)) return null;
 
     if (!svg.namespaceURI) svg.removeAttribute('xmlns');
@@ -298,6 +298,11 @@ function renderSvgFence(source) {
     const src = `data:image/svg+xml,${encodeURIComponent(markup)}`;
     const title = [...svg.children].find(child => child.localName === 'title')?.textContent || '';
     return `<div><img src="${src}" alt="${escapeAttribute(title)}" decoding="async"></div>`;
+}
+
+// SVG fences are parsed as XML, which has no HTML named entities such as &nbsp;.
+function normalizeSvgEntities(source) {
+    return (source || '').replace(/&nbsp;/gi, '&#160;');
 }
 
 function sanitizeHtml(html, options = {}) {

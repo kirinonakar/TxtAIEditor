@@ -19,6 +19,7 @@ const copyAllIcon = document.getElementById('copy-all-icon');
 const composer = document.getElementById('composer');
 const promptBox = document.getElementById('prompt');
 const sendButton = document.getElementById('send');
+const sendIcon = document.getElementById('send-icon');
 const clearButton = document.getElementById('clear-prompt');
 const timestamp = /^\d{2}:\d{2}:\d{2}[ \t]+(.*)/;
 const answerHeader = /^\[(?:Agent Response|assistant: (?:response|final answer))\]:?[ \t]*/i;
@@ -50,6 +51,8 @@ let imageWorkspaceKey = null;
 let nextImageRequestId = 0;
 let composerSessionId = null;
 let canSubmit = false;
+let sendLabel = '';
+let stopLabel = '';
 let composing = false;
 let followOutput = true;
 let theme = '';
@@ -369,6 +372,11 @@ function syncBranchButton(view) {
 
 function isCurrentSessionRunning() {
     return sessionItems.some(item => item.id === sessionId && item.isRunning);
+}
+
+// While the current session is running and no follow-up text is pending, the composer button stops the run.
+function isStopMode() {
+    return canSubmit && !!sessionId && isCurrentSessionRunning() && !promptBox.value.trim();
 }
 
 function setMessageButton(button, label, visible) {
@@ -699,6 +707,7 @@ function showSessions(items) {
     sessionsEmpty.hidden = items.length > 0;
     closeAllSessionsButton.disabled = items.length === 0;
     syncSessionSelection();
+    syncComposer();
 }
 
 function setCopyAllLabel(label, icon = '⧉') {
@@ -741,8 +750,18 @@ function syncComposer() {
             promptBox.disabled = !canSubmit;
         }
     }
-    sendButton.disabled = !canSubmit || composerSessionId !== sessionId ||
-        pending.has(sessionId) || (!composing && !promptBox.value.trim());
+    const stopMode = isStopMode();
+    sendButton.classList.toggle('composer-stop', stopMode);
+    sendIcon.textContent = stopMode ? '■' : '↑';
+    const buttonLabel = stopMode ? stopLabel : sendLabel;
+    if (buttonLabel && sendButton.title !== buttonLabel) {
+        sendButton.title = buttonLabel;
+        sendButton.setAttribute('aria-label', buttonLabel);
+    }
+    sendButton.disabled = stopMode
+        ? false
+        : !canSubmit || composerSessionId !== sessionId ||
+            pending.has(sessionId) || (!composing && !promptBox.value.trim());
     clearButton.hidden = promptBox.value.length === 0;
 }
 
@@ -857,10 +876,16 @@ window.addEventListener('keydown', event => {
 promptBox.addEventListener('keydown', event => {
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing || composing || event.keyCode === 229) return;
     event.preventDefault();
+    // An empty composer shows the stop button, so Enter must not cancel the run accidentally.
+    if (!promptBox.value.trim()) return;
     composer.requestSubmit();
 });
 composer.addEventListener('submit', event => {
     event.preventDefault();
+    if (isStopMode()) {
+        host.postMessage({ action: 'stop', sessionId });
+        return;
+    }
     if (sendButton.disabled || composing || !promptBox.value.trim()) return;
     const prompt = promptBox.value;
     pending.set(sessionId, prompt);
@@ -886,8 +911,11 @@ host.addEventListener('message', ({ data }) => {
             runningSessionLabel = data.runningSession;
             promptBox.placeholder = data.prompt;
             promptBox.setAttribute('aria-label', data.prompt);
+            sendLabel = data.send;
+            stopLabel = data.stop;
             sendButton.title = data.send;
             sendButton.setAttribute('aria-label', data.send);
+            syncComposer();
             clearButton.title = data.clear;
             clearButton.setAttribute('aria-label', data.clear);
             thinkingLabel = data.thinking;

@@ -221,6 +221,16 @@ namespace TxtAIEditor.Controls
             _ = _runCoordinator.SubmitChatPromptAsync(sessionId, prompt.Trim(), completed);
         }
 
+        internal void StopChatPrompt(string sessionId)
+        {
+            if (!string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _runCoordinator?.StopAgent(sessionId);
+        }
+
         internal bool BranchChatSession(string sessionId, int outputOffset)
         {
             if (!string.Equals(_currentSessionId, sessionId, StringComparison.Ordinal))

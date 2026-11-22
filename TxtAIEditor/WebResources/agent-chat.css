@@ -176,7 +176,11 @@ body {
 .assistant .short-cell { white-space: nowrap; }
 .assistant thead th { background: color-mix(in srgb, var(--fg) 10%, transparent); }
 .assistant .activity { margin: 0 0 4px; color: var(--muted); font-size: .8rem; white-space: pre-wrap; }
-.assistant .mermaid-block, .assistant .katex-display, .block:has(table) { overflow-x: auto; }
+.assistant .mermaid-block, .block:has(table) { overflow-x: auto; }
+/* KaTeX display boxes overhang their own line box by a fraction of a pixel, so
+   scrolling on .katex-display raised a needless vertical scrollbar.
+   Scroll the wrapper instead and keep the vertical axis clipped. */
+.assistant .math.display { display: block; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
 .assistant .mermaid-block { margin: .75em 0; }
 .assistant .mermaid-block svg { display: block; max-width: 100%; height: auto; }
 
@@ -226,6 +230,16 @@ body {
 
 .composer button:disabled { opacity: .38; cursor: default; }
 .composer button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.composer .composer-stop {
+    background: color-mix(in srgb, var(--foreground) 16%, transparent);
+    color: var(--foreground);
+    font-size: 15px;
+}
+
+.composer .composer-stop:hover {
+    background: color-mix(in srgb, var(--foreground) 26%, transparent);
+}
 
 .composer .composer-clear {
     flex: none;
