@@ -1897,7 +1897,7 @@ namespace TxtAIEditor.Controls
                 case ExplorerItemSorter.SortMode.NameReverse:
                     key = "ExplorerSortNameReverse";
                     fallback = "이름 역순 정렬";
-                    glyph = "\uE70E"; // Chevron up
+                    glyph = "\uE164"; // Name (reverse)
                     break;
                 case ExplorerItemSorter.SortMode.Newest:
                     key = "ExplorerSortNewest";
@@ -1912,17 +1912,17 @@ namespace TxtAIEditor.Controls
                 case ExplorerItemSorter.SortMode.Size:
                     key = "ExplorerSortSize";
                     fallback = "크기순 정렬";
-                    glyph = "\uE8CB";
+                    glyph = "\uE011"; // Size
                     break;
                 case ExplorerItemSorter.SortMode.SizeReverse:
                     key = "ExplorerSortSizeReverse";
                     fallback = "크기 역순 정렬";
-                    glyph = "\uE70D"; // Chevron down
+                    glyph = "\uE010"; // Size (reverse)
                     break;
                 case ExplorerItemSorter.SortMode.Extension:
                     key = "ExplorerSortExtension";
                     fallback = "확장자순 정렬";
-                    glyph = "\uE8CB";
+                    glyph = "\uE161"; // Extension
                     break;
                 default:
                     key = "ExplorerSortName";
