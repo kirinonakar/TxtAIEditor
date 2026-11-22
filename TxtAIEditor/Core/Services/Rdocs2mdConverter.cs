@@ -88,11 +88,12 @@ namespace TxtAIEditor.Core.Services
 
         /// <summary>
         /// Converts a document to a self-contained HTML document. The editor shows the
-        /// result through its HTML live preview mode.
+        /// result through its HTML live preview mode, so embedded pictures are inlined as
+        /// data URIs to keep the page independent from the document folder.
         /// </summary>
         public static async Task<string> ConvertToHtmlAsync(string filePath, CancellationToken cancellationToken = default)
         {
-            return await ConvertAsync(filePath, "html", sheetName: null, sectionRange: null, cancellationToken).ConfigureAwait(false);
+            return await ConvertAsync(filePath, "html", sheetName: null, sectionRange: null, cancellationToken, includeImages: true).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -122,7 +123,7 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static async Task<string> ConvertAsync(string filePath, string format, string? sheetName, string? sectionRange, CancellationToken cancellationToken)
+        private static async Task<string> ConvertAsync(string filePath, string format, string? sheetName, string? sectionRange, CancellationToken cancellationToken, bool includeImages = false)
         {
             string? executablePath = ExecutablePath;
             if (string.IsNullOrWhiteSpace(executablePath) || string.IsNullOrWhiteSpace(filePath) || !SafeFileExists(executablePath))
@@ -143,6 +144,13 @@ namespace TxtAIEditor.Core.Services
             startInfo.ArgumentList.Add("--stdout");
             startInfo.ArgumentList.Add("--format");
             startInfo.ArgumentList.Add(format);
+            if (includeImages)
+            {
+                // Inlines embedded raster images into the HTML output so the live preview
+                // keeps the pictures that the original document shows.
+                startInfo.ArgumentList.Add("--include-images");
+            }
+
             if (!string.IsNullOrWhiteSpace(sheetName))
             {
                 startInfo.ArgumentList.Add("--sheet");
