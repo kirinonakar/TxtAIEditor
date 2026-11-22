@@ -47,10 +47,11 @@ namespace TxtAIEditor.Controls
         private readonly SemaphoreSlim _fileOpenSemaphore = new(1, 1);
 
         // rdocs2md renders these formats as HTML, so they open in live preview mode instead of
-        // the Office viewer that needs an external converter.
+        // the Office viewer that needs an external converter. .ppt stays on the built-in Office
+        // viewer path (.ppt is converted to .pptx and rendered internally).
         private static readonly HashSet<string> Rdocs2mdHtmlPreviewExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            ".hwp", ".doc", ".xls", ".ppt"
+            ".hwp", ".doc", ".xls"
         };
 
         public FileTabLoadController(
