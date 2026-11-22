@@ -46,12 +46,17 @@ namespace TxtAIEditor.Controls
         private readonly Action<string, string> _showErrorMessage;
         private readonly SemaphoreSlim _fileOpenSemaphore = new(1, 1);
 
-        // rdocs2md renders these formats as HTML, so they open in live preview mode instead of
-        // the Office viewer that needs an external converter. .ppt stays on the built-in Office
-        // viewer path (.ppt is converted to .pptx and rendered internally).
+        // rdocs2md renders .hwp as HTML, so it opens in live preview mode instead of the Office
+        // viewer that needs an external converter. .doc and .xls follow the .ppt path and are
+        // converted through Office COM, so rdocs2md is used only when Word or Excel is missing.
         private static readonly HashSet<string> Rdocs2mdHtmlPreviewExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            ".hwp", ".doc", ".xls"
+            ".hwp"
+        };
+
+        private static readonly HashSet<string> OfficeComFallbackExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".doc", ".xls"
         };
 
         public FileTabLoadController(
@@ -150,7 +155,7 @@ namespace TxtAIEditor.Controls
                     return FileTabLoadResult.Opened(tab);
                 }
 
-                if (Rdocs2mdHtmlPreviewExtensions.Contains(extension) && Rdocs2mdConverter.SupportsExtension(filePath))
+                if (ShouldUseRdocs2mdHtmlPreview(filePath))
                 {
                     var convertedTab = await TryOpenConvertedHtmlTabAsync(filePath);
                     if (convertedTab != null)
@@ -471,6 +476,27 @@ namespace TxtAIEditor.Controls
             }
 
             return _openOfficeDocumentTab(filePath);
+        }
+
+        /// <summary>
+        /// .hwp always uses the rdocs2md HTML preview, while .doc and .xls prefer the Office COM
+        /// conversion that .ppt uses and fall back to rdocs2md when Word or Excel is not installed.
+        /// </summary>
+        private static bool ShouldUseRdocs2mdHtmlPreview(string filePath)
+        {
+            if (!Rdocs2mdConverter.SupportsExtension(filePath))
+            {
+                return false;
+            }
+
+            string extension = Path.GetExtension(filePath);
+            if (Rdocs2mdHtmlPreviewExtensions.Contains(extension))
+            {
+                return true;
+            }
+
+            return OfficeComFallbackExtensions.Contains(extension) &&
+                   !OfficeDocumentConverter.IsConversionHostAvailable(filePath);
         }
 
         private static bool RequiresExtractedViewer(string entryPath)

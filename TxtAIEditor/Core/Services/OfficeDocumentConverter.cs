@@ -7,6 +7,23 @@ namespace TxtAIEditor.Core.Services
 {
     public static class OfficeDocumentConverter
     {
+        /// <summary>
+        /// Returns true when the Office application that converts the given legacy format
+        /// (.doc, .xls, .ppt) is registered for COM automation on this machine.
+        /// </summary>
+        public static bool IsConversionHostAvailable(string filePath)
+        {
+            string? progId = Path.GetExtension(filePath).ToLowerInvariant() switch
+            {
+                ".doc" => "Word.Application",
+                ".xls" => "Excel.Application",
+                ".ppt" => "PowerPoint.Application",
+                _ => null
+            };
+
+            return progId != null && Type.GetTypeFromProgID(progId) != null;
+        }
+
         public static async Task<string> ConvertToDocxAsync(string docPath, bool suppressPasswordPrompts = false)
         {
             var task = Task.Run(() =>
