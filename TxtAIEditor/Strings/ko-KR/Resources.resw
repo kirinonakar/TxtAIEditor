@@ -2593,6 +2593,9 @@
   <data name="AgentSendButton" xml:space="preserve">
     <value>전송</value>
   </data>
+  <data name="AgentChatClearPrompt" xml:space="preserve">
+    <value>입력 지우기</value>
+  </data>
   <data name="AgentFollowUpQueued" xml:space="preserve">
     <value>추가 지시가 대기 중입니다. 다음 도구 호출이 끝나면 전송됩니다.</value>
   </data>

@@ -2593,6 +2593,9 @@ Plan: {0}</value>
   <data name="AgentSendButton" xml:space="preserve">
     <value>Send</value>
   </data>
+  <data name="AgentChatClearPrompt" xml:space="preserve">
+    <value>Clear input</value>
+  </data>
   <data name="AgentFollowUpQueued" xml:space="preserve">
     <value>Additional instruction is queued. It will be sent after the next tool call finishes.</value>
   </data>

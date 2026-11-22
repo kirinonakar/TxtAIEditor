@@ -19,6 +19,7 @@ const copyAllIcon = document.getElementById('copy-all-icon');
 const composer = document.getElementById('composer');
 const promptBox = document.getElementById('prompt');
 const sendButton = document.getElementById('send');
+const clearButton = document.getElementById('clear-prompt');
 const timestamp = /^\d{2}:\d{2}:\d{2}[ \t]+(.*)/;
 const answerHeader = /^\[(?:Agent Response|assistant: (?:response|final answer))\]:?[ \t]*/i;
 const logHeader = /^\[(?:Agent run\]|LLM API:|Tool (?:result|completed|failed)[:\]])/i;
@@ -742,6 +743,7 @@ function syncComposer() {
     }
     sendButton.disabled = !canSubmit || composerSessionId !== sessionId ||
         pending.has(sessionId) || (!composing && !promptBox.value.trim());
+    clearButton.hidden = promptBox.value.length === 0;
 }
 
 function prefillComposer(text) {
@@ -815,6 +817,15 @@ function update(message) {
     scrollToEnd();
 }
 
+clearButton.addEventListener('click', () => {
+    if (composing) return;
+    promptBox.value = '';
+    drafts.delete(composerSessionId);
+    syncComposer();
+    if (!promptBox.disabled) {
+        promptBox.focus();
+    }
+});
 promptBox.addEventListener('input', () => {
     drafts.set(composerSessionId, promptBox.value);
     syncComposer();
@@ -877,6 +888,8 @@ host.addEventListener('message', ({ data }) => {
             promptBox.setAttribute('aria-label', data.prompt);
             sendButton.title = data.send;
             sendButton.setAttribute('aria-label', data.send);
+            clearButton.title = data.clear;
+            clearButton.setAttribute('aria-label', data.clear);
             thinkingLabel = data.thinking;
             toolStatusPrefixes = data.toolStatusPrefixes.filter(Boolean);
             verboseToolPrefix = data.verboseToolPrefix;

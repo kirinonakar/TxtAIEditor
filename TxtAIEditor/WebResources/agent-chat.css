@@ -227,6 +227,24 @@ body {
 .composer button:disabled { opacity: .38; cursor: default; }
 .composer button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
+.composer .composer-clear {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    margin-bottom: 5px;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font: 400 13px/1 "Segoe UI", sans-serif;
+}
+
+.composer .composer-clear:hover {
+    background: color-mix(in srgb, var(--fg) 12%, transparent);
+    color: var(--foreground);
+}
+
+.composer .composer-clear[hidden] { display: none; }
+
 .turn-panel {
     grid-area: 1 / 2 / 3 / 3;
     display: grid;
