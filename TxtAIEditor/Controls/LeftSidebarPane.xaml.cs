@@ -24,6 +24,11 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? CreateNotebookClick { add => ExplorerView.CreateNotebookClick += value; remove => ExplorerView.CreateNotebookClick -= value; }
         public event RoutedEventHandler? RefreshClick { add => ExplorerView.RefreshClick += value; remove => ExplorerView.RefreshClick -= value; }
         public event RoutedEventHandler? SortClick { add => ExplorerView.SortClick += value; remove => ExplorerView.SortClick -= value; }
+        internal event EventHandler<ExplorerItemSorter.SortMode>? ExplorerSortModeSelected
+        {
+            add => ExplorerView.SortModeSelected += value;
+            remove => ExplorerView.SortModeSelected -= value;
+        }
         public event EventHandler<RemoteFileOpenedEventArgs>? RemoteFileOpened { add => ExplorerView.RemoteFileOpened += value; remove => ExplorerView.RemoteFileOpened -= value; }
         public event EventHandler<RemoteServerSelectedEventArgs>? RemoteServerSelected { add => ExplorerView.RemoteServerSelected += value; remove => ExplorerView.RemoteServerSelected -= value; }
         public event RoutedEventHandler? OpenInWindowsExplorerClick { add => ExplorerView.OpenInWindowsExplorerClick += value; remove => ExplorerView.OpenInWindowsExplorerClick -= value; }
@@ -201,6 +206,11 @@ namespace TxtAIEditor.Controls
         public void ClearExplorerFilter()
         {
             ExplorerView.ClearFilter();
+        }
+
+        internal void SetExplorerSortModeSelection(ExplorerItemSorter.SortMode mode)
+        {
+            ExplorerView.SetSelectedSortMode(mode);
         }
 
         public void Localize(Func<string, string, string> getString, bool updateEmptyFolderStatus)

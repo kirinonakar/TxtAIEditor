@@ -2961,6 +2961,39 @@
   <data name="ExplorerSortOldest" xml:space="preserve">
     <value>정렬: 수정한 날짜 오래된순</value>
   </data>
+  <data name="ExplorerSortNameReverse" xml:space="preserve">
+    <value>정렬: 이름 역순</value>
+  </data>
+  <data name="ExplorerSortSize" xml:space="preserve">
+    <value>정렬: 크기순</value>
+  </data>
+  <data name="ExplorerSortSizeReverse" xml:space="preserve">
+    <value>정렬: 크기 역순</value>
+  </data>
+  <data name="ExplorerSortExtension" xml:space="preserve">
+    <value>정렬: 확장자순</value>
+  </data>
+  <data name="ExplorerSortNameItem" xml:space="preserve">
+    <value>이름순</value>
+  </data>
+  <data name="ExplorerSortNameReverseItem" xml:space="preserve">
+    <value>이름순(역순)</value>
+  </data>
+  <data name="ExplorerSortNewestItem" xml:space="preserve">
+    <value>최신순</value>
+  </data>
+  <data name="ExplorerSortOldestItem" xml:space="preserve">
+    <value>오래된순</value>
+  </data>
+  <data name="ExplorerSortSizeItem" xml:space="preserve">
+    <value>크기순</value>
+  </data>
+  <data name="ExplorerSortSizeReverseItem" xml:space="preserve">
+    <value>크기순(역순)</value>
+  </data>
+  <data name="ExplorerSortExtensionItem" xml:space="preserve">
+    <value>확장자순</value>
+  </data>
   <data name="AgentHistoryTooltip" xml:space="preserve">
     <value>세션 히스토리</value>
   </data>

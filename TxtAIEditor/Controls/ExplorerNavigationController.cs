@@ -849,6 +849,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.SelectFolderClick += OnSelectFolderClick;
             _leftSidebar.RefreshClick += OnExplorerRefreshClick;
             _leftSidebar.SortClick += OnExplorerSortClick;
+            _leftSidebar.ExplorerSortModeSelected += OnExplorerSortModeSelected;
             _leftSidebar.RemoteServerSelected += OnRemoteServerSelected;
             _leftSidebar.OpenInWindowsExplorerClick += OnOpenInWindowsExplorerClick;
             _leftSidebar.ExplorerHomeClick += OnExplorerHomeClick;
@@ -1837,7 +1838,22 @@ namespace TxtAIEditor.Controls
         private void OnExplorerSortClick(object sender, RoutedEventArgs e)
         {
             _itemSorter.CycleMode();
+            ApplySortMode();
+        }
 
+        private void OnExplorerSortModeSelected(object? sender, ExplorerItemSorter.SortMode mode)
+        {
+            if (_itemSorter.Mode == mode)
+            {
+                return;
+            }
+
+            _itemSorter.SetMode(mode);
+            ApplySortMode();
+        }
+
+        private void ApplySortMode()
+        {
             UpdateSortButtonVisuals();
 
             if (!IsViewingRemote && CurrentFolderPath == ExplorerDirectoryService.LocalRootPath)
@@ -1878,6 +1894,11 @@ namespace TxtAIEditor.Controls
                     fallback = "이름순 정렬";
                     glyph = "\uE8CB"; // Standard sort glyph
                     break;
+                case ExplorerItemSorter.SortMode.NameReverse:
+                    key = "ExplorerSortNameReverse";
+                    fallback = "이름 역순 정렬";
+                    glyph = "\uE70E"; // Chevron up
+                    break;
                 case ExplorerItemSorter.SortMode.Newest:
                     key = "ExplorerSortNewest";
                     fallback = "수정한 날짜 최신순 정렬";
@@ -1888,6 +1909,21 @@ namespace TxtAIEditor.Controls
                     fallback = "수정한 날짜 오래된순 정렬";
                     glyph = "\uE74A"; // Up arrow
                     break;
+                case ExplorerItemSorter.SortMode.Size:
+                    key = "ExplorerSortSize";
+                    fallback = "크기순 정렬";
+                    glyph = "\uE8CB";
+                    break;
+                case ExplorerItemSorter.SortMode.SizeReverse:
+                    key = "ExplorerSortSizeReverse";
+                    fallback = "크기 역순 정렬";
+                    glyph = "\uE70D"; // Chevron down
+                    break;
+                case ExplorerItemSorter.SortMode.Extension:
+                    key = "ExplorerSortExtension";
+                    fallback = "확장자순 정렬";
+                    glyph = "\uE8CB";
+                    break;
                 default:
                     key = "ExplorerSortName";
                     fallback = "이름순 정렬";
@@ -1897,6 +1933,7 @@ namespace TxtAIEditor.Controls
 
             string tooltipText = _localizationService.GetString(key, fallback);
             Microsoft.UI.Xaml.Controls.ToolTipService.SetToolTip(_leftSidebar.ExplorerSortBtn, tooltipText);
+            _leftSidebar.SetExplorerSortModeSelection(_itemSorter.Mode);
 
             if (_leftSidebar.ExplorerSortBtn.Content is Microsoft.UI.Xaml.Controls.FontIcon fontIcon)
             {

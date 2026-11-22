@@ -2961,6 +2961,39 @@
   <data name="ExplorerSortOldest" xml:space="preserve">
     <value>排序：最舊的修改</value>
   </data>
+  <data name="ExplorerSortNameReverse" xml:space="preserve">
+    <value>排序：名稱（反向）</value>
+  </data>
+  <data name="ExplorerSortSize" xml:space="preserve">
+    <value>排序：大小</value>
+  </data>
+  <data name="ExplorerSortSizeReverse" xml:space="preserve">
+    <value>排序：大小（反向）</value>
+  </data>
+  <data name="ExplorerSortExtension" xml:space="preserve">
+    <value>排序：類型</value>
+  </data>
+  <data name="ExplorerSortNameItem" xml:space="preserve">
+    <value>名稱</value>
+  </data>
+  <data name="ExplorerSortNameReverseItem" xml:space="preserve">
+    <value>名稱（反向）</value>
+  </data>
+  <data name="ExplorerSortNewestItem" xml:space="preserve">
+    <value>最新</value>
+  </data>
+  <data name="ExplorerSortOldestItem" xml:space="preserve">
+    <value>最舊</value>
+  </data>
+  <data name="ExplorerSortSizeItem" xml:space="preserve">
+    <value>大小</value>
+  </data>
+  <data name="ExplorerSortSizeReverseItem" xml:space="preserve">
+    <value>大小（反向）</value>
+  </data>
+  <data name="ExplorerSortExtensionItem" xml:space="preserve">
+    <value>類型</value>
+  </data>
   <data name="AgentHistoryTooltip" xml:space="preserve">
     <value>會話歷史記錄</value>
   </data>

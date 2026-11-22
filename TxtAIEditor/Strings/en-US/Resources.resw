@@ -2961,6 +2961,39 @@ Plan: {0}</value>
   <data name="ExplorerSortOldest" xml:space="preserve">
     <value>Sort: Oldest Modified</value>
   </data>
+  <data name="ExplorerSortNameReverse" xml:space="preserve">
+    <value>Sort: Name (Reverse)</value>
+  </data>
+  <data name="ExplorerSortSize" xml:space="preserve">
+    <value>Sort: Size</value>
+  </data>
+  <data name="ExplorerSortSizeReverse" xml:space="preserve">
+    <value>Sort: Size (Reverse)</value>
+  </data>
+  <data name="ExplorerSortExtension" xml:space="preserve">
+    <value>Sort: Type</value>
+  </data>
+  <data name="ExplorerSortNameItem" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="ExplorerSortNameReverseItem" xml:space="preserve">
+    <value>Name (Reverse)</value>
+  </data>
+  <data name="ExplorerSortNewestItem" xml:space="preserve">
+    <value>Newest</value>
+  </data>
+  <data name="ExplorerSortOldestItem" xml:space="preserve">
+    <value>Oldest</value>
+  </data>
+  <data name="ExplorerSortSizeItem" xml:space="preserve">
+    <value>Size</value>
+  </data>
+  <data name="ExplorerSortSizeReverseItem" xml:space="preserve">
+    <value>Size (Reverse)</value>
+  </data>
+  <data name="ExplorerSortExtensionItem" xml:space="preserve">
+    <value>Type</value>
+  </data>
   <data name="AgentHistoryTooltip" xml:space="preserve">
     <value>Session History</value>
   </data>

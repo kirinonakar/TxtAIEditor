@@ -2961,6 +2961,39 @@
   <data name="ExplorerSortOldest" xml:space="preserve">
     <value>並べ替え: 更新日時 (古い順)</value>
   </data>
+  <data name="ExplorerSortNameReverse" xml:space="preserve">
+    <value>並べ替え: 名前順 (逆順)</value>
+  </data>
+  <data name="ExplorerSortSize" xml:space="preserve">
+    <value>並べ替え: サイズ順</value>
+  </data>
+  <data name="ExplorerSortSizeReverse" xml:space="preserve">
+    <value>並べ替え: サイズ順 (逆順)</value>
+  </data>
+  <data name="ExplorerSortExtension" xml:space="preserve">
+    <value>並べ替え: 拡張子順</value>
+  </data>
+  <data name="ExplorerSortNameItem" xml:space="preserve">
+    <value>名前順</value>
+  </data>
+  <data name="ExplorerSortNameReverseItem" xml:space="preserve">
+    <value>名前順 (逆順)</value>
+  </data>
+  <data name="ExplorerSortNewestItem" xml:space="preserve">
+    <value>新しい順</value>
+  </data>
+  <data name="ExplorerSortOldestItem" xml:space="preserve">
+    <value>古い順</value>
+  </data>
+  <data name="ExplorerSortSizeItem" xml:space="preserve">
+    <value>サイズ順</value>
+  </data>
+  <data name="ExplorerSortSizeReverseItem" xml:space="preserve">
+    <value>サイズ順 (逆順)</value>
+  </data>
+  <data name="ExplorerSortExtensionItem" xml:space="preserve">
+    <value>拡張子順</value>
+  </data>
   <data name="AgentHistoryTooltip" xml:space="preserve">
     <value>セッション履歴</value>
   </data>

@@ -64,6 +64,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? CreateNotebookClick;
         public event RoutedEventHandler? RefreshClick;
         public event RoutedEventHandler? SortClick;
+        internal event EventHandler<ExplorerItemSorter.SortMode>? SortModeSelected;
         public event EventHandler<RemoteFileOpenedEventArgs>? RemoteFileOpened
         {
             add => RemoteExplorer.RemoteFileOpened += value;
@@ -182,6 +183,13 @@ namespace TxtAIEditor.Controls
             ToolTipService.SetToolTip(ExplorerRefreshButton, refreshText);
             string sortText = getString("ExplorerSortName", "이름순 정렬");
             ToolTipService.SetToolTip(ExplorerSortButton, sortText);
+            ExplorerSortNameMenuItem.Text = getString("ExplorerSortNameItem", "이름순");
+            ExplorerSortNameReverseMenuItem.Text = getString("ExplorerSortNameReverseItem", "이름순(역순)");
+            ExplorerSortNewestMenuItem.Text = getString("ExplorerSortNewestItem", "최신순");
+            ExplorerSortOldestMenuItem.Text = getString("ExplorerSortOldestItem", "오래된순");
+            ExplorerSortSizeMenuItem.Text = getString("ExplorerSortSizeItem", "크기순");
+            ExplorerSortSizeReverseMenuItem.Text = getString("ExplorerSortSizeReverseItem", "크기순(역순)");
+            ExplorerSortExtensionMenuItem.Text = getString("ExplorerSortExtensionItem", "확장자순");
 
             var remoteExplorerText = getString("RemoteExplorerTitle", "리모트 서버");
             ToolTipService.SetToolTip(ExplorerRemoteButton, remoteExplorerText);
@@ -822,6 +830,29 @@ namespace TxtAIEditor.Controls
         private void OnCreateNotebookClick(object sender, RoutedEventArgs e) => CreateNotebookClick?.Invoke(sender, e);
         private void OnRefreshClick(object sender, RoutedEventArgs e) => RefreshClick?.Invoke(sender, e);
         private void OnSortClick(object sender, RoutedEventArgs e) => SortClick?.Invoke(sender, e);
+        private void OnSortModeMenuClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: string tag } ||
+                !Enum.TryParse(tag, out ExplorerItemSorter.SortMode mode))
+            {
+                return;
+            }
+
+            SetSelectedSortMode(mode);
+            SortModeSelected?.Invoke(this, mode);
+        }
+
+        internal void SetSelectedSortMode(ExplorerItemSorter.SortMode mode)
+        {
+            ExplorerSortNameMenuItem.IsChecked = mode == ExplorerItemSorter.SortMode.Name;
+            ExplorerSortNameReverseMenuItem.IsChecked = mode == ExplorerItemSorter.SortMode.NameReverse;
+            ExplorerSortNewestMenuItem.IsChecked = mode == ExplorerItemSorter.SortMode.Newest;
+            ExplorerSortOldestMenuItem.IsChecked = mode == ExplorerItemSorter.SortMode.Oldest;
+            ExplorerSortSizeMenuItem.IsChecked = mode == ExplorerItemSorter.SortMode.Size;
+            ExplorerSortSizeReverseMenuItem.IsChecked = mode == ExplorerItemSorter.SortMode.SizeReverse;
+            ExplorerSortExtensionMenuItem.IsChecked = mode == ExplorerItemSorter.SortMode.Extension;
+        }
+
         private async void OnRemoteFlyoutOpening(object sender, object e) => await RemoteExplorer.RefreshProfilesAsync();
         private void OnOverflowRemoteClick(object sender, RoutedEventArgs e)
         {
