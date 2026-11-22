@@ -36,6 +36,12 @@ namespace TxtAIEditor.Controls
                 new KeyEventHandler(OnExplorerKeyDown),
                 true);
             ExplorerTreeView.SelectionChanged += OnExplorerTreeSelectionChanged;
+            if (ExplorerSortButton.ContextFlyout is MenuFlyout sortModeFlyout)
+            {
+                CursorResetHelper.AttachToFlyout(sortModeFlyout, ExplorerSortButton);
+            }
+
+            ExplorerSortButton.RightTapped += OnSortButtonRightTapped;
         }
 
         public Grid Root => RootGrid;
@@ -830,6 +836,8 @@ namespace TxtAIEditor.Controls
         private void OnCreateNotebookClick(object sender, RoutedEventArgs e) => CreateNotebookClick?.Invoke(sender, e);
         private void OnRefreshClick(object sender, RoutedEventArgs e) => RefreshClick?.Invoke(sender, e);
         private void OnSortClick(object sender, RoutedEventArgs e) => SortClick?.Invoke(sender, e);
+        private void OnSortButtonRightTapped(object sender, RightTappedRoutedEventArgs e) =>
+            CursorResetHelper.ResetToArrow(ExplorerSortButton);
         private void OnSortModeMenuClick(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement { Tag: string tag } ||
