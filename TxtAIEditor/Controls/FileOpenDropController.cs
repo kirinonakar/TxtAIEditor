@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -19,6 +20,8 @@ namespace TxtAIEditor.Controls
         private readonly Func<bool> _isLeftSidebarVisible;
         private readonly Action<string, string> _showError;
         private readonly Func<string, string, string> _getString;
+        private readonly Func<DragEventArgs, bool>? _isAttachmentDropTarget;
+        private readonly Func<IReadOnlyList<string>, Task>? _addAttachmentsAsync;
 
         public FileOpenDropController(
             FrameworkElement dragOverlay,
@@ -30,7 +33,9 @@ namespace TxtAIEditor.Controls
             Func<bool> isExplorerTreeMode,
             Func<bool> isLeftSidebarVisible,
             Action<string, string> showError,
-            Func<string, string, string> getString)
+            Func<string, string, string> getString,
+            Func<DragEventArgs, bool>? isAttachmentDropTarget = null,
+            Func<IReadOnlyList<string>, Task>? addAttachmentsAsync = null)
         {
             _dragOverlay = dragOverlay;
             _leftSidebar = leftSidebar;
@@ -42,6 +47,8 @@ namespace TxtAIEditor.Controls
             _isLeftSidebarVisible = isLeftSidebarVisible;
             _showError = showError;
             _getString = getString;
+            _isAttachmentDropTarget = isAttachmentDropTarget;
+            _addAttachmentsAsync = addAttachmentsAsync;
         }
 
         public async Task OpenFileAsync()
@@ -114,6 +121,9 @@ namespace TxtAIEditor.Controls
             return IsHoveringOverLeftSidebar(e) || IsHoveringOverRightSidebar(e);
         }
 
+        private bool IsAttachmentDropTarget(DragEventArgs e) =>
+            _addAttachmentsAsync != null && _isAttachmentDropTarget?.Invoke(e) == true;
+
         public void HandleRootDragOver(DragEventArgs e)
         {
             if (e.Handled)
@@ -132,7 +142,15 @@ namespace TxtAIEditor.Controls
 
             if (e.DataView.Contains(StandardDataFormats.StorageItems))
             {
-                ApplyFileOpenDragUi(e);
+                if (IsAttachmentDropTarget(e))
+                {
+                    ApplyAttachmentDragUi(e);
+                }
+                else
+                {
+                    ApplyFileOpenDragUi(e);
+                }
+
                 _dragOverlay.Visibility = Visibility.Visible;
             }
             else
@@ -150,6 +168,12 @@ namespace TxtAIEditor.Controls
                 return;
             }
 
+            if (IsAttachmentDropTarget(e))
+            {
+                ApplyAttachmentDragUi(e);
+                return;
+            }
+
             ApplyFileOpenDragUi(e);
         }
 
@@ -158,6 +182,13 @@ namespace TxtAIEditor.Controls
             if (IsHoveringOverRightSidebar(e))
             {
                 _dragOverlay.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            if (IsAttachmentDropTarget(e))
+            {
+                _dragOverlay.Visibility = Visibility.Collapsed;
+                await AddAttachmentDropAsync(e);
                 return;
             }
 
@@ -179,6 +210,13 @@ namespace TxtAIEditor.Controls
 
             if (IsHoveringOverRightSidebar(e))
             {
+                return;
+            }
+
+            if (IsAttachmentDropTarget(e))
+            {
+                _dragOverlay.Visibility = Visibility.Collapsed;
+                await AddAttachmentDropAsync(e);
                 return;
             }
 
@@ -233,6 +271,47 @@ namespace TxtAIEditor.Controls
             e.DragUIOverride.Caption = _getString("DragDropOpenFileCaption", "파일 열기");
             e.DragUIOverride.IsCaptionVisible = true;
             e.DragUIOverride.IsContentVisible = true;
+        }
+
+        private void ApplyAttachmentDragUi(DragEventArgs e)
+        {
+            e.AcceptedOperation = DataPackageOperation.Copy;
+            e.DragUIOverride.Caption = _getString("AgentAttachFileCaption", "파일 첨부");
+            e.DragUIOverride.IsCaptionVisible = true;
+            e.DragUIOverride.IsContentVisible = true;
+        }
+
+        private async Task AddAttachmentDropAsync(DragEventArgs e)
+        {
+            e.Handled = true;
+            e.AcceptedOperation = DataPackageOperation.Copy;
+
+            if (_addAttachmentsAsync == null || !e.DataView.Contains(StandardDataFormats.StorageItems))
+            {
+                return;
+            }
+
+            try
+            {
+                var items = await e.DataView.GetStorageItemsAsync();
+                var filePaths = new List<string>();
+                foreach (var item in items)
+                {
+                    if (!string.IsNullOrWhiteSpace(item.Path) && File.Exists(item.Path))
+                    {
+                        filePaths.Add(item.Path);
+                    }
+                }
+
+                if (filePaths.Count > 0)
+                {
+                    await _addAttachmentsAsync(filePaths);
+                }
+            }
+            catch (Exception ex)
+            {
+                _showError(_getString("DragDropErrorTitle", "드래그 앤 드롭 오류"), ex.Message);
+            }
         }
     }
 }

@@ -214,7 +214,13 @@ namespace TxtAIEditor.Composition
                 callbacks.IsExplorerTreeMode,
                 () => shellPanelLayout.IsLeftSidebarVisible,
                 dialog.ShowErrorMessage,
-                callbacks.GetLocalizedString);
+                callbacks.GetLocalizedString,
+                e => ui.EditorWorkspace.IsAgentChatAttachmentDropTarget(e),
+                filePaths =>
+                {
+                    ui.PreviewGrid.AgentPane.RaiseDroppedFiles(filePaths);
+                    return Task.CompletedTask;
+                });
 
             var rootKeyboardShortcut = new RootKeyboardShortcutController(
                 callbacks.OpenNewTab,

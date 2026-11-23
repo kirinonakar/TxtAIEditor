@@ -3269,6 +3269,24 @@
   <data name="AgentChatTabTitle" xml:space="preserve">
     <value>代理程式聊天</value>
   </data>
+  <data name="AgentChatPalettePlugin" xml:space="preserve">
+    <value>外掛程式</value>
+  </data>
+  <data name="AgentChatPaletteMcp" xml:space="preserve">
+    <value>MCP</value>
+  </data>
+  <data name="AgentChatPaletteSkill" xml:space="preserve">
+    <value>技能</value>
+  </data>
+  <data name="AgentChatPalettePreset" xml:space="preserve">
+    <value>預設</value>
+  </data>
+  <data name="AgentChatPaletteEmpty" xml:space="preserve">
+    <value>沒有相符項目</value>
+  </data>
+  <data name="AgentChatPaletteActive" xml:space="preserve">
+    <value>已啟用</value>
+  </data>
   <data name="AgentChatCopyAll" xml:space="preserve">
     <value>複製全部</value>
   </data>

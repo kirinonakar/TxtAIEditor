@@ -3269,6 +3269,24 @@
   <data name="AgentChatTabTitle" xml:space="preserve">
     <value>エージェント チャット</value>
   </data>
+  <data name="AgentChatPalettePlugin" xml:space="preserve">
+    <value>プラグイン</value>
+  </data>
+  <data name="AgentChatPaletteMcp" xml:space="preserve">
+    <value>MCP</value>
+  </data>
+  <data name="AgentChatPaletteSkill" xml:space="preserve">
+    <value>スキル</value>
+  </data>
+  <data name="AgentChatPalettePreset" xml:space="preserve">
+    <value>プリセット</value>
+  </data>
+  <data name="AgentChatPaletteEmpty" xml:space="preserve">
+    <value>一致する項目がありません</value>
+  </data>
+  <data name="AgentChatPaletteActive" xml:space="preserve">
+    <value>有効</value>
+  </data>
   <data name="AgentChatCopyAll" xml:space="preserve">
     <value>すべてコピー</value>
   </data>

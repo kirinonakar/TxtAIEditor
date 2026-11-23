@@ -3269,6 +3269,24 @@ Plan: {0}</value>
   <data name="AgentChatTabTitle" xml:space="preserve">
     <value>Agent Chat</value>
   </data>
+  <data name="AgentChatPalettePlugin" xml:space="preserve">
+    <value>Plugins</value>
+  </data>
+  <data name="AgentChatPaletteMcp" xml:space="preserve">
+    <value>MCP</value>
+  </data>
+  <data name="AgentChatPaletteSkill" xml:space="preserve">
+    <value>Skills</value>
+  </data>
+  <data name="AgentChatPalettePreset" xml:space="preserve">
+    <value>Presets</value>
+  </data>
+  <data name="AgentChatPaletteEmpty" xml:space="preserve">
+    <value>No matching items</value>
+  </data>
+  <data name="AgentChatPaletteActive" xml:space="preserve">
+    <value>active</value>
+  </data>
   <data name="AgentChatCopyAll" xml:space="preserve">
     <value>Copy all</value>
   </data>

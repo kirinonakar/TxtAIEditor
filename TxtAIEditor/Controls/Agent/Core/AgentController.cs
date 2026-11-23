@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -208,6 +209,40 @@ namespace TxtAIEditor.Controls
         public IReadOnlyList<AgentFileEditPreview> SessionEdits => _sessionEditController.SessionEdits;
 
         internal AgentChatSnapshot GetChatSnapshot() => _openSessionController.GetChatSnapshot();
+
+        internal async Task<IReadOnlyList<AgentChatCommandItem>> GetChatCommandItemsAsync()
+        {
+            var items = new List<AgentChatCommandItem>();
+            foreach (AgentPluginEntry entry in await _mcpController.GetInstalledEntriesSnapshotAsync())
+            {
+                items.Add(new AgentChatCommandItem(entry.Id, entry.Type, entry.Name, entry.Description ?? string.Empty, entry.Active));
+            }
+
+            foreach ((string name, bool active) in _presetController.GetPresetStateSnapshot())
+            {
+                items.Add(new AgentChatCommandItem("preset:" + name, "preset", name, string.Empty, active));
+            }
+
+            return items;
+        }
+
+        internal async Task<bool> SetChatCommandItemActiveAsync(string id, bool active)
+        {
+            if (id.StartsWith("preset:", StringComparison.Ordinal))
+            {
+                return _presetController.SetPresetActive(id["preset:".Length..], active);
+            }
+
+            AgentPluginEntry? entry = (await _mcpController.GetInstalledEntriesSnapshotAsync())
+                .FirstOrDefault(item => item.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+            if (entry == null)
+            {
+                return false;
+            }
+
+            await _mcpController.SetEntryActiveAsync(entry, active);
+            return true;
+        }
 
         internal void SubmitChatPrompt(string sessionId, string prompt, Action<bool> completed)
         {

@@ -72,6 +72,7 @@ namespace TxtAIEditor.Controls
         private Func<string, string, string>? _getString;
         private string? _installedMcpToReveal;
         private string? _installedSkillToReveal;
+        private IReadOnlyList<AgentAttachmentItem> _attachments = Array.Empty<AgentAttachmentItem>();
 
         public string RawOutputText => GetRawOutputText();
         public string SelectedOutputText => _outputController.SelectedOutputText;
@@ -241,6 +242,22 @@ namespace TxtAIEditor.Controls
         {
             AgentStreamToTabToggleButton.IsChecked = isActive;
             ChatTabOutline.Visibility = showOutline ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        internal void RaiseDroppedFiles(IEnumerable<string> filePaths) => FilesDropped?.Invoke(this, filePaths);
+
+        internal IReadOnlyList<AgentAttachmentItem> Attachments => _attachments;
+
+        internal void RequestRemoveAttachment(string id)
+        {
+            foreach (var attachment in _attachments)
+            {
+                if (string.Equals(attachment.Id, id, StringComparison.Ordinal))
+                {
+                    RemoveAttachmentRequested?.Invoke(this, attachment);
+                    return;
+                }
+            }
         }
 
         public bool HideHtmlCodeBlocks
@@ -875,6 +892,26 @@ private Style? _accentRunButtonStyle;
             _menuCoordinator.UpdateAgentMcpMenu(mcpItems, selectedMcpNames, getString);
         }
 
+        internal IReadOnlyList<AgentSelectedChip> SelectedChips => _menuCoordinator.GetSelectedChips();
+
+        internal void RequestRemoveSelectedChip(string kind, string name)
+        {
+            switch (kind)
+            {
+                case AgentSelectedChipKinds.Preset:
+                    AgentPresetRemoved?.Invoke(this, name);
+                    break;
+                case AgentSelectedChipKinds.Skill:
+                    AgentSkillRemoved?.Invoke(this, name);
+                    break;
+                case AgentSelectedChipKinds.Mcp:
+                    AgentMcpRemoved?.Invoke(this, name);
+                    break;
+            }
+        }
+
+        internal void RequestClearSelectedChips() => AgentSelectedChipsCleared?.Invoke(this, EventArgs.Empty);
+
         internal void RevealInstalledAgentItem(AgentPluginEntry entry)
         {
             if (entry.Type == "skill")
@@ -985,6 +1022,7 @@ private Style? _accentRunButtonStyle;
 
         public void UpdateAttachments(IReadOnlyList<AgentAttachmentItem> attachments)
         {
+            _attachments = attachments;
             AgentAttachmentsList.ItemsSource = attachments;
             AgentAttachmentsList.Visibility = attachments.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }

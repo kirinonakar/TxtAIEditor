@@ -54,6 +54,8 @@ namespace TxtAIEditor.Controls
         private string? _lastTheme;
         private bool _lastUsePele;
         private (string Family, double Size)? _lastFont;
+        private string? _lastChipsSignature;
+        private string? _lastAttachmentsSignature;
 
         public AgentChatTabController(AgentPane pane, StatusBarPane statusBar, EditorWorkspacePane workspace, MainWindowViewModel viewModel,
             ITabCloseCommands documents, TabNavigationController navigation, ISettingsService settings,
@@ -176,6 +178,7 @@ namespace TxtAIEditor.Controls
             item.RightTapped += OnChatTabRightTapped;
             _tab = tab;
             _item = item;
+            _workspace.AgentChatAttachmentDropHitTest = HitTestAttachmentDrop;
             _tabBridges[tab.Id] = (webView, null!);
             _viewModel.Tabs.Add(tab);
             _workspace.DisableTabItemTransitions();
@@ -229,6 +232,27 @@ namespace TxtAIEditor.Controls
 
         private static bool IsChatPage(string? source) =>
             string.Equals(source, ChatPage.AbsoluteUri, StringComparison.Ordinal);
+
+        private bool HitTestAttachmentDrop(Windows.Foundation.Point point)
+        {
+            if (_tab is null || _navigation.GetActiveTab() != _tab || _item?.Content is not WebView2 webView ||
+                webView.XamlRoot is null || webView.ActualWidth <= 0 || webView.ActualHeight <= 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                Windows.Foundation.Point origin = webView.TransformToVisual(_workspace)
+                    .TransformPoint(new Windows.Foundation.Point(0, 0));
+                return point.X >= origin.X && point.X <= origin.X + webView.ActualWidth &&
+                    point.Y >= origin.Y && point.Y <= origin.Y + webView.ActualHeight;
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         private bool IsCurrentImageWorkspace(CoreWebView2 core, string workspaceKey) =>
             core == _readyWebView && _imageWorkspaceKey == workspaceKey && IsChatPage(core.Source);
@@ -339,6 +363,7 @@ namespace TxtAIEditor.Controls
                             send = _getString("AgentSendButton", "전송"),
                             stop = _getString("AgentStopButton", "중단"),
                             clear = _getString("AgentChatClearPrompt", "입력 지우기"),
+                            clearChips = _getString("AgentSelectedChipsClearAllTooltip", "모든 선택 칩 삭제"),
                             copy = _getString("EditorContextMenuCopy", "복사"),
                             copyAll = _getString("AgentChatCopyAll", "전체 복사"),
                             branch = _getString("AgentChatBranchFromHere", "브랜치"),
@@ -348,6 +373,7 @@ namespace TxtAIEditor.Controls
                             rewind = _getString("AgentChatRewindToHere", "되감기"),
                             userRole = _getString("AgentChatUserRole", "사용자 지시"),
                             assistantRole = _getString("AgentChatAssistantRole", "AI 답변"),
+                            attachFiles = _getString("AgentAttachFileCaption", "파일 첨부"),
                             copied = _getString("AgentChatCopied", "복사됨"),
                             copyFailed = _getString("AgentChatCopyFailed", "복사 실패"),
                             thinking = _getString("AgentActivityThinking", "생각중"),
@@ -357,7 +383,13 @@ namespace TxtAIEditor.Controls
                                 _getString("AgentHistoryToolCompletedFormat", "[도구 실행]: {0}").Split("{0}")[0].TrimEnd(),
                                 _getString("AgentHistoryToolFailedFormat", "[도구 실행 실패]: {0}").Split("{0}")[0].TrimEnd()
                             },
-                            chartErrorLabel = _getString("PreviewChartError", "차트를 표시할 수 없습니다.")
+                            chartErrorLabel = _getString("PreviewChartError", "차트를 표시할 수 없습니다."),
+                            palettePlugin = _getString("AgentChatPalettePlugin", "플러그인"),
+                            paletteMcp = _getString("AgentChatPaletteMcp", "MCP"),
+                            paletteSkill = _getString("AgentChatPaletteSkill", "스킬"),
+                            palettePreset = _getString("AgentChatPalettePreset", "프리셋"),
+                            paletteEmpty = _getString("AgentChatPaletteEmpty", "일치하는 항목 없음"),
+                            paletteActive = _getString("AgentChatPaletteActive", "활성")
                         });
                         Refresh();
                         _refreshTimer.Start();
@@ -432,10 +464,45 @@ namespace TxtAIEditor.Controls
                             _ = SendChatImageAsync(core, workspaceKey, requestId, path);
                         }
                         break;
+                    case "clearChips":
+                        QueueSessionAction(tab, core, _pane.RequestClearSelectedChips);
+                        break;
+                    case "removeChip":
+                        if (ReadString(message, "kind") is { Length: > 0 } chipKind &&
+                            ReadString(message, "name") is { Length: > 0 } chipName)
+                        {
+                            QueueSessionAction(tab, core, () => _pane.RequestRemoveSelectedChip(chipKind, chipName));
+                        }
+                        break;
+                    case "removeAttachment":
+                        if (ReadString(message, "id") is { Length: > 0 } attachmentId)
+                        {
+                            QueueSessionAction(tab, core, () => _pane.RequestRemoveAttachment(attachmentId));
+                        }
+                        break;
                     case "selectSession":
                         if (ReadString(message, "sessionId") is { Length: > 0 } sessionToSelect)
                         {
                             QueueSessionAction(tab, core, () => _pane.SelectOpenSession(sessionToSelect));
+                        }
+                        break;
+                    case "attachFiles":
+                        if (args.AdditionalObjects is { Count: > 0 } droppedObjects)
+                        {
+                            var droppedPaths = new List<string>();
+                            foreach (object droppedObject in droppedObjects)
+                            {
+                                if (droppedObject is CoreWebView2File droppedFile &&
+                                    !string.IsNullOrWhiteSpace(droppedFile.Path))
+                                {
+                                    droppedPaths.Add(droppedFile.Path);
+                                }
+                            }
+
+                            if (droppedPaths.Count > 0)
+                            {
+                                _pane.DispatcherQueue.TryEnqueue(() => _pane.RaiseDroppedFiles(droppedPaths));
+                            }
                         }
                         break;
                     case "newSession":
@@ -463,6 +530,17 @@ namespace TxtAIEditor.Controls
                                     Refresh();
                                 }
                             });
+                        }
+                        break;
+                    case "paletteRequest":
+                        _ = SendChatCommandItemsAsync(tab, core);
+                        break;
+                    case "paletteActivate":
+                        if (ReadString(message, "id") is { Length: > 0 } commandId)
+                        {
+                            bool commandActive = message.TryGetProperty("active", out var commandActiveValue) &&
+                                commandActiveValue.ValueKind == JsonValueKind.True;
+                            _ = ActivateChatCommandAsync(tab, core, commandId, commandActive);
                         }
                         break;
                 }
@@ -520,6 +598,55 @@ namespace TxtAIEditor.Controls
             Refresh();
         }
 
+        private async Task SendChatCommandItemsAsync(OpenedTab tab, CoreWebView2 core)
+        {
+            if (_agent is not { } agent)
+            {
+                return;
+            }
+
+            IReadOnlyList<AgentChatCommandItem> items;
+            try
+            {
+                items = await agent.GetChatCommandItemsAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+                return;
+            }
+
+            if (_tab != tab || _readyWebView != core)
+            {
+                return;
+            }
+
+            Post(new
+            {
+                action = "paletteItems",
+                items = items.Select(item => new { item.Id, item.Category, item.Name, item.Description, item.Active })
+            });
+        }
+
+        private async Task ActivateChatCommandAsync(OpenedTab tab, CoreWebView2 core, string id, bool active)
+        {
+            if (_agent is not { } agent || _tab != tab || _readyWebView != core)
+            {
+                return;
+            }
+
+            try
+            {
+                await agent.SetChatCommandItemActiveAsync(id, active);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
+
+            await SendChatCommandItemsAsync(tab, core);
+        }
+
         private static bool TryCopyText(string text)
         {
             try
@@ -546,6 +673,8 @@ namespace TxtAIEditor.Controls
 
             GetActiveDocument();
             RefreshOpenSessions();
+            RefreshChips();
+            RefreshAttachments();
             var snapshot = _agent.GetChatSnapshot();
             var settings = _settings.CurrentSettings;
             var font = (Family: settings.AgentChatFontFamily, Size: settings.AgentChatFontSize);
@@ -600,6 +729,49 @@ namespace TxtAIEditor.Controls
             _lastHiddenEnd = hiddenEnd;
             _lastTheme = settings.Theme;
             _lastUsePele = settings.UsePele;
+        }
+
+        private void RefreshAttachments()
+        {
+            var attachments = _pane.Attachments;
+            string signature = string.Join('\n', attachments.Select(attachment =>
+                $"{attachment.Id}\t{attachment.DisplayName}\t{attachment.Detail}\t{attachment.TokenText}"));
+            if (signature == _lastAttachmentsSignature)
+            {
+                return;
+            }
+
+            _lastAttachmentsSignature = signature;
+            Post(new
+            {
+                action = "attachments",
+                items = attachments.Select(attachment => new
+                {
+                    attachment.Id,
+                    label = attachment.DisplayName,
+                    detail = attachment.Detail,
+                    token = attachment.TokenText,
+                    attachment.RemoveTooltip
+                })
+            });
+        }
+
+        private void RefreshChips()
+        {
+            var chips = _pane.SelectedChips;
+            string signature = string.Join('\n', chips.Select(chip =>
+                $"{chip.Kind}\t{chip.Name}\t{chip.Label}\t{chip.RemoveTooltip}"));
+            if (signature == _lastChipsSignature)
+            {
+                return;
+            }
+
+            _lastChipsSignature = signature;
+            Post(new
+            {
+                action = "chips",
+                items = chips.Select(chip => new { chip.Kind, chip.Name, chip.Label, chip.RemoveTooltip })
+            });
         }
 
         private void RefreshOpenSessions()
@@ -704,12 +876,15 @@ namespace TxtAIEditor.Controls
         private void Reset()
         {
             _refreshTimer.Stop();
+            _workspace.AgentChatAttachmentDropHitTest = null;
             _tab = null;
             _item = null;
             _readyWebView = null;
             _lastSnapshot = null;
             _lastSessionItems = null;
             _imageWorkspaceKey = null;
+            _lastChipsSignature = null;
+            _lastAttachmentsSignature = null;
             UpdateToggleState();
         }
 

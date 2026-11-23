@@ -442,6 +442,63 @@ namespace TxtAIEditor.Controls
             return entries;
         }
 
+        internal Task<IReadOnlyList<AgentPluginEntry>> GetInstalledEntriesSnapshotAsync() => GetPluginManagerEntriesAsync();
+
+        internal async Task SetEntryActiveAsync(AgentPluginEntry entry, bool active)
+        {
+            if (entry.Type == "skill")
+            {
+                _skillController.SetSkillActive(entry.Name, active);
+                return;
+            }
+
+            if (entry.Type == "plugin")
+            {
+                string pluginId = entry.Id["plugin:".Length..];
+                AgentPluginPackage? plugin = _registry.Plugins.FirstOrDefault(package =>
+                    package.Id.Equals(pluginId, StringComparison.OrdinalIgnoreCase));
+                if (plugin != null && _plugins.IsPluginMcpSelectionComplete(plugin) != active)
+                {
+                    await _plugins.ToggleAgentPluginAsync(plugin);
+                }
+                return;
+            }
+
+            if (!entry.Id.StartsWith("mcp:", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            string serverId = entry.Id["mcp:".Length..];
+            if (_selectedServerIds.Contains(serverId) == active || ResolveServerName(serverId) is not { } serverName)
+            {
+                return;
+            }
+
+            await ToggleMcpAsync(serverName);
+        }
+
+        private string? ResolveServerName(string serverId)
+        {
+            if (serverId.Equals(AgentMcpPluginManagerTool.ServerId, StringComparison.OrdinalIgnoreCase))
+            {
+                return AgentMcpPluginManagerTool.ServerName;
+            }
+
+            if (serverId.Equals(_comfyUiTool.ServerId, StringComparison.OrdinalIgnoreCase))
+            {
+                return _comfyUiTool.ServerName;
+            }
+
+            if (serverId.Equals(_browserUseTool.ServerId, StringComparison.OrdinalIgnoreCase))
+            {
+                return _browserUseTool.ServerName;
+            }
+
+            return _registry.Servers.FirstOrDefault(server =>
+                server.Id.Equals(serverId, StringComparison.OrdinalIgnoreCase))?.Name;
+        }
+
         private Task<AgentPluginInstallResult> InstallPluginAsync(
             string type, JsonElement arguments, CancellationToken cancellationToken)
         {

@@ -11,6 +11,8 @@ namespace TxtAIEditor.Controls
         IReadOnlyList<string> PendingPrompts, IReadOnlyList<AgentChatOutputRange> HiddenOutput, bool CanSubmit,
         bool CanRewind);
 
+    internal sealed record AgentChatCommandItem(string Id, string Category, string Name, string Description, bool Active);
+
     internal static class AgentChatTranscript
     {
         private const string UserPromptHeader = "[User Prompt]:";

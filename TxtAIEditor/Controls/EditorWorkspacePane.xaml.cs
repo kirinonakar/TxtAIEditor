@@ -79,6 +79,25 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? MoveTabRightClick;
         public event EventHandler? TerminalPanelHeightChanged;
 
+        internal Func<Point, bool>? AgentChatAttachmentDropHitTest { get; set; }
+
+        internal bool IsAgentChatAttachmentDropTarget(DragEventArgs e)
+        {
+            if (AgentChatAttachmentDropHitTest is not { } hitTest)
+            {
+                return false;
+            }
+
+            try
+            {
+                return hitTest(e.GetPosition(this));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public TabView? ActiveTabView
         {
             get => _activeTabView;

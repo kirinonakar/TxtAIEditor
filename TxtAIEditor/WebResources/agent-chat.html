@@ -44,13 +44,28 @@
         </section>
     </aside>
     <form id="composer" class="composer" hidden>
-        <textarea id="prompt" rows="1" spellcheck="false" disabled></textarea>
-        <button id="clear-prompt" class="composer-clear" type="button" hidden>
-            <span aria-hidden="true">&#x2715;</span>
-        </button>
-        <button id="send" type="submit" disabled>
-            <span id="send-icon" aria-hidden="true">↑</span>
-        </button>
+        <div id="attachment-bar" class="composer-attachment-bar" hidden>
+            <div id="attachments" class="composer-attachments"></div>
+        </div>
+        <div id="chip-bar" class="composer-chip-bar" hidden>
+            <div id="chips" class="composer-chips"></div>
+            <button id="clear-chips" class="composer-chips-clear" type="button">
+                <span aria-hidden="true">&#x2715;</span>
+            </button>
+        </div>
+        <div class="composer-row">
+            <textarea id="prompt" rows="1" spellcheck="false" disabled></textarea>
+            <button id="clear-prompt" class="composer-clear" type="button" hidden>
+                <span aria-hidden="true">&#x2715;</span>
+            </button>
+            <button id="send" type="submit" disabled>
+                <span id="send-icon" aria-hidden="true">↑</span>
+            </button>
+        </div>
     </form>
+    <div id="slash-palette" class="slash-palette" role="listbox" hidden></div>
+    <div id="attach-hint" class="attach-hint" aria-hidden="true" hidden>
+        <span id="attach-hint-text"></span>
+    </div>
 </body>
 </html>

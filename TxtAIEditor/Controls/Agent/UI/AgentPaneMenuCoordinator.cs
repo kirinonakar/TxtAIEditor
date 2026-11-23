@@ -23,6 +23,15 @@ namespace TxtAIEditor.Controls
         public Action? AgentSelectedChipsCleared { get; init; }
     }
 
+    internal sealed record AgentSelectedChip(string Kind, string Name, string Label, string RemoveTooltip);
+
+    internal static class AgentSelectedChipKinds
+    {
+        public const string Preset = "preset";
+        public const string Mcp = "mcp";
+        public const string Skill = "skill";
+    }
+
     internal sealed class AgentPaneMenuCoordinator
     {
         private const double SelectedChipScrollStep = 160;
@@ -471,15 +480,10 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public void RebuildSelectedAgentPresetChips()
+        public IReadOnlyList<AgentSelectedChip> GetSelectedChips()
         {
-            if (_agentSelectedPresetPanel == null)
-            {
-                return;
-            }
-
-            _agentSelectedPresetPanel.Children.Clear();
             Func<string, string, string> getString = GetString;
+            var chips = new List<AgentSelectedChip>();
 
             foreach (string presetName in _agentPresetNames)
             {
@@ -488,13 +492,14 @@ namespace TxtAIEditor.Controls
                     continue;
                 }
 
-                _agentSelectedPresetPanel.Children.Add(CreateSelectedChip(
-                    presetName,
-                    getString("AgentPresetRemoveTooltip", "선택 해제"),
-                    () => _callbacks.AgentPresetRemoved?.Invoke(presetName)));
+                chips.Add(new AgentSelectedChip(AgentSelectedChipKinds.Preset, presetName, presetName,
+                    getString("AgentPresetRemoveTooltip", "선택 해제")));
             }
 
             string mcpPrefix = getString("AgentMcpChipPrefix", "MCP: ");
+            string pluginPrefix = getString("AgentPluginChipPrefix", "Plugin: ");
+            string mcpRemoveTooltip = getString("AgentMcpRemoveTooltip", "MCP 선택 해제");
+            string pluginRemoveTooltip = getString("AgentPluginRemoveTooltip", "Plugin 비활성화");
             foreach (var mcp in _agentMcpItems)
             {
                 if (!_selectedAgentMcpNames.Contains(mcp.Name))
@@ -502,33 +507,58 @@ namespace TxtAIEditor.Controls
                     continue;
                 }
 
-                string currentName = mcp.Name;
-                string chipPrefix = mcp.IsAgentPlugin
-                    ? getString("AgentPluginChipPrefix", "Plugin: ")
-                    : mcpPrefix;
-                _agentSelectedPresetPanel.Children.Add(CreateSelectedChip(
-                    chipPrefix + mcp.Name,
-                    mcp.IsAgentPlugin
-                        ? getString("AgentPluginRemoveTooltip", "Plugin 비활성화")
-                        : getString("AgentMcpRemoveTooltip", "MCP 선택 해제"),
-                    () => _callbacks.AgentMcpRemoved?.Invoke(currentName)));
+                chips.Add(new AgentSelectedChip(AgentSelectedChipKinds.Mcp, mcp.Name,
+                    (mcp.IsAgentPlugin ? pluginPrefix : mcpPrefix) + mcp.Name,
+                    mcp.IsAgentPlugin ? pluginRemoveTooltip : mcpRemoveTooltip));
             }
 
             string skillPrefix = getString("AgentSkillChipPrefix", "Skill: ");
+            string skillRemoveTooltip = getString("AgentSkillRemoveTooltip", "스킬 선택 해제");
             var selectedSkillNames = new List<string>(_selectedAgentSkillNames);
             selectedSkillNames.Sort(StringComparer.CurrentCultureIgnoreCase);
             foreach (string skillName in selectedSkillNames)
             {
-                string currentName = skillName;
+                chips.Add(new AgentSelectedChip(AgentSelectedChipKinds.Skill, skillName,
+                    skillPrefix + skillName, skillRemoveTooltip));
+            }
+
+            return chips;
+        }
+
+        public void RebuildSelectedAgentPresetChips()
+        {
+            if (_agentSelectedPresetPanel == null)
+            {
+                return;
+            }
+
+            _agentSelectedPresetPanel.Children.Clear();
+            foreach (AgentSelectedChip chip in GetSelectedChips())
+            {
+                AgentSelectedChip captured = chip;
                 _agentSelectedPresetPanel.Children.Add(CreateSelectedChip(
-                    skillPrefix + skillName,
-                    getString("AgentSkillRemoveTooltip", "스킬 선택 해제"),
-                    () => _callbacks.AgentSkillRemoved?.Invoke(currentName)));
+                    captured.Label, captured.RemoveTooltip, () => RequestChipRemoval(captured)));
             }
 
             _agentSelectedPresetScrollViewer.Visibility =
                 _agentSelectedPresetPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             QueueSelectedChipScrollButtonsUpdate();
+        }
+
+        private void RequestChipRemoval(AgentSelectedChip chip)
+        {
+            switch (chip.Kind)
+            {
+                case AgentSelectedChipKinds.Preset:
+                    _callbacks.AgentPresetRemoved?.Invoke(chip.Name);
+                    break;
+                case AgentSelectedChipKinds.Skill:
+                    _callbacks.AgentSkillRemoved?.Invoke(chip.Name);
+                    break;
+                default:
+                    _callbacks.AgentMcpRemoved?.Invoke(chip.Name);
+                    break;
+            }
         }
 
         public void OnSelectedPresetScrollViewerViewChanged()

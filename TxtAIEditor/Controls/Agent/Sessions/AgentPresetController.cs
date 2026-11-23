@@ -369,6 +369,30 @@ namespace TxtAIEditor.Controls
             UpdateUI();
         }
 
+        internal IReadOnlyList<(string Name, bool Active)> GetPresetStateSnapshot()
+        {
+            return _presets
+                .Select(preset => (preset.Name, _selectedPresetNames.Contains(preset.Name)))
+                .ToList();
+        }
+
+        internal bool SetPresetActive(string presetName, bool active)
+        {
+            AgentPreset? preset = FindPreset(presetName);
+            if (preset == null)
+            {
+                return false;
+            }
+
+            bool changed = active ? _selectedPresetNames.Add(preset.Name) : _selectedPresetNames.Remove(preset.Name);
+            if (changed)
+            {
+                UpdateUI();
+            }
+
+            return true;
+        }
+
         public void RemoveSelectedPreset(string presetName)
         {
             _selectedPresetNames.Remove(presetName);

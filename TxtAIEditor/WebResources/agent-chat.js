@@ -21,6 +21,15 @@ const promptBox = document.getElementById('prompt');
 const sendButton = document.getElementById('send');
 const sendIcon = document.getElementById('send-icon');
 const clearButton = document.getElementById('clear-prompt');
+const attachHint = document.getElementById('attach-hint');
+const attachHintText = document.getElementById('attach-hint-text');
+const chipBar = document.getElementById('chip-bar');
+const chipsRow = document.getElementById('chips');
+const clearChipsButton = document.getElementById('clear-chips');
+const attachmentBar = document.getElementById('attachment-bar');
+const attachmentsRow = document.getElementById('attachments');
+const slashPalette = document.getElementById('slash-palette');
+const slashCategoryOrder = ['plugin', 'mcp', 'skill', 'preset'];
 const timestamp = /^\d{2}:\d{2}:\d{2}[ \t]+(.*)/;
 const answerHeader = /^\[(?:Agent Response|assistant: (?:response|final answer))\]:?[ \t]*/i;
 const logHeader = /^\[(?:Agent run\]|LLM API:|Tool (?:result|completed|failed)[:\]])/i;
@@ -736,6 +745,61 @@ closeAllSessionsButton.addEventListener('click', () => {
     host.postMessage({ action: 'closeAllSessions' });
 });
 
+function showChips(items) {
+    const entries = Array.isArray(items) ? items : [];
+    chipsRow.replaceChildren();
+    for (const entry of entries) {
+        const chip = document.createElement('span');
+        chip.className = 'composer-chip';
+        const label = document.createElement('span');
+        label.className = 'composer-chip-label';
+        label.textContent = entry.label ?? entry.name ?? '';
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'composer-chip-remove';
+        remove.textContent = '\u00d7';
+        const removeLabel = entry.removeTooltip || entry.label || entry.name || '';
+        remove.title = removeLabel;
+        remove.setAttribute('aria-label', removeLabel);
+        remove.addEventListener('click', () => {
+            host.postMessage({ action: 'removeChip', kind: entry.kind, name: entry.name });
+        });
+        chip.append(label, remove);
+        chipsRow.append(chip);
+    }
+    chipBar.hidden = chipsRow.childElementCount === 0;
+}
+
+function showAttachments(items) {
+    const entries = Array.isArray(items) ? items : [];
+    attachmentsRow.replaceChildren();
+    for (const entry of entries) {
+        const chip = document.createElement('span');
+        chip.className = 'composer-attachment';
+        const label = document.createElement('span');
+        label.className = 'composer-attachment-label';
+        label.textContent = entry.label ?? '';
+        chip.title = [entry.label, entry.detail, entry.token].filter(Boolean).join(' · ');
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'composer-attachment-remove';
+        remove.textContent = '\u00d7';
+        const removeLabel = entry.removeTooltip || entry.label || '';
+        remove.title = removeLabel;
+        remove.setAttribute('aria-label', removeLabel);
+        remove.addEventListener('click', () => {
+            host.postMessage({ action: 'removeAttachment', id: entry.id });
+        });
+        chip.append(label, remove);
+        attachmentsRow.append(chip);
+    }
+    attachmentBar.hidden = attachmentsRow.childElementCount === 0;
+}
+
+clearChipsButton.addEventListener('click', () => {
+    host.postMessage({ action: 'clearChips' });
+});
+
 function syncComposer() {
     if (!composing) {
         if (composerSessionId !== sessionId) {
@@ -763,6 +827,9 @@ function syncComposer() {
         : !canSubmit || composerSessionId !== sessionId ||
             pending.has(sessionId) || (!composing && !promptBox.value.trim());
     clearButton.hidden = promptBox.value.length === 0;
+    if (composer.hidden || promptBox.disabled) {
+        closeSlashPalette();
+    }
 }
 
 function prefillComposer(text) {
@@ -776,6 +843,217 @@ function prefillComposer(text) {
         promptBox.setSelectionRange(text.length, text.length);
     }
 }
+
+const slashState = { open: false, loaded: false, items: [], matches: [], index: 0, start: 0, end: 0, query: '' };
+let slashLabels = { plugin: '', mcp: '', skill: '', preset: '', empty: '', active: '' };
+
+function getSlashToken() {
+    if (composing || promptBox.disabled || composer.hidden) return null;
+    const value = promptBox.value;
+    const caret = promptBox.selectionStart ?? 0;
+    if (promptBox.selectionEnd !== caret) return null;
+    let start = caret;
+    while (start > 0 && !/\s/.test(value[start - 1])) start--;
+    if (start >= caret || value[start] !== '/') return null;
+    if (start > 0 && !/\s/.test(value[start - 1])) return null;
+    return { start, end: caret, query: value.slice(start + 1, caret) };
+}
+
+function syncSlashPalette() {
+    const token = getSlashToken();
+    if (!token) {
+        closeSlashPalette();
+        return;
+    }
+
+    const wasOpen = slashState.open;
+    slashState.open = true;
+    slashState.start = token.start;
+    slashState.end = token.end;
+    slashState.query = token.query;
+    if (!wasOpen) {
+        slashState.index = 0;
+        host.postMessage({ action: 'paletteRequest' });
+    }
+
+    applySlashFilter();
+}
+
+function closeSlashPalette() {
+    if (!slashState.open && slashPalette.hidden) return;
+    slashState.open = false;
+    slashState.matches = [];
+    slashState.index = 0;
+    slashPalette.hidden = true;
+    slashPalette.replaceChildren();
+}
+
+function applySlashFilter() {
+    const query = slashState.query.trim().toLowerCase();
+    slashState.matches = slashState.items
+        .filter(item => matchesSlashQuery(item, query))
+        .sort(compareSlashCategories);
+    if (slashState.index >= slashState.matches.length) {
+        slashState.index = 0;
+    }
+
+    renderSlashPalette();
+}
+
+function matchesSlashQuery(item, query) {
+    if (!query) return true;
+    const category = slashLabels[item.category] || item.category || '';
+    return `${item.name ?? ''}\n${item.description ?? ''}\n${category}`.toLowerCase().includes(query);
+}
+
+function compareSlashCategories(left, right) {
+    const leftIndex = slashCategoryOrder.indexOf(left.category);
+    const rightIndex = slashCategoryOrder.indexOf(right.category);
+    return (leftIndex < 0 ? slashCategoryOrder.length : leftIndex) -
+        (rightIndex < 0 ? slashCategoryOrder.length : rightIndex);
+}
+
+function renderSlashPalette() {
+    if (!slashState.open) {
+        closeSlashPalette();
+        return;
+    }
+
+    slashPalette.replaceChildren();
+    if (!slashState.loaded) {
+        // The host list has not arrived yet; keep the palette out of the way instead of
+        // showing a misleading "no matching items" message.
+        slashPalette.hidden = true;
+        return;
+    }
+
+    if (slashState.matches.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'slash-palette-empty';
+        empty.textContent = slashLabels.empty;
+        slashPalette.append(empty);
+    } else {
+        let category = null;
+        slashState.matches.forEach((item, index) => {
+            if (item.category !== category) {
+                category = item.category;
+                const header = document.createElement('p');
+                header.className = 'slash-palette-group';
+                header.textContent = slashLabels[category] || category;
+                slashPalette.append(header);
+            }
+
+            slashPalette.append(createSlashRow(item, index));
+        });
+    }
+
+    slashPalette.hidden = false;
+    positionSlashPalette();
+    const activeRow = slashPalette.querySelector('.slash-palette-item.active');
+    if (activeRow) activeRow.scrollIntoView({ block: 'nearest' });
+}
+
+function createSlashRow(item, index) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'slash-palette-item' + (index === slashState.index ? ' active' : '');
+    row.dataset.index = String(index);
+    row.setAttribute('aria-pressed', item.active ? 'true' : 'false');
+    row.title = item.description || item.name || '';
+    if (item.active) {
+        row.setAttribute('aria-label', `${item.name} (${slashLabels.active})`);
+    }
+
+    const check = document.createElement('span');
+    check.className = 'slash-palette-check';
+    check.setAttribute('aria-hidden', 'true');
+    check.textContent = item.active ? '✓' : '';
+
+    const name = document.createElement('span');
+    name.className = 'slash-palette-name';
+    name.textContent = item.name ?? '';
+
+    const detail = document.createElement('span');
+    detail.className = 'slash-palette-detail';
+    detail.textContent = item.description ?? '';
+
+    row.append(check, name, detail);
+    row.addEventListener('mousedown', event => event.preventDefault());
+    row.addEventListener('click', () => chooseSlashItem(index));
+    return row;
+}
+
+function positionSlashPalette() {
+    if (composer.hidden) return;
+    const rect = composer.getBoundingClientRect();
+    const width = Math.min(Math.max(rect.width, 280), 560);
+    const maxLeft = Math.max(12, window.innerWidth - width - 12);
+    const left = Math.min(Math.max(rect.left + (rect.width - width) / 2, 12), maxLeft);
+    slashPalette.style.left = `${Math.round(left)}px`;
+    slashPalette.style.width = `${Math.round(width)}px`;
+    slashPalette.style.bottom = `${Math.round(window.innerHeight - rect.top + 8)}px`;
+    slashPalette.style.maxHeight = `${Math.max(140, Math.round(rect.top - 24))}px`;
+}
+
+function chooseSlashItem(index) {
+    const item = slashState.matches[index];
+    if (!item) return;
+    consumeSlashToken();
+    host.postMessage({ action: 'paletteActivate', id: item.id, active: !item.active });
+    if (!promptBox.disabled && document.activeElement !== promptBox) {
+        promptBox.focus();
+    }
+}
+
+function consumeSlashToken() {
+    const value = promptBox.value;
+    const start = slashState.start;
+    const end = Math.min(slashState.end, value.length);
+    if (value[start] !== '/') {
+        closeSlashPalette();
+        return;
+    }
+
+    const next = value.slice(0, start) + value.slice(end);
+    promptBox.value = next;
+    promptBox.setSelectionRange(start, start);
+    drafts.set(composerSessionId, next);
+    closeSlashPalette();
+    syncComposer();
+}
+
+function handleSlashKeyDown(event) {
+    if (!slashState.open || event.isComposing || composing || event.keyCode === 229) return false;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        const count = slashState.matches.length;
+        if (count === 0) return false;
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        slashState.index = (slashState.index + delta + count) % count;
+        renderSlashPalette();
+        return true;
+    }
+
+    if (event.key === 'Tab' || event.key === 'Enter') {
+        if (slashState.matches.length === 0) {
+            closeSlashPalette();
+            return false;
+        }
+
+        chooseSlashItem(slashState.index);
+        return true;
+    }
+
+    if (event.key === 'Escape') {
+        closeSlashPalette();
+        return true;
+    }
+
+    return false;
+}
+
+window.addEventListener('resize', () => {
+    if (slashState.open) positionSlashPalette();
+});
 
 function update(message) {
     const switched = sessionId !== message.sessionId;
@@ -838,6 +1116,7 @@ function update(message) {
 
 clearButton.addEventListener('click', () => {
     if (composing) return;
+    closeSlashPalette();
     promptBox.value = '';
     drafts.delete(composerSessionId);
     syncComposer();
@@ -848,6 +1127,7 @@ clearButton.addEventListener('click', () => {
 promptBox.addEventListener('input', () => {
     drafts.set(composerSessionId, promptBox.value);
     syncComposer();
+    syncSlashPalette();
 });
 promptBox.addEventListener('compositionstart', () => {
     composing = true;
@@ -855,7 +1135,10 @@ promptBox.addEventListener('compositionstart', () => {
 });
 promptBox.addEventListener('compositionend', () => {
     composing = false;
-    requestAnimationFrame(syncComposer);
+    requestAnimationFrame(() => {
+        syncComposer();
+        syncSlashPalette();
+    });
 });
 promptBox.addEventListener('blur', () => requestAnimationFrame(syncComposer));
 window.addEventListener('keydown', event => {
@@ -874,7 +1157,18 @@ window.addEventListener('keydown', event => {
     if (!event.repeat) host.postMessage({ action: 'shortcut', name: shortcut });
 }, true);
 promptBox.addEventListener('keydown', event => {
-    if (event.key !== 'Enter' || event.shiftKey || event.isComposing || composing || event.keyCode === 229) return;
+    if (!handleSlashKeyDown(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+});
+promptBox.addEventListener('keyup', () => {
+    if (!composing) syncSlashPalette();
+});
+promptBox.addEventListener('click', () => {
+    if (!composing) syncSlashPalette();
+});
+promptBox.addEventListener('keydown', event => {
+    if (event.defaultPrevented || event.key !== 'Enter' || event.shiftKey || event.isComposing || composing || event.keyCode === 229) return;
     event.preventDefault();
     // An empty composer shows the stop button, so Enter must not cancel the run accidentally.
     if (!promptBox.value.trim()) return;
@@ -882,6 +1176,7 @@ promptBox.addEventListener('keydown', event => {
 });
 composer.addEventListener('submit', event => {
     event.preventDefault();
+    closeSlashPalette();
     if (isStopMode()) {
         host.postMessage({ action: 'stop', sessionId });
         return;
@@ -893,6 +1188,39 @@ composer.addEventListener('submit', event => {
     host.postMessage({ action: 'submit', sessionId, prompt });
     syncComposer();
 });
+
+function hasDraggedFiles(event) {
+    const transfer = event.dataTransfer;
+    return !!transfer && Array.from(transfer.types ?? []).includes('Files');
+}
+
+window.addEventListener('dragenter', event => {
+    if (!hasDraggedFiles(event)) return;
+    event.preventDefault();
+    if (attachHint) attachHint.hidden = false;
+}, true);
+window.addEventListener('dragover', event => {
+    if (!hasDraggedFiles(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    if (attachHint) attachHint.hidden = false;
+}, true);
+window.addEventListener('dragleave', event => {
+    if (event.relatedTarget || !attachHint) return;
+    attachHint.hidden = true;
+}, true);
+window.addEventListener('drop', event => {
+    if (!hasDraggedFiles(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (attachHint) attachHint.hidden = true;
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    if (files.length === 0) return;
+    // WebView2 gives the host the absolute path of each dropped file through
+    // postMessageWithAdditionalObjects, which the HTML5 File object never exposes.
+    host.postMessageWithAdditionalObjects({ action: 'attachFiles' }, files);
+}, true);
 
 host.addEventListener('message', ({ data }) => {
     switch (data.action) {
@@ -933,6 +1261,19 @@ host.addEventListener('message', ({ data }) => {
             rewindLabel = data.rewind;
             userRoleLabel = data.userRole;
             assistantRoleLabel = data.assistantRole;
+            clearChipsButton.title = data.clearChips ?? '';
+            clearChipsButton.setAttribute('aria-label', data.clearChips ?? '');
+            if (attachHintText) attachHintText.textContent = data.attachFiles ?? '';
+            slashLabels = {
+                plugin: data.palettePlugin ?? '',
+                mcp: data.paletteMcp ?? '',
+                skill: data.paletteSkill ?? '',
+                preset: data.palettePreset ?? '',
+                empty: data.paletteEmpty ?? '',
+                active: data.paletteActive ?? ''
+            };
+            slashPalette.setAttribute('aria-label', data.prompt ?? '');
+            if (slashState.open) renderSlashPalette();
             setCopyAllLabel(copyAllLabel);
             for (const view of messageViews) {
                 syncBranchButton(view);
@@ -945,6 +1286,17 @@ host.addEventListener('message', ({ data }) => {
             break;
         case 'sessions':
             showSessions(data.items);
+            break;
+        case 'chips':
+            showChips(data.items);
+            break;
+        case 'attachments':
+            showAttachments(data.items);
+            break;
+        case 'paletteItems':
+            slashState.items = Array.isArray(data.items) ? data.items : [];
+            slashState.loaded = true;
+            if (slashState.open) applySlashFilter();
             break;
         case 'imageUnavailable': {
             const load = getImageLoad(data);
