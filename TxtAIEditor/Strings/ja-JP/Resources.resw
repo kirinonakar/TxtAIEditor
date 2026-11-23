@@ -2835,6 +2835,9 @@
   <data name="AgentRemoveAttachmentTooltip" xml:space="preserve">
     <value>添付を削除</value>
   </data>
+  <data name="AgentClearAttachmentsTooltip" xml:space="preserve">
+    <value>添付をすべて削除</value>
+  </data>
   <data name="AgentAttachmentErrorTitle" xml:space="preserve">
     <value>添付追加エラー</value>
   </data>

@@ -206,6 +206,11 @@ namespace TxtAIEditor.Controls
 
         public void Clear()
         {
+            if (_isRunningProvider())
+            {
+                return;
+            }
+
             _attachments.Clear();
             RefreshAttachments();
         }

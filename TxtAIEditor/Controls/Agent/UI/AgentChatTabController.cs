@@ -364,6 +364,7 @@ namespace TxtAIEditor.Controls
                             stop = _getString("AgentStopButton", "중단"),
                             clear = _getString("AgentChatClearPrompt", "입력 지우기"),
                             clearChips = _getString("AgentSelectedChipsClearAllTooltip", "모든 선택 칩 삭제"),
+                            clearAttachments = _getString("AgentClearAttachmentsTooltip", "모든 첨부 제거"),
                             copy = _getString("EditorContextMenuCopy", "복사"),
                             copyAll = _getString("AgentChatCopyAll", "전체 복사"),
                             branch = _getString("AgentChatBranchFromHere", "브랜치"),
@@ -479,6 +480,9 @@ namespace TxtAIEditor.Controls
                         {
                             QueueSessionAction(tab, core, () => _pane.RequestRemoveAttachment(attachmentId));
                         }
+                        break;
+                    case "clearAttachments":
+                        QueueSessionAction(tab, core, _pane.RequestClearAttachments);
                         break;
                     case "selectSession":
                         if (ReadString(message, "sessionId") is { Length: > 0 } sessionToSelect)

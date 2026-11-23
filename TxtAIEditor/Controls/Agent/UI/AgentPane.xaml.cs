@@ -246,6 +246,10 @@ namespace TxtAIEditor.Controls
 
         internal void RaiseDroppedFiles(IEnumerable<string> filePaths) => FilesDropped?.Invoke(this, filePaths);
 
+        internal event Action? ClearAttachmentsRequested;
+
+        internal void RequestClearAttachments() => ClearAttachmentsRequested?.Invoke();
+
         internal IReadOnlyList<AgentAttachmentItem> Attachments => _attachments;
 
         internal void RequestRemoveAttachment(string id)

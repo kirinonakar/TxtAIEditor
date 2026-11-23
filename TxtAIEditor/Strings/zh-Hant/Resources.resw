@@ -2835,6 +2835,9 @@
   <data name="AgentRemoveAttachmentTooltip" xml:space="preserve">
     <value>刪除附件</value>
   </data>
+  <data name="AgentClearAttachmentsTooltip" xml:space="preserve">
+    <value>移除所有附件</value>
+  </data>
   <data name="AgentAttachmentErrorTitle" xml:space="preserve">
     <value>附件錯誤</value>
   </data>

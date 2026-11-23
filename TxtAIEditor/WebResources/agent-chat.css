@@ -324,6 +324,27 @@ body {
     outline-offset: 1px;
 }
 
+.composer .composer-attachments-clear {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted);
+    font: 400 12px/1 "Segoe UI", sans-serif;
+}
+
+.composer .composer-attachments-clear:hover {
+    background: color-mix(in srgb, var(--fg) 14%, transparent);
+    color: var(--foreground);
+}
+
+.composer .composer-attachments-clear:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
 .composer-chip-bar {
     display: flex;
     align-items: flex-start;

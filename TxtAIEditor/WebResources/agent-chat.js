@@ -28,6 +28,7 @@ const chipsRow = document.getElementById('chips');
 const clearChipsButton = document.getElementById('clear-chips');
 const attachmentBar = document.getElementById('attachment-bar');
 const attachmentsRow = document.getElementById('attachments');
+const clearAttachmentsButton = document.getElementById('clear-attachments');
 const slashPalette = document.getElementById('slash-palette');
 const slashCategoryOrder = ['plugin', 'mcp', 'skill', 'preset'];
 const timestamp = /^\d{2}:\d{2}:\d{2}[ \t]+(.*)/;
@@ -800,6 +801,10 @@ clearChipsButton.addEventListener('click', () => {
     host.postMessage({ action: 'clearChips' });
 });
 
+clearAttachmentsButton.addEventListener('click', () => {
+    host.postMessage({ action: 'clearAttachments' });
+});
+
 function syncComposer() {
     if (!composing) {
         if (composerSessionId !== sessionId) {
@@ -1263,6 +1268,8 @@ host.addEventListener('message', ({ data }) => {
             assistantRoleLabel = data.assistantRole;
             clearChipsButton.title = data.clearChips ?? '';
             clearChipsButton.setAttribute('aria-label', data.clearChips ?? '');
+            clearAttachmentsButton.title = data.clearAttachments ?? '';
+            clearAttachmentsButton.setAttribute('aria-label', data.clearAttachments ?? '');
             if (attachHintText) attachHintText.textContent = data.attachFiles ?? '';
             slashLabels = {
                 plugin: data.palettePlugin ?? '',
