@@ -377,7 +377,8 @@ namespace TxtAIEditor.Controls
 
             foreach (var tab in _viewModel.Tabs)
             {
-                tab.InlineLivePreviewEnabled = LivePreviewEnabled;
+                tab.InlineLivePreviewEnabled = LivePreviewEnabled &&
+                    SupportedFileTypes.IsLivePreviewRenderableTab(tab);
                 await ApplyInlineLivePreviewAsync(tab);
             }
         }

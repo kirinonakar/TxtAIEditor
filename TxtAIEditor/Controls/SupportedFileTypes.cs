@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using TxtAIEditor.Core.Models;
 using TxtAIEditor.Core.Services;
 
 namespace TxtAIEditor.Controls
@@ -121,6 +122,19 @@ namespace TxtAIEditor.Controls
         private static readonly string[] Rdocs2mdConvertibleFileExtensions =
             Rdocs2mdConverter.IsAvailable ? new[] { ".hwp" } : Array.Empty<string>();
 
+        // Live (inline) preview renders Markdown/HTML style documents only. Every
+        // other extension keeps the plain editor even when live mode is enabled.
+        public static readonly string[] LivePreviewFileExtensions =
+        {
+            ".txt",
+            ".md",
+            ".markdown",
+            ".html",
+            ".htm",
+            ".svg",
+            ".tex"
+        };
+
         public static readonly string[] PickerFileExtensions =
             TextFileExtensions
                 .Concat(ImageFileExtensions)
@@ -166,6 +180,26 @@ namespace TxtAIEditor.Controls
         public static bool IsNotebookFile(string filePath)
         {
             return HasExtension(filePath, NotebookFileExtensions);
+        }
+
+        public static bool IsLivePreviewRenderableFile(string? filePath)
+        {
+            string path = filePath ?? string.Empty;
+            string extension = Path.GetExtension(path);
+            return extension.Length == 0 || HasExtension(path, LivePreviewFileExtensions);
+        }
+
+        public static bool IsLivePreviewRenderableTab(OpenedTab tab)
+        {
+            // Converted office documents keep their original path but are previewed as HTML.
+            if (tab.IsConvertedDocumentHtml ||
+                tab.Language.Equals("html", StringComparison.OrdinalIgnoreCase) ||
+                tab.Language.Equals("svg", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return IsLivePreviewRenderableFile(tab.FilePath);
         }
 
         public static bool IsReadOnlyDocumentFile(string filePath)

@@ -1409,7 +1409,9 @@ namespace TxtAIEditor.Controls
             bool updateLanguageUi,
             int targetIndex = -1)
         {
-            tab.InlineLivePreviewEnabled = !tab.IsHexViewer && _isLivePreviewEnabled();
+            tab.InlineLivePreviewEnabled = !tab.IsHexViewer &&
+                _isLivePreviewEnabled() &&
+                SupportedFileTypes.IsLivePreviewRenderableTab(tab);
             _editorSessions[tab.Id] = session;
 
             AddOpenTab(tab, targetIndex);
