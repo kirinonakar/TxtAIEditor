@@ -193,7 +193,13 @@ namespace TxtAIEditor.Core.Models
             }
         }
 
-        public bool InlineLivePreviewEnabled { get; set; } = false;
+        private bool _inlineLivePreviewEnabled;
+        public bool InlineLivePreviewEnabled
+        {
+            get => IsConvertedDocumentHtml ? !IsHexViewer : _inlineLivePreviewEnabled;
+            set => _inlineLivePreviewEnabled = value;
+        }
+
         private TabContentKind _contentKind = TabContentKind.Text;
         public TabContentKind ContentKind
         {
@@ -270,8 +276,7 @@ namespace TxtAIEditor.Core.Models
         }
         public string? HexSourceFilePath { get; set; }
         public bool IsReadOnlyTextFile { get; set; } = false;
-        // Set when the tab holds HTML converted from an office document (rdocs2md), so the
-        // live preview can render it while the original file stays read-only.
+        // rdocs2md HTML is always rendered as a read-only document preview.
         public bool IsConvertedDocumentHtml { get; set; } = false;
         private DocumentOrigin _origin = UntitledOrigin.Instance;
         public DocumentOrigin Origin => _document?.Origin ?? _origin;

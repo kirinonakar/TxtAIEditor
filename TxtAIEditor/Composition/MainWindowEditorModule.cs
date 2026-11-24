@@ -229,7 +229,8 @@ namespace TxtAIEditor.Composition
             ITextModel? textModel,
             bool isEncrypted,
             string? encryptionPassword,
-            string? language = null) =>
+            string? language = null,
+            bool isConvertedDocumentHtml = false) =>
             Runtime.EditorTabOpen.OpenNewTab(
                 filePath,
                 content,
@@ -239,7 +240,8 @@ namespace TxtAIEditor.Composition
                 textModel,
                 isEncrypted,
                 encryptionPassword,
-                language: language);
+                language: language,
+                isConvertedDocumentHtml: isConvertedDocumentHtml);
 
         public Task<bool> PrepareTabForTransferAsync(OpenedTab tab) =>
             Runtime.EditorTabOpen.PrepareForTransferAsync(tab);

@@ -381,6 +381,11 @@ namespace TxtAIEditor.Controls
 
             foreach (var tab in _viewModel.Tabs)
             {
+                if (tab.IsConvertedDocumentHtml)
+                {
+                    continue;
+                }
+
                 tab.InlineLivePreviewEnabled = LivePreviewEnabled &&
                     SupportedFileTypes.IsLivePreviewRenderableTab(tab);
                 await ApplyInlineLivePreviewAsync(tab);

@@ -147,7 +147,8 @@ namespace TxtAIEditor.Composition
             ITextModel? textModel = null,
             bool isEncrypted = false,
             string? encryptionPassword = null,
-            string? language = null)
+            string? language = null,
+            bool isConvertedDocumentHtml = false)
         {
             return Controllers.Editor.OpenNewTab(
                 filePath,
@@ -158,7 +159,8 @@ namespace TxtAIEditor.Composition
                 textModel,
                 isEncrypted,
                 encryptionPassword,
-                language: language);
+                language: language,
+                isConvertedDocumentHtml: isConvertedDocumentHtml);
         }
 
         public OpenedTab OpenNewTab(FileTabOpenRequest request)
@@ -172,7 +174,8 @@ namespace TxtAIEditor.Composition
                 request.TextModel,
                 request.IsEncrypted,
                 request.EncryptionPassword,
-                request.Language);
+                request.Language,
+                request.IsConvertedDocumentHtml);
         }
 
         public OpenedTab OpenGeneratedTab(string content) => OpenNewTab(null, content);

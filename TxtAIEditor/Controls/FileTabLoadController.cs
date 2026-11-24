@@ -20,11 +20,6 @@ namespace TxtAIEditor.Controls
     {
         public Func<bool>? PreserveWorkspaceOnFileOpenProvider { get; set; }
 
-        /// <summary>
-        /// Invoked after a converted document tab opens so the window switches to live preview.
-        /// </summary>
-        public Action? EnableLivePreview { get; set; }
-
         private readonly IGitService _gitService;
         private readonly SecureNoteEncryptionService _secureNoteEncryptionService;
         private readonly ArchiveExplorerService _archiveExplorerService;
@@ -413,7 +408,7 @@ namespace TxtAIEditor.Controls
                 return null;
             }
 
-            var tab = _openNewTab(new FileTabOpenRequest
+            return _openNewTab(new FileTabOpenRequest
             {
                 FilePath = filePath,
                 Content = html,
@@ -421,13 +416,9 @@ namespace TxtAIEditor.Controls
                 EncodingName = "UTF-8",
                 EncodingWasAutoDetected = false,
                 TextModel = TextModelFactory.FromText(html),
-                IsReadOnly = true
+                IsReadOnly = true,
+                IsConvertedDocumentHtml = true
             });
-
-            tab.ContentKind = TabContentKind.ExtractedDocumentText;
-            tab.IsConvertedDocumentHtml = true;
-            EnableLivePreview?.Invoke();
-            return tab;
         }
 
         private void QueueGitRefreshIfNeeded(string? repoRoot)
@@ -531,6 +522,7 @@ namespace TxtAIEditor.Controls
         public string? FilePath { get; set; }
         public string Content { get; set; } = "";
         public bool IsReadOnly { get; set; }
+        public bool IsConvertedDocumentHtml { get; set; }
         public string? Language { get; set; }
         public string EncodingName { get; set; } = "UTF-8";
         public bool EncodingWasAutoDetected { get; set; } = true;

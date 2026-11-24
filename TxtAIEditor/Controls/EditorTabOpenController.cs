@@ -191,7 +191,8 @@ namespace TxtAIEditor.Controls
             bool isEncrypted = false,
             string? encryptionPassword = null,
             int targetIndex = -1,
-            string? language = null)
+            string? language = null,
+            bool isConvertedDocumentHtml = false)
         {
             var documentParts = _editorTabDocumentFactory.Create(
                 filePath,
@@ -203,7 +204,12 @@ namespace TxtAIEditor.Controls
                 isEncrypted,
                 encryptionPassword);
             var tab = documentParts.Tab;
-            // Converted documents are opened as HTML, which drives the live preview mode.
+            if (isConvertedDocumentHtml)
+            {
+                tab.IsConvertedDocumentHtml = true;
+                tab.ContentKind = TabContentKind.ExtractedDocumentText;
+            }
+
             if (!string.IsNullOrWhiteSpace(language))
             {
                 tab.Language = language;

@@ -37,8 +37,7 @@ namespace TxtAIEditor.Composition
         Func<string, OpenedTab> OpenOfficeDocumentTab,
         Func<string, OpenedTab> OpenHexTab,
         Func<string, OpenedTab> OpenNotebookTab,
-        Action QueueGitStatusRefresh,
-        Action EnableLivePreview);
+        Action QueueGitStatusRefresh);
 
     internal sealed record MainWindowWorkspaceControllers(
         FunctionKeyShortcutService FunctionKeyShortcut,
@@ -145,7 +144,6 @@ namespace TxtAIEditor.Composition
                 () => commonServices.SettingsService.CurrentSettings.HomeFolderPath);
 
             fileTabLoad.PreserveWorkspaceOnFileOpenProvider = () => explorerNavigation.IsTreeMode;
-            fileTabLoad.EnableLivePreview = callbacks.EnableLivePreview;
 
             var favoritesRecent = new FavoritesRecentController(
                 commonServices.SettingsService,

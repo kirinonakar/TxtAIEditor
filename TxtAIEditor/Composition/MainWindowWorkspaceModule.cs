@@ -96,8 +96,7 @@ namespace TxtAIEditor.Composition
                     previewFacade.OpenOfficeDocumentTab,
                     previewFacade.OpenHexTab,
                     previewFacade.OpenNotebookTab,
-                    module.QueueGitStatusRefresh,
-                    () => getToolbarCommand()?.EnableLivePreview()));
+                    module.QueueGitStatusRefresh));
 
             module.Bind(controllers);
             controllers.GitPanel.FileRestored += workspaceFacade.HandleGitFileRestored;
