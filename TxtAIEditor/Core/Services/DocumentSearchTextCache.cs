@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,8 +14,6 @@ namespace TxtAIEditor.Core.Services
         private const long ByteLimit = 256L * 1024 * 1024;
         private const int BufferSize = 16 * 1024;
         private const long LargeExtractionAllocation = 64L * 1024 * 1024;
-        private const string TempDirectoryPrefix = "TxtAIEditor-Search-";
-        private static int _reclaimingSearchMemory;
 
         private readonly object _gate = new();
         private readonly CancellationTokenSource _lifetime = new();
@@ -31,7 +28,7 @@ namespace TxtAIEditor.Core.Services
         internal string FolderPath { get; } = folderPath;
 
         internal static bool IsSearchTempDirectory(string directory, string name) =>
-            name.StartsWith(TempDirectoryPrefix, StringComparison.OrdinalIgnoreCase) &&
+            name.StartsWith(AppTemporaryFiles.SearchDirectoryPrefix, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(Path.GetDirectoryName(directory), Path.TrimEndingDirectorySeparator(Path.GetTempPath()),
                 StringComparison.OrdinalIgnoreCase);
 
@@ -150,7 +147,7 @@ namespace TxtAIEditor.Core.Services
             lock (_gate)
             {
                 if (_retired) throw new OperationCanceledException();
-                _directory ??= Directory.CreateTempSubdirectory(TempDirectoryPrefix).FullName;
+                _directory ??= Directory.CreateTempSubdirectory(AppTemporaryFiles.SearchDirectoryPrefix).FullName;
                 return Path.Combine(_directory, Path.GetRandomFileName());
             }
         }
@@ -232,24 +229,8 @@ namespace TxtAIEditor.Core.Services
                     Debug.WriteLine($"Could not remove folder search temp directory: {ex.Message}");
                 }
 
-                if (reclaimMemory) ReclaimSearchMemory();
+                if (reclaimMemory) FolderSearchMemoryMonitor.Shared.ReclaimAfterFolderChange();
             });
-        }
-
-        private static void ReclaimSearchMemory()
-        {
-            if (Interlocked.Exchange(ref _reclaimingSearchMemory, 1) != 0) return;
-            try
-            {
-                // Whole-document parsers can leave large GC segments committed after their objects are gone.
-                // Compact once after the last search stopped using the retired folder, off the UI thread.
-                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-                GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
-            }
-            finally
-            {
-                Volatile.Write(ref _reclaimingSearchMemory, 0);
-            }
         }
 
         private static void TryDeleteFile(string path)

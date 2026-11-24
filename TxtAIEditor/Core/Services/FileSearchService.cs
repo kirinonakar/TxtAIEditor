@@ -173,6 +173,7 @@ namespace TxtAIEditor.Core.Services
                 MaxDegreeOfParallelism = GetSearchDegreeOfParallelism()
             };
 
+            using var memoryWatch = FolderSearchMemoryMonitor.Shared.WatchSearch();
             await Parallel.ForEachAsync(EnumerateSearchFiles(searchRoot, options.IncludeHiddenFiles, cancellationToken), parallelOptions, async (file, token) =>
             {
                 token.ThrowIfCancellationRequested();

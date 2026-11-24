@@ -16,8 +16,7 @@ namespace TxtAIEditor
     public partial class App : Application
     {
         private const string SingleInstanceMutexName = "TxtAIEditorSingleInstanceMutex";
-        private static readonly string AppTempDir = Path.Combine(Path.GetTempPath(), "TxtAIEditor");
-        private static readonly string IpcDir = Path.Combine(AppTempDir, "IPC");
+        private static readonly string IpcDir = Path.Combine(AppTemporaryFiles.Root, "IPC");
         public static Window? MainWindow { get; private set; }
         private readonly List<MainWindow> _windows = new List<MainWindow>();
         private Window? _window;
@@ -144,6 +143,7 @@ namespace TxtAIEditor
                 return;
             }
 
+            await Task.Run(() => AppTemporaryFiles.CleanUp(Path.GetTempPath(), preserveIpc: true));
             var mainWindow = new MainWindow();
             RegisterWindow(mainWindow);
             await mainWindow.PrepareForInitialActivationAsync();
@@ -759,6 +759,10 @@ namespace TxtAIEditor
             _shellActivationService?.Dispose();
             _shellActivationService = null;
 
+            DocumentTextExtractionService.KillRunningPdftotextProcesses();
+            AppTemporaryFiles.CleanUp(Path.GetTempPath(), preserveIpc: false);
+            CleanupWindowlessBackgroundProcesses(TimeSpan.Zero);
+
             if (_singleInstanceMutex != null)
             {
                 try { _singleInstanceMutex.ReleaseMutex(); } catch { }
@@ -766,74 +770,9 @@ namespace TxtAIEditor
                 _singleInstanceMutex = null;
             }
 
-            DocumentTextExtractionService.KillRunningPdftotextProcesses();
-            CleanupTemporaryFiles();
-            CleanupWindowlessBackgroundProcesses(TimeSpan.Zero);
-
             // The packaged Explorer command runs as a separate windowless -Embedding process.
             // Stop it together with the main instance so RuntimeBroker can release the COM activation.
             Environment.Exit(0);
-        }
-
-        private static void CleanupTemporaryFiles()
-        {
-            try
-            {
-                string tempRoot = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                string appTempRoot = Path.GetFullPath(AppTempDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                if (!appTempRoot.StartsWith(tempRoot, StringComparison.OrdinalIgnoreCase) ||
-                    !string.Equals(Path.GetFileName(appTempRoot), "TxtAIEditor", StringComparison.OrdinalIgnoreCase) ||
-                    !Directory.Exists(appTempRoot))
-                {
-                    return;
-                }
-
-                foreach (string file in Directory.EnumerateFiles(appTempRoot, "*", SearchOption.AllDirectories))
-                {
-                    TryDeleteFile(file);
-                }
-
-                foreach (string directory in Directory.EnumerateDirectories(appTempRoot, "*", SearchOption.AllDirectories)
-                    .OrderByDescending(path => path.Length))
-                {
-                    TryDeleteDirectory(directory);
-                }
-
-                TryDeleteDirectory(appTempRoot);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to clean temporary files: {ex.Message}");
-            }
-        }
-
-        private static void TryDeleteFile(string path)
-        {
-            try
-            {
-                if (File.Exists(path))
-                {
-                    File.SetAttributes(path, FileAttributes.Normal);
-                    File.Delete(path);
-                }
-            }
-            catch
-            {
-            }
-        }
-
-        private static void TryDeleteDirectory(string path)
-        {
-            try
-            {
-                if (Directory.Exists(path))
-                {
-                    Directory.Delete(path, recursive: false);
-                }
-            }
-            catch
-            {
-            }
         }
 
         private Task<bool> HandleShellActivationAsync(string[] arguments)
