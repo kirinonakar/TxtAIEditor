@@ -32,6 +32,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ReplaceAllClick;
         public event RoutedEventHandler? ClearResultsClick;
         public event RoutedEventHandler? ReplaceOneClick;
+        public event EventHandler<string>? ResultFileClick;
         public event ItemClickEventHandler? ResultItemClick;
 
         public void Localize(Func<string, string, string> getString)
@@ -62,6 +63,15 @@ namespace TxtAIEditor.Controls
         private void OnReplaceAllClick(object sender, RoutedEventArgs e) => ReplaceAllClick?.Invoke(sender, e);
         private void OnClearResultsClick(object sender, RoutedEventArgs e) => ClearResultsClick?.Invoke(sender, e);
         private void OnReplaceOneClick(object sender, RoutedEventArgs e) => ReplaceOneClick?.Invoke(sender, e);
+
+        private void OnSearchResultFileClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is HyperlinkButton { Tag: string path })
+            {
+                ResultFileClick?.Invoke(this, path);
+            }
+        }
+
         private void OnSearchResultItemClick(object sender, ItemClickEventArgs e) => ResultItemClick?.Invoke(sender, e);
     }
 }

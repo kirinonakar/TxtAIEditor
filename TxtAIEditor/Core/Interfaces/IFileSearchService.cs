@@ -25,6 +25,7 @@ namespace TxtAIEditor.Core.Interfaces
     public interface IFileSearchService
     {
         Regex BuildSearchRegex(string query, FileSearchOptions options);
+        void ClearFolderSearchCache();
         Task<FileSearchSummary> SearchAsync(
             string searchRoot,
             string query,

@@ -149,8 +149,8 @@ namespace TxtAIEditor.Composition
         public bool TryOpenArchive(string filePath) =>
             Composition.ExplorerNavigation.TryOpenArchive(filePath);
 
-        public Task<OpenedTab?> LoadFileAsync(string filePath) =>
-            Composition.FileTabLoad.LoadAsync(filePath);
+        public Task<OpenedTab?> LoadFileAsync(string filePath, bool preserveWorkspace) =>
+            Composition.FileTabLoad.LoadAsync(filePath, preserveWorkspace);
 
         public Task<FileTabLoadResult> LoadFileWithResultAsync(string filePath) =>
             Composition.FileTabLoad.LoadWithResultAsync(filePath);

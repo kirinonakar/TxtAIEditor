@@ -42,6 +42,7 @@ namespace TxtAIEditor.Composition
                     await editor.ReplaceOneAsync(item);
                 }
             };
+            ui.LeftSidebar.SearchResultFileClick += async (_, path) => await editor.OpenSearchResultFileAsync(path);
             ui.LeftSidebar.SearchResultItemClick += async (_, e) =>
             {
                 if (e.ClickedItem is SearchResultItem item)

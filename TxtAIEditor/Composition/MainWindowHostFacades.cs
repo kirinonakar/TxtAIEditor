@@ -40,6 +40,7 @@ namespace TxtAIEditor.Composition
     {
         Task LoadFileIntoTabAsync(string filePath);
         Task LoadFileIntoTabAsync(string filePath, int lineNumber);
+        Task LoadSearchResultIntoTabAsync(string filePath);
         OpenedTab OpenEmptyTab();
         OpenedTab OpenNewTab(FileTabOpenRequest request);
         OpenedTab OpenGeneratedTab(string content);

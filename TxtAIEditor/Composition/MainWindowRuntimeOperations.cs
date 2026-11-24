@@ -112,7 +112,7 @@ namespace TxtAIEditor.Composition
             }
 
             _state.CurrentFolderPath = folderPath;
-            Controllers.Editor.CancelActiveSearch();
+            Controllers.Editor.HandleSearchFolderChanged();
             UpdateAutoSaveStatus();
             UpdateAllTabWorkspaceIndicators();
             Controllers.Agents.Composition.Agent.NotifyWorkspaceChanged();
@@ -226,14 +226,20 @@ namespace TxtAIEditor.Composition
 
         public Task LoadFileIntoTabAsync(string filePath) => LoadFileIntoTabAsync(filePath, 0);
 
-        public async Task LoadFileIntoTabAsync(string filePath, int lineNumber)
+        public Task LoadFileIntoTabAsync(string filePath, int lineNumber) =>
+            LoadFileIntoTabCoreAsync(filePath, lineNumber, preserveWorkspace: false);
+
+        public Task LoadSearchResultIntoTabAsync(string filePath) =>
+            LoadFileIntoTabCoreAsync(filePath, 0, preserveWorkspace: true);
+
+        private async Task LoadFileIntoTabCoreAsync(string filePath, int lineNumber, bool preserveWorkspace)
         {
-            if (Controllers.Workspace.TryOpenArchive(filePath))
+            if (!preserveWorkspace && Controllers.Workspace.TryOpenArchive(filePath))
             {
                 return;
             }
 
-            var loadedTab = await Controllers.Workspace.LoadFileAsync(filePath);
+            var loadedTab = await Controllers.Workspace.LoadFileAsync(filePath, preserveWorkspace);
             if (loadedTab != null)
             {
                 ActivateLoadedTab(loadedTab);

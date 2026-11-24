@@ -73,7 +73,7 @@ namespace TxtAIEditor.Composition
                 editorFacade.UpdateLanguageUi,
                 editorFacade.SchedulePreview,
                 shellFacade.UpdateWindowTitle,
-                documentFacade.LoadFileIntoTabAsync,
+                documentFacade.LoadSearchResultIntoTabAsync,
                 workspace.GetSearchRoot,
                 workspace.GetLargeFileThresholdBytes,
                 workspace.RefreshGitStatusUiAsync,
@@ -196,6 +196,9 @@ namespace TxtAIEditor.Composition
         public void CancelActiveSearch() =>
             Foundation.SearchReplace.CancelActiveSearch();
 
+        public void HandleSearchFolderChanged() =>
+            Foundation.SearchReplace.HandleSearchFolderChanged();
+
         public void ClearSearchResults() =>
             Foundation.SearchReplace.ClearSearchResults();
 
@@ -210,6 +213,9 @@ namespace TxtAIEditor.Composition
 
         public Task ReplaceOneAsync(SearchResultItem item) =>
             Foundation.SearchReplace.ReplaceOneAsync(item);
+
+        public Task OpenSearchResultFileAsync(string path) =>
+            Foundation.SearchReplace.OpenSearchResultFileAsync(path);
 
         public Task OpenSearchResultAsync(SearchResultItem item) =>
             Foundation.SearchReplace.OpenSearchResultAsync(item);

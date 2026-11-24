@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Enumeration;
+using System.IO.MemoryMappedFiles;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -20,6 +22,7 @@ namespace TxtAIEditor.Core.Services
         private const int SearchResultBatchSize = 100;
         private const int SearchResultLimit = 10_000;
         private const int SearchPreviewLength = 512;
+        private const int SearchReadBufferSize = 16 * 1024;
         private const int EncodingSampleSize = 256 * 1024;
         private static readonly HashSet<string> SkippedDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -52,6 +55,8 @@ namespace TxtAIEditor.Core.Services
 
         private readonly IFileService _fileService;
         private readonly DocumentTextExtractionService _documentTextExtractionService;
+        private readonly object _folderSearchGate = new();
+        private DocumentSearchTextCache? _folderSearchCache;
 
         public FileSearchService(IFileService fileService)
             : this(fileService, new DocumentTextExtractionService())
@@ -81,7 +86,18 @@ namespace TxtAIEditor.Core.Services
             return new Regex(pattern, regexOptions, TimeSpan.FromSeconds(2));
         }
 
-        public Task<FileSearchSummary> SearchAsync(
+        public void ClearFolderSearchCache()
+        {
+            DocumentSearchTextCache? cache;
+            lock (_folderSearchGate)
+            {
+                cache = _folderSearchCache;
+                _folderSearchCache = null;
+            }
+            cache?.Dispose();
+        }
+
+        public async Task<FileSearchSummary> SearchAsync(
             string searchRoot,
             string query,
             long largeFileThresholdBytes,
@@ -89,9 +105,36 @@ namespace TxtAIEditor.Core.Services
             Action<IReadOnlyList<SearchResultItem>> publishResults,
             CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            string folderPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(searchRoot));
+            DocumentSearchTextCache? previous = null;
+            DocumentSearchTextCache cache;
+            CancellationTokenSource searchCancellation;
+            lock (_folderSearchGate)
+            {
+                if (_folderSearchCache is null || _folderSearchCache.FolderPath != folderPath)
+                {
+                    previous = _folderSearchCache;
+                    _folderSearchCache = new DocumentSearchTextCache(folderPath);
+                }
+                cache = _folderSearchCache;
+                searchCancellation = cache.BeginSearch(cancellationToken);
+            }
+
             // Preparing the enumerator reads ancestor .gitignore files. Regex compilation
             // and all filesystem access must happen after leaving the caller's UI thread.
-            return Task.Run(() => SearchCoreAsync(searchRoot, query, options, publishResults, cancellationToken), cancellationToken);
+            try
+            {
+                previous?.Dispose();
+                CancellationToken token = searchCancellation.Token;
+                return await Task.Run(() => SearchCoreAsync(folderPath, query, options, publishResults, cache, token), token)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                searchCancellation.Dispose();
+                cache.EndSearch();
+            }
         }
 
         private async Task<FileSearchSummary> SearchCoreAsync(
@@ -99,6 +142,7 @@ namespace TxtAIEditor.Core.Services
             string query,
             FileSearchOptions options,
             Action<IReadOnlyList<SearchResultItem>> publishResults,
+            DocumentSearchTextCache cache,
             CancellationToken cancellationToken)
         {
             Regex? regex = options.IsRegex || options.WholeWord
@@ -136,8 +180,8 @@ namespace TxtAIEditor.Core.Services
                 try
                 {
                     int fileFoundCount = DocumentTextExtractionService.IsSupportedExtension(file)
-                        ? await SearchExtractedDocumentAsync(file, matcher, PublishLimitedResults, token).ConfigureAwait(false)
-                        : SearchTextFile(file, matcher, PublishLimitedResults, token);
+                        ? await SearchExtractedDocumentAsync(file, cache, matcher, PublishLimitedResults, token).ConfigureAwait(false)
+                        : SearchTextFile(file, cache, matcher, PublishLimitedResults, token);
 
                     if (fileFoundCount > 0)
                     {
@@ -165,50 +209,20 @@ namespace TxtAIEditor.Core.Services
 
         private async Task<int> SearchExtractedDocumentAsync(
             string file,
+            DocumentSearchTextCache cache,
             SearchMatcher matcher,
             Action<IReadOnlyList<SearchResultItem>> publishResults,
             CancellationToken cancellationToken)
         {
-            int foundCount = 0;
-            string extracted = await _documentTextExtractionService
-                .ExtractFolderSearchTextAsync(file, DocumentSearchMaxChars, cancellationToken)
+            using TextReader? reader = await _documentTextExtractionService
+                .OpenFolderSearchTextAsync(file, DocumentSearchMaxChars, cache, cancellationToken)
                 .ConfigureAwait(false);
-
-            if (string.IsNullOrWhiteSpace(extracted))
-            {
-                return 0;
-            }
-
-            var tempResults = new List<SearchResultItem>(SearchResultBatchSize);
-            int lineNum = 1;
-            foreach (string line in EnumerateNormalizedLines(extracted))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (matcher.TryFind(line, out int indexOfMatch, out int matchLength))
-                {
-                    tempResults.Add(new SearchResultItem
-                    {
-                        Path = file,
-                        LineNumber = lineNum,
-                        LineContent = CreateSearchPreview(line, indexOfMatch),
-                        IndexOfMatch = indexOfMatch,
-                        MatchLength = matchLength,
-                        CanReplace = false
-                    });
-                    foundCount++;
-                    FlushSearchResultsIfNeeded(tempResults, publishResults, cancellationToken);
-                }
-
-                lineNum++;
-            }
-
-            FlushSearchResults(tempResults, publishResults, cancellationToken);
-            return foundCount;
+            return reader is null ? 0 : SearchTextReader(file, reader, cache, matcher, publishResults, cancellationToken, canReplace: false);
         }
 
         private static int SearchTextFile(
             string file,
+            DocumentSearchTextCache cache,
             SearchMatcher matcher,
             Action<IReadOnlyList<SearchResultItem>> publishResults,
             CancellationToken cancellationToken)
@@ -235,56 +249,112 @@ namespace TxtAIEditor.Core.Services
                 detectEncodingFromByteOrderMarks: true,
                 bufferSize: stream.Length < 64 * 1024 ? 4096 : 64 * 1024);
 
-            return SearchTextReader(file, reader, matcher, publishResults, cancellationToken);
+            return SearchTextReader(file, reader, cache, matcher, publishResults, cancellationToken);
         }
 
         private static int SearchTextReader(
             string file,
             TextReader reader,
+            DocumentSearchTextCache cache,
             SearchMatcher matcher,
             Action<IReadOnlyList<SearchResultItem>> publishResults,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool canReplace = true)
         {
             int foundCount = 0;
             var tempResults = new List<SearchResultItem>(SearchResultBatchSize);
-
-            string? line;
+            var buffer = new char[SearchReadBufferSize];
+            using var continuedLine = new LongSearchLine(matcher, cache);
+            bool hasContinuation = false;
+            bool skipLineFeed = false;
             int lineNum = 1;
-            while ((line = reader.ReadLine()) != null)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
 
-                if (matcher.TryFind(line, out int indexOfMatch, out int matchLength))
+            void FinishLine(ReadOnlySpan<char> text)
+            {
+                int indexOfMatch;
+                int matchLength;
+                string? preview = null;
+                bool found;
+                if (hasContinuation)
+                {
+                    continuedLine.Append(text);
+                    found = continuedLine.TryFind(out indexOfMatch, out matchLength, out preview);
+                }
+                else
+                {
+                    found = matcher.TryFind(text, out indexOfMatch, out matchLength);
+                }
+
+                if (found)
                 {
                     tempResults.Add(new SearchResultItem
                     {
                         Path = file,
                         LineNumber = lineNum,
-                        LineContent = CreateSearchPreview(line, indexOfMatch),
+                        LineContent = preview ?? CreateSearchPreview(text, indexOfMatch, text.Length, textOffset: 0),
                         IndexOfMatch = indexOfMatch,
-                        MatchLength = matchLength
+                        MatchLength = matchLength,
+                        CanReplace = canReplace
                     });
                     foundCount++;
                     FlushSearchResultsIfNeeded(tempResults, publishResults, cancellationToken);
                 }
 
+                if (hasContinuation)
+                {
+                    continuedLine.Reset();
+                    hasContinuation = false;
+                }
                 lineNum++;
             }
 
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int read = reader.Read(buffer, 0, buffer.Length);
+                if (read == 0) break;
+
+                ReadOnlySpan<char> remaining = buffer.AsSpan(0, read);
+                if (skipLineFeed && remaining[0] == '\n') remaining = remaining[1..];
+                skipLineFeed = false;
+
+                while (!remaining.IsEmpty)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    int end = remaining.IndexOfAny('\r', '\n');
+                    if (end < 0)
+                    {
+                        continuedLine.Append(remaining);
+                        hasContinuation = true;
+                        break;
+                    }
+
+                    FinishLine(remaining[..end]);
+                    bool carriageReturn = remaining[end] == '\r';
+                    remaining = remaining[(end + 1)..];
+                    if (carriageReturn)
+                    {
+                        if (remaining.IsEmpty) skipLineFeed = true;
+                        else if (remaining[0] == '\n') remaining = remaining[1..];
+                    }
+                }
+            }
+
+            if (hasContinuation) FinishLine(ReadOnlySpan<char>.Empty);
             FlushSearchResults(tempResults, publishResults, cancellationToken);
             return foundCount;
         }
 
-        private static string CreateSearchPreview(string line, int matchIndex)
+        private static string CreateSearchPreview(ReadOnlySpan<char> text, int matchIndex, int lineLength, int textOffset)
         {
-            if (line.Length <= SearchPreviewLength)
+            if (lineLength <= SearchPreviewLength)
             {
-                return line;
+                return text.ToString();
             }
 
-            int start = Math.Clamp(matchIndex - SearchPreviewLength / 4, 0, line.Length - SearchPreviewLength);
-            return string.Concat(start > 0 ? "…" : "", line.AsSpan(start, SearchPreviewLength),
-                start + SearchPreviewLength < line.Length ? "…" : "");
+            int start = Math.Clamp(matchIndex - SearchPreviewLength / 4, 0, lineLength - SearchPreviewLength);
+            return string.Concat(start > 0 ? "…" : "", text.Slice(start - textOffset, SearchPreviewLength),
+                start + SearchPreviewLength < lineLength ? "…" : "");
         }
 
         public string ReplaceSearchMatches(string original, string query, string replace, FileSearchOptions options)
@@ -408,16 +478,6 @@ namespace TxtAIEditor.Core.Services
             return AutoDetectedSearchFileExtensions.Contains(ext);
         }
 
-        private static IEnumerable<string> EnumerateNormalizedLines(string text)
-        {
-            using var reader = new StringReader(text);
-            string? line;
-            while ((line = reader.ReadLine()) != null)
-            {
-                yield return line;
-            }
-        }
-
         private static bool IsSearchReadException(Exception ex)
         {
             return ex is IOException ||
@@ -470,7 +530,7 @@ namespace TxtAIEditor.Core.Services
         {
             cancellationToken.ThrowIfCancellationRequested();
             string dirName = Path.GetFileName(Path.TrimEndingDirectorySeparator(currentDir));
-            if (ShouldSkipDirectoryName(dirName, includeHiddenFiles))
+            if (ShouldSkipDirectoryName(dirName, includeHiddenFiles) || DocumentSearchTextCache.IsSearchTempDirectory(currentDir, dirName))
             {
                 yield break;
             }
@@ -604,11 +664,156 @@ namespace TxtAIEditor.Core.Services
             publishResults(batch);
         }
 
+        private sealed class LongSearchLine : IDisposable
+        {
+            private const int RegexBufferSize = 2 * SearchReadBufferSize;
+            private readonly SearchMatcher _matcher;
+            private readonly DocumentSearchTextCache _cache;
+            private readonly int _overlap;
+            private char[]? _window;
+            private char[]? _context;
+            private char[]? _regexBuffer;
+            private FileStream? _regexInput;
+            private int _length;
+            private int _windowLength;
+            private int _contextStart;
+            private int _contextLength;
+            private int _matchIndex = -1;
+            private int _matchLength;
+
+            public LongSearchLine(SearchMatcher matcher, DocumentSearchTextCache cache)
+            {
+                _matcher = matcher;
+                _cache = cache;
+                // Retain enough input for a match crossing the read boundary and its preview.
+                _overlap = Math.Max(0, matcher.QueryLength - 1) + SearchPreviewLength;
+            }
+
+            public void Append(ReadOnlySpan<char> text)
+            {
+                if (text.IsEmpty) return;
+                if (text.Length > int.MaxValue - _length) throw new InvalidDataException("Search line exceeds the supported character length.");
+
+                if (_matcher.RequiresFullLine)
+                {
+                    AppendRegexInput(text);
+                }
+                else if (_matchIndex < 0)
+                {
+                    _window ??= new char[SearchReadBufferSize + _overlap];
+                    text.CopyTo(_window.AsSpan(_windowLength));
+                    int windowStart = _length - _windowLength;
+                    ReadOnlySpan<char> window = _window.AsSpan(0, _windowLength + text.Length);
+                    if (_matcher.TryFind(window, out int index, out _matchLength))
+                    {
+                        _matchIndex = windowStart + index;
+                        _contextStart = Math.Max(0, _matchIndex - SearchPreviewLength);
+                        AppendContext(window[(_contextStart - windowStart)..]);
+                    }
+                    else
+                    {
+                        _windowLength = Math.Min(window.Length, _overlap);
+                        window[^_windowLength..].CopyTo(_window);
+                    }
+                }
+                else
+                {
+                    AppendContext(text);
+                }
+
+                _length += text.Length;
+            }
+
+            private void AppendRegexInput(ReadOnlySpan<char> text)
+            {
+                if (_regexInput is null && _length + text.Length <= RegexBufferSize)
+                {
+                    _regexBuffer ??= new char[RegexBufferSize];
+                    text.CopyTo(_regexBuffer.AsSpan(_length));
+                    return;
+                }
+
+                // Store UTF-16 so the mapped text can be matched without decoding the whole line into a string.
+                if (_regexInput is null)
+                {
+                    _regexInput = _cache.CreateScratchStream();
+                    _regexInput.Write(MemoryMarshal.AsBytes(_regexBuffer.AsSpan(0, _length)));
+                }
+                _regexInput.Write(MemoryMarshal.AsBytes(text));
+            }
+
+            private void AppendContext(ReadOnlySpan<char> text)
+            {
+                _context ??= new char[2 * SearchPreviewLength];
+                int length = Math.Min(text.Length, _context.Length - _contextLength);
+                text[..length].CopyTo(_context.AsSpan(_contextLength));
+                _contextLength += length;
+            }
+
+            public bool TryFind(out int index, out int matchLength, out string? preview)
+            {
+                if (_matcher.RequiresFullLine)
+                {
+                    return _regexInput is null
+                        ? FindRegexMatch(_regexBuffer.AsSpan(0, _length), out index, out matchLength, out preview)
+                        : FindMappedRegexMatch(out index, out matchLength, out preview);
+                }
+
+                index = _matchIndex;
+                matchLength = _matchLength;
+                preview = index >= 0 ? CreateSearchPreview(_context.AsSpan(0, _contextLength), index, _length, _contextStart) : null;
+                return index >= 0;
+            }
+
+            private bool FindRegexMatch(ReadOnlySpan<char> line, out int index, out int matchLength, out string? preview)
+            {
+                bool found = _matcher.TryFind(line, out index, out matchLength);
+                preview = found ? CreateSearchPreview(line, index, _length, textOffset: 0) : null;
+                return found;
+            }
+
+            private unsafe bool FindMappedRegexMatch(out int index, out int matchLength, out string? preview)
+            {
+                _regexInput!.Flush();
+                using var mapped = MemoryMappedFile.CreateFromFile(_regexInput, mapName: null, capacity: 0,
+                    MemoryMappedFileAccess.Read, HandleInheritability.None, leaveOpen: true);
+                using var view = mapped.CreateViewAccessor(0, (long)_length * sizeof(char), MemoryMappedFileAccess.Read);
+                byte* pointer = null;
+                view.SafeMemoryMappedViewHandle.AcquirePointer(ref pointer);
+                try
+                {
+                    return FindRegexMatch(new ReadOnlySpan<char>(pointer + view.PointerOffset, _length), out index, out matchLength, out preview);
+                }
+                finally
+                {
+                    view.SafeMemoryMappedViewHandle.ReleasePointer();
+                }
+            }
+
+            public void Reset()
+            {
+                Dispose();
+                _length = 0;
+                _windowLength = 0;
+                _contextLength = 0;
+                _matchIndex = -1;
+            }
+
+            public void Dispose()
+            {
+                _regexInput?.Dispose();
+                _regexInput = null;
+            }
+        }
+
         private readonly struct SearchMatcher
         {
             private readonly string _query;
             private readonly StringComparison _comparison;
             private readonly Regex? _regex;
+
+            public bool RequiresFullLine => _regex is not null;
+            public int QueryLength => _query.Length;
 
             private SearchMatcher(string query, StringComparison comparison, Regex? regex)
             {
@@ -628,15 +833,15 @@ namespace TxtAIEditor.Core.Services
                 return new SearchMatcher(query, comparison, null);
             }
 
-            public bool TryFind(string line, out int indexOfMatch, out int matchLength)
+            public bool TryFind(ReadOnlySpan<char> line, out int indexOfMatch, out int matchLength)
             {
                 if (_regex != null)
                 {
-                    Match match = _regex.Match(line);
-                    if (match.Success)
+                    var matches = _regex.EnumerateMatches(line);
+                    if (matches.MoveNext())
                     {
-                        indexOfMatch = match.Index;
-                        matchLength = match.Length;
+                        indexOfMatch = matches.Current.Index;
+                        matchLength = matches.Current.Length;
                         return true;
                     }
 

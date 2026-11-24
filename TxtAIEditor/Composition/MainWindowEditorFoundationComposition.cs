@@ -33,7 +33,7 @@ namespace TxtAIEditor.Composition
         Action<OpenedTab> UpdateLanguageUi,
         Action<OpenedTab> SchedulePreview,
         Action UpdateWindowTitle,
-        Func<string, Task> LoadFileAsync,
+        Func<string, Task> LoadSearchResultFileAsync,
         Func<string> GetSearchRoot,
         Func<long> GetLargeFileThresholdBytes,
         Func<Task> RefreshGitStatusAsync,
@@ -150,7 +150,7 @@ namespace TxtAIEditor.Composition
                 editorSessions,
                 tabDirtyState,
                 tabNavigation.GetActiveTab,
-                callbacks.LoadFileAsync,
+                callbacks.LoadSearchResultFileAsync,
                 callbacks.UpdateLivePreview,
                 editorLineNavigation,
                 tab => splitImeSync.SyncEditsToOtherTabsAsync(tab));

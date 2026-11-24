@@ -88,18 +88,18 @@ namespace TxtAIEditor.Controls
             _showErrorMessage = showErrorMessage;
         }
 
-        public async Task<OpenedTab?> LoadAsync(string filePath)
+        public async Task<OpenedTab?> LoadAsync(string filePath, bool preserveWorkspace)
         {
-            var result = await LoadWithResultAsync(filePath);
+            var result = await LoadWithResultAsync(filePath, preserveWorkspace);
             return result.Tab;
         }
 
-        public async Task<FileTabLoadResult> LoadWithResultAsync(string filePath)
+        public async Task<FileTabLoadResult> LoadWithResultAsync(string filePath, bool preserveWorkspace = false)
         {
             await _fileOpenSemaphore.WaitAsync();
             try
             {
-                string? repoRoot = _gitService.FindRepositoryRoot(Path.GetDirectoryName(filePath));
+                string? repoRoot = preserveWorkspace ? null : _gitService.FindRepositoryRoot(Path.GetDirectoryName(filePath));
                 if (PreserveWorkspaceOnFileOpenProvider?.Invoke() != true && !string.IsNullOrEmpty(repoRoot))
                 {
                     _currentRepoPathChanged(repoRoot);

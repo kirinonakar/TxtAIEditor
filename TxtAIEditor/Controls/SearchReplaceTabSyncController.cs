@@ -21,7 +21,7 @@ namespace TxtAIEditor.Controls
         private readonly Dictionary<string, EditorDocumentSession> _editorSessions;
         private readonly TabDirtyStateController _tabDirtyStateController;
         private readonly Func<OpenedTab?> _activeTabProvider;
-        private readonly Func<string, Task> _loadFileAsync;
+        private readonly Func<string, Task> _loadSearchResultFileAsync;
         private readonly Action<OpenedTab> _updateLivePreview;
         private readonly EditorLineNavigationController _lineNavigationController;
         private readonly Func<OpenedTab, Task> _syncEditsToOtherTabsAsync;
@@ -34,7 +34,7 @@ namespace TxtAIEditor.Controls
             Dictionary<string, EditorDocumentSession> editorSessions,
             TabDirtyStateController tabDirtyStateController,
             Func<OpenedTab?> activeTabProvider,
-            Func<string, Task> loadFileAsync,
+            Func<string, Task> loadSearchResultFileAsync,
             Action<OpenedTab> updateLivePreview,
             EditorLineNavigationController lineNavigationController,
             Func<OpenedTab, Task> syncEditsToOtherTabsAsync)
@@ -46,7 +46,7 @@ namespace TxtAIEditor.Controls
             _editorSessions = editorSessions;
             _tabDirtyStateController = tabDirtyStateController;
             _activeTabProvider = activeTabProvider;
-            _loadFileAsync = loadFileAsync;
+            _loadSearchResultFileAsync = loadSearchResultFileAsync;
             _updateLivePreview = updateLivePreview;
             _lineNavigationController = lineNavigationController;
             _syncEditsToOtherTabsAsync = syncEditsToOtherTabsAsync;
@@ -162,23 +162,39 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        public async Task HighlightOpenedFileResultAsync(OpenedTab tab, SearchResultItem item, string query)
+        public Task OpenSearchResultFileAsync(string path, OpenedTab? searchedTab)
         {
-            TabViewItem? tabItem = FindTabItem(tab.Id);
-            if (tabItem != null)
+            if (searchedTab == null)
             {
-                if (_primaryTabView.TabItems.Contains(tabItem))
-                {
-                    _primaryTabView.SelectedItem = tabItem;
-                }
-                else
-                {
-                    _secondaryTabView.SelectedItem = tabItem;
-                }
+                return _loadSearchResultFileAsync(path);
             }
 
+            if (TrySelectOpenedTab(searchedTab.Id) || searchedTab.FilePath is not string filePath)
+            {
+                return Task.CompletedTask;
+            }
+
+            return _loadSearchResultFileAsync(filePath);
+        }
+
+        public async Task HighlightOpenedFileResultAsync(OpenedTab tab, SearchResultItem item, string query)
+        {
+            TrySelectOpenedTab(tab.Id);
             await _lineNavigationController.RevealTabLineAsync(
                 tab.Id, item.LineNumber, item.IndexOfMatch, item.MatchLength, query);
+        }
+
+        private bool TrySelectOpenedTab(string tabId)
+        {
+            TabViewItem? tabItem = FindTabItem(tabId);
+            if (tabItem == null)
+            {
+                return false;
+            }
+
+            var tabView = _primaryTabView.TabItems.Contains(tabItem) ? _primaryTabView : _secondaryTabView;
+            tabView.SelectedItem = tabItem;
+            return true;
         }
 
         public async Task HandleFileModifiedAsync(string filePath)
@@ -259,7 +275,7 @@ namespace TxtAIEditor.Controls
 
         public async Task LoadAndHighlightAsync(SearchResultItem item, string query)
         {
-            await _loadFileAsync(item.Path);
+            await _loadSearchResultFileAsync(item.Path);
             await Task.Delay(250);
             await _lineNavigationController.RevealFileLineAsync(
                 item.Path,

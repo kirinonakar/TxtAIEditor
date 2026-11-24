@@ -86,6 +86,9 @@ namespace TxtAIEditor.Core.Services
             return await ConvertAsync(filePath, "md", sheetName: null, sectionRange: null, cancellationToken).ConfigureAwait(false);
         }
 
+        internal static Task<bool> WriteMarkdownAsync(string filePath, TextWriter output, int maxChars, CancellationToken cancellationToken) =>
+            RunConversionAsync(filePath, "md", sheetName: null, sectionRange: null, output, maxChars, cancellationToken);
+
         /// <summary>
         /// Converts a document to a self-contained HTML document. The editor shows the
         /// result through its HTML live preview mode, so embedded pictures are inlined as
@@ -125,10 +128,19 @@ namespace TxtAIEditor.Core.Services
 
         private static async Task<string> ConvertAsync(string filePath, string format, string? sheetName, string? sectionRange, CancellationToken cancellationToken, bool includeImages = false)
         {
+            using var output = new StringWriter();
+            await RunConversionAsync(filePath, format, sheetName, sectionRange, output, int.MaxValue, cancellationToken, includeImages).ConfigureAwait(false);
+            return output.ToString();
+        }
+
+        private static async Task<bool> RunConversionAsync(string filePath, string format, string? sheetName, string? sectionRange,
+            TextWriter output, int maxChars, CancellationToken cancellationToken, bool includeImages = false)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             string? executablePath = ExecutablePath;
             if (string.IsNullOrWhiteSpace(executablePath) || string.IsNullOrWhiteSpace(filePath) || !SafeFileExists(executablePath))
             {
-                return string.Empty;
+                return false;
             }
 
             var startInfo = new ProcessStartInfo(executablePath)
@@ -168,45 +180,55 @@ namespace TxtAIEditor.Core.Services
                 if (!process.Start())
                 {
                     Debug.WriteLine("rdocs2md.exe did not start; skipped document conversion.");
-                    return string.Empty;
+                    return false;
                 }
             }
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is IOException || ex is UnauthorizedAccessException)
             {
                 Debug.WriteLine($"Failed to start rdocs2md.exe: {ex.Message}");
-                return string.Empty;
+                return false;
             }
-
-            Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
-            Task<string> errorTask = process.StandardError.ReadToEndAsync();
 
             using var timeoutSource = new CancellationTokenSource(ConversionTimeout);
             using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);
+            using var diagnostic = new StringWriter();
+            Task<bool> outputTask = DocumentTextExtractionService.CopyTextPrefixAsync(process.StandardOutput, output, maxChars, linkedSource.Token);
+            Task<bool> errorTask = DocumentTextExtractionService.CopyTextPrefixAsync(process.StandardError, diagnostic, 4096, linkedSource.Token);
+            Task waitTask = process.WaitForExitAsync(linkedSource.Token);
             try
             {
-                await process.WaitForExitAsync(linkedSource.Token).ConfigureAwait(false);
+                Task first = await Task.WhenAny(outputTask, errorTask, waitTask).ConfigureAwait(false);
+                await first.ConfigureAwait(false);
+                if (first != outputTask)
+                {
+                    Task outputOrExit = await Task.WhenAny(outputTask, waitTask).ConfigureAwait(false);
+                    await outputOrExit.ConfigureAwait(false);
+                }
+                bool hasText = await outputTask.ConfigureAwait(false);
+                await waitTask.ConfigureAwait(false);
+                await errorTask.ConfigureAwait(false);
+                if (process.ExitCode != 0)
+                {
+                    string detail = diagnostic.ToString().Trim();
+                    if (detail.Length == 0 && output is StringWriter text)
+                    {
+                        detail = text.ToString().Trim();
+                    }
+                    throw new InvalidOperationException($"rdocs2md exited with code {process.ExitCode}: {Truncate(detail, 400)}");
+                }
+                return hasText;
             }
-            catch (OperationCanceledException)
+            catch (Exception ex)
             {
                 TryKill(process);
-                ObserveFaults(outputTask, errorTask);
-                if (cancellationToken.IsCancellationRequested)
+                linkedSource.Cancel();
+                await Task.WhenAll(outputTask, errorTask, waitTask).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                if (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested && timeoutSource.IsCancellationRequested)
                 {
-                    throw;
+                    throw new TimeoutException($"rdocs2md conversion timed out after {ConversionTimeout.TotalSeconds:0} seconds: {filePath}");
                 }
-
-                throw new TimeoutException($"rdocs2md conversion timed out after {ConversionTimeout.TotalSeconds:0} seconds: {filePath}");
+                throw;
             }
-
-            string markdown = await outputTask.ConfigureAwait(false);
-            string error = await errorTask.ConfigureAwait(false);
-            if (process.ExitCode != 0)
-            {
-                string detail = string.IsNullOrWhiteSpace(error) ? markdown.Trim() : error.Trim();
-                throw new InvalidOperationException($"rdocs2md exited with code {process.ExitCode}: {Truncate(detail, 400)}");
-            }
-
-            return markdown;
         }
 
         private static string? FindExecutablePath()
@@ -294,18 +316,6 @@ namespace TxtAIEditor.Core.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to stop rdocs2md: {ex.Message}");
-            }
-        }
-
-        private static void ObserveFaults(params Task<string>[] tasks)
-        {
-            foreach (Task<string> task in tasks)
-            {
-                _ = task.ContinueWith(
-                    static completed => _ = completed.Exception,
-                    CancellationToken.None,
-                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
             }
         }
 

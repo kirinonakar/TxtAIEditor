@@ -69,7 +69,8 @@
                                                         </Grid.ColumnDefinitions>
                                                         <FontIcon Glyph="&#xE7C3;" FontSize="11" Margin="0,0,6,0" Foreground="{ThemeResource SystemControlForegroundAccentBrush}" VerticalAlignment="Center"/>
                                                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" ToolTipService.ToolTip="{x:Bind Path}">
-                                                            <TextBlock Text="{x:Bind FileName}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                                                            <HyperlinkButton Content="{x:Bind FileName}" Tag="{x:Bind Path}" Click="OnSearchResultFileClick"
+                                                                             FontWeight="Bold" FontSize="11" Padding="0" MinWidth="0" MinHeight="0" VerticalAlignment="Center"/>
                                                             <TextBlock Text="{x:Bind RelativeDirectory}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                                         </StackPanel>
                                                         <Border Grid.Column="2" Background="{ThemeResource SystemControlBackgroundAccentBrush}" CornerRadius="10" Padding="6,1,6,1" VerticalAlignment="Center">

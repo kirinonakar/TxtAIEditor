@@ -101,6 +101,7 @@ namespace TxtAIEditor.Controls
         public event RoutedEventHandler? ReplaceAllClick { add => SearchView.ReplaceAllClick += value; remove => SearchView.ReplaceAllClick -= value; }
         public event RoutedEventHandler? SearchClearResultsClick { add => SearchView.ClearResultsClick += value; remove => SearchView.ClearResultsClick -= value; }
         public event RoutedEventHandler? ReplaceOneClick { add => SearchView.ReplaceOneClick += value; remove => SearchView.ReplaceOneClick -= value; }
+        public event EventHandler<string>? SearchResultFileClick { add => SearchView.ResultFileClick += value; remove => SearchView.ResultFileClick -= value; }
         public event ItemClickEventHandler? SearchResultItemClick { add => SearchView.ResultItemClick += value; remove => SearchView.ResultItemClick -= value; }
         public event ItemClickEventHandler? RecentFileItemClick { add => RecentView.ItemClick += value; remove => RecentView.ItemClick -= value; }
         public event RightTappedEventHandler? RecentFileItemRightTapped { add => RecentView.ItemRightTapped += value; remove => RecentView.ItemRightTapped -= value; }

@@ -438,6 +438,9 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public Task OpenSearchResultFileAsync(string path) =>
+            _tabSyncController?.OpenSearchResultFileAsync(path, _searchedTab) ?? Task.CompletedTask;
+
         public async Task OpenSearchResultAsync(SearchResultItem item)
         {
             if (item != null)
@@ -491,6 +494,20 @@ namespace TxtAIEditor.Controls
 
         public void ClearSearchResults()
         {
+            ResetSearchResults();
+            _searchQueryInput.Text = string.Empty;
+            SetSearchHeaderText(isSearching: false);
+        }
+
+        public void HandleSearchFolderChanged()
+        {
+            _fileSearchService.ClearFolderSearchCache();
+            ResetSearchResults();
+            SetSearchHeaderText(isSearching: false);
+        }
+
+        private void ResetSearchResults()
+        {
             CancelActiveSearch();
             _searchResultsList.SelectedItem = null;
             _viewModel.SearchResults.Clear();
@@ -500,8 +517,6 @@ namespace TxtAIEditor.Controls
             _lastSearchQuery = string.Empty;
             _resultLimitReached = false;
             _folderSearchCompleted = false;
-            _searchQueryInput.Text = string.Empty;
-            SetSearchHeaderText(isSearching: false);
         }
 
         private void SetSearchHeaderIsSearching(int searchVersion, bool isSearching)

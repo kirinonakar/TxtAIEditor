@@ -107,6 +107,7 @@ namespace TxtAIEditor
 
             this.Activated += OnWindowActivated;
             this.Activated += Controllers.Lifecycle.Window.HandleActivationChanged;
+            this.Closed += (_, _) => Controllers.Editor.HandleSearchFolderChanged();
             this.Closed += Controllers.Lifecycle.Window.HandleWindowClosed;
             this.Closed += (_, _) => (Application.Current as App)?.HandleWindowClosed(this);
             this.AppWindow.Closing += OnAppWindowClosing;
