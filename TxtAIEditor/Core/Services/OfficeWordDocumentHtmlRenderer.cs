@@ -104,13 +104,51 @@ namespace TxtAIEditor.Core.Services
                 pageHeight = documentPageHeight;
             }
 
+            bool legacy = Path.GetExtension(filePath).Equals(".doc", StringComparison.OrdinalIgnoreCase);
+            string pageParts = legacy
+                ? await BuildPagePartsAsync(archive, relationships, body.Element(body.Name.Namespace + "sectPr")).ConfigureAwait(false)
+                : string.Empty;
             return BuildDocumentHtml(
                 Path.GetFileName(filePath),
                 content.ToString(),
                 pageWidth,
                 pagePadding,
                 pageHeight,
-                hasSavedPagination);
+                hasSavedPagination,
+                paginateWord: legacy,
+                wordPageParts: pageParts);
+        }
+
+        private static async Task<string> BuildPagePartsAsync(ZipArchive archive,
+            IReadOnlyDictionary<string, string> relationships, XElement? section)
+        {
+            var parts = new StringBuilder();
+            foreach (XElement reference in section?.Elements() ?? Enumerable.Empty<XElement>())
+            {
+                string kind = reference.Name.LocalName switch
+                {
+                    "headerReference" => "header",
+                    "footerReference" => "footer",
+                    _ => string.Empty
+                };
+                string variant = GetAttributeValue(reference, "type");
+                if (kind.Length == 0 || variant is not ("default" or "even" or "first") ||
+                    !relationships.TryGetValue(GetAttributeValue(reference, "id"), out string? path)) continue;
+
+                XDocument? part = await TryLoadXmlEntryAsync(archive, path).ConfigureAwait(false);
+                if (part?.Root == null) continue;
+                var images = await LoadRelationshipsAsync(archive,
+                    OfficePresentationPackageReader.GetRelationshipsPath(path), "word").ConfigureAwait(false);
+
+                parts.Append("<template data-doc-page-part=\"").Append(kind).Append('-').Append(variant).Append("\"><")
+                    .Append(kind).Append(" class=\"doc-page-part\">");
+                foreach (XElement block in EnumerateWordBlocks(part.Root))
+                {
+                    AppendBlockHtml(parts, archive, images, block);
+                }
+                parts.Append("</").Append(kind).Append("></template>");
+            }
+            return parts.ToString();
         }
 
         private static bool TryReadWordPageLayout(
@@ -305,6 +343,7 @@ namespace TxtAIEditor.Core.Services
             };
 
             var styles = new List<string>();
+            AppendStyle(styles, BuildRunStyle(GetDirectProperty(paragraphProperties, "rPr")));
             if (alignment != null) styles.Add("text-align:" + alignment);
             if (value == "distribute") styles.Add("text-align-last:justify");
 
@@ -312,6 +351,16 @@ namespace TxtAIEditor.Core.Services
             XElement? indentation = GetDirectProperty(paragraphProperties, "ind");
             AppendMeasurement(styles, spacing, "before", "margin-top");
             AppendMeasurement(styles, spacing, "after", "margin-bottom");
+            if (TryReadWordTwips(spacing, "line", out int line) && line > 0)
+            {
+                string height = GetAttributeValue(spacing, "lineRule") switch
+                {
+                    "exact" => WordTwipsToCssPoints(line),
+                    "atLeast" => "max(1em," + WordTwipsToCssPoints(line) + ")",
+                    _ => (line / 240.0).ToString("0.###", CultureInfo.InvariantCulture)
+                };
+                styles.Add("line-height:" + height);
+            }
             AppendMeasurement(styles, indentation, "left", "margin-left");
             AppendMeasurement(styles, indentation, "right", "margin-right");
             AppendMeasurement(styles, indentation, "firstLine", "text-indent");
@@ -501,6 +550,8 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyDictionary<string, string> relationships,
             XElement element)
         {
+            if (TryAppendPositionedShape(builder, archive, relationships, element)) return;
+            XElement? extent = element.Descendants().FirstOrDefault(child => child.Name.LocalName == "extent");
             var relationshipIds = element.Descendants()
                 .Where(e => e.Name.LocalName == "blip" || e.Name.LocalName == "imagedata")
                 .Select(e => GetAttributeValue(e, "embed"))
@@ -523,11 +574,55 @@ namespace TxtAIEditor.Core.Services
                     continue;
                 }
 
-                builder.Append("<figure class=\"doc-image\"><img src=\"")
-                    .Append(Html(dataUri))
-                    .Append("\" alt=\"\"></figure>");
+                builder.Append("<span class=\"doc-image\"><img src=\"").Append(Html(dataUri)).Append("\" alt=\"\"");
+                if (TryReadEmus(extent, "cx", out long width) && width > 0)
+                {
+                    string style = "width:" + EmusToPoints(width);
+                    if (TryReadEmus(extent, "cy", out long height) && height > 0)
+                        style += ";aspect-ratio:" + width.ToString(CultureInfo.InvariantCulture) + "/" +
+                            height.ToString(CultureInfo.InvariantCulture) + ";object-fit:fill";
+                    AppendStyleAttribute(builder, style);
+                }
+                builder.Append("></span>");
             }
         }
+
+        private static bool TryAppendPositionedShape(StringBuilder builder, ZipArchive archive,
+            IReadOnlyDictionary<string, string> relationships, XElement element)
+        {
+            XElement? anchor = GetDirectProperty(element, "anchor");
+            XElement? textbox = GetDirectProperty(anchor, "txbxContent");
+            XElement? line = GetDirectProperty(anchor, "ln");
+            if (textbox == null && line == null) return false;
+            XElement? extent = GetDirectProperty(anchor, "extent");
+            XElement? horizontal = GetDirectProperty(anchor, "positionH");
+            XElement? vertical = GetDirectProperty(anchor, "positionV");
+            if (!TryReadEmus(extent, "cx", out long width) || !TryReadEmus(extent, "cy", out long height) ||
+                !long.TryParse(GetDirectProperty(horizontal, "posOffset")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long left) ||
+                !long.TryParse(GetDirectProperty(vertical, "posOffset")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long top)) return false;
+
+            string verticalReference = GetAttributeValue(vertical, "relativeFrom");
+            string style = "left:" + EmusToPoints(left) + ";top:" + EmusToPoints(top) +
+                ";width:" + EmusToPoints(width) + ";height:" + EmusToPoints(height);
+            if (TryReadEmus(line, "w", out long stroke) && stroke > 0)
+                style += ";border:" + EmusToPoints(stroke) + " solid currentColor";
+            builder.Append("<template class=\"doc-positioned-drawing\" data-horizontal=\"")
+                .Append(GetAttributeValue(horizontal, "relativeFrom") == "page" ? "page" : "margin").Append("\" data-vertical=\"")
+                .Append(verticalReference is "paragraph" or "page" ? verticalReference : "margin").Append("\"><div class=\"doc-positioned-shape\"");
+            AppendStyleAttribute(builder, style);
+            builder.Append('>');
+            if (textbox != null)
+            {
+                foreach (XElement block in EnumerateWordBlocks(textbox)) AppendBlockHtml(builder, archive, relationships, block);
+            }
+            builder.Append("</div></template>");
+            return true;
+        }
+
+        private static bool TryReadEmus(XElement? element, string name, out long value) =>
+            long.TryParse(GetAttributeValue(element, name), NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+
+        private static string EmusToPoints(long value) => (value / 12700.0).ToString("0.###", CultureInfo.InvariantCulture) + "pt";
 
         private static string BuildTableHtml(
             ZipArchive archive,
@@ -569,6 +664,7 @@ namespace TxtAIEditor.Core.Services
                 builder.Append("<tr");
                 AppendStyleAttribute(builder, BuildRowStyle(rowProperties));
                 builder.Append('>');
+                AppendOmittedTableColumns(builder, ReadOmittedTableColumns(rowProperties, "gridBefore"));
                 foreach (WordTableCellLayout cell in layout.CellsByRow[rowIndex])
                 {
                     builder.Append("<td");
@@ -613,6 +709,7 @@ namespace TxtAIEditor.Core.Services
                     builder.Append("</td>");
                 }
 
+                AppendOmittedTableColumns(builder, ReadOmittedTableColumns(rowProperties, "gridAfter"));
                 builder.Append("</tr>");
             }
 
@@ -635,7 +732,8 @@ namespace TxtAIEditor.Core.Services
                 var renderedCells = new List<WordTableCellLayout>();
                 var nextVerticalMerges = new Dictionary<int, WordTableCellLayout>();
                 WordTableCellLayout? previousCell = null;
-                int columnIndex = 0;
+                XElement? rowProperties = GetDirectProperty(row, "trPr");
+                int columnIndex = ReadOmittedTableColumns(rowProperties, "gridBefore");
 
                 foreach (XElement cell in row.Elements().Where(e => e.Name.LocalName == "tc"))
                 {
@@ -679,12 +777,25 @@ namespace TxtAIEditor.Core.Services
                     columnIndex += columnSpan;
                 }
 
-                columnCount = Math.Max(columnCount, columnIndex);
+                columnCount = Math.Max(columnCount, columnIndex + ReadOmittedTableColumns(rowProperties, "gridAfter"));
                 cellsByRow.Add(renderedCells);
                 activeVerticalMerges = nextVerticalMerges;
             }
 
             return new WordTableLayout(rows, cellsByRow, Math.Max(1, columnCount));
+        }
+
+        private static int ReadOmittedTableColumns(XElement? rowProperties, string name) =>
+            int.TryParse(GetAttributeValue(GetDirectProperty(rowProperties, name), "val"),
+                NumberStyles.None, CultureInfo.InvariantCulture, out int count) ? Math.Min(512, count) : 0;
+
+        private static void AppendOmittedTableColumns(StringBuilder builder, int count)
+        {
+            if (count > 0)
+            {
+                builder.Append("<td aria-hidden=\"true\" style=\"border:0;padding:0;min-width:0\" colspan=\"")
+                    .Append(count.ToString(CultureInfo.InvariantCulture)).Append("\"></td>");
+            }
         }
 
         private static void AddActiveVerticalMerge(
@@ -717,8 +828,14 @@ namespace TxtAIEditor.Core.Services
             AppendStyle(styles, ReadShadingStyle(tableProperties));
             if (gridWidth > 0)
             {
-                styles.Add("width:" + WordTwipsToCssPoints(gridWidth));
-                AppendMeasurement(styles, GetDirectProperty(tableProperties, "tblInd"), "w", "margin-left");
+                string width = WordTwipsToCssPoints(gridWidth);
+                if (TryReadWordTwips(GetDirectProperty(tableProperties, "tblInd"), "w", out int indent) && indent != 0)
+                {
+                    string margin = WordTwipsToCssPoints(indent);
+                    styles.Add("margin-left:" + margin);
+                    if (indent > 0) width = "min(" + width + ",max(0px,100% - " + margin + "))";
+                }
+                styles.Add("width:" + width);
             }
 
             XElement? borders = GetDirectProperty(tableProperties, "tblBorders");

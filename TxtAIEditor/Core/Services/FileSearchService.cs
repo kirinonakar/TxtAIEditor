@@ -186,7 +186,8 @@ namespace TxtAIEditor.Core.Services
         {
             int foundCount = 0;
             string extracted = await _documentTextExtractionService
-                .ExtractTextAsync(file, DocumentSearchMaxChars, normalize: false, cancellationToken: cancellationToken, skipProtectedDocuments: true)
+                .ExtractTextAsync(file, DocumentSearchMaxChars, normalize: false, cancellationToken: cancellationToken,
+                    skipProtectedDocuments: true, preferRdocs2mdForOpenXml: true)
                 .ConfigureAwait(false);
 
             if (string.IsNullOrWhiteSpace(extracted))

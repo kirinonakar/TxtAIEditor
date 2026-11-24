@@ -24,7 +24,9 @@ namespace TxtAIEditor.Core.Services
             string? pageWidth = null,
             string? pagePadding = null,
             string? pageHeight = null,
-            bool hasSavedPagination = false)
+            bool hasSavedPagination = false,
+            bool paginateWord = false,
+            string wordPageParts = "")
         {
             string documentPageWidth = string.IsNullOrWhiteSpace(pageWidth) ? "920px" : pageWidth;
             string responsivePageWidth = string.IsNullOrWhiteSpace(pageWidth)
@@ -133,6 +135,16 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
 }
 .word-fixed-table td { min-width: 0; }
 .word-fixed-table .doc-paragraph { margin: 0; line-height: normal; }
+[data-word-pagination] .doc-table-wrap { overflow: visible; }
+[data-word-pagination] td > .doc-table-wrap { margin-block: 0; }
+[data-word-pagination] .doc-table { table-layout: fixed; }
+[data-word-pagination] .doc-table td { min-width: 0; }
+[data-word-pagination] .doc-paragraph { margin: 0; line-height: normal; }
+.doc-page-part { display: flow-root; }
+.doc-page-part .doc-image, .doc-positioned-shape .doc-image { margin: 0; }
+.doc-paragraph > .doc-image img { display: inline-block; vertical-align: middle; }
+.doc-drawing-layer { position: relative; height: 0; pointer-events: none; z-index: 1; }
+.doc-positioned-shape { position: absolute; }
 .doc-table.hwpx-table {
     width: auto;
     max-width: 100%;
@@ -254,14 +266,17 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
         margin: 0;
         border: 0;
     }
+    [data-word-pagination] .doc-table tr { break-inside: avoid; }
 }
 </style>
 </head>
 <body>
-<main class="page"{{(hasSavedPagination ? " data-saved-pagination" : string.Empty)}}>
+<main class="page"{{(hasSavedPagination ? " data-saved-pagination" : string.Empty)}}{{(paginateWord ? " data-word-pagination" : string.Empty)}}>
 {{content}}
 </main>
+{{wordPageParts}}
 <script>
+{{(paginateWord ? OfficeWordPagination.Script : string.Empty)}}
 (() => {
     const page = document.querySelector('.page');
     if (!page) {

@@ -24,19 +24,20 @@ namespace TxtAIEditor.Core.Services
         private readonly ZipArchive _archive;
         private readonly OfficeCompoundFile _compound;
         private readonly CancellationToken _cancellationToken;
-        private readonly XElement _body = new(W + "body");
+        private XElement _body = new(W + "body");
         private readonly XElement _relationships = new(Relationships + "Relationships");
         private readonly List<bool> _fieldResults = new();
         private readonly Dictionary<int, Picture?> _pictures = new();
         private readonly Dictionary<int, Picture> _anchoredPictures = new();
+        private readonly Dictionary<int, XElement> _anchoredShapes = new();
         private readonly List<string> _fonts = new();
         private int _pictureCount;
         private int _hiddenFieldCount;
+        private Dictionary<ushort, int>? _normalParagraph;
+        private Dictionary<ushort, int>? _normalCharacters;
         private byte[]? _data;
         private XElement _paragraph = new(W + "p");
-        private XElement? _table;
-        private XElement? _row;
-        private XElement? _cell;
+        private readonly List<TableFrame> _tables = new();
 
         private OfficeBinaryWord(ZipArchive archive, OfficeCompoundFile compound, CancellationToken cancellationToken)
         {
@@ -69,10 +70,7 @@ namespace TxtAIEditor.Core.Services
 
             offsets += 2;
             ReadFonts(TablePart(word, table, offsets, 15));
-            if (U16(word, offsets - 2) > 50)
-            {
-                ReadAnchoredPictures(word, table, offsets);
-            }
+            ReadNormalStyle(TablePart(word, table, offsets, 1));
             List<PropertyRange> paragraphs = ReadFkp(word, TablePart(word, table, offsets, 13), paragraph: true);
             List<PropertyRange> characters = ReadFkp(word, TablePart(word, table, offsets, 12), paragraph: false);
             ReadOnlySpan<byte> clx = TablePart(word, table, offsets, 33);
@@ -82,6 +80,8 @@ namespace TxtAIEditor.Core.Services
                 cursor += 3 + U16(clx, cursor + 1);
             }
 
+            XElement body = _body;
+            XElement section = ReadSection(word, TablePart(word, table, offsets, 6));
             if (mainLength > 0)
             {
                 if (cursor >= clx.Length || clx[cursor] != 2)
@@ -89,18 +89,129 @@ namespace TxtAIEditor.Core.Services
                     throw new InvalidDataException("Missing Word text piece table.");
                 }
 
-                ReadPieces(word, Slice(clx, cursor + 5, I32(clx, cursor + 1)), mainLength, paragraphs, characters);
+                ReadOnlySpan<byte> pieces = Slice(clx, cursor + 5, I32(clx, cursor + 1));
+                if (U16(word, offsets - 2) > 56)
+                {
+                    var textboxes = ReadTextboxes(word, pieces, longWords, TablePart(word, table, offsets, 56),
+                        paragraphs, characters);
+                    ReadAnchoredDrawings(word, table, offsets, textboxes);
+                }
+                ReadHeaderFooter(word, pieces, longWords, TablePart(word, table, offsets, 11),
+                    section, paragraphs, characters, HasDifferentEvenAndOddPages(TablePart(word, table, offsets, 31)));
+                ReadStory(body, word, pieces, 0, mainLength, paragraphs, characters);
             }
 
-            if (_paragraph.HasElements) FinishParagraph('\r', default);
-            FinishTable();
-            if (!_body.HasElements) _body.Add(new XElement(W + "p"));
-            _body.Add(ReadSection(word, TablePart(word, table, offsets, 6)));
-            WriteXml(_archive, "word/document.xml", new XElement(W + "document", _body));
+            if (!body.HasElements) body.Add(new XElement(W + "p"));
+            body.Add(section);
+            WriteXml(_archive, "word/document.xml", new XElement(W + "document", body));
             if (_relationships.HasElements) WriteXml(_archive, "word/_rels/document.xml.rels", _relationships);
         }
 
-        private void ReadPieces(byte[] word, ReadOnlySpan<byte> pieces, int length,
+        private static bool HasDifferentEvenAndOddPages(ReadOnlySpan<byte> dop) => dop.Length >= 2 && (U16(dop, 0) & 1) != 0;
+
+        private Dictionary<uint, XElement> ReadTextboxes(byte[] word, ReadOnlySpan<byte> pieces, int fib,
+            ReadOnlySpan<byte> stories, List<PropertyRange> paragraphs, List<PropertyRange> characters)
+        {
+            var textboxes = new Dictionary<uint, XElement>();
+            if (stories.Length < 30 || (stories.Length - 4) % 26 != 0) return textboxes;
+            int origin = 0;
+            for (int offset = 14; offset < 38; offset += 4) origin = checked(origin + I32(word, fib + offset));
+            int length = I32(word, fib + 38);
+            if (origin < 0 || length <= 0) return textboxes;
+
+            int count = (stories.Length - 4) / 26;
+            for (int index = 0; index < count - 1; index++)
+            {
+                _cancellationToken.ThrowIfCancellationRequested();
+                int descriptor = (count + 1) * 4 + index * 22;
+                if (U16(stories, descriptor + 8) != 0) continue; // Reusable FTXBXS.
+                uint shapeId = U32(stories, descriptor + 14);
+                int start = I32(stories, index * 4);
+                int end = I32(stories, (index + 1) * 4);
+                if (start < 0 || end > length || end <= start) continue;
+                var textbox = new XElement(W + "txbxContent");
+                ReadStory(textbox, word, pieces, checked(origin + start), checked(origin + end - 1), paragraphs, characters);
+                if (textbox.HasElements) textboxes.TryAdd(shapeId, textbox);
+            }
+            return textboxes;
+        }
+
+        private void ReadHeaderFooter(byte[] word, ReadOnlySpan<byte> pieces, int fib, ReadOnlySpan<byte> stories,
+            XElement section, List<PropertyRange> paragraphs, List<PropertyRange> characters, bool evenAndOdd)
+        {
+            int origin = checked(I32(word, fib + 14) + I32(word, fib + 18));
+            int length = I32(word, fib + 22);
+            if (length <= 0 || origin < 0 || stories.Length < 56) return;
+            bool firstPage = section.Element(W + "titlePg") != null;
+            for (int index = 0; index < 6; index++)
+            {
+                if ((index is 0 or 2 && !evenAndOdd) || (index >= 4 && !firstPage)) continue;
+                // The first six CPs belong to footnote/endnote separators.
+                int start = I32(stories, (6 + index) * 4);
+                int end = I32(stories, (7 + index) * 4);
+                if (start < 0 || end > length || end <= start + 1) continue;
+
+                bool header = index is 0 or 1 or 4;
+                string name = header ? "header" : "footer";
+                string variant = index switch { 0 or 2 => "even", 4 or 5 => "first", _ => "default" };
+                var content = new XElement(W + (header ? "hdr" : "ftr"));
+                ReadStory(content, word, pieces, checked(origin + start), checked(origin + end - 1), paragraphs, characters);
+                if (!content.HasElements) continue;
+                string file = name + (index + 1) + ".xml";
+                string id = "rPagePart" + (index + 1);
+                WriteXml(_archive, "word/" + file, content);
+                var embedded = content.Descendants(A + "blip").Select(image => (string?)image.Attribute(RelationshipId + "embed"))
+                    .OfType<string>().ToHashSet(StringComparer.Ordinal);
+                if (embedded.Count > 0)
+                {
+                    WriteXml(_archive, "word/_rels/" + file + ".rels", new XElement(Relationships + "Relationships",
+                        _relationships.Elements().Where(link => (string?)link.Attribute("Id") is string key && embedded.Contains(key))));
+                }
+                _relationships.Add(Relationship(id, file, name));
+                section.Add(new XElement(W + name + "Reference", new XAttribute(W + "type", variant),
+                    new XAttribute(RelationshipId + "id", id)));
+            }
+        }
+
+        private void ReadNormalStyle(ReadOnlySpan<byte> stylesheet)
+        {
+            if (stylesheet.Length < 20) return;
+            int infoSize = U16(stylesheet, 0);
+            int baseSize = U16(stylesheet, 4);
+            int offset = 2 + infoSize;
+            if (baseSize is not (10 or 18) || offset > stylesheet.Length - 2) return;
+            int length = U16(stylesheet, offset);
+            offset += 2;
+            if (length < baseSize + 4 || length > stylesheet.Length - offset) return;
+            ReadOnlySpan<byte> style = stylesheet.Slice(offset, length);
+            if ((U16(style, 2) & 15) != 1) return;
+            offset = baseSize + 4 + 2 * U16(style, baseSize);
+            if (offset > style.Length - 2) return;
+            int papLength = U16(style, offset);
+            offset += 2;
+            if (papLength < 2 || papLength > style.Length - offset) return;
+            _normalParagraph = ReadProperties(style.Slice(offset + 2, papLength - 2), false, out _);
+            offset += (papLength + 1) & ~1;
+            if (offset > style.Length - 2) return;
+            int chpLength = U16(style, offset);
+            offset += 2;
+            if (chpLength > style.Length - offset) return;
+            _normalCharacters = ReadProperties(style.Slice(offset, chpLength), false, out _);
+        }
+
+        private void ReadStory(XElement content, byte[] word, ReadOnlySpan<byte> pieces, int startCp, int endCp,
+            List<PropertyRange> paragraphs, List<PropertyRange> characters)
+        {
+            _body = content;
+            _paragraph = new XElement(W + "p");
+            _fieldResults.Clear();
+            _hiddenFieldCount = 0;
+            ReadPieces(word, pieces, startCp, endCp, paragraphs, characters);
+            if (_paragraph.HasElements) FinishParagraph('\r', default);
+            CloseTablesAbove(0);
+        }
+
+        private void ReadPieces(byte[] word, ReadOnlySpan<byte> pieces, int startCp, int endCp,
             List<PropertyRange> paragraphs, List<PropertyRange> characters)
         {
             if (pieces.Length < 4 || (pieces.Length - 4) % 12 != 0 || I32(pieces, 0) != 0)
@@ -109,20 +220,23 @@ namespace TxtAIEditor.Core.Services
             }
 
             int count = (pieces.Length - 4) / 12;
-            if (I32(pieces, count * 4) < length) throw new InvalidDataException("Incomplete Word text piece table.");
+            if (startCp < 0 || startCp > endCp || I32(pieces, count * 4) < endCp)
+                throw new InvalidDataException("Incomplete Word text piece table.");
             var text = new StringBuilder();
             Dictionary<ushort, int>? style = null;
             for (int i = 0; i < count; i++)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
-                int start = I32(pieces, i * 4);
-                int end = Math.Min(length, I32(pieces, (i + 1) * 4));
-                if (start >= length) break;
-                if (start < 0 || end < start) throw new InvalidDataException("Unordered Word text pieces.");
+                int pieceStart = I32(pieces, i * 4);
+                int end = Math.Min(endCp, I32(pieces, (i + 1) * 4));
+                if (pieceStart >= endCp) break;
+                if (pieceStart < 0 || end < pieceStart) throw new InvalidDataException("Unordered Word text pieces.");
+                int start = Math.Max(startCp, pieceStart);
+                if (start >= end) continue;
                 uint fc = U32(pieces, (count + 1) * 4 + i * 8 + 2);
                 bool compressed = (fc & 0x40000000) != 0;
                 int stride = compressed ? 1 : 2;
-                int offset = (int)(fc & 0x3FFFFFFF) / (compressed ? 2 : 1);
+                int offset = checked((int)(fc & 0x3FFFFFFF) / (compressed ? 2 : 1) + (start - pieceStart) * stride);
                 ReadOnlySpan<byte> data = Slice(word, offset, checked((end - start) * stride));
                 string value = (compressed ? CompressedText : Encoding.Unicode).GetString(data);
                 PropertyRange range = default;
@@ -179,7 +293,8 @@ namespace TxtAIEditor.Core.Services
                             break;
                         case '\u0001':
                             FlushText(text, style);
-                            if (style != null && style.TryGetValue(0x6A03, out int imageOffset) &&
+                            if (style != null && Get(style, 0x0806) is not (1 or 129) &&
+                                style.TryGetValue(0x6A03, out int imageOffset) &&
                                 ReadPicture(imageOffset) is Picture picture)
                             {
                                 AppendPicture(picture);
@@ -190,6 +305,11 @@ namespace TxtAIEditor.Core.Services
                             {
                                 FlushText(text, style);
                                 AppendPicture(anchored);
+                            }
+                            else if (_anchoredShapes.TryGetValue(start + index, out XElement? drawing))
+                            {
+                                FlushText(text, style);
+                                _paragraph.Add(new XElement(W + "r", new XElement(drawing)));
                             }
                             break;
                         case '\u001E': text.Append('\u2011'); break;
@@ -212,15 +332,15 @@ namespace TxtAIEditor.Core.Services
             if (Get(style, 0x0836, 0x085D) is 1 or 129) properties.Add(new XElement(W + "i"));
             if (Get(style, 0x2A3E) > 0) properties.Add(new XElement(W + "u"));
             int size = Get(style, 0x4A43, 0x4A61);
-            if (size > 0) properties.Add(Val("sz", size));
-            if (style?.ContainsKey(0x4A4F) == true || style?.ContainsKey(0x4A50) == true)
+            properties.Add(Val("sz", size > 0 ? size : DefaultFontSize()));
+            int font = EffectiveProperty(style, _normalCharacters, 0x4A4F, 0x4A50);
+            int eastAsian = EffectiveProperty(style, _normalCharacters, 0x4A50, 0x4A4F);
+            var fonts = new XElement(W + "rFonts");
+            if ((uint)font < _fonts.Count && _fonts[font].Length > 0) fonts.SetAttributeValue(W + "ascii", _fonts[font]);
+            if ((uint)eastAsian < _fonts.Count && _fonts[eastAsian].Length > 0) fonts.SetAttributeValue(W + "eastAsia", _fonts[eastAsian]);
+            if (fonts.HasAttributes)
             {
-                int font = Get(style, 0x4A4F, 0x4A50);
-                int eastAsian = Get(style, 0x4A50, 0x4A4F);
-                var fonts = new XElement(W + "rFonts");
-                if ((uint)font < _fonts.Count && _fonts[font].Length > 0) fonts.SetAttributeValue(W + "ascii", _fonts[font]);
-                if ((uint)eastAsian < _fonts.Count && _fonts[eastAsian].Length > 0) fonts.SetAttributeValue(W + "eastAsia", _fonts[eastAsian]);
-                if (fonts.HasAttributes) properties.Add(fonts);
+                properties.Add(fonts);
             }
             int color = Get(style, 0x6870);
             int indexedColor = Get(style, 0x2A42);
@@ -235,68 +355,82 @@ namespace TxtAIEditor.Core.Services
         {
             Dictionary<ushort, int>? style = range.Properties;
             XElement properties = new(W + "pPr");
-            string? alignment = Get(style, 0x2461, 0x2403) switch
+            string? alignment = EffectiveProperty(style, _normalParagraph, 0x2461, 0x2403, 0) switch
             {
                 1 => "center", 2 => "right", 3 => "both", 4 => "distribute", _ => null
             };
             if (alignment != null) properties.Add(Val("jc", alignment));
             if (Get(style, 0x2407) == 1) properties.Add(new XElement(W + "pageBreakBefore"));
-            AddMeasurements(properties, "spacing", ("before", Get(style, 0xA413)), ("after", Get(style, 0xA414)));
+            var spacing = new XElement(W + "spacing");
+            spacing.SetAttributeValue(W + "before", EffectiveProperty(style, _normalParagraph, 0xA413, missing: 0));
+            spacing.SetAttributeValue(W + "after", EffectiveProperty(style, _normalParagraph, 0xA414, missing: 0));
+            int line = EffectiveProperty(style, _normalParagraph, 0x6412, missing: 0);
+            short lineSize = unchecked((short)line);
+            if (lineSize != 0)
+            {
+                spacing.SetAttributeValue(W + "line", Math.Abs((int)lineSize));
+                spacing.SetAttributeValue(W + "lineRule", lineSize < 0 ? "exact" : line >> 16 == 1 ? "auto" : "atLeast");
+            }
+            properties.Add(spacing, new XElement(W + "rPr", Val("sz", DefaultFontSize())));
             AddMeasurements(properties, "ind", ("left", (short)Get(style, 0x845E, 0x840F)),
                 ("right", (short)Get(style, 0x845D, 0x840E)), ("firstLine", (short)Get(style, 0x8460, 0x8411)));
             if (properties.HasElements) _paragraph.AddFirst(properties);
 
-            bool inTable = mark == '\a' || Get(style, 0x2416) == 1 || Get(style, 0x6649) > 0;
-            if (inTable)
+            int depth = Get(style, 0x6649);
+            if (depth <= 0) depth = mark == '\a' || Get(style, 0x2416) == 1 ? 1 : 0;
+            if (depth > 64) throw new InvalidDataException("Word tables are nested too deeply.");
+            CloseTablesAbove(depth);
+            if (depth > 0)
             {
-                _table ??= new XElement(W + "tbl");
-                if ((mark == '\a' && Get(style, 0x2417) == 1) || Get(style, 0x244C) == 1)
+                while (_tables.Count < depth) _tables.Add(new TableFrame());
+                TableFrame frame = _tables[^1];
+                bool endRow = depth == 1 ? mark == '\a' && Get(style, 0x2417) == 1 : Get(style, 0x244C) == 1;
+                if (endRow)
                 {
-                    FinishRow(range.RowProperties);
+                    frame.FinishRow(range.RowProperties);
                 }
                 else
                 {
-                    _row ??= new XElement(W + "tr");
-                    _cell ??= new XElement(W + "tc");
-                    _cell.Add(_paragraph);
-                    if (mark == '\a' || Get(style, 0x244B) == 1) FinishCell();
+                    frame.GetCell().Add(_paragraph);
+                    if (depth == 1 ? mark == '\a' : Get(style, 0x244B) == 1) frame.FinishCell();
                 }
             }
             else
             {
-                FinishTable();
                 _body.Add(_paragraph);
             }
 
             _paragraph = new XElement(W + "p");
         }
 
-        private void FinishCell()
+        private void CloseTablesAbove(int depth)
         {
-            if (_cell == null) return;
-            _row!.Add(_cell);
-            _cell = null;
-        }
-
-        private void FinishRow(OfficeBinaryWordTable.RowProperties? properties = null)
-        {
-            FinishCell();
-            if (_row == null) return;
-            if (properties != null) _row.AddAnnotation(properties);
-            _table!.Add(_row);
-            _row = null;
-        }
-
-        private void FinishTable()
-        {
-            if (_table == null) return;
-            FinishRow();
-            if (_table.Element(W + "tr") != null)
+            while (_tables.Count > depth)
             {
-                OfficeBinaryWordTable.ApplyLayout(_table);
-                _body.Add(_table);
+                TableFrame frame = _tables[^1];
+                _tables.RemoveAt(_tables.Count - 1);
+                frame.FinishRow(null);
+                if (!frame.Table.HasElements) continue;
+                OfficeBinaryWordTable.ApplyLayout(frame.Table);
+                XElement parent = _tables.Count == 0 ? _body : _tables[^1].GetCell();
+                parent.Add(frame.Table);
             }
-            _table = null;
+        }
+
+        private int DefaultFontSize()
+        {
+            int size = Get(_normalCharacters, 0x4A43);
+            return size > 0 ? size : 20;
+        }
+
+        private static int EffectiveProperty(Dictionary<ushort, int>? direct, Dictionary<ushort, int>? inherited,
+            ushort property, ushort equivalent = 0, int missing = -1)
+        {
+            if (direct != null && (direct.TryGetValue(property, out int value) ||
+                equivalent != 0 && direct.TryGetValue(equivalent, out value))) return value;
+            if (inherited != null && (inherited.TryGetValue(property, out int inheritedValue) ||
+                equivalent != 0 && inherited.TryGetValue(equivalent, out inheritedValue))) return inheritedValue;
+            return missing;
         }
 
         private Picture? ReadPicture(int offset)
@@ -323,7 +457,7 @@ namespace TxtAIEditor.Core.Services
                 ImageSize(_data, offset + 30, offset + 34));
         }
 
-        private void ReadAnchoredPictures(byte[] word, byte[] table, int offsets)
+        private void ReadAnchoredDrawings(byte[] word, byte[] table, int offsets, Dictionary<uint, XElement> textboxes)
         {
             ReadOnlySpan<byte> anchors = TablePart(word, table, offsets, 40);
             int length = I32(word, offsets + 50 * 8 + 4);
@@ -335,6 +469,7 @@ namespace TxtAIEditor.Core.Services
             OfficeArtBinary.Record store = group.Children(table).FirstOrDefault(record => record.Type == 0xF001);
             OfficeArtBinary.Record[] images = store.Children(table).ToArray();
             var shapeImages = new Dictionary<uint, int>();
+            var frames = new Dictionary<uint, uint>();
             for (int position = group.End; position < end;)
             {
                 int label = table[position++];
@@ -347,8 +482,15 @@ namespace TxtAIEditor.Core.Services
                     OfficeArtBinary.Record[] parts = shape.Children(table).ToArray();
                     OfficeArtBinary.Record id = parts.FirstOrDefault(record => record.Type == 0xF00A);
                     if (id.Length < 8) continue;
-                    int image = (int)OfficeArtBinary.ReadShapeOptions(table, parts).GetValueOrDefault(260);
-                    if (image > 0 && image <= images.Length) shapeImages.TryAdd(U32(id.Body(table), 0), image - 1);
+                    uint shapeId = U32(id.Body(table), 0);
+                    var options = OfficeArtBinary.ReadShapeOptions(table, parts);
+                    int image = (int)options.GetValueOrDefault(260);
+                    if (image > 0 && image <= images.Length) shapeImages.TryAdd(shapeId, image - 1);
+                    if (id.Instance == 1 && (options.GetValueOrDefault(447) & 0x100010) == 0x100000 &&
+                        options.GetValueOrDefault(459) is > 0 and <= 1_270_000)
+                    {
+                        frames.TryAdd(shapeId, options[459]);
+                    }
                 }
             }
 
@@ -358,9 +500,24 @@ namespace TxtAIEditor.Core.Services
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 ReadOnlySpan<byte> anchor = Slice(anchors, 4 * (count + 1) + index * 26, 26);
-                if (!shapeImages.TryGetValue(U32(anchor, 0), out int imageIndex)) continue;
+                uint shapeId = U32(anchor, 0);
+                int cp = I32(anchors, index * 4);
                 long width = Math.Max(1, I32(anchor, 12) - (long)I32(anchor, 4)) * 635;
                 long height = Math.Max(1, I32(anchor, 16) - (long)I32(anchor, 8)) * 635;
+                if (textboxes.TryGetValue(shapeId, out XElement? textbox) || frames.ContainsKey(shapeId))
+                {
+                    ushort flags = U16(anchor, 20);
+                    string horizontalReference = ((flags >> 1) & 3) == 1 ? "page" : "margin";
+                    string verticalReference = ((flags >> 3) & 3) switch { 1 => "page", 2 => "paragraph", _ => "margin" };
+                    uint border = frames.GetValueOrDefault(shapeId);
+                    _anchoredShapes[cp] = new XElement(W + "drawing", new XElement(Wp + "anchor",
+                        PositionedOffset("positionH", horizontalReference, I32(anchor, 4)),
+                        PositionedOffset("positionV", verticalReference, I32(anchor, 8)),
+                        new XElement(Wp + "extent", new XAttribute("cx", width), new XAttribute("cy", height)),
+                        border > 0 ? new XElement(A + "ln", new XAttribute("w", border)) : null, textbox));
+                    continue;
+                }
+                if (!shapeImages.TryGetValue(shapeId, out int imageIndex)) continue;
                 if (!paths.TryGetValue(imageIndex, out Picture? picture))
                 {
                     OfficeArtBinary.Record record = images[imageIndex];
@@ -369,9 +526,12 @@ namespace TxtAIEditor.Core.Services
                     if (image == null) continue;
                     paths.Add(imageIndex, picture = WritePicture(image, width, height));
                 }
-                _anchoredPictures[I32(anchors, index * 4)] = picture with { Width = width, Height = height };
+                _anchoredPictures[cp] = picture with { Width = width, Height = height };
             }
         }
+
+        private static XElement PositionedOffset(string name, string reference, int twips) =>
+            new(Wp + name, new XAttribute("relativeFrom", reference), new XElement(Wp + "posOffset", twips * 635L));
 
         private Picture WritePicture(OfficeArtBinary.Image image, long width, long height)
         {
@@ -418,6 +578,7 @@ namespace TxtAIEditor.Core.Services
             }
 
             return new XElement(W + "sectPr",
+                Get(properties, 0x300A) == 1 ? new XElement(W + "titlePg") : null,
                 new XElement(W + "pgSz", new XAttribute(W + "w", SectionValue(properties, 0xB01F, 12240)),
                     new XAttribute(W + "h", SectionValue(properties, 0xB020, 15840))),
                 new XElement(W + "pgMar", new XAttribute(W + "left", SectionValue(properties, 0xB021, 1440)),
@@ -589,5 +750,35 @@ namespace TxtAIEditor.Core.Services
         private readonly record struct PropertyRange(int Start, int End, Dictionary<ushort, int>? Properties,
             OfficeBinaryWordTable.RowProperties? RowProperties);
         private sealed record Picture(string Id, long Width, long Height);
+
+        private sealed class TableFrame
+        {
+            private XElement? _row;
+            private XElement? _cell;
+
+            internal XElement Table { get; } = new(W + "tbl");
+
+            internal XElement GetCell()
+            {
+                _row ??= new XElement(W + "tr");
+                return _cell ??= new XElement(W + "tc");
+            }
+
+            internal void FinishCell()
+            {
+                if (_cell == null) return;
+                _row!.Add(_cell);
+                _cell = null;
+            }
+
+            internal void FinishRow(OfficeBinaryWordTable.RowProperties? properties)
+            {
+                FinishCell();
+                if (_row == null) return;
+                if (properties != null) _row.AddAnnotation(properties);
+                Table.Add(_row);
+                _row = null;
+            }
+        }
     }
 }

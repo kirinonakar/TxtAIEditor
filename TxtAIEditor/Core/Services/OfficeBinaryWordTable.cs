@@ -40,12 +40,10 @@ namespace TxtAIEditor.Core.Services
         private static int[] BuildGrid(Row[] rows)
         {
             if (rows.Length == 0 || rows[0].Edges.Length < 2) return [];
-            int left = rows[0].Edges[0];
-            int right = rows[0].Edges[^1];
             var boundaries = new SortedSet<int>();
             foreach (Row row in rows)
             {
-                if (row.Edges.Length < 2 || row.Edges[0] != left || row.Edges[^1] != right) return [];
+                if (row.Edges.Length < 2) return [];
                 for (int i = 0; i < row.Edges.Length; i++)
                 {
                     if (i > 0 && row.Edges[i] <= row.Edges[i - 1]) return [];
@@ -195,11 +193,20 @@ namespace TxtAIEditor.Core.Services
 
             internal void Apply(int[] grid, bool firstRow, bool lastRow)
             {
+                var rowProperties = new XElement(W + "trPr");
                 if (_height != 0)
                 {
-                    _row.AddFirst(new XElement(W + "trPr", new XElement(W + "trHeight",
-                        new XAttribute(W + "val", Math.Abs(_height)), new XAttribute(W + "hRule", _height < 0 ? "exact" : "atLeast"))));
+                    rowProperties.Add(new XElement(W + "trHeight",
+                        new XAttribute(W + "val", Math.Abs(_height)), new XAttribute(W + "hRule", _height < 0 ? "exact" : "atLeast")));
                 }
+                if (grid.Length > 1)
+                {
+                    int before = Array.BinarySearch(grid, Edges[0]);
+                    int after = grid.Length - 1 - Array.BinarySearch(grid, Edges[^1]);
+                    if (before > 0) rowProperties.Add(Value("gridBefore", before));
+                    if (after > 0) rowProperties.Add(Value("gridAfter", after));
+                }
+                if (rowProperties.HasElements) _row.AddFirst(rowProperties);
 
                 for (int i = 0; i < _cells.Length; i++)
                 {

@@ -10,6 +10,7 @@ export async function prepareOfficePdf() {
     if (!page && !slide && !workbook) {
         throw new Error(document.querySelector('.message')?.textContent || 'Could not render the Office document.');
     }
+    await window.prepareWordPagination?.();
     page?.classList.add('office-pdf-export');
     const layout = { width: 210 / 25.4, height: 297 / 25.4, top: .5, right: .5, bottom: .5, left: .5 };
     if (page) {
@@ -94,6 +95,7 @@ export async function prepareOfficePdf() {
     if (page) {
         const namedPages = readHwpxPrintLayouts(page);
         const hasSavedPagination = page.hasAttribute('data-saved-pagination') ||
+            page.hasAttribute('data-word-pagination') ||
             !!page.querySelector('.hwpx-split-table .doc-page-break');
         if (hasSavedPagination || namedPages.size) {
             fitSavedDocumentPages(page, layout, namedPages, hasSavedPagination);

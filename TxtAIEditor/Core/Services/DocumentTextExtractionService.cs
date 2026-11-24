@@ -45,7 +45,8 @@ namespace TxtAIEditor.Core.Services
             IProgress<int>? progress = null,
             bool normalize = true,
             CancellationToken cancellationToken = default,
-            bool skipProtectedDocuments = false)
+            bool skipProtectedDocuments = false,
+            bool preferRdocs2mdForOpenXml = false)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath) || maxChars <= 0)
             {
@@ -60,7 +61,11 @@ namespace TxtAIEditor.Core.Services
             // as an encrypted container. PDF text is also unreliable to rebuild by hand. Try rdocs2md
             // first so both formats stay searchable, and let PDF fall back to pdftotext and the
             // built-in parser when the tool is missing or fails.
-            string? markdown = await TryConvertWithRdocs2mdAsync(filePath, extension, cancellationToken).ConfigureAwait(false);
+            bool preferRdocs2md = Rdocs2mdPreferredExtensions.Contains(extension) ||
+                (preferRdocs2mdForOpenXml && extension is (".docx" or ".pptx" or ".xlsx"));
+            string? markdown = preferRdocs2md
+                ? await TryConvertWithRdocs2mdAsync(filePath, cancellationToken).ConfigureAwait(false)
+                : null;
             if (markdown is not null)
             {
                 progress?.Report(98);
@@ -103,9 +108,9 @@ namespace TxtAIEditor.Core.Services
                 extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static async Task<string?> TryConvertWithRdocs2mdAsync(string filePath, string extension, CancellationToken cancellationToken)
+        private static async Task<string?> TryConvertWithRdocs2mdAsync(string filePath, CancellationToken cancellationToken)
         {
-            if (!Rdocs2mdPreferredExtensions.Contains(extension) || !Rdocs2mdConverter.IsAvailable)
+            if (!Rdocs2mdConverter.IsAvailable)
             {
                 return null;
             }
