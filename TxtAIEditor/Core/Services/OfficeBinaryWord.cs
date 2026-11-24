@@ -92,7 +92,7 @@ namespace TxtAIEditor.Core.Services
                 ReadPieces(word, Slice(clx, cursor + 5, I32(clx, cursor + 1)), mainLength, paragraphs, characters);
             }
 
-            if (_paragraph.HasElements) FinishParagraph('\r', null);
+            if (_paragraph.HasElements) FinishParagraph('\r', default);
             FinishTable();
             if (!_body.HasElements) _body.Add(new XElement(W + "p"));
             _body.Add(ReadSection(word, TablePart(word, table, offsets, 6)));
@@ -144,7 +144,7 @@ namespace TxtAIEditor.Core.Services
                     if (ch is '\r' or '\a')
                     {
                         FlushText(text, style);
-                        FinishParagraph(ch, FindRange(paragraphs, position).Properties);
+                        FinishParagraph(ch, FindRange(paragraphs, position));
                         continue;
                     }
 
@@ -231,8 +231,9 @@ namespace TxtAIEditor.Core.Services
             text.Clear();
         }
 
-        private void FinishParagraph(char mark, Dictionary<ushort, int>? style)
+        private void FinishParagraph(char mark, PropertyRange range)
         {
+            Dictionary<ushort, int>? style = range.Properties;
             XElement properties = new(W + "pPr");
             string? alignment = Get(style, 0x2461, 0x2403) switch
             {
@@ -248,11 +249,10 @@ namespace TxtAIEditor.Core.Services
             bool inTable = mark == '\a' || Get(style, 0x2416) == 1 || Get(style, 0x6649) > 0;
             if (inTable)
             {
-                _table ??= new XElement(W + "tbl", new XElement(W + "tblPr", new XElement(W + "tblBorders",
-                    Border("top"), Border("left"), Border("bottom"), Border("right"), Border("insideH"), Border("insideV"))));
+                _table ??= new XElement(W + "tbl");
                 if ((mark == '\a' && Get(style, 0x2417) == 1) || Get(style, 0x244C) == 1)
                 {
-                    FinishRow();
+                    FinishRow(range.RowProperties);
                 }
                 else
                 {
@@ -278,10 +278,11 @@ namespace TxtAIEditor.Core.Services
             _cell = null;
         }
 
-        private void FinishRow()
+        private void FinishRow(OfficeBinaryWordTable.RowProperties? properties = null)
         {
             FinishCell();
             if (_row == null) return;
+            if (properties != null) _row.AddAnnotation(properties);
             _table!.Add(_row);
             _row = null;
         }
@@ -290,7 +291,11 @@ namespace TxtAIEditor.Core.Services
         {
             if (_table == null) return;
             FinishRow();
-            if (_table.Element(W + "tr") != null) _body.Add(_table);
+            if (_table.Element(W + "tr") != null)
+            {
+                OfficeBinaryWordTable.ApplyLayout(_table);
+                _body.Add(_table);
+            }
             _table = null;
         }
 
@@ -402,14 +407,14 @@ namespace TxtAIEditor.Core.Services
         private static long ImageSize(byte[] data, int size, int scale) =>
             Math.Max(1, (int)I16(data, size)) * 635L * Math.Max(1, (int)U16(data, scale)) / 1000;
 
-        private static XElement ReadSection(byte[] word, ReadOnlySpan<byte> sections)
+        private XElement ReadSection(byte[] word, ReadOnlySpan<byte> sections)
         {
             Dictionary<ushort, int>? properties = null;
             if (sections.Length >= 20 && (sections.Length - 4) % 16 == 0)
             {
                 int count = (sections.Length - 4) / 16;
                 int offset = I32(sections, (count + 1) * 4 + 2);
-                if (offset != -1) properties = ReadProperties(Slice(word, offset + 2, U16(word, offset)));
+                if (offset != -1) properties = ReadProperties(Slice(word, offset + 2, U16(word, offset)), false, out _);
             }
 
             return new XElement(W + "sectPr",
@@ -461,10 +466,10 @@ namespace TxtAIEditor.Core.Services
                         length -= 2;
                     }
 
-                    var properties = ReadProperties(Slice(page[..511], offset, length));
-                    if (properties.Count > 0)
+                    var properties = ReadProperties(Slice(page[..511], offset, length), paragraph, out var rowProperties);
+                    if (properties.Count > 0 || rowProperties != null)
                     {
-                        ranges.Add(new PropertyRange(I32(page, run * 4), I32(page, (run + 1) * 4), properties));
+                        ranges.Add(new PropertyRange(I32(page, run * 4), I32(page, (run + 1) * 4), properties, rowProperties));
                     }
                 }
             }
@@ -473,9 +478,18 @@ namespace TxtAIEditor.Core.Services
             return ranges;
         }
 
-        private static Dictionary<ushort, int> ReadProperties(ReadOnlySpan<byte> data)
+        private Dictionary<ushort, int> ReadProperties(ReadOnlySpan<byte> data, bool paragraph,
+            out OfficeBinaryWordTable.RowProperties? rowProperties)
         {
             var properties = new Dictionary<ushort, int>();
+            rowProperties = null;
+            ReadProperties(data, properties, paragraph, ref rowProperties, depth: 0);
+            return properties;
+        }
+
+        private void ReadProperties(ReadOnlySpan<byte> data, Dictionary<ushort, int> properties, bool paragraph,
+            ref OfficeBinaryWordTable.RowProperties? rowProperties, int depth)
+        {
             for (int offset = 0; offset + 2 <= data.Length;)
             {
                 ushort code = U16(data, offset);
@@ -498,19 +512,44 @@ namespace TxtAIEditor.Core.Services
                         size = data[offset++];
                     }
 
-                    if (size < 0 || size > data.Length - offset) break;
-                    offset += size;
-                    continue;
                 }
 
-                if (size > data.Length - offset) break;
-                if (size == 1) properties[code] = data[offset];
-                if (size == 2) properties[code] = U16(data, offset);
-                if (size == 4) properties[code] = I32(data, offset);
+                if (size < 0 || size > data.Length - offset) break;
+                ReadOnlySpan<byte> operand = data.Slice(offset, size);
+                if (paragraph && OfficeBinaryWordTable.IsRowProperty(code))
+                {
+                    (rowProperties ??= new()).Add(code, operand);
+                }
+                else if (paragraph && code is 0x6646 or 0x646B)
+                {
+                    if (depth < 8 && TryReadIndirectProperties(I32(operand, 0), out ReadOnlySpan<byte> indirect))
+                    {
+                        ReadProperties(indirect, properties, paragraph, ref rowProperties, depth + 1);
+                    }
+                    // A huge PAPX replaces the rest of this property block. For PTableProps,
+                    // also read the backward-compatible TDefTable that can follow the pointer.
+                    if (code == 0x6646) break;
+                }
+                else if ((code >> 13) != 6)
+                {
+                    if (size == 1) properties[code] = operand[0];
+                    if (size == 2) properties[code] = U16(operand, 0);
+                    if (size == 4) properties[code] = I32(operand, 0);
+                }
                 offset += size;
             }
+        }
 
-            return properties;
+        private bool TryReadIndirectProperties(int offset, out ReadOnlySpan<byte> properties)
+        {
+            properties = default;
+            if (!_compound.Contains("Data")) return false;
+            _data ??= _compound.ReadStream("Data");
+            if (offset < 0 || offset > _data.Length - 2) return false;
+            int length = U16(_data, offset);
+            if (length > _data.Length - offset - 2) return false;
+            properties = _data.AsSpan(offset + 2, length);
+            return true;
         }
 
         private static PropertyRange FindRange(List<PropertyRange> ranges, int position)
@@ -526,7 +565,7 @@ namespace TxtAIEditor.Core.Services
                 else return range;
             }
 
-            return new PropertyRange(position, low < ranges.Count ? ranges[low].Start : int.MaxValue, null);
+            return new PropertyRange(position, low < ranges.Count ? ranges[low].Start : int.MaxValue, null, null);
         }
 
         private static int Get(Dictionary<ushort, int>? properties, ushort key, ushort fallback = 0) =>
@@ -534,9 +573,8 @@ namespace TxtAIEditor.Core.Services
                 fallback != 0 && properties.TryGetValue(fallback, out value)) ? value : 0;
 
         private static XElement Val(string name, object value) => new(W + name, new XAttribute(W + "val", value));
-        private static XElement Border(string name) => new(W + name, new XAttribute(W + "val", "single"),
-            new XAttribute(W + "sz", 4), new XAttribute(W + "color", "808080"));
-        private static string ColorRef(int color) => $"{color & 255:X2}{(color >> 8) & 255:X2}{(color >> 16) & 255:X2}";
+        internal static string ColorRef(int color) => $"{color & 255:X2}{(color >> 8) & 255:X2}{(color >> 16) & 255:X2}";
+        internal static string? IndexedColor(int index) => index > 0 && index < Colors.Length ? Colors[index] : null;
 
         private static void AddMeasurements(XElement properties, string name, params (string Name, int Value)[] values)
         {
@@ -548,7 +586,8 @@ namespace TxtAIEditor.Core.Services
             if (item.HasAttributes) properties.Add(item);
         }
 
-        private readonly record struct PropertyRange(int Start, int End, Dictionary<ushort, int>? Properties);
+        private readonly record struct PropertyRange(int Start, int End, Dictionary<ushort, int>? Properties,
+            OfficeBinaryWordTable.RowProperties? RowProperties);
         private sealed record Picture(string Id, long Width, long Height);
     }
 }

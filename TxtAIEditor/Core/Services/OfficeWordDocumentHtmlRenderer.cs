@@ -542,10 +542,26 @@ namespace TxtAIEditor.Core.Services
             WordTableLayout layout = BuildTableLayout(table);
             XElement? tableProperties = GetDirectProperty(table, "tblPr");
             XElement? tableBorders = GetDirectProperty(tableProperties, "tblBorders");
+            int[] columnWidths = ReadFixedTableColumns(table, tableProperties);
+            int tableWidth = columnWidths.Sum();
             var builder = new StringBuilder();
-            builder.Append("<div class=\"doc-table-wrap\"><table class=\"doc-table\"");
-            AppendStyleAttribute(builder, BuildTableStyle(tableProperties));
-            builder.Append("><tbody>");
+            builder.Append("<div class=\"doc-table-wrap\"><table class=\"doc-table");
+            if (tableWidth > 0) builder.Append(" word-fixed-table");
+            builder.Append('"');
+            AppendStyleAttribute(builder, BuildTableStyle(tableProperties, tableWidth));
+            builder.Append('>');
+            if (tableWidth > 0)
+            {
+                builder.Append("<colgroup>");
+                foreach (int width in columnWidths)
+                {
+                    builder.Append("<col style=\"width:")
+                        .Append((width * 100.0 / tableWidth).ToString("0.#####", CultureInfo.InvariantCulture))
+                        .Append("%\">");
+                }
+                builder.Append("</colgroup>");
+            }
+            builder.Append("<tbody>");
             for (int rowIndex = 0; rowIndex < layout.Rows.Count; rowIndex++)
             {
                 XElement row = layout.Rows[rowIndex];
@@ -629,6 +645,7 @@ namespace TxtAIEditor.Core.Services
                         activeVerticalMerges.TryGetValue(columnIndex, out WordTableCellLayout? mergedCell))
                     {
                         mergedCell.RowSpan++;
+                        mergedCell.LastRowElement = cell;
                         AddActiveVerticalMerge(nextVerticalMerges, mergedCell);
                         columnIndex = mergedCell.ColumnIndex + mergedCell.ColumnSpan;
                         previousCell = null;
@@ -680,10 +697,29 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static string BuildTableStyle(XElement? tableProperties)
+        private static int[] ReadFixedTableColumns(XElement table, XElement? tableProperties)
+        {
+            if (GetAttributeValue(GetDirectProperty(tableProperties, "tblLayout"), "type") != "fixed" ||
+                GetDirectProperty(table, "tblGrid") is not { } grid) return [];
+
+            var widths = new List<int>();
+            foreach (XElement column in grid.Elements().Where(element => element.Name.LocalName == "gridCol"))
+            {
+                if (!TryReadWordTwips(column, "w", out int width) || width is <= 0 or > 65535 || widths.Count >= 512) return [];
+                widths.Add(width);
+            }
+            return widths.ToArray();
+        }
+
+        private static string BuildTableStyle(XElement? tableProperties, int gridWidth)
         {
             var styles = new List<string>();
             AppendStyle(styles, ReadShadingStyle(tableProperties));
+            if (gridWidth > 0)
+            {
+                styles.Add("width:" + WordTwipsToCssPoints(gridWidth));
+                AppendMeasurement(styles, GetDirectProperty(tableProperties, "tblInd"), "w", "margin-left");
+            }
 
             XElement? borders = GetDirectProperty(tableProperties, "tblBorders");
             foreach (string edge in new[] { "top", "right", "bottom", "left" })
@@ -698,6 +734,7 @@ namespace TxtAIEditor.Core.Services
         {
             var styles = new List<string>();
             AppendStyle(styles, ReadShadingStyle(rowProperties));
+            AppendMeasurement(styles, GetDirectProperty(rowProperties, "trHeight"), "val", "height");
             return string.Join(';', styles);
         }
 
@@ -711,6 +748,15 @@ namespace TxtAIEditor.Core.Services
             XElement? cellBorders = GetDirectProperty(cellProperties, "tcBorders");
             var styles = new List<string>();
             AppendStyle(styles, ReadShadingStyle(cellProperties));
+            XElement? margins = GetDirectProperty(cellProperties, "tcMar");
+            foreach (string side in new[] { "top", "right", "bottom", "left" })
+            {
+                XElement? margin = GetBorderElement(margins, side);
+                if (GetAttributeValue(margin, "type") == "dxa")
+                {
+                    AppendMeasurement(styles, margin, "w", "padding-" + side);
+                }
+            }
 
             XElement? verticalAlignment = GetDirectProperty(cellProperties, "vAlign");
             string alignment = GetAttributeValue(verticalAlignment, "val").ToLowerInvariant();
@@ -726,7 +772,10 @@ namespace TxtAIEditor.Core.Services
             bool hasExplicitBorders = cellBorders != null || tableBorders != null;
             foreach (string edge in new[] { "top", "right", "bottom", "left" })
             {
-                string? borderStyle = ReadBorderStyle(cellBorders, edge);
+                XElement? continuationBorders = edge == "bottom"
+                    ? GetDirectProperty(GetDirectProperty(cell.LastRowElement, "tcPr"), "tcBorders")
+                    : null;
+                string? borderStyle = ReadBorderStyle(continuationBorders, edge) ?? ReadBorderStyle(cellBorders, edge);
                 if (borderStyle == null)
                 {
                     string tableEdge = GetTableBorderEdge(cell, edge, rowCount, columnCount);
@@ -989,6 +1038,7 @@ namespace TxtAIEditor.Core.Services
             public int ColumnSpan { get; set; }
 
             public int RowSpan { get; set; } = 1;
+            public XElement? LastRowElement { get; set; }
         }
     }
 }

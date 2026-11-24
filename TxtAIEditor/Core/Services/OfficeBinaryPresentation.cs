@@ -20,7 +20,6 @@ namespace TxtAIEditor.Core.Services
         private const int Drawing = 0x040C;
         private const int ShapeContainer = 0xF004;
         private const int GroupContainer = 0xF003;
-        private const int UnitsToEmu = 15875;
         private static readonly XNamespace P = "http://schemas.openxmlformats.org/presentationml/2006/main";
         private static readonly XNamespace A = "http://schemas.openxmlformats.org/drawingml/2006/main";
 
@@ -82,7 +81,8 @@ namespace TxtAIEditor.Core.Services
             }
 
             WriteXml(_archive, "ppt/presentation.xml", new XElement(P + "presentation", ids,
-                new XElement(P + "sldSz", new XAttribute("cx", (long)_width * UnitsToEmu), new XAttribute("cy", (long)_height * UnitsToEmu))));
+                new XElement(P + "sldSz",
+                    new XAttribute("cx", MasterUnitsToEmu(_width)), new XAttribute("cy", MasterUnitsToEmu(_height)))));
             WriteXml(_archive, "ppt/_rels/presentation.xml.rels", relationships);
         }
 
@@ -412,10 +412,12 @@ namespace TxtAIEditor.Core.Services
         }
 
         private static XElement Position(string name, Bounds bounds) => new(A + name,
-            new XAttribute("x", bounds.Left * UnitsToEmu), new XAttribute("y", bounds.Top * UnitsToEmu));
+            new XAttribute("x", MasterUnitsToEmu(bounds.Left)), new XAttribute("y", MasterUnitsToEmu(bounds.Top)));
         private static XElement Extents(string name, Bounds bounds) => new(A + name,
-            new XAttribute("cx", Math.Max(1, bounds.Right - bounds.Left) * UnitsToEmu),
-            new XAttribute("cy", Math.Max(1, bounds.Bottom - bounds.Top) * UnitsToEmu));
+            new XAttribute("cx", MasterUnitsToEmu(Math.Max(1, bounds.Right - bounds.Left))),
+            new XAttribute("cy", MasterUnitsToEmu(Math.Max(1, bounds.Bottom - bounds.Top))));
+        // A master unit is 1/576 inch. DrawingML uses 914,400 EMUs per inch.
+        internal static long MasterUnitsToEmu(long units) => units * 914_400 / 576;
         internal static XElement SolidFill(string color) => new(A + "solidFill", new XElement(A + "srgbClr", new XAttribute("val", color)));
         internal static string Rgb(uint value) => $"{value & 255:X2}{(value >> 8) & 255:X2}{(value >> 16) & 255:X2}";
 

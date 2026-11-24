@@ -91,31 +91,45 @@ namespace TxtAIEditor.Core.Services
             paragraphs = new();
             characters = new();
             if (source.Styles.Length == 0 || length == 0) return;
+
+            ReadOnlySpan<byte> styles = source.Styles.Body(data);
+            // A style run can include the implicit paragraph mark after the stored text.
+            // Read that mark before looking for character formatting, even when it has its own run.
+            if (!TryParseRuns(styles, length + 1, length, paragraphs, characters))
+            {
+                TryParseRuns(styles, length, length, paragraphs, characters);
+            }
+        }
+
+        private bool TryParseRuns(ReadOnlySpan<byte> styles, int paragraphLength, int textLength,
+            List<ParagraphRun> paragraphs, List<CharacterRun> characters)
+        {
             try
             {
-                ReadOnlySpan<byte> styles = source.Styles.Body(data);
                 int offset = 0;
                 int end = 0;
-                while (end < length)
+                while (end < paragraphLength)
                 {
-                    end += ReadCount(styles, offset, length, end);
+                    end += ReadCount(styles, offset, textLength, end);
                     int level = U16(styles, offset + 4);
                     offset += 6;
                     paragraphs.Add(new ParagraphRun(end, ReadParagraph(styles, ref offset) with { Level = level }));
                 }
                 end = 0;
-                while (end < length)
+                while (end < textLength)
                 {
-                    end += ReadCount(styles, offset, length, end);
+                    end += ReadCount(styles, offset, textLength, end);
                     offset += 4;
                     characters.Add(new CharacterRun(end, ReadCharacter(styles, ref offset)));
                 }
+                return true;
             }
             catch (InvalidDataException)
             {
                 // A malformed optional format block must not hide the slide text.
                 paragraphs.Clear();
                 characters.Clear();
+                return false;
             }
         }
 
@@ -164,6 +178,7 @@ namespace TxtAIEditor.Core.Services
             _ = OptionalShort(data, ref offset, mask, 0x400000);
             _ = OptionalShort(data, ref offset, mask, 0x800000);
             int? size = OptionalShort(data, ref offset, mask, 0x20000);
+            if (size is < 1 or > 4000) size = null;
             string? color = null;
             if ((mask & 0x40000) != 0)
             {
@@ -190,8 +205,8 @@ namespace TxtAIEditor.Core.Services
             if (paragraph.Level is >= 0 and <= 8) properties.SetAttributeValue("lvl", paragraph.Level);
             int? left = paragraph.LeftMargin ?? master.LeftMargin;
             int? indent = paragraph.Indent ?? master.Indent;
-            if (left.HasValue) properties.SetAttributeValue("marL", left.Value * 15875L);
-            if (indent.HasValue) properties.SetAttributeValue("indent", (indent.Value - left.GetValueOrDefault()) * 15875L);
+            if (left.HasValue) properties.SetAttributeValue("marL", MasterUnitsToEmu(left.Value));
+            if (indent.HasValue) properties.SetAttributeValue("indent", MasterUnitsToEmu(indent.Value - left.GetValueOrDefault()));
             if (paragraph.Bullet ?? master.Bullet ?? false)
             {
                 int code = paragraph.BulletChar ?? master.BulletChar ?? 0x2022;

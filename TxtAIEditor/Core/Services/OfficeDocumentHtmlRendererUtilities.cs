@@ -127,6 +127,12 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
 }
 .doc-table .doc-paragraph { margin-bottom: .35em; line-height: 1.45; }
 .doc-table .doc-paragraph:last-child { margin-bottom: 0; }
+.doc-table.word-fixed-table {
+    max-width: 100%;
+    table-layout: fixed;
+}
+.word-fixed-table td { min-width: 0; }
+.word-fixed-table .doc-paragraph { margin: 0; line-height: normal; }
 .doc-table.hwpx-table {
     width: auto;
     max-width: 100%;
