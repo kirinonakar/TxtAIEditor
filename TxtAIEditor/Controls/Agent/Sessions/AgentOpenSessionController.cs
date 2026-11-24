@@ -480,7 +480,8 @@ namespace TxtAIEditor.Controls
                 foreach (var (session, deadline) in _idleDeadlines.ToArray())
                 {
                     bool StillScheduled() => _idleDeadlines.TryGetValue(session, out long scheduled) && scheduled == deadline;
-                    bool IsBusy() => IsSessionRunning(session.Id) || HasPendingSubagentShutdown(session.Id);
+                    bool IsBusy() => IsSessionRunning(session.Id) || IsPendingClose(session.Id) || HasPendingSubagentShutdown(session.Id);
+                    bool CanPark() => StillScheduled() && !IsSessionVisible(session.Id) && !IsBusy();
                     if (deadline > now || !StillScheduled())
                     {
                         continue;
@@ -492,11 +493,11 @@ namespace TxtAIEditor.Controls
                     }
 
                     if (!session.IsParked && !IsSessionVisible(session.Id) && !IsReusableBlankSession(session) &&
-                        _sessionEditController.TryParkSessionEdits(session.Id, session.SessionEdits))
+                        await _sessionEditController.TryParkIdleSessionEditsAsync(session, CanPark) && CanPark())
                     {
                         try
                         {
-                            await session.ParkBodyAsync(() => StillScheduled() && !IsSessionVisible(session.Id) && !IsBusy());
+                            await session.ParkBodyAsync(CanPark);
                         }
                         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
                         {

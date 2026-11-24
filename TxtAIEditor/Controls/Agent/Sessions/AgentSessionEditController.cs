@@ -141,6 +141,48 @@ namespace TxtAIEditor.Controls
             return true;
         }
 
+        public async Task<bool> TryParkIdleSessionEditsAsync(AgentOpenSessionState session, Func<bool> canPark)
+        {
+            string id = session.Id;
+            if (_recordingSessions.Contains(id))
+            {
+                return false;
+            }
+            if (_parkedEdits.ContainsKey(id))
+            {
+                return true;
+            }
+
+            List<AgentFileEditPreview> edits = _sessionEditsBySession.GetValueOrDefault(id) ?? session.SessionEdits;
+            if (edits.Count == 0 && _history.GetEntry(id)?.EditsId == null)
+            {
+                _sessionEditsBySession.Remove(id);
+                return true;
+            }
+
+            var snapshot = edits.Select(edit => Clone(edit)).ToList();
+            try
+            {
+                var spill = await Task.Run(() => AgentSessionSpill<List<AgentFileEditPreview>>.Write(snapshot));
+                var currentEdits = _sessionEditsBySession.GetValueOrDefault(id) ?? session.SessionEdits;
+                if (!canPark() || _recordingSessions.Contains(id) || _parkedEdits.ContainsKey(id) ||
+                    !ReferenceEquals(currentEdits, edits) || !AreEquivalent(currentEdits, snapshot))
+                {
+                    await Task.Run(spill.Dispose);
+                    return false;
+                }
+
+                _parkedEdits.Add(id, spill);
+                _sessionEditsBySession.Remove(id);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+            {
+                System.Diagnostics.Debug.WriteLine(ex.Message);
+                return false;
+            }
+        }
+
         public void SetLiveEdits(string id, List<AgentFileEditPreview> edits)
         {
             ReleaseSessionEdits(id);

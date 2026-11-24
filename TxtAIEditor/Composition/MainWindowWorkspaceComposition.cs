@@ -17,6 +17,8 @@ namespace TxtAIEditor.Composition
         Action ThemeRequested,
         Action StickyNoteRequested,
         Func<string> GetCurrentRepoPathForGitRefresh,
+        Func<(string FolderPath, string? ActiveFilePath)> GetGitRefreshLocation,
+        Func<bool, Task> RefreshGitPanelAsync,
         Func<string> GetCurrentFolderPath,
         Func<string, string, string> GetLocalizedString,
         Func<ExplorerNavigationController?> GetExplorerNavigation,
@@ -100,8 +102,8 @@ namespace TxtAIEditor.Composition
             var gitStatusRefresh = new GitStatusRefreshController(
                 window.DispatcherQueue,
                 gitAutoRefreshTimer,
-                callbacks.GetCurrentRepoPathForGitRefresh,
-                gitPanel.RefreshAsync);
+                callbacks.GetGitRefreshLocation,
+                callbacks.RefreshGitPanelAsync);
 
             var fileTabLoad = new FileTabLoadController(
                 workspaceServices.GitService,

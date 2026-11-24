@@ -14,7 +14,7 @@ namespace TxtAIEditor.Controls
         private readonly TerminalShortcutService _terminalShortcutService;
         private readonly FunctionKeyShortcutService _functionKeyShortcutService;
         private readonly IAutoSaveLifecycle _autoSaveLifecycle;
-        private readonly DispatcherTimer _gitAutoRefreshTimer;
+        private readonly GitStatusRefreshController _gitStatusRefresh;
         private readonly EditorWorkspacePane _editorWorkspace;
         private readonly IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> _tabBridges;
         private readonly LivePreviewController _livePreviewController;
@@ -25,7 +25,7 @@ namespace TxtAIEditor.Controls
             TerminalShortcutService terminalShortcutService,
             FunctionKeyShortcutService functionKeyShortcutService,
             IAutoSaveLifecycle autoSaveLifecycle,
-            DispatcherTimer gitAutoRefreshTimer,
+            GitStatusRefreshController gitStatusRefresh,
             EditorWorkspacePane editorWorkspace,
             IDictionary<string, (WebView2 WebView, CustomEditorBridge Bridge)> tabBridges,
             LivePreviewController livePreviewController)
@@ -35,7 +35,7 @@ namespace TxtAIEditor.Controls
             _terminalShortcutService = terminalShortcutService;
             _functionKeyShortcutService = functionKeyShortcutService;
             _autoSaveLifecycle = autoSaveLifecycle;
-            _gitAutoRefreshTimer = gitAutoRefreshTimer;
+            _gitStatusRefresh = gitStatusRefresh;
             _editorWorkspace = editorWorkspace;
             _tabBridges = tabBridges;
             _livePreviewController = livePreviewController;
@@ -87,7 +87,7 @@ namespace TxtAIEditor.Controls
             RunCleanup(() =>
             {
                 _autoSaveLifecycle.Stop();
-                _gitAutoRefreshTimer.Stop();
+                _gitStatusRefresh.Stop();
             }, suppressErrors);
             RunCleanup(_editorWorkspace.StopAllTerminalSessions, suppressErrors);
             RunCleanup(CloseEditorBridges, suppressErrors);

@@ -89,7 +89,7 @@ namespace TxtAIEditor.Composition
                 terminalShortcut,
                 functionKeyShortcut,
                 autoSaveLifecycle,
-                gitAutoRefreshTimer,
+                workspace.GitStatusRefresh,
                 ui.EditorWorkspace,
                 tabBridges,
                 livePreview);

@@ -17,6 +17,7 @@ namespace TxtAIEditor.Controls
         private readonly Dictionary<Guid, QuickNoteWindow> _openNotes = new();
         private readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
         private List<QuickNote>? _notes;
+        private Task<List<QuickNote>?>? _pendingLoad;
         private bool _dirty;
         private bool _saveFailed;
         private ContentDialog? _activeDialog;
@@ -33,7 +34,7 @@ namespace TxtAIEditor.Controls
 
         public async Task AddAsync(nint trayOwner)
         {
-            if (!EnsureLoaded())
+            if (!await EnsureLoadedAsync())
             {
                 await ShowTrayErrorAsync(trayOwner, _text("QuickNotesLoadError", "메모를 불러올 수 없습니다."));
                 return;
@@ -53,7 +54,7 @@ namespace TxtAIEditor.Controls
 
         public async Task OpenAllAsync(nint trayOwner)
         {
-            if (!EnsureLoaded())
+            if (!await EnsureLoadedAsync())
             {
                 await ShowTrayErrorAsync(trayOwner, _text("QuickNotesLoadError", "메모를 불러올 수 없습니다."));
                 return;
@@ -65,11 +66,16 @@ namespace TxtAIEditor.Controls
             }
         }
 
+        public Task PreloadAsync() => EnsureLoadedAsync();
+
+        public bool CanOpenAll => _notes?.Count != 0;
+
         public TrayQuickNoteItems GetTrayItems(nint trayOwner, Action<Action> enqueue)
         {
-            if (!EnsureLoaded())
+            if (_notes == null)
             {
                 return new TrayQuickNoteItems(Array.Empty<TrayQuickNoteItem>(),
+                    _pendingLoad != null ? _text("EditorLoadingText", "로딩 중...") :
                     _text("QuickNotesLoadError", "메모를 불러올 수 없습니다."));
             }
 
@@ -117,22 +123,33 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private bool EnsureLoaded()
+        private async Task<bool> EnsureLoadedAsync()
         {
             if (_notes != null)
             {
                 return true;
             }
 
+            var load = _pendingLoad ??= Task.Run(LoadNotes);
+            var notes = await load;
+            if (ReferenceEquals(_pendingLoad, load))
+            {
+                _notes = notes;
+                _pendingLoad = null;
+            }
+            return _notes != null;
+        }
+
+        private List<QuickNote>? LoadNotes()
+        {
             try
             {
-                _notes = _store.Load();
-                return true;
+                return _store.Load();
             }
             catch (Exception ex) when (AppErrorHandler.IsRecoverable(ex))
             {
                 AppErrorHandler.Report(ex);
-                return false;
+                return null;
             }
         }
 

@@ -76,6 +76,8 @@ namespace TxtAIEditor.Composition
                     () => getToolbarCommand()?.ToggleTheme(),
                     shell.StickyNoteMode.ToggleMode,
                     module.GetCurrentRepoPathForGitRefresh,
+                    module.GetGitRefreshLocation,
+                    module.RefreshGitPanelAsync,
                     () => state.CurrentFolderPath,
                     shellFacade.GetLocalizedString,
                     module.TryGetExplorerNavigation,
@@ -170,23 +172,58 @@ namespace TxtAIEditor.Composition
             MainWindowWorkspaceOperations.GetLargeFileThresholdBytes(_commonServices.SettingsService);
 
         public Task RefreshGitStatusUiAsync() =>
-            MainWindowWorkspaceOperations.RefreshGitStatusUiAsync(
-                _state,
-                _workspaceServices.GitService,
-                Composition.GitAutoRefreshTimer,
-                _tabNavigation,
-                Composition.GitStatusRefresh,
-                _setCurrentRepoPath);
+            Composition.GitStatusRefresh.RefreshAsync();
 
         public void RefreshCurrentFolder(string folderPath) =>
             Composition.ExplorerNavigation.LoadDirectoryRoot(folderPath);
 
-        private string GetCurrentRepoPathForGitRefresh() =>
-            MainWindowWorkspaceOperations.GetCurrentRepoPathForGitRefresh(
-                _state,
-                _workspaceServices.GitService,
-                _tabNavigation,
-                _setCurrentRepoPath);
+        private (string FolderPath, string? ActiveFilePath) GetGitRefreshLocation() =>
+            (_state.CurrentFolderPath, _tabNavigation.GetActiveTab()?.FilePath);
+
+        private string GetCurrentRepoPathForGitRefresh()
+        {
+            var (repoPath, _) = MainWindowWorkspaceOperations.FindGitWorkspace(
+                GetGitRefreshLocation(), _workspaceServices.GitService);
+            if (repoPath != null)
+            {
+                _setCurrentRepoPath(repoPath);
+            }
+
+            return _state.CurrentRepoPath;
+        }
+
+        private async Task RefreshGitPanelAsync(bool automatic)
+        {
+            var location = GetGitRefreshLocation();
+            var (repoPath, folderExists) = await Task.Run(() =>
+                MainWindowWorkspaceOperations.FindGitWorkspace(location, _workspaceServices.GitService));
+            bool IsCurrent()
+            {
+                var current = GetGitRefreshLocation();
+                return !Composition.GitStatusRefresh.IsStopped && location.FolderPath == current.FolderPath &&
+                    (folderExists || location.ActiveFilePath == current.ActiveFilePath);
+            }
+            if (!IsCurrent())
+            {
+                return;
+            }
+
+            string previousRepoPath = _state.CurrentRepoPath;
+            if (repoPath != null)
+            {
+                _setCurrentRepoPath(repoPath);
+            }
+
+            if (!automatic && folderExists)
+            {
+                Composition.GitAutoRefreshTimer.Start();
+            }
+
+            if (!automatic || !string.IsNullOrEmpty(_state.CurrentRepoPath) || !string.IsNullOrEmpty(previousRepoPath))
+            {
+                await Composition.GitPanel.RefreshAsync(_state.CurrentRepoPath, IsCurrent);
+            }
+        }
 
         private ExplorerNavigationController? TryGetExplorerNavigation() =>
             _controllers?.ExplorerNavigation;

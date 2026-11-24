@@ -225,7 +225,7 @@ namespace TxtAIEditor
                 _trayOwnerWindow = owner;
                 string GetText(string key, string fallback) => owner.GetLocalizedString(key, fallback);
                 nint trayHandle = WinRT.Interop.WindowNative.GetWindowHandle(owner);
-                QuickNotesController GetQuickNotes() => _quickNotes ??= new QuickNotesController(
+                QuickNotesController quickNotes = _quickNotes ??= new QuickNotesController(
                     (key, fallback) => _trayOwnerWindow?.GetLocalizedString(key, fallback) ?? fallback,
                     _quickNotesTheme);
                 void QueueNoteAction(Action action) => owner.DispatcherQueue.TryEnqueue(() =>
@@ -249,9 +249,11 @@ namespace TxtAIEditor
                         GetText("QuickNotesAdd", "추가"),
                         GetText("QuickNotesOpenAll", "모두 열기"),
                         GetText("QuickNotesDelete", "삭제"),
-                        () => QueueNoteAction(() => _ = AppErrorHandler.RunAsync(() => GetQuickNotes().AddAsync(trayHandle))),
-                        () => QueueNoteAction(() => _ = AppErrorHandler.RunAsync(() => GetQuickNotes().OpenAllAsync(trayHandle))),
-                        () => GetQuickNotes().GetTrayItems(trayHandle, QueueNoteAction)));
+                        () => QueueNoteAction(() => _ = AppErrorHandler.RunAsync(() => quickNotes.AddAsync(trayHandle))),
+                        () => QueueNoteAction(() => _ = AppErrorHandler.RunAsync(() => quickNotes.OpenAllAsync(trayHandle))),
+                        () => quickNotes.CanOpenAll,
+                        () => quickNotes.GetTrayItems(trayHandle, QueueNoteAction)));
+                _ = AppErrorHandler.RunAsync(quickNotes.PreloadAsync);
                 return true;
             }
             catch (Exception ex)

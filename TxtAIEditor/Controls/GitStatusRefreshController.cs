@@ -11,25 +11,33 @@ namespace TxtAIEditor.Controls
     {
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly DispatcherTimer _autoRefreshTimer;
-        private readonly Func<string> _repoPathProvider;
-        private readonly Func<Task> _refreshAsync;
+        private readonly Func<(string FolderPath, string? ActiveFilePath)> _locationProvider;
+        private readonly Func<bool, Task> _refreshAsync;
         private readonly object _refreshGate = new();
         private Task? _activeRefreshTask;
-        private string _activeRepoPath = string.Empty;
+        private (string FolderPath, string? ActiveFilePath) _activeLocation;
         private int _refreshVersion;
 
         public GitStatusRefreshController(
             DispatcherQueue dispatcherQueue,
             DispatcherTimer autoRefreshTimer,
-            Func<string> repoPathProvider,
-            Func<Task> refreshAsync)
+            Func<(string FolderPath, string? ActiveFilePath)> locationProvider,
+            Func<bool, Task> refreshAsync)
         {
             _dispatcherQueue = dispatcherQueue;
             _autoRefreshTimer = autoRefreshTimer;
-            _repoPathProvider = repoPathProvider;
+            _locationProvider = locationProvider;
             _refreshAsync = refreshAsync;
 
             _autoRefreshTimer.Tick += OnAutoRefreshTimerTick;
+        }
+
+        public bool IsStopped { get; private set; }
+
+        public void Stop()
+        {
+            IsStopped = true;
+            _autoRefreshTimer.Stop();
         }
 
         public Task RefreshAsync()
@@ -42,15 +50,7 @@ namespace TxtAIEditor.Controls
         {
             int version = Interlocked.Increment(ref _refreshVersion);
 
-            void RunGitRefresh()
-            {
-                _ = RefreshQueuedAsync(version);
-            }
-
-            if (!_dispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, RunGitRefresh))
-            {
-                RunGitRefresh();
-            }
+            _dispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _ = RefreshQueuedAsync(version));
         }
 
         private async Task RefreshQueuedAsync(int version)
@@ -70,30 +70,39 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private Task RequestRefreshAsync()
+        private Task RequestRefreshAsync(bool automatic = false)
         {
-            string repoPath = _repoPathProvider() ?? string.Empty;
+            if (IsStopped)
+            {
+                return Task.CompletedTask;
+            }
+
+            var location = _locationProvider();
             lock (_refreshGate)
             {
                 if (_activeRefreshTask is { IsCompleted: false } activeRefresh)
                 {
-                    if (string.Equals(_activeRepoPath, repoPath, StringComparison.OrdinalIgnoreCase))
+                    if (automatic)
+                    {
+                        return Task.CompletedTask;
+                    }
+                    if (_activeLocation == location)
                     {
                         return activeRefresh;
                     }
 
-                    _activeRepoPath = repoPath;
-                    _activeRefreshTask = RunAfterAsync(activeRefresh);
+                    _activeLocation = location;
+                    _activeRefreshTask = RunAfterAsync(activeRefresh, location);
                     return _activeRefreshTask;
                 }
 
-                _activeRepoPath = repoPath;
-                _activeRefreshTask = _refreshAsync();
+                _activeLocation = location;
+                _activeRefreshTask = _refreshAsync(automatic);
                 return _activeRefreshTask;
             }
         }
 
-        private async Task RunAfterAsync(Task previousRefresh)
+        private async Task RunAfterAsync(Task previousRefresh, (string FolderPath, string? ActiveFilePath) location)
         {
             try
             {
@@ -104,14 +113,21 @@ namespace TxtAIEditor.Controls
                 Debug.WriteLine($"Previous Git refresh failed: {ex.Message}");
             }
 
-            await _refreshAsync();
+            if (!IsStopped && location == _locationProvider())
+            {
+                await _refreshAsync(false);
+            }
         }
 
         private async void OnAutoRefreshTimerTick(object? sender, object e)
         {
-            if (!string.IsNullOrEmpty(_repoPathProvider()))
+            try
             {
-                await RefreshAsync();
+                await RequestRefreshAsync(automatic: true);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Automatic Git refresh failed: {ex.Message}");
             }
         }
     }

@@ -102,7 +102,7 @@ namespace TxtAIEditor.Controls
             _leftSidebar.GitRemoteBtn.IsEnabled = !string.IsNullOrEmpty(repoPath);
         }
 
-        public async Task RefreshAsync(string repoPath)
+        public async Task RefreshAsync(string repoPath, Func<bool>? isCurrent = null)
         {
             if (string.IsNullOrEmpty(repoPath))
             {
@@ -139,6 +139,11 @@ namespace TxtAIEditor.Controls
 
             string requestedRepoPath = repoPath;
             repoPath = await Task.Run(() => _gitService.FindRepositoryRoot(requestedRepoPath) ?? requestedRepoPath);
+            if (isCurrent?.Invoke() == false)
+            {
+                return;
+            }
+
             string branch = await Task.Run(() => _gitService.GetCurrentBranchAsync(repoPath));
             bool isGitNotDetected = GitBranchStatus.IsNotDetected(branch);
             string localizedBranch = isGitNotDetected ? GetGitNotDetectedText() : branch;
@@ -159,7 +164,16 @@ namespace TxtAIEditor.Controls
             var fileStatuses = await fileStatusesTask;
             int unpushedCount = await unpushedCountTask;
 
-            int changedCount = fileStatuses.Count(kvp => kvp.Value != "!!" && kvp.Value.Trim() != "!!");
+            var gitFiles = await Task.Run(() => fileStatuses
+                .Where(kvp => kvp.Value.Trim() != "!!")
+                .Select(kvp => CreateGitFileItem(kvp.Key, kvp.Value))
+                .ToArray());
+            if (isCurrent?.Invoke() == false)
+            {
+                return;
+            }
+
+            int changedCount = gitFiles.Length;
             string branchText = localizedBranch;
             if (!isGitNotDetected)
             {
@@ -230,10 +244,6 @@ namespace TxtAIEditor.Controls
                 _hasMoreGitHistory = historyList.Count >= historyCount;
             }
 
-            var gitFiles = await Task.Run(() => fileStatuses
-                .Where(kvp => kvp.Value.Trim() != "!!")
-                .Select(kvp => CreateGitFileItem(kvp.Key, kvp.Value))
-                .ToArray());
             bool filesChanged = _viewModel.GitFiles.Count != gitFiles.Length ||
                 _viewModel.GitFiles.Zip(gitFiles).Any(pair =>
                     pair.First.Name != pair.Second.Name ||
@@ -265,10 +275,17 @@ namespace TxtAIEditor.Controls
             _isLoadingMoreGitHistory = true;
             try
             {
+                int offset = _loadedGitHistoryCount;
                 var moreHistory = await _gitService.GetRecentHistoryAsync(
                     repoPath,
                     GitHistoryBatchSize,
-                    _loadedGitHistoryCount);
+                    offset);
+
+                if (!string.Equals(repoPath, _gitHistoryRepoPath, StringComparison.OrdinalIgnoreCase) ||
+                    offset != _loadedGitHistoryCount)
+                {
+                    return;
+                }
 
                 if (moreHistory.Count == 0)
                 {
@@ -1390,7 +1407,7 @@ namespace TxtAIEditor.Controls
 
         private async void OnGitHistoryScrolledToEnd(object? sender, EventArgs e)
         {
-            await LoadMoreHistoryAsync(_repoPathProvider());
+            await LoadMoreHistoryAsync(_gitHistoryRepoPath);
         }
 
         private async void OnGitHistoryItemClick(object sender, ItemClickEventArgs e)

@@ -14,16 +14,21 @@ namespace TxtAIEditor.Core.Services
         private const uint NifMessage = 0x00000001;
         private const uint NifIcon = 0x00000002;
         private const uint NifTip = 0x00000004;
+        private const uint NifShowTip = 0x00000080;
         private const uint NimAdd = 0x00000000;
         private const uint NimDelete = 0x00000002;
+        private const uint NimSetVersion = 0x00000004;
+        private const uint NotifyIconVersion4 = 4;
         private const uint ImageIcon = 1;
         private const uint LoadFromFile = 0x00000010;
         private const uint LoadDefaultSize = 0x00000040;
         private const uint WsPopup = 0x80000000;
         private const uint WsExToolWindow = 0x00000080;
         private const uint WmContextMenu = 0x007B;
+        private const uint WmInitMenuPopup = 0x0117;
         private const uint WmLButtonDoubleClick = 0x0203;
         private const uint WmRButtonUp = 0x0205;
+        private const uint NinKeySelect = 0x0401;
         private const uint WmNull = 0x0000;
         private const uint MfString = 0x00000000;
         private const uint MfGrayed = 0x00000001;
@@ -51,7 +56,10 @@ namespace TxtAIEditor.Core.Services
         private readonly SubclassProc _subclassProc;
         private readonly uint _taskbarCreatedMessage;
         private IntPtr _iconHandle;
+        private IntPtr _notesSubmenu;
+        private Action? _populateNotesSubmenu;
         private TrayQuickNoteRows? _noteRows;
+        private bool _usesVersion4;
         private bool _showingMenu;
         private bool _disposed;
 
@@ -129,6 +137,9 @@ namespace TxtAIEditor.Core.Services
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error());
             }
+
+            data.TimeoutOrVersion = NotifyIconVersion4;
+            _usesVersion4 = ShellNotifyIcon(NimSetVersion, ref data);
         }
 
         private NotifyIconData CreateNotifyIconData()
@@ -138,7 +149,7 @@ namespace TxtAIEditor.Core.Services
                 Size = (uint)Marshal.SizeOf<NotifyIconData>(),
                 WindowHandle = _trayWindowHandle,
                 Id = TrayIconId,
-                Flags = NifMessage | NifIcon | NifTip,
+                Flags = NifMessage | NifIcon | NifTip | NifShowTip,
                 CallbackMessage = TrayCallbackMessage,
                 IconHandle = _iconHandle,
                 Tip = _toolTip
@@ -165,6 +176,20 @@ namespace TxtAIEditor.Core.Services
             nuint subclassId,
             nuint referenceData)
         {
+            if (message == WmInitMenuPopup && wParam == _notesSubmenu && _populateNotesSubmenu is Action populate)
+            {
+                _populateNotesSubmenu = null;
+                try
+                {
+                    populate();
+                }
+                catch (Exception ex) when (AppErrorHandler.IsRecoverable(ex))
+                {
+                    Debug.WriteLine($"Failed to populate quick note menu: {ex.Message}");
+                }
+                return IntPtr.Zero;
+            }
+
             if (_noteRows?.HandleMenuMessage(message, wParam, lParam) == true)
             {
                 return new IntPtr(1);
@@ -183,14 +208,29 @@ namespace TxtAIEditor.Core.Services
             }
             else if (message == TrayCallbackMessage)
             {
-                uint mouseMessage = unchecked((uint)lParam.ToInt64());
-                if (mouseMessage == WmLButtonDoubleClick)
+                uint notification = unchecked((ushort)lParam.ToInt64());
+                if (notification == WmLButtonDoubleClick || (_usesVersion4 && notification == NinKeySelect))
                 {
                     _openRequested();
                 }
-                else if (mouseMessage == WmRButtonUp || mouseMessage == WmContextMenu)
+                else if (notification == (_usesVersion4 ? WmContextMenu : WmRButtonUp))
                 {
-                    ShowContextMenu();
+                    Point position;
+                    if (_usesVersion4)
+                    {
+                        long coordinates = wParam.ToInt64();
+                        position = new Point
+                        {
+                            X = unchecked((short)coordinates),
+                            Y = unchecked((short)(coordinates >> 16))
+                        };
+                    }
+                    else if (!GetCursorPos(out position))
+                    {
+                        return IntPtr.Zero;
+                    }
+
+                    ShowContextMenu(position);
                 }
 
                 return IntPtr.Zero;
@@ -199,7 +239,7 @@ namespace TxtAIEditor.Core.Services
             return DefSubclassProc(windowHandle, message, wParam, lParam);
         }
 
-        private void ShowContextMenu()
+        private void ShowContextMenu(Point position)
         {
             if (_showingMenu || _disposed)
             {
@@ -236,13 +276,11 @@ namespace TxtAIEditor.Core.Services
                 }
 
                 AppendMenu(menu, MfSeparator, 0, null);
-                TrayQuickNoteItems notes = _quickNotes.GetItems();
-                AppendQuickNotesMenu(menu, actions, commandId, notes);
-                AppendMenu(menu, notes.Items.Count == 0 ? MfString | MfGrayed : MfString,
+                AttachQuickNotesMenu(menu, actions, commandId);
+                AppendMenu(menu, _quickNotes.CanOpenAll() ? MfString : MfString | MfGrayed,
                     OpenAllNotesCommand, _quickNotes.OpenAllText);
                 AppendMenu(menu, MfString, OpenMenuCommand, _openText);
                 AppendMenu(menu, MfString, CloseMenuCommand, _closeText);
-                GetCursorPos(out Point cursorPosition);
                 IntPtr previousForegroundWindow = GetForegroundWindow();
                 SetForegroundWindow(_trayWindowHandle);
 
@@ -252,8 +290,8 @@ namespace TxtAIEditor.Core.Services
                     command = TrackPopupMenu(
                         menu,
                         TpmRightButton | TpmReturnCommand,
-                        cursorPosition.X,
-                        cursorPosition.Y,
+                        position.X,
+                        position.Y,
                         0,
                         _trayWindowHandle,
                         IntPtr.Zero);
@@ -310,6 +348,8 @@ namespace TxtAIEditor.Core.Services
             finally
             {
                 DestroyMenu(menu);
+                _populateNotesSubmenu = null;
+                _notesSubmenu = IntPtr.Zero;
                 _noteRows?.Dispose();
                 _noteRows = null;
                 _showingMenu = false;
@@ -317,8 +357,7 @@ namespace TxtAIEditor.Core.Services
             selectedAction?.Invoke();
         }
 
-        private void AppendQuickNotesMenu(
-            IntPtr menu, Dictionary<uint, Action> actions, uint commandId, TrayQuickNoteItems notes)
+        private void AttachQuickNotesMenu(IntPtr menu, Dictionary<uint, Action> actions, uint commandId)
         {
             IntPtr submenu = CreatePopupMenu();
             if (submenu == IntPtr.Zero)
@@ -333,6 +372,13 @@ namespace TxtAIEditor.Core.Services
             }
 
             AppendMenu(submenu, MfString, AddNoteCommand, _quickNotes.AddText);
+            _notesSubmenu = submenu;
+            _populateNotesSubmenu = () => PopulateQuickNotesMenu(submenu, actions, commandId);
+        }
+
+        private void PopulateQuickNotesMenu(IntPtr submenu, Dictionary<uint, Action> actions, uint commandId)
+        {
+            TrayQuickNoteItems notes = _quickNotes.GetItems();
             AppendMenu(submenu, MfSeparator, 0, null);
             if (notes.Status is string status)
             {
@@ -343,7 +389,14 @@ namespace TxtAIEditor.Core.Services
                 return;
             }
 
-            _noteRows = new TrayQuickNoteRows(_dpiWindowHandle, submenu, _quickNotes.DeleteText);
+            try
+            {
+                _noteRows = new TrayQuickNoteRows(_dpiWindowHandle, submenu, _quickNotes.DeleteText);
+            }
+            catch (Exception ex) when (AppErrorHandler.IsRecoverable(ex))
+            {
+                Debug.WriteLine($"Failed to initialize quick note menu buttons: {ex.Message}");
+            }
             foreach (TrayQuickNoteItem note in notes.Items)
             {
                 if (commandId >= LastMenuCommand)
@@ -351,7 +404,7 @@ namespace TxtAIEditor.Core.Services
                     break;
                 }
 
-                if (_noteRows.Append(commandId, note))
+                if (_noteRows?.Append(commandId, note) == true)
                 {
                     actions.Add(commandId++, note.Open);
                     continue;
@@ -517,7 +570,7 @@ namespace TxtAIEditor.Core.Services
 
     internal sealed record TrayQuickNotesMenu(
         string Title, string AddText, string OpenAllText, string DeleteText,
-        Action Add, Action OpenAll, Func<TrayQuickNoteItems> GetItems);
+        Action Add, Action OpenAll, Func<bool> CanOpenAll, Func<TrayQuickNoteItems> GetItems);
 
     internal sealed record TrayQuickNoteItems(IReadOnlyList<TrayQuickNoteItem> Items, string? Status);
 

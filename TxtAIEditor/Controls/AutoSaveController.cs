@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -43,7 +44,9 @@ namespace TxtAIEditor.Controls
             var settings = _settingsProvider();
             if (settings == null) return;
 
-            _enabled = settings.AutoSave && !string.IsNullOrEmpty(GetAutoSaveRoot(settings));
+            var (repoPath, workspacePath) = GetCandidateRoots();
+            _enabled = settings.AutoSave &&
+                (!string.IsNullOrWhiteSpace(repoPath) || !string.IsNullOrWhiteSpace(workspacePath));
             if (_enabled && !_isSaving)
             {
                 _timer.Start();
@@ -62,18 +65,22 @@ namespace TxtAIEditor.Controls
 
         private async void OnTimerTick(object? sender, object e)
         {
-            if (!_enabled || _isSaving) return;
+            if (!_enabled || _isSaving || !_viewModel.Tabs.Any(t => t.IsDirty && !string.IsNullOrEmpty(t.FilePath)))
+            {
+                return;
+            }
 
             _isSaving = true;
             _timer.Stop();
 
             try
             {
-                var settings = _settingsProvider();
-                if (settings == null) return;
-
-                string autoSaveRoot = GetAutoSaveRoot(settings);
-                if (string.IsNullOrEmpty(autoSaveRoot)) return;
+                var roots = GetCandidateRoots();
+                string autoSaveRoot = await Task.Run(() => GetAutoSaveRoot(roots.RepoPath, roots.WorkspacePath));
+                if (string.IsNullOrEmpty(autoSaveRoot) || !_enabled || roots != GetCandidateRoots())
+                {
+                    return;
+                }
 
                 string rootPath;
                 try
@@ -85,24 +92,36 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                var dirtyTabs = _viewModel.Tabs.Where(t =>
+                bool CanSave(OpenedTab tab)
                 {
-                    if (!t.IsDirty || string.IsNullOrEmpty(t.FilePath)) return false;
+                    if (!tab.IsDirty || string.IsNullOrEmpty(tab.FilePath)) return false;
                     try
                     {
-                        string fullPath = Path.GetFullPath(t.FilePath);
+                        string fullPath = Path.GetFullPath(tab.FilePath);
                         return fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase);
                     }
                     catch
                     {
                         return false;
                     }
-                }).ToList();
-
-                foreach (var tab in dirtyTabs)
-                {
-                    await _saveTabAsync(tab);
                 }
+
+                foreach (var tab in _viewModel.Tabs.Where(CanSave).ToArray())
+                {
+                    if (!_enabled || roots != GetCandidateRoots())
+                    {
+                        break;
+                    }
+
+                    if (CanSave(tab))
+                    {
+                        await _saveTabAsync(tab);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Automatic save failed: {ex.Message}");
             }
             finally
             {
@@ -114,21 +133,19 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private string GetAutoSaveRoot(EditorSettings settings)
+        private (string RepoPath, string? WorkspacePath) GetCandidateRoots() =>
+            (_repoPathProvider(), _settingsProvider()?.AutoSaveAllowNonGitFolders == true ? _workspacePathProvider() : null);
+
+        private static string GetAutoSaveRoot(string repoPath, string? workspacePath)
         {
-            string repoPath = _repoPathProvider();
             if (!string.IsNullOrWhiteSpace(repoPath) && Directory.Exists(repoPath))
             {
                 return repoPath;
             }
 
-            if (settings.AutoSaveAllowNonGitFolders)
+            if (!string.IsNullOrWhiteSpace(workspacePath) && Directory.Exists(workspacePath))
             {
-                string workspacePath = _workspacePathProvider();
-                if (!string.IsNullOrWhiteSpace(workspacePath) && Directory.Exists(workspacePath))
-                {
-                    return workspacePath;
-                }
+                return workspacePath;
             }
 
             return string.Empty;
