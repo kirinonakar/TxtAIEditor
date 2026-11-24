@@ -158,8 +158,9 @@ body { padding: 28px 16px 40px; }
     line-height: 1;
 }
 .ppt-text {
-    display: block;
+    display: flow-root;
     width: 100%;
+    flex-shrink: 0;
     transform-origin: top left;
 }
 .ppt-shape p { width: 100%; margin: 0; line-height: 1.15; }
@@ -290,19 +291,35 @@ function fitTextBox(box) {
     text.style.width = '100%';
     text.style.height = 'auto';
 
-    const availableWidth = Math.max(1, box.clientWidth);
-    const availableHeight = Math.max(1, box.clientHeight);
-    const neededWidth = Math.max(1, text.scrollWidth);
-    const neededHeight = Math.max(1, text.scrollHeight);
-    const scale = Math.min(1, availableWidth / neededWidth, availableHeight / neededHeight);
+    const boxStyle = getComputedStyle(box);
+    const availableWidth = Math.max(1, box.clientWidth -
+        parseFloat(boxStyle.paddingLeft) - parseFloat(boxStyle.paddingRight));
+    const availableHeight = Math.max(1, box.clientHeight -
+        parseFloat(boxStyle.paddingTop) - parseFloat(boxStyle.paddingBottom));
+    const naturalWidth = Math.max(1, text.scrollWidth);
+    const naturalHeight = Math.max(1, text.scrollHeight);
+    if (naturalWidth <= text.clientWidth && naturalHeight <= availableHeight) return;
 
-    if (scale < 0.995) {
-        // Keep dense presentation text readable. The previous 0.45 floor made
-        // slides with paragraph separators look like thumbnails in the viewer.
-        const fitScale = Math.max(0.82, scale * 0.985);
-        text.style.width = `${100 / fitScale}%`;
-        text.style.transform = `scale(${fitScale})`;
+    // A wider unscaled text area can remove wraps. Measure each candidate
+    // instead of shrinking in proportion to the original wrapped height.
+    const heightLimit = Math.max(1, availableHeight - 1);
+    let fits = Math.min(1, availableWidth / naturalWidth, heightLimit / naturalHeight);
+    let tooLarge = 1;
+    for (let i = 0; i < 8 && tooLarge - fits > 0.005; i++) {
+        const scale = (fits + tooLarge) / 2;
+        text.style.width = `${100 / scale}%`;
+        if (text.scrollHeight * scale <= heightLimit && text.scrollWidth <= text.clientWidth) {
+            fits = scale;
+        } else {
+            tooLarge = scale;
+        }
     }
+    text.style.width = `${100 / fits}%`;
+    const fittedHeight = text.scrollHeight * fits;
+    // Reserve the scaled height in layout so centered and bottom-anchored
+    // text aligns using its painted height.
+    text.style.height = `${fittedHeight}px`;
+    text.style.transform = `scale(${fits})`;
 }
 function fitSlide(slide) {
     const canvas = slide.querySelector('.slide-canvas');

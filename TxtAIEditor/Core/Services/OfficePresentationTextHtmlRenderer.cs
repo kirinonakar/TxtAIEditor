@@ -393,6 +393,7 @@ namespace TxtAIEditor.Core.Services
                     slideWidth,
                     baseWidthPx,
                     fontScale);
+            bool endsWithBreak = false;
             foreach (XElement element in paragraph.Elements())
             {
                 if (element.Name.LocalName == "r" || element.Name.LocalName == "fld")
@@ -422,12 +423,14 @@ namespace TxtAIEditor.Core.Services
                     }
 
                     builder.Append('>').Append(Html(text)).Append("</span>");
+                    endsWithBreak = false;
                     continue;
                 }
 
                 if (element.Name.LocalName == "br" || element.Name.LocalName == "cr")
                 {
                     builder.Append("<br>");
+                    endsWithBreak = true;
                     continue;
                 }
 
@@ -437,8 +440,16 @@ namespace TxtAIEditor.Core.Services
                     if (!string.IsNullOrEmpty(mathHtml))
                     {
                         builder.Append(mathHtml);
+                        endsWithBreak = false;
                     }
                 }
+            }
+
+            if (endsWithBreak)
+            {
+                // A final <br> by itself ends the current line without laying out
+                // the additional blank line stored in the paragraph.
+                builder.Append("<span aria-hidden=\"true\">&nbsp;</span>");
             }
 
             if (builder.Length == 0)
@@ -744,7 +755,7 @@ namespace TxtAIEditor.Core.Services
                     Text = string.IsNullOrEmpty(marker) ? "•" : marker,
                     Typeface = typeface,
                     Color = ReadBulletColor(levelProperties, bullet, themeColors),
-                    SizeScale = ReadBulletSizeScale(levelProperties),
+                    SizeScale = ReadBulletSizeScale(paragraphProperties, levelProperties),
                     IsTriangle = isTriangle
                 };
             }
@@ -796,10 +807,10 @@ namespace TxtAIEditor.Core.Services
             return ReadPresentationColor(directColor, themeColors);
         }
 
-        private static double ReadBulletSizeScale(XElement? levelProperties)
+        private static double ReadBulletSizeScale(XElement? paragraphProperties, XElement? levelProperties)
         {
-            XElement? size = levelProperties?.Elements()
-                .FirstOrDefault(e => e.Name.LocalName == "buSzPct");
+            XElement? size = paragraphProperties?.Elements().FirstOrDefault(e => e.Name.LocalName == "buSzPct") ??
+                levelProperties?.Elements().FirstOrDefault(e => e.Name.LocalName == "buSzPct");
             return size != null &&
                 TryReadLong(size, "val", out long value) &&
                 value > 0
@@ -812,13 +823,6 @@ namespace TxtAIEditor.Core.Services
             PresentationBulletMarker bullet)
         {
             var style = new StringBuilder();
-            if (bullet.IsTriangle)
-            {
-                style.Append("font-size:")
-                    .Append(FormatInvariant(bullet.SizeScale * 100.0))
-                    .Append("%;");
-            }
-
             builder.Append("<span class=\"ppt-bullet\"");
             if (!string.IsNullOrWhiteSpace(bullet.Typeface))
             {
@@ -842,6 +846,13 @@ namespace TxtAIEditor.Core.Services
             }
 
             builder.Append('>');
+            bool hasCustomSize = bullet.SizeScale != 1.0;
+            if (hasCustomSize)
+            {
+                builder.Append("<span style=\"font-size:")
+                    .Append(FormatInvariant(bullet.SizeScale * 100.0))
+                    .Append("%\">");
+            }
             if (bullet.IsTriangle)
             {
                 builder.Append("<span class=\"ppt-bullet-triangle\"></span>");
@@ -851,6 +862,7 @@ namespace TxtAIEditor.Core.Services
                 builder.Append(EncodeBulletText(bullet.Text));
             }
 
+            if (hasCustomSize) builder.Append("</span>");
             builder.Append(" </span>");
         }
 

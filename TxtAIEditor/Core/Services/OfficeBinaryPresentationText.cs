@@ -146,13 +146,14 @@ namespace TxtAIEditor.Core.Services
             offset += 4;
             int bulletFlags = (mask & 0xF) != 0 ? ReadShort(data, ref offset) : 0;
             int? bulletChar = OptionalShort(data, ref offset, mask, 0x80);
-            _ = OptionalShort(data, ref offset, mask, 0x10); // Bullet font.
-            _ = OptionalShort(data, ref offset, mask, 0x40); // Bullet size.
-            if ((mask & 0x20) != 0) offset += 4;
+            int? bulletFont = OptionalShort(data, ref offset, mask, 0x10);
+            int? bulletSize = OptionalShort(data, ref offset, mask, 0x40);
+            uint? bulletColor = (mask & 0x20) != 0 ? U32(data, offset) : null;
+            if (bulletColor.HasValue) offset += 4;
             int? alignment = OptionalShort(data, ref offset, mask, 0x800);
-            _ = OptionalShort(data, ref offset, mask, 0x1000);
-            _ = OptionalShort(data, ref offset, mask, 0x2000);
-            _ = OptionalShort(data, ref offset, mask, 0x4000);
+            int? lineSpacing = OptionalShort(data, ref offset, mask, 0x1000);
+            int? spaceBefore = OptionalShort(data, ref offset, mask, 0x2000);
+            int? spaceAfter = OptionalShort(data, ref offset, mask, 0x4000);
             int? leftMargin = OptionalShort(data, ref offset, mask, 0x100);
             int? indent = OptionalShort(data, ref offset, mask, 0x400);
             _ = OptionalShort(data, ref offset, mask, 0x8000);
@@ -164,8 +165,12 @@ namespace TxtAIEditor.Core.Services
             _ = OptionalShort(data, ref offset, mask, 0x10000);
             if ((mask & 0xE0000) != 0) _ = ReadShort(data, ref offset);
             _ = OptionalShort(data, ref offset, mask, 0x200000);
-            return new ParagraphStyle(alignment, (mask & 1) != 0 ? (bulletFlags & 1) != 0 : null,
-                bulletChar, leftMargin, indent, null);
+            return new ParagraphStyle(alignment, leftMargin, indent, null, lineSpacing, spaceBefore, spaceAfter,
+                new BulletStyle((mask & 1) != 0 ? (bulletFlags & 1) != 0 : null,
+                    bulletChar is int character ? (ushort)character : null,
+                    (mask & 2) != 0 ? (bulletFlags & 2) != 0 : null, bulletFont,
+                    (mask & 4) != 0 ? (bulletFlags & 4) != 0 : null, bulletColor,
+                    (mask & 8) != 0 ? (bulletFlags & 8) != 0 : null, bulletSize));
         }
 
         private CharacterStyle ReadCharacter(ReadOnlySpan<byte> data, ref int offset)
@@ -182,10 +187,8 @@ namespace TxtAIEditor.Core.Services
             string? color = null;
             if ((mask & 0x40000) != 0)
             {
-                uint rgb = U32(data, offset);
+                color = ResolveColorIndex(U32(data, offset));
                 offset += 4;
-                uint index = rgb >> 24;
-                color = index < colors.Length ? colors[index] : index == 0xFE ? Rgb(rgb) : null;
             }
             _ = OptionalShort(data, ref offset, mask, 0x80000);
             return new CharacterStyle(
@@ -194,7 +197,13 @@ namespace TxtAIEditor.Core.Services
                 (mask & 4) != 0 ? (flags & 4) != 0 : null, font, eastAsianFont, size, color);
         }
 
-        private static XElement ParagraphProperties(ParagraphStyle paragraph, ParagraphStyle master)
+        private string? ResolveColorIndex(uint value)
+        {
+            uint index = value >> 24;
+            return index < colors.Length ? colors[index] : index == 0xFE ? Rgb(value) : null;
+        }
+
+        private XElement ParagraphProperties(ParagraphStyle paragraph, ParagraphStyle master)
         {
             var properties = new XElement(A + "pPr");
             int? alignment = paragraph.Alignment ?? master.Alignment;
@@ -207,14 +216,66 @@ namespace TxtAIEditor.Core.Services
             int? indent = paragraph.Indent ?? master.Indent;
             if (left.HasValue) properties.SetAttributeValue("marL", MasterUnitsToEmu(left.Value));
             if (indent.HasValue) properties.SetAttributeValue("indent", MasterUnitsToEmu(indent.Value - left.GetValueOrDefault()));
-            if (paragraph.Bullet ?? master.Bullet ?? false)
-            {
-                int code = paragraph.BulletChar ?? master.BulletChar ?? 0x2022;
-                string bullet = code < 32 || code >= 0xE000 ? "•" : XmlText(((char)code).ToString());
-                properties.Add(new XElement(A + "buChar", new XAttribute("char", bullet)));
-            }
+
+            properties.Add(ParagraphSpacing("lnSpc", paragraph.LineSpacing ?? master.LineSpacing),
+                ParagraphSpacing("spcBef", paragraph.SpaceBefore ?? master.SpaceBefore),
+                ParagraphSpacing("spcAft", paragraph.SpaceAfter ?? master.SpaceAfter));
+            AppendBullet(properties, paragraph.Bullet, master.Bullet);
             return properties;
         }
+
+        private static XElement? ParagraphSpacing(string name, int? spacing)
+        {
+            if (spacing is not int value) return null;
+            // Positive values are percentages. Negative values store an absolute distance
+            // in master units, with eight master units to a point.
+            return new XElement(A + name, value >= 0
+                ? new XElement(A + "spcPct", new XAttribute("val", value * 1000))
+                : new XElement(A + "spcPts", new XAttribute("val", -value * 100 / 8)));
+        }
+
+        private void AppendBullet(XElement properties, BulletStyle bullet, BulletStyle master)
+        {
+            if (!(bullet.Enabled ?? master.Enabled ?? false)) return;
+
+            int code = bullet.Character ?? master.Character ?? 0x2022;
+            string? typeface = null;
+            if (bullet.HasFont ?? master.HasFont ?? false)
+            {
+                fonts.TryGetValue(bullet.Font ?? master.Font ?? -1, out typeface);
+            }
+
+            if (typeface != null && typeface.Equals("Wingdings", StringComparison.OrdinalIgnoreCase) &&
+                code is 0x006C or 0xF06C)
+            {
+                code = 0x25CF; // The filled-circle glyph in the legacy symbol font.
+                typeface = null;
+            }
+            else if (typeface is not null && IsSymbolFont(typeface) && code is >= 0x20 and <= 0xFF)
+            {
+                code += 0xF000; // These fonts use the Windows symbol character map.
+            }
+
+            if ((bullet.HasColor ?? master.HasColor ?? false) &&
+                (bullet.Color ?? master.Color) is uint colorIndex && ResolveColorIndex(colorIndex) is string color)
+            {
+                properties.Add(new XElement(A + "buClr", new XElement(A + "srgbClr", new XAttribute("val", color))));
+            }
+            if (bullet.HasSize ?? master.HasSize ?? false)
+            {
+                int size = bullet.Size ?? master.Size ?? 0;
+                if (size > 0) properties.Add(new XElement(A + "buSzPct", new XAttribute("val", size * 1000)));
+            }
+            if (typeface != null) properties.Add(new XElement(A + "buFont", new XAttribute("typeface", typeface)));
+            string character = code < 32 || (code >= 0xE000 && typeface == null)
+                ? "•" : XmlText(((char)code).ToString());
+            properties.Add(new XElement(A + "buChar", new XAttribute("char", character)));
+        }
+
+        private static bool IsSymbolFont(string typeface) =>
+            typeface.StartsWith("Wingdings", StringComparison.OrdinalIgnoreCase) ||
+            typeface.Equals("Webdings", StringComparison.OrdinalIgnoreCase) ||
+            typeface.Equals("Symbol", StringComparison.OrdinalIgnoreCase);
 
         private void AppendRun(XElement paragraph, ReadOnlySpan<char> text, CharacterStyle direct, CharacterStyle master, int defaultSize)
         {
@@ -251,8 +312,10 @@ namespace TxtAIEditor.Core.Services
             (mask & bit) != 0 ? ReadShort(data, ref offset) : null;
 
         internal readonly record struct Style(ParagraphStyle Paragraph, CharacterStyle Character);
-        internal readonly record struct ParagraphStyle(int? Alignment, bool? Bullet, int? BulletChar,
-            int? LeftMargin, int? Indent, int? Level);
+        internal readonly record struct ParagraphStyle(int? Alignment, int? LeftMargin, int? Indent, int? Level,
+            int? LineSpacing, int? SpaceBefore, int? SpaceAfter, BulletStyle Bullet);
+        internal readonly record struct BulletStyle(bool? Enabled, int? Character, bool? HasFont, int? Font,
+            bool? HasColor, uint? Color, bool? HasSize, int? Size);
         internal readonly record struct CharacterStyle(bool? Bold, bool? Italic, bool? Underline,
             int? Font, int? EastAsianFont, int? Size, string? Color);
         private readonly record struct ParagraphRun(int End, ParagraphStyle Style);
