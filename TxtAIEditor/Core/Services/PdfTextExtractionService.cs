@@ -442,7 +442,7 @@ namespace TxtAIEditor.Core.Services
                 string? resourceBody = GetPageResourceBody(body, objectBodies);
                 if (!string.IsNullOrEmpty(resourceBody))
                 {
-                    Dictionary<string, ToUnicodeCMap> pageFontMaps = BuildFontUnicodeMapsFromResourceText(resourceBody, fontObjectToCMap);
+                    Dictionary<string, ToUnicodeCMap> pageFontMaps = BuildFontUnicodeMapsFromResourceText(resourceBody, objectBodies, fontObjectToCMap);
                     if (pageFontMaps.Count > 0)
                     {
                         fontUnicodeMaps = pageFontMaps;
@@ -487,7 +487,7 @@ namespace TxtAIEditor.Core.Services
                     continue;
                 }
 
-                Dictionary<string, ToUnicodeCMap> pageFontMaps = BuildFontUnicodeMapsFromResourceText(resourceBody, fontObjectToCMap);
+                Dictionary<string, ToUnicodeCMap> pageFontMaps = BuildFontUnicodeMapsFromResourceText(resourceBody, objectBodies, fontObjectToCMap);
                 if (pageFontMaps.Count == 0)
                 {
                     continue;
@@ -660,10 +660,11 @@ namespace TxtAIEditor.Core.Services
             return pageBody.Substring(dictStart, dictEnd - dictStart + 2);
         }
 
-        private static Dictionary<string, ToUnicodeCMap> BuildFontUnicodeMapsFromResourceText(string resourceText, Dictionary<int, ToUnicodeCMap> fontObjectToCMap)
+        private static Dictionary<string, ToUnicodeCMap> BuildFontUnicodeMapsFromResourceText(
+            string resourceText, Dictionary<int, string> objectBodies, Dictionary<int, ToUnicodeCMap> fontObjectToCMap)
         {
             var result = new Dictionary<string, ToUnicodeCMap>(StringComparer.Ordinal);
-            foreach (string fontBlock in EnumerateFontResourceBlocks(resourceText))
+            foreach (string fontBlock in EnumerateFontResourceBlocks(resourceText, objectBodies))
             {
                 foreach (Match entry in Regex.Matches(fontBlock, @"/(?<name>[A-Za-z0-9_.+\-#]+)\s+(?<obj>\d+)\s+\d+\s+R", RegexOptions.NonBacktracking))
                 {
@@ -751,7 +752,7 @@ namespace TxtAIEditor.Core.Services
                 (text.Contains("beginbfchar", StringComparison.Ordinal) || text.Contains("beginbfrange", StringComparison.Ordinal));
         }
 
-        private static IEnumerable<string> EnumerateFontResourceBlocks(string raw)
+        private static IEnumerable<string> EnumerateFontResourceBlocks(string raw, Dictionary<int, string>? objectBodies = null)
         {
             int searchStart = 0;
             while (searchStart < raw.Length)
@@ -776,6 +777,16 @@ namespace TxtAIEditor.Core.Services
 
                 if (dictStart + 1 >= raw.Length || raw[dictStart] != '<' || raw[dictStart + 1] != '<')
                 {
+                    if (objectBodies is not null)
+                    {
+                        Match reference = Regex.Match(raw.Substring(dictStart), @"^(?<obj>\d+)\s+\d+\s+R\b", RegexOptions.NonBacktracking);
+                        if (reference.Success && int.TryParse(reference.Groups["obj"].Value, out int fontDictionaryObject) &&
+                            objectBodies.TryGetValue(fontDictionaryObject, out string? fontDictionary))
+                        {
+                            yield return fontDictionary;
+                        }
+                    }
+
                     continue;
                 }
 

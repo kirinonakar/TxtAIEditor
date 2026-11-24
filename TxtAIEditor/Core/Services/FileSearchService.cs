@@ -108,7 +108,6 @@ namespace TxtAIEditor.Core.Services
             int foundCount = 0;
             int skippedFiles = 0;
             int resultCount = 0;
-            using var documentSlot = new SemaphoreSlim(4);
 
             void PublishLimitedResults(IReadOnlyList<SearchResultItem> results)
             {
@@ -136,23 +135,9 @@ namespace TxtAIEditor.Core.Services
 
                 try
                 {
-                    int fileFoundCount;
-                    if (DocumentTextExtractionService.IsSupportedExtension(file))
-                    {
-                        await documentSlot.WaitAsync(token).ConfigureAwait(false);
-                        try
-                        {
-                            fileFoundCount = await SearchExtractedDocumentAsync(file, matcher, PublishLimitedResults, token).ConfigureAwait(false);
-                        }
-                        finally
-                        {
-                            documentSlot.Release();
-                        }
-                    }
-                    else
-                    {
-                        fileFoundCount = SearchTextFile(file, matcher, PublishLimitedResults, token);
-                    }
+                    int fileFoundCount = DocumentTextExtractionService.IsSupportedExtension(file)
+                        ? await SearchExtractedDocumentAsync(file, matcher, PublishLimitedResults, token).ConfigureAwait(false)
+                        : SearchTextFile(file, matcher, PublishLimitedResults, token);
 
                     if (fileFoundCount > 0)
                     {
@@ -186,8 +171,7 @@ namespace TxtAIEditor.Core.Services
         {
             int foundCount = 0;
             string extracted = await _documentTextExtractionService
-                .ExtractTextAsync(file, DocumentSearchMaxChars, normalize: false, cancellationToken: cancellationToken,
-                    skipProtectedDocuments: true, preferRdocs2mdForOpenXml: true)
+                .ExtractFolderSearchTextAsync(file, DocumentSearchMaxChars, cancellationToken)
                 .ConfigureAwait(false);
 
             if (string.IsNullOrWhiteSpace(extracted))

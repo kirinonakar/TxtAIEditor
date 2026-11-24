@@ -108,6 +108,11 @@ namespace TxtAIEditor.Core.Services
             string pageParts = legacy
                 ? await BuildPagePartsAsync(archive, relationships, body.Element(body.Name.Namespace + "sectPr")).ConfigureAwait(false)
                 : string.Empty;
+            XDocument? propertiesDocument = legacy
+                ? await TryLoadXmlEntryAsync(archive, "docProps/app.xml").ConfigureAwait(false)
+                : null;
+            bool savedSinglePage = propertiesDocument?.Root?.Elements()
+                .FirstOrDefault(property => property.Name.LocalName == "Pages")?.Value == "1";
             return BuildDocumentHtml(
                 Path.GetFileName(filePath),
                 content.ToString(),
@@ -116,7 +121,8 @@ namespace TxtAIEditor.Core.Services
                 pageHeight,
                 hasSavedPagination,
                 paginateWord: legacy,
-                wordPageParts: pageParts);
+                wordPageParts: pageParts,
+                savedWordSinglePage: savedSinglePage);
         }
 
         private static async Task<string> BuildPagePartsAsync(ZipArchive archive,

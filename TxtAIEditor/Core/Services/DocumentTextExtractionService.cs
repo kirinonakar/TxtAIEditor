@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace TxtAIEditor.Core.Services
@@ -23,6 +24,9 @@ namespace TxtAIEditor.Core.Services
     public sealed class DocumentTextExtractionService
     {
         private static readonly ConcurrentDictionary<int, Process> RunningPdftotextProcesses = new();
+        private static readonly SemaphoreSlim FolderSearchParserSlots = new(4);
+        private static readonly SemaphoreSlim FolderSearchRdocs2mdSlots = new(Math.Clamp(Environment.ProcessorCount, 2, 8));
+        private static readonly DocumentSearchTextCache FolderSearchCache = new();
 
         // Documents converted with rdocs2md before the built-in extractors run. PDF keeps its
         // pdftotext and built-in parser fallbacks, so it resolves as rdocs2md > pdftotext > built-in.
@@ -72,25 +76,84 @@ namespace TxtAIEditor.Core.Services
                 return Truncate(normalize ? NormalizeExtractedText(markdown) : markdown, maxChars);
             }
 
-            if (skipProtectedDocuments && extension is not (".pdf" or ".doc" or ".ppt" or ".xls") &&
-                OfficeLegacyPackage.HasCompoundFileSignature(filePath, cancellationToken))
-            {
-                throw new InvalidDataException("Encrypted Office documents are skipped during folder search.");
-            }
-
-            string text = extension switch
-            {
-                ".pdf" => await ExtractPdfTextAsync(filePath, maxChars, progress, cancellationToken, skipProtectedDocuments).ConfigureAwait(false),
-                ".doc" or ".docx" => await ExtractDocxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                ".ppt" or ".pptx" => await ExtractPptxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                ".xls" or ".xlsx" => await ExtractXlsxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                ".hwpx" => await ExtractHwpxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                _ => string.Empty
-            };
+            string text = extension == ".pdf"
+                ? await ExtractPdfTextAsync(filePath, maxChars, progress, cancellationToken, skipProtectedDocuments).ConfigureAwait(false)
+                : await ExtractWithBuiltInParserAsync(filePath, extension, maxChars, progress, cancellationToken, skipProtectedDocuments).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
             progress?.Report(98);
             return Truncate(normalize ? NormalizeExtractedText(text) : text, maxChars);
+        }
+
+        internal async Task<string> ExtractFolderSearchTextAsync(string filePath, int maxChars, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string extension = Path.GetExtension(filePath).ToLowerInvariant();
+            if (extension is not (".hwp" or ".epub"))
+            {
+                try
+                {
+                    string text = await FolderSearchCache.GetTextAsync(filePath, maxChars, converterPath: null, FolderSearchParserSlots,
+                        (path, token) => ExtractWithBuiltInParserAsync(path, extension, maxChars, progress: null, token, skipProtectedDocuments: true),
+                        cancellationToken).ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        return Truncate(text, maxChars);
+                    }
+                }
+                catch (Exception ex) when (extension != ".pdf" && ex is (InvalidDataException or XmlException or EndOfStreamException or NotSupportedException))
+                {
+                    string? fallback = await TryConvertWithRdocs2mdAsync(filePath, cancellationToken, forFolderSearch: true).ConfigureAwait(false);
+                    if (fallback is null)
+                    {
+                        throw;
+                    }
+
+                    return Truncate(fallback, maxChars);
+                }
+            }
+
+            string? markdown = await TryConvertWithRdocs2mdAsync(filePath, cancellationToken, forFolderSearch: true).ConfigureAwait(false);
+            if (markdown is not null)
+            {
+                return Truncate(markdown, maxChars);
+            }
+
+            if (extension != ".pdf" || !File.Exists(filePath))
+            {
+                return string.Empty;
+            }
+
+            await FolderSearchParserSlots.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await TryExtractPdfWithPdftotextAsync(filePath, maxChars, progress: null, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                FolderSearchParserSlots.Release();
+            }
+        }
+
+        private static Task<string> ExtractWithBuiltInParserAsync(
+            string filePath, string extension, int maxChars, IProgress<int>? progress,
+            CancellationToken cancellationToken, bool skipProtectedDocuments)
+        {
+            if (skipProtectedDocuments && extension is not (".pdf" or ".doc" or ".ppt" or ".xls") &&
+                OfficeLegacyPackage.HasCompoundFileSignature(filePath, cancellationToken))
+            {
+                throw OfficeLegacyPackage.Encrypted();
+            }
+
+            return extension switch
+            {
+                ".pdf" => new PdfTextExtractionService().ExtractTextAsync(filePath, maxChars, progress, cancellationToken, skipProtectedDocuments),
+                ".doc" or ".docx" => ExtractDocxTextAsync(filePath, maxChars, progress, cancellationToken),
+                ".ppt" or ".pptx" => ExtractPptxTextAsync(filePath, maxChars, progress, cancellationToken),
+                ".xls" or ".xlsx" => ExtractXlsxTextAsync(filePath, maxChars, progress, cancellationToken),
+                ".hwpx" => ExtractHwpxTextAsync(filePath, maxChars, progress, cancellationToken),
+                _ => Task.FromResult(string.Empty)
+            };
         }
 
         public static bool IsSupportedExtension(string filePath)
@@ -108,16 +171,20 @@ namespace TxtAIEditor.Core.Services
                 extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static async Task<string?> TryConvertWithRdocs2mdAsync(string filePath, CancellationToken cancellationToken)
+        private static async Task<string?> TryConvertWithRdocs2mdAsync(
+            string filePath, CancellationToken cancellationToken, bool forFolderSearch = false)
         {
-            if (!Rdocs2mdConverter.IsAvailable)
+            if (Rdocs2mdConverter.ExecutablePath is not string converterPath)
             {
                 return null;
             }
 
             try
             {
-                string markdown = await Rdocs2mdConverter.ConvertToMarkdownAsync(filePath, cancellationToken).ConfigureAwait(false);
+                string markdown = forFolderSearch
+                    ? await FolderSearchCache.GetTextAsync(filePath, int.MaxValue, converterPath, FolderSearchRdocs2mdSlots,
+                        Rdocs2mdConverter.ConvertToMarkdownAsync, cancellationToken).ConfigureAwait(false)
+                    : await Rdocs2mdConverter.ConvertToMarkdownAsync(filePath, cancellationToken).ConfigureAwait(false);
                 return string.IsNullOrWhiteSpace(markdown) ? null : markdown;
             }
             catch (OperationCanceledException)
@@ -131,7 +198,7 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private async Task<string> ExtractPdfTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken, bool skipProtectedDocuments)
+        private static async Task<string> ExtractPdfTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken, bool skipProtectedDocuments)
         {
             string text = await TryExtractPdfWithPdftotextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(text))
@@ -140,8 +207,7 @@ namespace TxtAIEditor.Core.Services
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            return await new PdfTextExtractionService()
-                .ExtractTextAsync(filePath, maxChars, progress, cancellationToken, skipProtectedDocuments)
+            return await ExtractWithBuiltInParserAsync(filePath, ".pdf", maxChars, progress, cancellationToken, skipProtectedDocuments)
                 .ConfigureAwait(false);
         }
 

@@ -71,6 +71,7 @@ namespace TxtAIEditor.Core.Services
             offsets += 2;
             ReadFonts(TablePart(word, table, offsets, 15));
             ReadNormalStyle(TablePart(word, table, offsets, 1));
+            ReadOnlySpan<byte> documentProperties = TablePart(word, table, offsets, 31);
             List<PropertyRange> paragraphs = ReadFkp(word, TablePart(word, table, offsets, 13), paragraph: true);
             List<PropertyRange> characters = ReadFkp(word, TablePart(word, table, offsets, 12), paragraph: false);
             ReadOnlySpan<byte> clx = TablePart(word, table, offsets, 33);
@@ -97,7 +98,7 @@ namespace TxtAIEditor.Core.Services
                     ReadAnchoredDrawings(word, table, offsets, textboxes);
                 }
                 ReadHeaderFooter(word, pieces, longWords, TablePart(word, table, offsets, 11),
-                    section, paragraphs, characters, HasDifferentEvenAndOddPages(TablePart(word, table, offsets, 31)));
+                    section, paragraphs, characters, HasDifferentEvenAndOddPages(documentProperties));
                 ReadStory(body, word, pieces, 0, mainLength, paragraphs, characters);
             }
 
@@ -105,6 +106,12 @@ namespace TxtAIEditor.Core.Services
             body.Add(section);
             WriteXml(_archive, "word/document.xml", new XElement(W + "document", body));
             if (_relationships.HasElements) WriteXml(_archive, "word/_rels/document.xml.rels", _relationships);
+            // The last calculated page count is a layout hint for forms with floating shapes.
+            if (_anchoredShapes.Count > 0 && documentProperties.Length >= 48 && I16(documentProperties, 46) == 1)
+            {
+                XNamespace properties = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties";
+                WriteXml(_archive, "docProps/app.xml", new XElement(properties + "Properties", new XElement(properties + "Pages", 1)));
+            }
         }
 
         private static bool HasDifferentEvenAndOddPages(ReadOnlySpan<byte> dop) => dop.Length >= 2 && (U16(dop, 0) & 1) != 0;

@@ -26,7 +26,8 @@ namespace TxtAIEditor.Core.Services
             string? pageHeight = null,
             bool hasSavedPagination = false,
             bool paginateWord = false,
-            string wordPageParts = "")
+            string wordPageParts = "",
+            bool savedWordSinglePage = false)
         {
             string documentPageWidth = string.IsNullOrWhiteSpace(pageWidth) ? "920px" : pageWidth;
             string responsivePageWidth = string.IsNullOrWhiteSpace(pageWidth)
@@ -141,6 +142,7 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
 [data-word-pagination] .doc-table td { min-width: 0; }
 [data-word-pagination] .doc-paragraph { margin: 0; line-height: normal; }
 .doc-page-part { display: flow-root; }
+.doc-fitted-page { display: flow-root; }
 .doc-page-part .doc-image, .doc-positioned-shape .doc-image { margin: 0; }
 .doc-paragraph > .doc-image img { display: inline-block; vertical-align: middle; }
 .doc-drawing-layer { position: relative; height: 0; pointer-events: none; z-index: 1; }
@@ -271,7 +273,7 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
 </style>
 </head>
 <body>
-<main class="page"{{(hasSavedPagination ? " data-saved-pagination" : string.Empty)}}{{(paginateWord ? " data-word-pagination" : string.Empty)}}>
+<main class="page"{{(hasSavedPagination ? " data-saved-pagination" : string.Empty)}}{{(paginateWord ? " data-word-pagination" : string.Empty)}}{{(savedWordSinglePage ? " data-word-single-page" : string.Empty)}}>
 {{content}}
 </main>
 {{wordPageParts}}

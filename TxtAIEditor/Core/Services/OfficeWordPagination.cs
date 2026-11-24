@@ -20,9 +20,11 @@ namespace TxtAIEditor.Core.Services
         const zoom = page.style.zoom;
         page.style.zoom = '1';
         try {
-            const height = readContentHeight() - pagePartHeight;
-            if (height <= 0) return;
+            const pageHeight = readContentHeight();
             liftManualBreaks();
+            if (pageHeight > 0 && fitSinglePage(pageHeight)) return;
+            const height = pageHeight - pagePartHeight;
+            if (height <= 0) return;
             const boundaries = measureBoundaries(height);
             for (const boundary of boundaries) {
                 const separator = document.createElement('span');
@@ -35,6 +37,40 @@ namespace TxtAIEditor.Core.Services
         } finally {
             page.style.zoom = zoom;
         }
+    }
+
+    function fitSinglePage(pageHeight) {
+        if (!page.hasAttribute('data-word-single-page') || page.querySelector('.doc-page-break')) return false;
+        const blocks = [...page.children];
+        const style = getComputedStyle(page);
+        const width = page.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        if (width <= 0 || blocks.length === 0) return false;
+
+        const group = document.createElement('div');
+        group.className = 'doc-fitted-page';
+        group.style.width = width + 'px';
+        group.append(...blocks);
+        page.append(group);
+        placePagePartsAndDrawings(group);
+
+        const origin = group.getBoundingClientRect().top;
+        let height = Math.max(1, group.scrollHeight);
+        for (const drawing of group.querySelectorAll('.doc-positioned-shape')) {
+            height = Math.max(height, Math.ceil(drawing.getBoundingClientRect().bottom - origin));
+        }
+        const scale = Math.min(1, Math.floor(pageHeight / height * 10000) / 10000);
+        if (scale < 0.65) {
+            // The stored statistics can be stale. Allow normal pagination when
+            // honoring them would make the document hard to read.
+            page.append(...blocks);
+            group.remove();
+            return false;
+        }
+        // Keep line wrapping at the original width and scale the text and
+        // floating drawings together. Reserve the full area the drawings use.
+        group.style.minHeight = height + 'px';
+        if (scale < 1) group.style.zoom = String(scale);
+        return true;
     }
 
     function loadImages(root) {
@@ -74,8 +110,8 @@ namespace TxtAIEditor.Core.Services
         return pageParts.get(kind + '-' + variant) ?? pageParts.get(kind + '-default');
     }
 
-    function placePagePartsAndDrawings() {
-        const blocks = [...page.children];
+    function placePagePartsAndDrawings(container = page) {
+        const blocks = [...container.children];
         let start = 0;
         let pageIndex = 0;
         for (let end = 0; end <= blocks.length; end++) {
@@ -85,8 +121,8 @@ namespace TxtAIEditor.Core.Services
             const header = findPagePart('header', pageIndex);
             const footer = findPagePart('footer', pageIndex);
             const first = content[0] ?? separator;
-            if (header) page.insertBefore(header.content.cloneNode(true), first ?? null);
-            if (footer) page.insertBefore(footer.content.cloneNode(true), separator ?? null);
+            if (header) container.insertBefore(header.content.cloneNode(true), first ?? null);
+            if (footer) container.insertBefore(footer.content.cloneNode(true), separator ?? null);
             placeDrawings(content);
             start = end + 1;
             pageIndex++;

@@ -108,7 +108,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 
 ### 🤖 AI Agent
 *   **Complex Workspace Tasks:** Executes multi-step workspace tasks using tools (file I/O, terminal execution, web search/fetch, and document text extraction).
-*   **Markdown Document Conversion:** When `rdocs2md.exe` is available on `PATH`, the `extract_document` tool and the Explorer panel's folder-wide content search use it to convert PDF, DOCX, PPTX, XLSX, HWPX, HWP, EPUB, DOC, XLS, and PPT files to Markdown (`.md`).
+*   **Markdown Document Conversion:** When `rdocs2md.exe` is available on `PATH`, the `extract_document` tool uses it to convert PDF, DOCX, PPTX, XLSX, HWPX, HWP, EPUB, DOC, XLS, and PPT files to Markdown (`.md`).
 *   **Multisession Management:** Runs and manages parallel, fully isolated agent environments (workspace paths, settings, history, subagent, and background execution).
 *   **Agent Chat Tab:** Stream the live agent conversation into a dedicated editor tab with its own prompt composer, turn navigation, and inline Markdown, math, Mermaid and chart rendering.
 *   **Model Context Protocol (MCP) Support:** Dynamically connects HTTP or stdio MCP servers to expose custom tools to the agent, with built-in support for:
@@ -121,7 +121,7 @@ Designed for developers, writers, and power users, TxtAIEditor provides a fluid,
 ### 🔄 rdocs2md Integration
 *   **Optional External Converter:** When [`rdocs2md`](https://github.com/kirinonakar/rdocs2md) (`rdocs2md.exe`) is available on `PATH` (or beside the application in its `Tools` folder), TxtAIEditor uses it as a universal document converter. When it is missing, the built-in readers and the Office conversion path behave exactly as before — no configuration is required in either case.
 *   **HTML Document Preview:** Opening an `.hwp` file converts it to a self-contained HTML document with `rdocs2md` and shows the result read-only in HTML live preview mode.
-*   **Folder-Wide Content Search:** The Explorer panel searches Markdown converted by `rdocs2md` for PDF, HWP, HWPX, EPUB, and Office documents. If `rdocs2md` is unavailable or conversion fails, `.hwpx`, `.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, and `.xlsx` remain searchable through the built-in Office parsers. PDFs use `rdocs2md`, then `pdftotext`, then the built-in PDF parser. `.hwp` content search requires `rdocs2md`.
+*   **Folder-Wide Content Search:** The Explorer panel first uses built-in parsers for Office documents, HWPX, and PDF. It uses `rdocs2md` for HWP, EPUB, and as a fallback when the built-in parser cannot extract text. For PDF, `pdftotext` is the final fallback. The app caches built-in and `rdocs2md` results in memory for repeat searches.
 *   **Agent Document Extraction:** The Agent's `extract_document` tool converts supported documents (`.pdf`, `.docx`, `.pptx`, `.xlsx`, `.hwpx`, `.hwp`, `.epub`, `.doc`, `.xls`, `.ppt`) to Markdown (`.md`) with `rdocs2md`, and exports selected worksheet sheets to CSV (`.csv`).
 *   **Supported Extensions:** `.pdf`, `.hwp`, `.hwpx`, `.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx`, `.odt`, `.ods`, `.odp`, `.rtf`, `.epub`.
 
