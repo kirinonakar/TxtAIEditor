@@ -55,6 +55,7 @@ namespace TxtAIEditor.Controls
         private readonly Action _refreshEditorWorkspaceSplitters;
         private readonly Action<object> _initializePickerWindow;
         private readonly Action<string, string> _openTextInEditor;
+        private bool _themeToggleInProgress;
 
         public MainWindowSettingsController(
             AppWindow appWindow,
@@ -140,26 +141,32 @@ namespace TxtAIEditor.Controls
 
         public async Task ToggleThemeAsync()
         {
-            var settings = _settingsService.CurrentSettings;
-            if (settings.Theme == "Light")
+            if (_themeToggleInProgress)
             {
-                settings.Theme = "Dark";
+                return;
             }
-            else if (settings.Theme == "Dark")
-            {
-                settings.Theme = "PastelDark";
-            }
-            else
-            {
-                settings.Theme = "Light";
-            }
-            await _settingsService.SaveSettingsAsync(settings);
 
-            ApplyUiPersonalization(settings);
-            _livePreviewController.ApplyPreferredColorScheme(settings.Theme);
-            ApplyPreferredColorSchemeToOpenEditors(settings.Theme);
-            await ApplySettingsToOpenEditorsAsync(settings);
-            _livePreviewController.RenderActiveTab();
+            _themeToggleInProgress = true;
+            try
+            {
+                var settings = _settingsService.CurrentSettings;
+                settings.Theme = settings.Theme switch
+                {
+                    "Light" => "Dark",
+                    "Dark" => "PastelDark",
+                    _ => "Light"
+                };
+                await _settingsService.SaveSettingsAsync(settings);
+
+                ApplyUiPersonalization(settings);
+                ApplyWebViewColorScheme(settings.Theme);
+                await ApplySettingsToEditorTabsAsync(settings);
+                _livePreviewController.RenderActiveTab();
+            }
+            finally
+            {
+                _themeToggleInProgress = false;
+            }
         }
 
         public async Task ShowSettingsAsync(string? initialTab = null)
@@ -202,6 +209,7 @@ namespace TxtAIEditor.Controls
             _updateAutoSaveStatus();
             _topToolbar.WordWrapIsChecked = settings.WordWrap;
             ApplyUiPersonalization(settings);
+            ApplyWebViewColorScheme(settings.Theme);
             _editorWorkspace.ApplyTerminalSettings(settings);
             _rightSidebar.AgentPane.ApplySettings(settings);
             LocalizeUi();
@@ -242,6 +250,15 @@ namespace TxtAIEditor.Controls
 
         public async Task ApplySettingsToOpenEditorsAsync(EditorSettings settings)
         {
+            await ApplySettingsToEditorTabsAsync(settings);
+            if (_notebookViewerController != null)
+            {
+                await _notebookViewerController.ApplySettingsAsync(settings);
+            }
+        }
+
+        private async Task ApplySettingsToEditorTabsAsync(EditorSettings settings)
+        {
             foreach (var grp in _tabBridges.Values)
             {
                 if (grp.Bridge != null)
@@ -252,11 +269,6 @@ namespace TxtAIEditor.Controls
                 {
                     grp.WebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(CreateEditorOptionsMessage(settings)));
                 }
-            }
-
-            if (_notebookViewerController != null)
-            {
-                await _notebookViewerController.ApplySettingsAsync(settings);
             }
         }
 
@@ -329,14 +341,16 @@ namespace TxtAIEditor.Controls
             return result;
         }
 
-        private void ApplyPreferredColorSchemeToOpenEditors(string theme)
+        private void ApplyWebViewColorScheme(string theme)
         {
+            _livePreviewController.ApplyPreferredColorScheme(theme);
             foreach (var grp in _tabBridges.Values)
             {
                 WebViewAppearanceService.ApplyPreferredColorScheme(grp.WebView?.CoreWebView2, theme);
             }
             _pdfViewerController.ApplyPreferredColorScheme(theme);
             _officeDocumentViewerController.ApplyPreferredColorScheme(theme);
+            _notebookViewerController?.ApplyPreferredColorScheme(theme);
         }
 
         private void ApplyMarkdownToolbarBackground(Windows.UI.Color color)

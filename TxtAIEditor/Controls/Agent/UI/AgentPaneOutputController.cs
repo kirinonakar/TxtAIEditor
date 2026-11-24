@@ -61,6 +61,7 @@ namespace TxtAIEditor.Controls
         private string? _pendingThinkingLabel;
         private DateTimeOffset _lastThinkingLabelRender = DateTimeOffset.MinValue;
         private bool _outputRenderDeferred;
+        private bool _themeRenderQueued;
         private bool _forceOutputRender;
         private bool _outputSelectionLostByRender;
         private DispatcherTimer? _outputRenderResumeTimer;
@@ -82,7 +83,22 @@ namespace TxtAIEditor.Controls
             _outputPages.ElementClearing += OnOutputPageClearing;
             _outputPages.Loaded += (_, _) => QueueOutputScrollToEnd();
             _outputPages.SizeChanged += (_, _) => QueueOutputScrollToEnd();
-            _resourceOwner.ActualThemeChanged += (_, _) => RenderFullOutputText(force: true);
+            _resourceOwner.ActualThemeChanged += OnActualThemeChanged;
+        }
+
+        private void OnActualThemeChanged(FrameworkElement sender, object args)
+        {
+            if (_themeRenderQueued)
+            {
+                return;
+            }
+
+            // Rebuilding rich text while XAML propagates a theme can reenter layout.
+            _themeRenderQueued = _resourceOwner.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                _themeRenderQueued = false;
+                RenderFullOutputText(force: true);
+            });
         }
 
         public string RawOutputText

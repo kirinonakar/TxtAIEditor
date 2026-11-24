@@ -11,16 +11,21 @@ namespace TxtAIEditor.Core.Services
         {
             try
             {
-                if (coreWebView?.Profile == null)
+                var profile = coreWebView?.Profile;
+                if (profile == null)
                 {
                     return;
                 }
 
                 bool isDark = string.Equals(theme, "Dark", StringComparison.OrdinalIgnoreCase) ||
                               string.Equals(theme, "PastelDark", StringComparison.OrdinalIgnoreCase);
-                coreWebView.Profile.PreferredColorScheme = isDark
+                var colorScheme = isDark
                     ? CoreWebView2PreferredColorScheme.Dark
                     : CoreWebView2PreferredColorScheme.Light;
+                if (profile.PreferredColorScheme != colorScheme)
+                {
+                    profile.PreferredColorScheme = colorScheme;
+                }
             }
             catch { }
         }

@@ -125,7 +125,11 @@ namespace TxtAIEditor.Controls
 
         public void Find() => RunCommand(FindAsync);
 
-        public void ToggleTheme() => RunCommand(_settingsController.ToggleThemeAsync);
+        public void ToggleTheme()
+        {
+            // The editor can invoke this from a WebView2 message callback.
+            _topToolbar.DispatcherQueue.TryEnqueue(() => RunCommand(_settingsController.ToggleThemeAsync));
+        }
 
         public void ShowSettings() => RunCommand(() => _settingsController.ShowSettingsAsync());
 

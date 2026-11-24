@@ -40,6 +40,7 @@ namespace TxtAIEditor.Controls
         private bool _webViewReady;
         private bool _webViewInitializing;
         private bool _resizeQueued;
+        private bool _themeUpdateQueued;
         private string _terminalProfileId = "PowerShell";
         private string _terminalFontFamily = "Consolas";
         private double _terminalFontSize = 13.0;
@@ -1083,7 +1084,16 @@ namespace TxtAIEditor.Controls
 
         private void OnActualThemeChanged(FrameworkElement sender, object args)
         {
-            UpdateAllTerminalThemes();
+            if (_themeUpdateQueued)
+            {
+                return;
+            }
+
+            _themeUpdateQueued = _dispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+            {
+                _themeUpdateQueued = false;
+                UpdateAllTerminalThemes();
+            });
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)

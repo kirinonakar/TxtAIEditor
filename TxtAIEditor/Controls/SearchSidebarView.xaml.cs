@@ -9,6 +9,9 @@ namespace TxtAIEditor.Controls
 {
     public sealed partial class SearchSidebarView : UserControl
     {
+        private string _collapseAllText = string.Empty;
+        private string _expandAllText = string.Empty;
+
         public SearchSidebarView()
         {
             InitializeComponent();
@@ -50,6 +53,9 @@ namespace TxtAIEditor.Controls
             ReplaceAllButton.Content = getString("ReplaceAllFiles", "모두 바꾸기");
             ClearResultsButton.Content = getString("SearchClearResults", "지우기");
             ToolTipService.SetToolTip(ClearResultsButton, getString("SearchClearResultsTooltip", "검색을 중지하고 검색어와 결과 지우기"));
+            _collapseAllText = getString("EditorContextMenuCollapseAll", "전체 접기");
+            _expandAllText = getString("EditorContextMenuExpandAll", "전체 펼치기");
+            UpdateSearchResultsButton();
 
             if (Resources.TryGetValue("LocBridge", out var bridgeObject) &&
                 bridgeObject is LocalizationBridge bridge)
@@ -63,6 +69,23 @@ namespace TxtAIEditor.Controls
         private void OnReplaceAllClick(object sender, RoutedEventArgs e) => ReplaceAllClick?.Invoke(sender, e);
         private void OnClearResultsClick(object sender, RoutedEventArgs e) => ClearResultsClick?.Invoke(sender, e);
         private void OnReplaceOneClick(object sender, RoutedEventArgs e) => ReplaceOneClick?.Invoke(sender, e);
+
+        private void OnToggleSearchResultsClick(object sender, RoutedEventArgs e)
+        {
+            bool collapse = SearchResultsList.Visibility == Visibility.Visible;
+            SearchResultsList.Visibility = collapse ? Visibility.Collapsed : Visibility.Visible;
+            SearchResultFilesList.Visibility = collapse ? Visibility.Visible : Visibility.Collapsed;
+            UpdateSearchResultsButton();
+        }
+
+        private void UpdateSearchResultsButton()
+        {
+            bool expanded = SearchResultsList.Visibility == Visibility.Visible;
+            ToggleSearchResultsIcon.Glyph = expanded ? "\uE70E" : "\uE70D";
+            string action = expanded ? _collapseAllText : _expandAllText;
+            ToolTipService.SetToolTip(ToggleSearchResultsButton, action);
+            AutomationProperties.SetName(ToggleSearchResultsButton, action);
+        }
 
         private void OnSearchResultFileClick(object sender, RoutedEventArgs e)
         {

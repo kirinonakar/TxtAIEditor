@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -39,6 +40,8 @@ namespace TxtAIEditor.Controls
         private readonly ExplorerSearchService _searchService;
         private readonly ExplorerGitStatusService _gitStatusService;
         private int _gitStatusVersion;
+        private bool _themeRefreshQueued;
+        private int _themeRefreshVersion;
         private readonly ExplorerBreadcrumbBuilder _breadcrumbBuilder;
         private System.Threading.CancellationTokenSource? _remoteCancellation;
         private CancellationTokenSource? _filterCancellation;
@@ -114,11 +117,7 @@ namespace TxtAIEditor.Controls
                 _leftSidebar.DispatcherQueue.TryEnqueue(() => _ = RefreshRemoteDirectoryAsync());
             _remoteWorkspaceService.ConfirmWebDavCertificateAsync = ConfirmWebDavCertificateAsync;
             UpdateSortButtonVisuals();
-            _leftSidebar.ActualThemeChanged += (sender, args) =>
-            {
-                RefreshExplorerItemThemeColors();
-                _ = UpdateGitStatusesAsync();
-            };
+            _leftSidebar.ActualThemeChanged += OnActualThemeChanged;
         }
 
         private async Task<bool> ConfirmWebDavCertificateAsync(Uri uri, CancellationToken cancellationToken)
@@ -825,20 +824,58 @@ namespace TxtAIEditor.Controls
             node.IsExpanded = true;
         }
 
+        private void OnActualThemeChanged(FrameworkElement sender, object args)
+        {
+            _themeRefreshVersion++;
+            if (!_themeRefreshQueued)
+            {
+                _themeRefreshQueued = _leftSidebar.DispatcherQueue.TryEnqueue(
+                    DispatcherQueuePriority.Low, RefreshExplorerItemThemeColors);
+            }
+        }
+
         private void RefreshExplorerItemThemeColors()
         {
+            _themeRefreshQueued = false;
+            int version = _themeRefreshVersion;
             bool isDark = _leftSidebar.ActualTheme == ElementTheme.Dark;
-            foreach (var item in _viewModel.ExplorerItems)
+            var items = _viewModel.ExplorerItems.Concat(EnumerateTreeItems()).ToArray();
+            int offset = 0;
+
+            void ApplyNextBatch()
             {
-                item.IsDark = isDark;
-                item.RefreshThemeColors();
+                if (version != _themeRefreshVersion)
+                {
+                    return;
+                }
+
+                var elapsed = Stopwatch.StartNew();
+                int batchEnd = Math.Min(offset + 128, items.Length);
+                while (offset < batchEnd)
+                {
+                    var item = items[offset++];
+                    if (item.IsDark == isDark)
+                    {
+                        // Dark and Pastel Dark share the same base theme but have different icon colors.
+                        item.RefreshThemeColors();
+                    }
+                    else
+                    {
+                        item.IsDark = isDark;
+                    }
+                    if (elapsed.ElapsedMilliseconds >= 4)
+                    {
+                        break;
+                    }
+                }
+
+                if (offset < items.Length)
+                {
+                    _leftSidebar.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ApplyNextBatch);
+                }
             }
 
-            foreach (var item in EnumerateTreeItems())
-            {
-                item.IsDark = isDark;
-                item.RefreshThemeColors();
-            }
+            ApplyNextBatch();
         }
 
         private void WireEvents()

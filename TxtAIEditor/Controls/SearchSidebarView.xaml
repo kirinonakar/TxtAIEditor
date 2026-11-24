@@ -10,6 +10,24 @@
         <DataTemplate x:Key="SearchActionContentTemplate">
             <TextBlock Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center"/>
         </DataTemplate>
+        <DataTemplate x:Key="SearchResultFileHeaderTemplate" x:DataType="models:SearchResultGroup">
+            <Grid Padding="8,4,8,4" Background="{ThemeResource SystemControlBackgroundListLowBrush}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE7C3;" FontSize="11" Margin="0,0,6,0" Foreground="{ThemeResource SystemControlForegroundAccentBrush}" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" ToolTipService.ToolTip="{x:Bind Path}">
+                    <HyperlinkButton Content="{x:Bind FileName}" Tag="{x:Bind Path}" Click="OnSearchResultFileClick"
+                                     FontWeight="Bold" FontSize="11" Padding="0" MinWidth="0" MinHeight="0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{x:Bind RelativeDirectory}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+                <Border Grid.Column="2" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="10" Padding="6,1,6,1" VerticalAlignment="Center">
+                    <TextBlock Text="{x:Bind MatchCount, Mode=OneWay}" FontSize="8" FontWeight="Bold" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                </Border>
+            </Grid>
+        </DataTemplate>
     </UserControl.Resources>
     <Grid x:Name="RootGrid" Padding="0,10,0,10" Visibility="Collapsed">
                                 <Grid.RowDefinitions>
@@ -22,9 +40,14 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="SearchHeaderText" TextWrapping="Wrap" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                                        <TextBlock x:Name="SearchHeaderText" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
                                         <Ellipse x:Name="SearchProgressDot" Grid.Column="1" Width="7" Height="7" Fill="#2FB344" Visibility="Collapsed" VerticalAlignment="Center"/>
+                                        <Button x:Name="ToggleSearchResultsButton" Grid.Column="2" Click="OnToggleSearchResultsClick"
+                                                Width="32" Height="28" Padding="0" VerticalAlignment="Center">
+                                            <FontIcon x:Name="ToggleSearchResultsIcon" Glyph="&#xE70E;" FontSize="12"/>
+                                        </Button>
                                     </Grid>
                                     <TextBox x:Name="SearchQueryInput" PlaceholderText="검색어 입력..." KeyDown="OnSearchQueryInputKeyDown" Height="32" FontSize="12" FontFamily="Segoe UI, Malgun Gothic" VerticalContentAlignment="Center" Padding="10,8,10,0" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Disabled" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"/>
                                     <TextBox x:Name="ReplaceQueryInput" PlaceholderText="바꿀 단어 입력..." Height="32" FontSize="12" FontFamily="Segoe UI, Malgun Gothic" VerticalContentAlignment="Center" Padding="10,8,10,0" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Disabled" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"/>
@@ -58,27 +81,21 @@
     
                                 <ListView x:Name="SearchResultsList" Grid.Row="1" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="OnSearchResultItemClick">
                                     <ListView.GroupStyle>
-                                        <GroupStyle>
-                                            <GroupStyle.HeaderTemplate>
-                                                <DataTemplate x:DataType="models:SearchResultGroup">
-                                                    <Grid Padding="8,4,8,4" Background="{ThemeResource SystemControlBackgroundListLowBrush}">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <FontIcon Glyph="&#xE7C3;" FontSize="11" Margin="0,0,6,0" Foreground="{ThemeResource SystemControlForegroundAccentBrush}" VerticalAlignment="Center"/>
-                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" ToolTipService.ToolTip="{x:Bind Path}">
-                                                            <HyperlinkButton Content="{x:Bind FileName}" Tag="{x:Bind Path}" Click="OnSearchResultFileClick"
-                                                                             FontWeight="Bold" FontSize="11" Padding="0" MinWidth="0" MinHeight="0" VerticalAlignment="Center"/>
-                                                            <TextBlock Text="{x:Bind RelativeDirectory}" FontSize="9" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                                        </StackPanel>
-                                                        <Border Grid.Column="2" Background="{ThemeResource SystemControlBackgroundAccentBrush}" CornerRadius="10" Padding="6,1,6,1" VerticalAlignment="Center">
-                                                            <TextBlock Text="{x:Bind MatchCount, Mode=OneWay}" FontSize="8" FontWeight="Bold" Foreground="White"/>
-                                                        </Border>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </GroupStyle.HeaderTemplate>
+                                        <GroupStyle HeaderTemplate="{StaticResource SearchResultFileHeaderTemplate}">
+                                            <GroupStyle.HeaderContainerStyle>
+                                                <Style TargetType="ListViewHeaderItem">
+                                                    <Setter Property="Margin" Value="0"/>
+                                                    <Setter Property="MinHeight" Value="0"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="ListViewHeaderItem">
+                                                                <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                                                  HorizontalContentAlignment="Stretch"/>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </GroupStyle.HeaderContainerStyle>
                                         </GroupStyle>
                                     </ListView.GroupStyle>
                                     <ListView.ItemTemplate>
@@ -96,6 +113,17 @@
                                             </Grid>
                                         </DataTemplate>
                                     </ListView.ItemTemplate>
+                                </ListView>
+                                <ListView x:Name="SearchResultFilesList" Grid.Row="1" Visibility="Collapsed"
+                                          ItemsSource="{Binding SearchResultsGrouped}" SelectionMode="None"
+                                          ItemTemplate="{StaticResource SearchResultFileHeaderTemplate}">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="MinHeight" Value="0"/>
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
                                 </ListView>
     </Grid>
 </UserControl>

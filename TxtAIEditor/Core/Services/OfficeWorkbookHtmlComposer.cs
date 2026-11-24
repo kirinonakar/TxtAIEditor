@@ -18,6 +18,11 @@ namespace TxtAIEditor.Core.Services
 {
     internal static class OfficeWorkbookHtmlComposer
     {
+        private static readonly JsonSerializerOptions WorkbookJsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
         public static async Task<string> BuildAsync(string filePath, Func<string, string, string> getString)
         {
             IReadOnlyList<ViewerWorkbookSheet> sheets = await OfficeWorkbookPackageReader.ReadAsync(filePath).ConfigureAwait(false);
@@ -26,17 +31,31 @@ namespace TxtAIEditor.Core.Services
                 return BuildErrorHtml(getString("OfficeViewerNoSheets", "No sheets to display."));
             }
 
+            var cellStyles = new List<CellAppearance>();
+            var styleIndexes = new Dictionary<CellAppearance, int>();
+
+            object CreateCellPayload(ViewerWorkbookCell cell)
+            {
+                var appearance = new CellAppearance(cell.BackgroundColor, cell.TextColor, cell.Bold, cell.Italic);
+                if (appearance == default)
+                {
+                    return cell.Value;
+                }
+
+                if (!styleIndexes.TryGetValue(appearance, out int index))
+                {
+                    index = cellStyles.Count;
+                    styleIndexes.Add(appearance, index);
+                    cellStyles.Add(appearance);
+                }
+
+                return new object[] { cell.Value, index };
+            }
+
             var sheetPayload = sheets.Select(sheet => new
             {
                 name = sheet.Name,
-                rows = sheet.Rows.Select(row => row.Select(cell => new
-                {
-                    value = cell.Value,
-                    backgroundColor = cell.BackgroundColor,
-                    textColor = cell.TextColor,
-                    bold = cell.Bold,
-                    italic = cell.Italic
-                }).ToArray()).ToArray(),
+                rows = sheet.Rows.Select(row => row.Select(CreateCellPayload)),
                 objects = sheet.Objects.Select(item => new
                 {
                     type = item.Kind,
@@ -46,17 +65,12 @@ namespace TxtAIEditor.Core.Services
                     width = item.Width,
                     height = item.Height,
                     hasHeader = item.HasHeader,
-                    rows = item.Rows.Select(row => row.Select(cell => new
-                    {
-                        value = cell.Value,
-                        backgroundColor = cell.BackgroundColor,
-                        textColor = cell.TextColor,
-                        bold = cell.Bold,
-                        italic = cell.Italic
-                    }).ToArray()).ToArray()
-                }).ToArray()
-            }).ToArray();
+                    rows = item.Rows.Select(row => row.Select(CreateCellPayload))
+                })
+            });
+            // Enumerating the sheet payload also fills the shared style list.
             string sheetsJson = JsonSerializer.Serialize(sheetPayload);
+            string cellStylesJson = JsonSerializer.Serialize(cellStyles, WorkbookJsonOptions);
             string emptySheetTextJson = JsonSerializer.Serialize(getString("OfficeViewerEmptySheet", "Empty sheet."));
             string rowsTextJson = JsonSerializer.Serialize(getString("OfficeViewerRowsLabel", "rows"));
             string columnsTextJson = JsonSerializer.Serialize(getString("OfficeViewerColumnsLabel", "columns"));
@@ -334,6 +348,7 @@ td.selected-cell.active-cell {
 <div id="tableWrap" class="table-wrap"></div>
 <script>
 const sheets = {{sheetsJson}};
+const cellStyles = {{cellStylesJson}};
 const emptySheetText = {{emptySheetTextJson}};
 const rowsText = {{rowsTextJson}};
 const columnsText = {{columnsTextJson}};
@@ -378,27 +393,26 @@ function cell(tag, text, className) {
 }
 
 function valueOf(cell) {
-    return cell && typeof cell === 'object' ? (cell.value ?? '') : (cell ?? '');
+    return Array.isArray(cell) ? cell[0] : (cell ?? '');
 }
 
 function applyCellStyle(td, cell) {
-    if (!cell || typeof cell !== 'object') return;
-    if (cell.backgroundColor) td.style.backgroundColor = cell.backgroundColor;
-    if (cell.textColor) td.style.color = cell.textColor;
-    if (cell.bold) td.style.fontWeight = '700';
-    if (cell.italic) td.style.fontStyle = 'italic';
+    if (!Array.isArray(cell)) return;
+    const style = cellStyles[cell[1]];
+    if (style.backgroundColor) td.style.backgroundColor = style.backgroundColor;
+    if (style.textColor) td.style.color = style.textColor;
+    if (style.bold) td.style.fontWeight = '700';
+    if (style.italic) td.style.fontStyle = 'italic';
 }
 
 function createWorkbookCell(sourceCell) {
     const value = String(valueOf(sourceCell) ?? '');
     const td = document.createElement('td');
     td.className = 'xlsx-cell';
-    td.dataset.xlsxHasValue = value.length > 0 ? 'true' : 'false';
-
-    const text = document.createElement('span');
-    text.className = 'xlsx-cell-text';
-    text.textContent = value;
-    td.appendChild(text);
+    if (value.length > 0) {
+        td.dataset.xlsxHasValue = 'true';
+        td.appendChild(cell('span', value, 'xlsx-cell-text'));
+    }
     applyCellStyle(td, sourceCell);
     return td;
 }
@@ -407,28 +421,29 @@ function updateWorkbookTextOverflow() {
     const table = wrap.querySelector('table.workbook-table');
     if (!table) return;
 
-    table.querySelectorAll('tbody tr').forEach(row => {
-        const cells = Array.from(row.querySelectorAll('td.xlsx-cell[data-csv-column]'));
-        let nextValueCell = null;
+    // Each body cell lines up with its header. Read the column positions
+    // together before writing any widths to avoid repeated layout work.
+    const headers = table.tHead.rows[0].cells;
+    const columnLefts = [];
+    for (let column = 1; column < headers.length; column++) {
+        columnLefts[column] = headers[column].getBoundingClientRect().left;
+    }
 
-        for (let index = cells.length - 1; index >= 0; index--) {
-            const currentCell = cells[index];
-            const text = currentCell.querySelector('.xlsx-cell-text');
+    for (const row of table.tBodies[0].rows) {
+        const cells = row.cells;
+        let nextValueColumn = -1;
+        for (let column = cells.length - 1; column > 0; column--) {
+            const text = cells[column].firstElementChild;
             if (!text) continue;
 
-            text.style.width = 'max-content';
-            if (currentCell.dataset.xlsxHasValue !== 'true') continue;
-
-            if (nextValueCell) {
-                const currentRect = currentCell.getBoundingClientRect();
-                const nextRect = nextValueCell.getBoundingClientRect();
-                const availableWidth = Math.max(0, Math.round(nextRect.left - currentRect.left - 8));
-                text.style.width = `${availableWidth}px`;
+            if (nextValueColumn !== -1) {
+                const availableWidth = Math.max(0, Math.round(columnLefts[nextValueColumn] - columnLefts[column] - 8));
+                const width = `${availableWidth}px`;
+                if (text.style.width !== width) text.style.width = width;
             }
-
-            nextValueCell = currentCell;
+            nextValueColumn = column;
         }
-    });
+    }
 }
 
 function scheduleWorkbookTextOverflowUpdate() {
@@ -865,6 +880,8 @@ function renderSheet(index, rowLimit = maxRows) {
         }
         tbody.appendChild(tr);
     });
+    selectionState = createCellSelection(0, 0);
+    tbody.rows[0].cells[1].classList.add('selected-cell', 'active-cell');
     table.appendChild(tbody);
     wrap.appendChild(table);
     renderSheetObjects(sheet);
@@ -873,10 +890,6 @@ function renderSheet(index, rowLimit = maxRows) {
     meta.innerHTML = `${rows.length.toLocaleString()} ${rowsText} x ${columnCount.toLocaleString()} ${columnsText}` +
         (rows.length > maxRows ? ` <span class="truncated">${firstShown}</span>` : '');
 
-    if (!selectionState) {
-        selectionState = createCellSelection(0, 0);
-    }
-    applySelectionClasses();
     updateResizedStyles();
 }
 
@@ -887,7 +900,6 @@ window.__txtAiEditorPrepareWorkbookPdf = () => {
     exportDocument.className = 'office-pdf-workbook';
     sheets.forEach((sheet, index) => {
         activeSheetIndex = index;
-        selectionState = null;
         renderSheet(index, Number.MAX_SAFE_INTEGER);
         const section = document.createElement('section');
         section.className = 'office-pdf-sheet';
@@ -908,7 +920,6 @@ sheets.forEach((sheet, index) => {
 });
 select.addEventListener('change', () => {
     activeSheetIndex = Number(select.value || 0);
-    selectionState = null;
     renderSheet(activeSheetIndex);
 });
 wrap.addEventListener('pointerdown', event => {
@@ -969,6 +980,8 @@ renderSheet(0);
 </html>
 """;
         }
+
+        private readonly record struct CellAppearance(string? BackgroundColor, string? TextColor, bool Bold, bool Italic);
 
         private static string BuildErrorHtml(string message)
         {

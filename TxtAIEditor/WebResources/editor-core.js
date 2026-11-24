@@ -305,7 +305,8 @@ function applyOptions(msg) {
         msg.foldCollapseText, msg.foldExpandText, msg.foldSelectionFormat,
         msg.chartErrorLabel,
         msg.markdownTableText,
-        !!msg.editInMarkdownPreview, !!msg.usePele, theme
+        !!msg.editInMarkdownPreview, !!msg.usePele,
+        state.inlineLivePreviewEnabled ? theme : null
     ]);
     const layoutChanged = appliedLayoutOptionsKey !== layoutOptionsKey;
     const renderChanged = appliedRenderOptionsKey !== renderOptionsKey;
@@ -426,8 +427,8 @@ function applyOptions(msg) {
         document.documentElement.style.setProperty('--hex-data-odd', '#8a8a8a');
     }
 
-    // Colors are CSS variables: changing them must not discard measured rows
-    // or rebuild the document (including the active IME contenteditable).
+    // Palette changes repaint source rows through CSS variables. Inline preview
+    // may also need to regenerate themed diagrams without dropping layout measurements.
     if (layoutChanged) {
         clearMeasuredLineHeights();
     }

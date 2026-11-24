@@ -24,13 +24,16 @@ namespace TxtAIEditor.Core.Services
             bool wasPastelDark = Application.Current.Resources.TryGetValue("ActiveTheme", out var activeTheme) &&
                 string.Equals(activeTheme as string, "PastelDark", StringComparison.Ordinal);
             bool isPastelDark = settings.Theme == "PastelDark";
-            if (isPastelDark)
+            if (wasPastelDark != isPastelDark)
             {
-                ApplyPastelDarkTheme();
-            }
-            else
-            {
-                ClearCustomThemeOverrides();
+                if (isPastelDark)
+                {
+                    ApplyPastelDarkTheme();
+                }
+                else
+                {
+                    ClearCustomThemeOverrides();
+                }
             }
 
             var requestedTheme = settings.Theme == "Light" ? ElementTheme.Light : ElementTheme.Dark;
@@ -42,7 +45,10 @@ namespace TxtAIEditor.Core.Services
                     ? ElementTheme.Light
                     : ElementTheme.Dark;
             }
-            rootElement.RequestedTheme = requestedTheme;
+            if (rootElement.RequestedTheme != requestedTheme)
+            {
+                rootElement.RequestedTheme = requestedTheme;
+            }
 
             ApplyTitleBarTheme(settings, appWindow);
             ApplyMarkdownToolbarTheme(settings, applyMarkdownToolbarBackground);
