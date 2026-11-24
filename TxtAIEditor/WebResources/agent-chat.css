@@ -171,6 +171,19 @@ body {
 
 .assistant code { font: .9em Consolas, monospace; }
 .assistant :not(pre) > code { padding: .12em .27em; border-radius: 4px; background: var(--code); }
+.assistant .code-block-copy { position: relative; margin: .75em 0; }
+.assistant .code-block-copy > pre { margin: 0; }
+.assistant .message-copy.code-copy {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    margin: 0;
+    padding: 1px 7px;
+    background: var(--card);
+    opacity: .85;
+}
+.assistant .message-copy.code-copy:hover { background: var(--bubble); opacity: 1; }
+.assistant .message-content > :last-child > .code-block-copy { margin-bottom: 0; }
 .assistant table { border-collapse: collapse; }
 .assistant th, .assistant td { padding: 5px 10px; border: 1px solid var(--line); }
 .assistant .short-cell { white-space: nowrap; }

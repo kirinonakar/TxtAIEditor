@@ -81,6 +81,8 @@ let assistantRoleLabel = '';
 let sessionCopyId = null;
 let sessionCopyFeedbackTimer;
 let nextCopyId = 0;
+let nextCodeCopyId = 0;
+const codeCopyButtons = new Map();
 let canBranch = false;
 let canRewind = false;
 let sessionItems = [];
@@ -291,6 +293,33 @@ function assistantBlocks(text) {
     return { blocks, copyText: markdown.join('\n\n') };
 }
 
+// Adds a copy button to every fenced code block so only the code body is copied.
+function attachCodeCopyButtons(container) {
+    for (const pre of container.querySelectorAll('pre')) {
+        if (pre.parentElement?.classList.contains('code-block-copy')) continue;
+        const code = pre.querySelector('code');
+        const text = code ? code.textContent : '';
+        if (!text) continue;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'code-block-copy';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'message-copy code-copy';
+        button.setAttribute('aria-live', 'polite');
+        button.textContent = copyLabel;
+        button.title = copyLabel;
+        button.setAttribute('aria-label', copyLabel);
+        const copyId = `code-${++nextCodeCopyId}`;
+        button.addEventListener('click', () => host.postMessage({ action: 'copy', copyId, text }));
+        codeCopyButtons.set(copyId, button);
+        pre.replaceWith(wrapper);
+        wrapper.append(pre, button);
+    }
+    for (const [copyId, button] of codeCopyButtons) {
+        if (!button.isConnected) codeCopyButtons.delete(copyId);
+    }
+}
+
 function renderAssistant(view, text) {
     const { blocks, copyText } = assistantBlocks(text);
     const content = view.content;
@@ -316,6 +345,7 @@ function renderAssistant(view, text) {
             for (const cell of node.querySelectorAll('th, td')) {
                 if (cell.textContent.trim().length <= 3) cell.classList.add('short-cell');
             }
+            attachCodeCopyButtons(node);
         } else {
             node.textContent = block.activity;
         }
@@ -1282,6 +1312,11 @@ host.addEventListener('message', ({ data }) => {
             slashPalette.setAttribute('aria-label', data.prompt ?? '');
             if (slashState.open) renderSlashPalette();
             setCopyAllLabel(copyAllLabel);
+            for (const button of codeCopyButtons.values()) {
+                button.textContent = copyLabel;
+                button.title = copyLabel;
+                button.setAttribute('aria-label', copyLabel);
+            }
             for (const view of messageViews) {
                 syncBranchButton(view);
                 syncEditButtons(view);
@@ -1326,6 +1361,13 @@ host.addEventListener('message', ({ data }) => {
                 clearTimeout(sessionCopyFeedbackTimer);
                 setCopyAllLabel(data.success ? copiedLabel : copyFailedLabel, data.success ? '✓' : '×');
                 sessionCopyFeedbackTimer = setTimeout(() => setCopyAllLabel(copyAllLabel), 1600);
+                break;
+            }
+            const codeButton = codeCopyButtons.get(data.copyId);
+            if (codeButton) {
+                clearTimeout(codeButton.copyFeedbackTimer);
+                codeButton.textContent = data.success ? copiedLabel : copyFailedLabel;
+                codeButton.copyFeedbackTimer = setTimeout(() => { codeButton.textContent = copyLabel; }, 1600);
                 break;
             }
             const view = messageViews.find(message => message.copyId === data.copyId);
