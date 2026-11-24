@@ -339,12 +339,17 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
                 return null;
             }
 
+            string extension = Path.GetExtension(imagePath).ToLowerInvariant();
+            if (extension is ".emf" or ".wmf")
+            {
+                return OfficePresentationPackageReader.TryReadImageDataUri(archive, imagePath);
+            }
+
             using Stream stream = entry.Open();
             using var memory = new MemoryStream();
             stream.CopyTo(memory);
 
             byte[] bytes = memory.ToArray();
-            string extension = Path.GetExtension(imagePath).ToLowerInvariant();
             if (extension is ".tif" or ".tiff")
             {
                 byte[]? pngBytes = ConvertTiffBytesToPngBytes(bytes);

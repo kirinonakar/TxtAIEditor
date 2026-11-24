@@ -139,13 +139,6 @@ namespace TxtAIEditor.Core.Services
                 : int.MaxValue;
         }
 
-        internal static async Task<ZipArchive> OpenArchiveAsync(string filePath)
-        {
-            var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096, useAsync: true);
-            await Task.CompletedTask.ConfigureAwait(false);
-            return new ZipArchive(stream, ZipArchiveMode.Read);
-        }
-
         internal static async Task<XDocument?> TryLoadXmlEntryAsync(ZipArchive archive, string path)
         {
             ZipArchiveEntry? entry = archive.GetEntry(path);

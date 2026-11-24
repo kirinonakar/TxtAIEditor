@@ -21,82 +21,31 @@ namespace TxtAIEditor.Core.Services
 
         private async Task<string> BuildHtmlCoreAsync(string filePath, bool forPdf)
         {
-            string extension = Path.GetExtension(filePath);
-            string tempFilePath = string.Empty;
-            bool isTempFile = false;
+            string extension = Path.GetExtension(filePath).ToLowerInvariant();
 
             try
             {
-                try
+                string html = extension switch
                 {
-                    if (extension.Equals(".doc", StringComparison.OrdinalIgnoreCase))
-                    {
-                        tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(filePath).ConfigureAwait(false);
-                        filePath = tempFilePath;
-                        extension = ".docx";
-                        isTempFile = true;
-                    }
-                    else if (extension.Equals(".xls", StringComparison.OrdinalIgnoreCase))
-                    {
-                        tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(filePath).ConfigureAwait(false);
-                        filePath = tempFilePath;
-                        extension = ".xlsx";
-                        isTempFile = true;
-                    }
-                    else if (extension.Equals(".ppt", StringComparison.OrdinalIgnoreCase))
-                    {
-                        tempFilePath = await OfficeDocumentConverter.ConvertToPptxAsync(filePath).ConfigureAwait(false);
-                        filePath = tempFilePath;
-                        extension = ".pptx";
-                        isTempFile = true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    if (forPdf) throw;
-                    return AddFindPanel(BuildErrorHtml(ex.Message));
-                }
-
-                if (extension.Equals(".docx", StringComparison.OrdinalIgnoreCase))
-                {
-                    string html = await OfficeTextDocumentHtmlRenderer.BuildWordAsync(filePath, _getString).ConfigureAwait(false);
-                    return forPdf ? html : AddFindPanel(html);
-                }
-
-                if (extension.Equals(".hwpx", StringComparison.OrdinalIgnoreCase))
-                {
-                    string html = await OfficeTextDocumentHtmlRenderer.BuildHwpxAsync(filePath, _getString).ConfigureAwait(false);
-                    return forPdf ? html : AddFindPanel(html);
-                }
-
-                if (extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase))
-                {
-                    string html = await OfficePresentationDocumentHtmlRenderer.BuildAsync(filePath, _getString).ConfigureAwait(false);
-                    return forPdf ? html : AddFindPanel(html);
-                }
-
-                if (extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
-                {
-                    string html = await OfficeWorkbookDocumentHtmlRenderer.BuildAsync(filePath, _getString).ConfigureAwait(false);
-                    return forPdf ? html : AddFindPanel(html);
-                }
-
-                if (forPdf) throw new NotSupportedException(_getString("OfficeViewerUnsupportedDocument", "Unsupported Office document."));
-                return AddFindPanel(BuildErrorHtml(_getString("OfficeViewerUnsupportedDocument", "Unsupported Office document.")));
+                    ".doc" or ".docx" => await OfficeTextDocumentHtmlRenderer.BuildWordAsync(filePath, _getString).ConfigureAwait(false),
+                    ".ppt" or ".pptx" => await OfficePresentationDocumentHtmlRenderer.BuildAsync(filePath, _getString).ConfigureAwait(false),
+                    ".xls" or ".xlsx" => await OfficeWorkbookDocumentHtmlRenderer.BuildAsync(filePath, _getString).ConfigureAwait(false),
+                    ".hwpx" => await OfficeTextDocumentHtmlRenderer.BuildHwpxAsync(filePath, _getString).ConfigureAwait(false),
+                    _ => throw new NotSupportedException(_getString("OfficeViewerUnsupportedDocument", "Unsupported Office document."))
+                };
+                return forPdf ? html : AddFindPanel(html);
             }
-            finally
+            catch (OfficeLegacyPackage.EncryptedDocumentException) when (!forPdf)
             {
-                if (isTempFile && !string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
-                {
-                    try
-                    {
-                        File.Delete(tempFilePath);
-                    }
-                    catch
-                    {
-                        // Ignore delete errors for temp files
-                    }
-                }
+                return AddFindPanel(BuildErrorHtml(_getString("OfficeViewerLegacyEncrypted", "This Office document is password-encrypted.")));
+            }
+            catch (Exception ex) when (!forPdf && (extension is ".doc" or ".ppt" or ".xls" || ex is NotSupportedException))
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+                string message = ex is NotSupportedException
+                    ? _getString("OfficeViewerUnsupportedDocument", "Unsupported Office document.")
+                    : string.Format(_getString("OfficeViewerLegacyReadError", "Could not read the binary Office document. {0}"), ex.Message);
+                return AddFindPanel(BuildErrorHtml(message));
             }
         }
 

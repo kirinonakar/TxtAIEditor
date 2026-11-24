@@ -3359,6 +3359,12 @@
   <data name="OfficeViewerUnsupportedDocument" xml:space="preserve">
     <value>지원하지 않는 Office 문서입니다.</value>
   </data>
+  <data name="OfficeViewerLegacyEncrypted" xml:space="preserve">
+    <value>암호로 보호된 Office 문서입니다.</value>
+  </data>
+  <data name="OfficeViewerLegacyReadError" xml:space="preserve">
+    <value>Office 바이너리 문서를 읽을 수 없습니다. {0}</value>
+  </data>
   <data name="OfficeViewerDocxStructureError" xml:space="preserve">
     <value>DOCX 문서 구조를 읽을 수 없습니다.</value>
   </data>

@@ -84,9 +84,6 @@ namespace TxtAIEditor.Controls
             });
 
             string relativePath = _workspace.RelativePath(fullPath);
-            string tempFilePath = string.Empty;
-            bool isTempFile = false;
-            string targetPathForExtraction = fullPath;
             string extension = Path.GetExtension(fullPath).ToLowerInvariant();
             IReadOnlyList<string> requestedSheets = SplitSheetSelection(sheet);
             bool useRdocs2mdSheets = requestedSheets.Count > 0 &&
@@ -107,130 +104,83 @@ namespace TxtAIEditor.Controls
                     extension);
             }
 
+            if (!useMarkdown && (extension is ".xls" or ".xlsx"))
+            {
+                return await ExtractSpreadsheetAsync(fullPath, relativePath, outputPath, limit, progress, requestedSheets, path).ConfigureAwait(false);
+            }
+
+            string text;
             try
             {
-                try
-                {
-                    _workspace.VerifyResolvedPath(fullPath);
-                    if (!useMarkdown && extension == ".doc")
-                    {
-                        tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(fullPath).ConfigureAwait(false);
-                        targetPathForExtraction = tempFilePath;
-                        isTempFile = true;
-                    }
-                    else if (!useMarkdown && extension == ".xls")
-                    {
-                        tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(fullPath).ConfigureAwait(false);
-                        targetPathForExtraction = tempFilePath;
-                        isTempFile = true;
-                    }
-                    else if (!useMarkdown && extension == ".ppt")
-                    {
-                        tempFilePath = await OfficeDocumentConverter.ConvertToPptxAsync(fullPath).ConfigureAwait(false);
-                        targetPathForExtraction = tempFilePath;
-                        isTempFile = true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    return string.Format(
-                        _getString("AgentExtractDocumentReadFailedFormat", "extract_document failed: could not extract text from {0}: {1}"),
-                        path,
-                        ex.Message);
-                }
-
-                if (!useMarkdown && Path.GetExtension(targetPathForExtraction).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
-                {
-                    return await ExtractSpreadsheetAsync(targetPathForExtraction, relativePath, outputPath, limit, progress, requestedSheets, path).ConfigureAwait(false);
-                }
-
-                string text;
-                try
-                {
-                    _workspace.VerifyResolvedPath(targetPathForExtraction);
-                    text = useMarkdown
-                        ? Truncate(await Rdocs2mdConverter.ConvertToMarkdownAsync(targetPathForExtraction, _cancellationToken()).ConfigureAwait(false), limit)
-                        : await _documentTextExtractionService.ExtractTextAsync(targetPathForExtraction, limit, progress).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    return string.Format(
-                        _getString("AgentExtractDocumentReadFailedFormat", "extract_document failed: could not extract text from {0}: {1}"),
-                        path,
-                        ex.Message);
-                }
-
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    return string.Format(
-                        _getString("AgentExtractDocumentNoTextFormat", "extract_document: no text extracted from {0}. If this is a scanned PDF or image-only document, OCR may be required."),
-                        relativePath);
-                }
-
-                string targetFullPath;
-                try
-                {
-                    targetFullPath = string.IsNullOrWhiteSpace(outputPath)
-                        ? GetDefaultExtractedTextPath(fullPath, useMarkdown)
-                        : _workspace.ResolveInsideWorkspace(outputPath);
-                }
-                catch (Exception ex)
-                {
-                    return string.Format(_getString("AgentExtractDocumentFailedFormat", "extract_document failed: {0}"), ex.Message);
-                }
-
-                string defaultOutputExtension = GetDefaultExtractedTextExtension(fullPath, useMarkdown);
-                if (string.IsNullOrWhiteSpace(Path.GetExtension(targetFullPath)))
-                {
-                    targetFullPath += defaultOutputExtension;
-                }
-                _workspace.VerifyWritablePath(targetFullPath);
-
-                string newContent = NormalizeNewlines(text);
-                bool targetAlreadyExists = File.Exists(targetFullPath);
-                if (targetAlreadyExists)
-                {
-                    string oldContent = NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath));
-                    if (string.Equals(newContent, oldContent, StringComparison.Ordinal))
-                    {
-                        var unchangedBuilder = new StringBuilder();
-                        unchangedBuilder.AppendLine($"{_getString("AgentExtractDocumentUnchangedPrefix", "extract_document unchanged:")} {_workspace.RelativePath(targetFullPath)}");
-                        unchangedBuilder.AppendLine(_getString("AgentExtractDocumentUnchangedDetail", "The output file already contains the extracted text."));
-                        return unchangedBuilder.ToString();
-                    }
-
-                    targetFullPath = _workspace.GetAvailableSiblingPath(targetFullPath);
-                }
-
-                await AgentFileEditToolService.WriteNewWorkspaceFileAsync(_workspace, targetFullPath, newContent, Encoding.UTF8, _cancellationToken());
-                await _notifyFileModifiedAsync(targetFullPath);
-
-                string targetRelativePath = _workspace.RelativePath(targetFullPath);
-                var builder = new StringBuilder();
-                builder.AppendLine($"{_getString("AgentExtractDocumentSavedPrefix", "extract_document saved:")} {targetRelativePath}");
-                builder.AppendLine($"{_getString("AgentExtractDocumentSourcePrefix", "source:")} {relativePath}");
-                if (targetAlreadyExists)
-                {
-                    builder.AppendLine(string.Format(
-                        _getString("AgentExtractDocumentOutputExistsNoteFormat", "note: requested output existed, so the converted text was saved to a new file instead of overwriting: {0}"),
-                        targetRelativePath));
-                }
-                return builder.ToString();
+                _workspace.VerifyResolvedPath(fullPath);
+                text = useMarkdown
+                    ? Truncate(await Rdocs2mdConverter.ConvertToMarkdownAsync(fullPath, _cancellationToken()).ConfigureAwait(false), limit)
+                    : await _documentTextExtractionService.ExtractTextAsync(fullPath, limit, progress, cancellationToken: _cancellationToken()).ConfigureAwait(false);
             }
-            finally
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                if (isTempFile && !string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
-                {
-                    try
-                    {
-                        File.Delete(tempFilePath);
-                    }
-                    catch
-                    {
-                        // Ignore delete errors for temp files
-                    }
-                }
+                return string.Format(
+                    _getString("AgentExtractDocumentReadFailedFormat", "extract_document failed: could not extract text from {0}: {1}"),
+                    path,
+                    ex.Message);
             }
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Format(
+                    _getString("AgentExtractDocumentNoTextFormat", "extract_document: no text extracted from {0}. If this is a scanned PDF or image-only document, OCR may be required."),
+                    relativePath);
+            }
+
+            string targetFullPath;
+            try
+            {
+                targetFullPath = string.IsNullOrWhiteSpace(outputPath)
+                    ? GetDefaultExtractedTextPath(fullPath, useMarkdown)
+                    : _workspace.ResolveInsideWorkspace(outputPath);
+            }
+            catch (Exception ex)
+            {
+                return string.Format(_getString("AgentExtractDocumentFailedFormat", "extract_document failed: {0}"), ex.Message);
+            }
+
+            string defaultOutputExtension = GetDefaultExtractedTextExtension(fullPath, useMarkdown);
+            if (string.IsNullOrWhiteSpace(Path.GetExtension(targetFullPath)))
+            {
+                targetFullPath += defaultOutputExtension;
+            }
+            _workspace.VerifyWritablePath(targetFullPath);
+
+            string newContent = NormalizeNewlines(text);
+            bool targetAlreadyExists = File.Exists(targetFullPath);
+            if (targetAlreadyExists)
+            {
+                string oldContent = NormalizeNewlines(await File.ReadAllTextAsync(targetFullPath));
+                if (string.Equals(newContent, oldContent, StringComparison.Ordinal))
+                {
+                    var unchangedBuilder = new StringBuilder();
+                    unchangedBuilder.AppendLine($"{_getString("AgentExtractDocumentUnchangedPrefix", "extract_document unchanged:")} {_workspace.RelativePath(targetFullPath)}");
+                    unchangedBuilder.AppendLine(_getString("AgentExtractDocumentUnchangedDetail", "The output file already contains the extracted text."));
+                    return unchangedBuilder.ToString();
+                }
+
+                targetFullPath = _workspace.GetAvailableSiblingPath(targetFullPath);
+            }
+
+            await AgentFileEditToolService.WriteNewWorkspaceFileAsync(_workspace, targetFullPath, newContent, Encoding.UTF8, _cancellationToken());
+            await _notifyFileModifiedAsync(targetFullPath);
+
+            string targetRelativePath = _workspace.RelativePath(targetFullPath);
+            var builder = new StringBuilder();
+            builder.AppendLine($"{_getString("AgentExtractDocumentSavedPrefix", "extract_document saved:")} {targetRelativePath}");
+            builder.AppendLine($"{_getString("AgentExtractDocumentSourcePrefix", "source:")} {relativePath}");
+            if (targetAlreadyExists)
+            {
+                builder.AppendLine(string.Format(
+                    _getString("AgentExtractDocumentOutputExistsNoteFormat", "note: requested output existed, so the converted text was saved to a new file instead of overwriting: {0}"),
+                    targetRelativePath));
+            }
+            return builder.ToString();
         }
 
         private async Task<string> ExtractSpreadsheetAsync(
@@ -246,9 +196,9 @@ namespace TxtAIEditor.Controls
             try
             {
                 _workspace.VerifyResolvedPath(fullPath);
-                sheets = await DocumentTextExtractionService.ExtractXlsxSheetsAsync(fullPath, maxChars, progress);
+                sheets = await DocumentTextExtractionService.ExtractXlsxSheetsAsync(fullPath, maxChars, progress, _cancellationToken());
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return string.Format(
                     _getString("AgentExtractDocumentReadFailedFormat", "extract_document failed: could not extract text from {0}: {1}"),

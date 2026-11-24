@@ -3359,6 +3359,12 @@ Plan: {0}</value>
   <data name="OfficeViewerUnsupportedDocument" xml:space="preserve">
     <value>Unsupported Office document.</value>
   </data>
+  <data name="OfficeViewerLegacyEncrypted" xml:space="preserve">
+    <value>This Office document is password-encrypted.</value>
+  </data>
+  <data name="OfficeViewerLegacyReadError" xml:space="preserve">
+    <value>Could not read the binary Office document. {0}</value>
+  </data>
   <data name="OfficeViewerDocxStructureError" xml:space="preserve">
     <value>Could not read the DOCX document structure.</value>
   </data>

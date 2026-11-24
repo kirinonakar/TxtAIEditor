@@ -3359,6 +3359,12 @@
   <data name="OfficeViewerUnsupportedDocument" xml:space="preserve">
     <value>不受支援的 Office 文件。</value>
   </data>
+  <data name="OfficeViewerLegacyEncrypted" xml:space="preserve">
+    <value>此 Office 文件已使用密碼加密。</value>
+  </data>
+  <data name="OfficeViewerLegacyReadError" xml:space="preserve">
+    <value>無法讀取二進位 Office 文件。{0}</value>
+  </data>
   <data name="OfficeViewerDocxStructureError" xml:space="preserve">
     <value>無法讀取 DOCX 文檔結構。</value>
   </data>

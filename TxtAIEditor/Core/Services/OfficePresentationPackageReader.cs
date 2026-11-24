@@ -20,19 +20,6 @@ namespace TxtAIEditor.Core.Services
         private const int MaxMetafileRenderDimension = 4096;
         private static readonly object MetafileRenderLock = new();
 
-        public static async Task<ZipArchive> OpenArchiveAsync(string filePath)
-        {
-            var stream = new FileStream(
-                filePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.ReadWrite | FileShare.Delete,
-                4096,
-                useAsync: true);
-            await Task.CompletedTask.ConfigureAwait(false);
-            return new ZipArchive(stream, ZipArchiveMode.Read);
-        }
-
         public static async Task<XDocument?> TryLoadXmlEntryAsync(ZipArchive archive, string path)
         {
             ZipArchiveEntry? entry = archive.GetEntry(path);

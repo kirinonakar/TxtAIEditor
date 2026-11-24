@@ -19,7 +19,7 @@ namespace TxtAIEditor.Core.Services
             Func<string, string, string> getString)
         {
             using ZipArchive archive =
-                await OfficePresentationPackageReader.OpenArchiveAsync(filePath)
+                await OfficeLegacyPackage.OpenAsync(filePath)
                     .ConfigureAwait(false);
             XDocument? presentation =
                 await OfficePresentationPackageReader.TryLoadXmlEntryAsync(

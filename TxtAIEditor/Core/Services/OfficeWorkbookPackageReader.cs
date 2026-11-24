@@ -21,7 +21,7 @@ namespace TxtAIEditor.Core.Services
     {
         internal static async Task<IReadOnlyList<ViewerWorkbookSheet>> ReadAsync(string filePath)
         {
-            using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
+            using ZipArchive archive = await OfficeLegacyPackage.OpenAsync(filePath).ConfigureAwait(false);
             IReadOnlyList<string> sharedStrings = await LoadWorkbookSharedStringsAsync(archive).ConfigureAwait(false);
             IReadOnlyList<string> themeColors = await LoadWorkbookThemeColorsAsync(archive).ConfigureAwait(false);
             IReadOnlyList<ViewerCellStyle> styles = await LoadWorkbookStylesAsync(archive, themeColors).ConfigureAwait(false);

@@ -17,7 +17,7 @@ namespace TxtAIEditor.Core.Services
     {
         public static async Task<string> BuildAsync(string filePath, Func<string, string, string> getString)
         {
-            using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
+            using ZipArchive archive = await OfficeLegacyPackage.OpenAsync(filePath).ConfigureAwait(false);
             XDocument? document = await TryLoadXmlEntryAsync(archive, "word/document.xml").ConfigureAwait(false);
             if (document == null)
             {
@@ -304,14 +304,26 @@ namespace TxtAIEditor.Core.Services
                 _ => null
             };
 
-            if (string.IsNullOrWhiteSpace(alignment))
-            {
-                return string.Empty;
-            }
+            var styles = new List<string>();
+            if (alignment != null) styles.Add("text-align:" + alignment);
+            if (value == "distribute") styles.Add("text-align-last:justify");
 
-            return value == "distribute"
-                ? "text-align:justify;text-align-last:justify"
-                : "text-align:" + alignment;
+            XElement? spacing = GetDirectProperty(paragraphProperties, "spacing");
+            XElement? indentation = GetDirectProperty(paragraphProperties, "ind");
+            AppendMeasurement(styles, spacing, "before", "margin-top");
+            AppendMeasurement(styles, spacing, "after", "margin-bottom");
+            AppendMeasurement(styles, indentation, "left", "margin-left");
+            AppendMeasurement(styles, indentation, "right", "margin-right");
+            AppendMeasurement(styles, indentation, "firstLine", "text-indent");
+            return string.Join(';', styles);
+        }
+
+        private static void AppendMeasurement(List<string> styles, XElement? properties, string attribute, string css)
+        {
+            if (TryReadWordTwips(properties, attribute, out int value))
+            {
+                styles.Add(css + ":" + WordTwipsToCssPoints(value));
+            }
         }
 
         private static void AppendInlineHtml(
@@ -416,6 +428,13 @@ namespace TxtAIEditor.Core.Services
             }
 
             var styles = new List<string>();
+            XElement? fonts = GetDirectProperty(properties, "rFonts");
+            string ascii = GetAttributeValue(fonts, "ascii");
+            string eastAsian = GetAttributeValue(fonts, "eastAsia");
+            string fontFamilies = string.Join(',', new[] { ascii, eastAsian }.Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(font => Regex.IsMatch(font, @"^[\p{L}\p{M}\p{N} ._+\-]{1,128}$"))
+                .Select(font => "'" + font + "'"));
+            if (fontFamilies.Length > 0) styles.Add("font-family:" + fontFamilies + ",serif");
             if (properties.Elements().Any(e => e.Name.LocalName == "b"))
             {
                 styles.Add("font-weight:700");

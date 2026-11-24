@@ -67,66 +67,25 @@ namespace TxtAIEditor.Core.Services
                 return Truncate(normalize ? NormalizeExtractedText(markdown) : markdown, maxChars);
             }
 
-            if (skipProtectedDocuments && extension != ".pdf" && OfficeSearchProtection.IsEncrypted(filePath, cancellationToken))
+            if (skipProtectedDocuments && extension is not (".pdf" or ".doc" or ".ppt" or ".xls") &&
+                OfficeLegacyPackage.HasCompoundFileSignature(filePath, cancellationToken))
             {
                 throw new InvalidDataException("Encrypted Office documents are skipped during folder search.");
             }
 
-            string tempFilePath = string.Empty;
-            bool isTempFile = false;
-
-            try
+            string text = extension switch
             {
-                if (extension == ".doc")
-                {
-                    tempFilePath = await OfficeDocumentConverter.ConvertToDocxAsync(filePath, skipProtectedDocuments).ConfigureAwait(false);
-                    filePath = tempFilePath;
-                    extension = ".docx";
-                    isTempFile = true;
-                }
-                else if (extension == ".xls")
-                {
-                    tempFilePath = await OfficeDocumentConverter.ConvertToXlsxAsync(filePath, skipProtectedDocuments).ConfigureAwait(false);
-                    filePath = tempFilePath;
-                    extension = ".xlsx";
-                    isTempFile = true;
-                }
-                else if (extension == ".ppt")
-                {
-                    tempFilePath = await OfficeDocumentConverter.ConvertToPptxAsync(filePath).ConfigureAwait(false);
-                    filePath = tempFilePath;
-                    extension = ".pptx";
-                    isTempFile = true;
-                }
+                ".pdf" => await ExtractPdfTextAsync(filePath, maxChars, progress, cancellationToken, skipProtectedDocuments).ConfigureAwait(false),
+                ".doc" or ".docx" => await ExtractDocxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                ".ppt" or ".pptx" => await ExtractPptxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                ".xls" or ".xlsx" => await ExtractXlsxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                ".hwpx" => await ExtractHwpxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
+                _ => string.Empty
+            };
 
-                string text = extension switch
-                {
-                    ".pdf" => await ExtractPdfTextAsync(filePath, maxChars, progress, cancellationToken, skipProtectedDocuments).ConfigureAwait(false),
-                    ".docx" => await ExtractDocxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                    ".pptx" => await ExtractPptxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                    ".xlsx" => await ExtractXlsxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                    ".hwpx" => await ExtractHwpxTextAsync(filePath, maxChars, progress, cancellationToken).ConfigureAwait(false),
-                    _ => string.Empty
-                };
-
-                cancellationToken.ThrowIfCancellationRequested();
-                progress?.Report(98);
-                return Truncate(normalize ? NormalizeExtractedText(text) : text, maxChars);
-            }
-            finally
-            {
-                if (isTempFile && !string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
-                {
-                    try
-                    {
-                        File.Delete(tempFilePath);
-                    }
-                    catch
-                    {
-                        // Ignore delete errors for temp files
-                    }
-                }
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(98);
+            return Truncate(normalize ? NormalizeExtractedText(text) : text, maxChars);
         }
 
         public static bool IsSupportedExtension(string filePath)
@@ -363,7 +322,7 @@ namespace TxtAIEditor.Core.Services
 
         private static async Task<string> ExtractDocxTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken)
         {
-            using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
+            using ZipArchive archive = await OfficeLegacyPackage.OpenAsync(filePath, cancellationToken).ConfigureAwait(false);
             ZipArchiveEntry? entry = archive.GetEntry("word/document.xml");
             if (entry == null)
             {
@@ -391,7 +350,7 @@ namespace TxtAIEditor.Core.Services
 
         private static async Task<string> ExtractPptxTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken)
         {
-            using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
+            using ZipArchive archive = await OfficeLegacyPackage.OpenAsync(filePath, cancellationToken).ConfigureAwait(false);
             var slideEntries = archive.Entries
                 .Where(entry => Regex.IsMatch(entry.FullName, @"^ppt/slides/slide\d+\.xml$", RegexOptions.IgnoreCase))
                 .OrderBy(entry => GetTrailingNumber(entry.FullName))
@@ -467,7 +426,7 @@ namespace TxtAIEditor.Core.Services
 
         private static async Task<string> ExtractHwpxTextAsync(string filePath, int maxChars, IProgress<int>? progress, CancellationToken cancellationToken)
         {
-            using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
+            using ZipArchive archive = await OfficeLegacyPackage.OpenAsync(filePath, cancellationToken).ConfigureAwait(false);
             var sectionEntries = archive.Entries
                 .Where(entry => Regex.IsMatch(entry.FullName, @"^Contents/section\d+\.xml$", RegexOptions.IgnoreCase))
                 .OrderBy(entry => GetTrailingNumber(entry.FullName))
@@ -522,7 +481,7 @@ namespace TxtAIEditor.Core.Services
 
         public static async Task<IReadOnlyList<ExtractedSpreadsheetSheet>> ExtractXlsxSheetsAsync(string filePath, int maxChars, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
         {
-            using ZipArchive archive = await OpenArchiveAsync(filePath).ConfigureAwait(false);
+            using ZipArchive archive = await OfficeLegacyPackage.OpenAsync(filePath, cancellationToken).ConfigureAwait(false);
             IReadOnlyList<string> sharedStrings = await LoadSharedStringsAsync(archive).ConfigureAwait(false);
             IReadOnlyDictionary<string, string> sheetNamesByPath = await LoadSheetNamesByPathAsync(archive).ConfigureAwait(false);
 
@@ -636,21 +595,6 @@ namespace TxtAIEditor.Core.Services
             }
 
             return column;
-        }
-
-        private static async Task<ZipArchive> OpenArchiveAsync(string filePath)
-        {
-            var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, useAsync: true);
-            await Task.CompletedTask.ConfigureAwait(false);
-            try
-            {
-                return new ZipArchive(stream, ZipArchiveMode.Read);
-            }
-            catch
-            {
-                stream.Dispose();
-                throw;
-            }
         }
 
         private static async Task<XDocument> LoadXmlEntryAsync(ZipArchiveEntry entry)
