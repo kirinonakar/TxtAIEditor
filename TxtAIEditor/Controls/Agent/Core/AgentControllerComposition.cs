@@ -201,7 +201,7 @@ namespace TxtAIEditor.Controls
                 AppBadgeNotificationService.UpdateBadge,
                 getString,
                 navigateToFolderAsync);
-            sessionSelections.IsMcpServerInOpenSession = openSessionController.IsMcpServerInOpenSession;
+            sessionSelections.IsMcpServerInActiveSession = openSessionController.IsMcpServerInActiveSession;
             sessionEditController.BindOpenSessions(openSessionController);
             var sessionHistoryCoordinator = new AgentSessionHistoryCoordinator(
                 agentPane,

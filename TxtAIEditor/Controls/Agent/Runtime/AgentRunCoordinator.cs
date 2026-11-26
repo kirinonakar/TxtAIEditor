@@ -825,6 +825,7 @@ namespace TxtAIEditor.Controls
                 _activeWorkspaceRunContext.Value = null;
                 activeOpenSession.IsRunning = false;
                 _runningSessions.Remove(runContext.SessionId);
+                _mcpController.ReleaseUnusedConnections(runContext.Selections.McpServers);
                 if (!isSubagent)
                 {
                     _selectionContextController.ClearRunSnapshots();

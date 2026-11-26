@@ -13,6 +13,7 @@ namespace TxtAIEditor.Controls
         private readonly Func<string, string, string> _getString;
         private readonly Dictionary<string, ServerStartOperation> _serverStartOperations = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _serverStatus = new(StringComparer.OrdinalIgnoreCase);
+        private bool _disposed;
 
         public event Action? Changed;
 
@@ -35,16 +36,21 @@ namespace TxtAIEditor.Controls
 
         public Task<JsonDocument> ExecuteToolAsync(
             AgentMcpServer server, string toolName, JsonElement arguments, CancellationToken cancellationToken)
-            => _runtime.ExecuteToolAsync(server, toolName, arguments, cancellationToken);
-
-        public void Reset(string serverId)
         {
-            _runtime.RemoveSession(serverId);
-            _serverStatus.Remove(serverId);
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _runtime.ExecuteToolAsync(server, toolName, arguments, cancellationToken);
         }
+
+        public void Reset(string serverId) => Stop(serverId);
 
         public async Task StartAsync(AgentMcpServer server, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_disposed || !_isSelected(server.Id))
+            {
+                return;
+            }
+
             if (!_serverStartOperations.TryGetValue(server.Id, out var operation))
             {
                 operation = new ServerStartOperation();
@@ -79,9 +85,10 @@ namespace TxtAIEditor.Controls
             {
                 _serverStatus[server.Id] = _getString("AgentMcpStatusConnecting", "연결 중");
                 Changed?.Invoke();
-                IReadOnlyList<AgentMcpTool> tools = await _runtime.RefreshToolsAsync(server, cancellationToken);
+                IReadOnlyList<AgentMcpTool> tools = await _runtime.LoadToolsAsync(server, cancellationToken);
 
-                if (_isSelected(server.Id) && !cancellationToken.IsCancellationRequested)
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_isSelected(server.Id))
                 {
                     _serverStatus[server.Id] = string.Format(
                         _getString("AgentMcpStatusToolCount", "{0:N0}개 도구"),
@@ -89,7 +96,7 @@ namespace TxtAIEditor.Controls
                 }
                 else
                 {
-                    _runtime.RemoveSession(server.Id);
+                    Stop(server.Id);
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -133,11 +140,13 @@ namespace TxtAIEditor.Controls
 
         public void Dispose()
         {
-            foreach (var operation in _serverStartOperations.Values)
+            _disposed = true;
+            var operations = new List<ServerStartOperation>(_serverStartOperations.Values);
+            _serverStartOperations.Clear();
+            foreach (var operation in operations)
             {
                 operation.Cancel();
             }
-            _serverStartOperations.Clear();
             _runtime.Dispose();
         }
 

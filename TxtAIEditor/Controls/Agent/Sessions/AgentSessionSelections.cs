@@ -44,9 +44,9 @@ namespace TxtAIEditor.Controls
 
         public AgentSessionSelections Visible { get; set; } = new();
         public AgentSessionSelections Current => _runSelection.Value ?? Visible;
-        public Func<string, bool>? IsMcpServerInOpenSession { get; set; }
+        public Func<string, bool>? IsMcpServerInActiveSession { get; set; }
 
-        public bool IsMcpServerInUse(string id) => IsMcpServerInOpenSession?.Invoke(id) ?? Visible.McpServers.Contains(id);
+        public bool IsMcpServerInUse(string id) => IsMcpServerInActiveSession?.Invoke(id) ?? Visible.McpServers.Contains(id);
 
         public IDisposable Use(AgentSessionSelections selection)
         {

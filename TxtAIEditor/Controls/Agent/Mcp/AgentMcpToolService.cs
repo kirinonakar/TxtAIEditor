@@ -157,7 +157,7 @@ namespace TxtAIEditor.Controls
             }
 
             var server = _registry.Servers.FirstOrDefault(item => item.Id.Equals(alias.ServerId, StringComparison.OrdinalIgnoreCase));
-            if (server == null)
+            if (server == null || !_selectedServerIds.Contains(server.Id))
             {
                 return $"MCP tool failed: server not found for {aliasName}.";
             }

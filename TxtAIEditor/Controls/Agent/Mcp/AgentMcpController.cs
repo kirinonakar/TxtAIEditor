@@ -588,7 +588,7 @@ namespace TxtAIEditor.Controls
             foreach (var server in GetSelectedServers())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (_connections.GetTools(server.Id).Count == 0)
+                if (_selectedServerIds.Contains(server.Id) && _connections.GetTools(server.Id).Count == 0)
                 {
                     using var readinessCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     readinessCancellation.CancelAfter(TimeSpan.FromSeconds(5));

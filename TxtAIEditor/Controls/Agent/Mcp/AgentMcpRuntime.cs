@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -10,7 +11,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 using static TxtAIEditor.Controls.AgentMcpAuthTypes;
+using static TxtAIEditor.Controls.AgentProcessJob;
 
 namespace TxtAIEditor.Controls
 {
@@ -55,15 +58,18 @@ namespace TxtAIEditor.Controls
                 : Array.Empty<AgentMcpTool>();
         }
 
-        public async Task<IReadOnlyList<AgentMcpTool>> RefreshToolsAsync(
+        public async Task<IReadOnlyList<AgentMcpTool>> LoadToolsAsync(
             AgentMcpServer server,
             CancellationToken cancellationToken)
         {
             AgentMcpSession? session = null;
             try
             {
-                session = await EnsureSessionAsync(server, cancellationToken, forceRefresh: true);
-                session.Tools.Clear();
+                session = await EnsureSessionAsync(server, cancellationToken);
+                if (session.Tools.Count > 0)
+                {
+                    return session.Tools;
+                }
 
                 string? cursor = null;
                 do
@@ -112,7 +118,10 @@ namespace TxtAIEditor.Controls
             }
             catch
             {
-                RemoveSession(server.Id, session);
+                if (session != null)
+                {
+                    RemoveSession(server.Id, session);
+                }
                 throw;
             }
         }
@@ -158,11 +167,10 @@ namespace TxtAIEditor.Controls
 
         private async Task<AgentMcpSession> EnsureSessionAsync(
             AgentMcpServer server,
-            CancellationToken cancellationToken,
-            bool forceRefresh = false)
+            CancellationToken cancellationToken)
         {
-            if (!forceRefresh &&
-                _sessions.TryGetValue(server.Id, out var existing) &&
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_sessions.TryGetValue(server.Id, out var existing) &&
                 existing.Initialized &&
                 (!AgentMcpTransportTypes.IsStdio(server.Transport) || existing.Process?.HasExited == false))
             {
@@ -177,14 +185,14 @@ namespace TxtAIEditor.Controls
                     ? StatelessProtocolVersion
                     : LegacyProtocolVersion
             };
-            if (AgentMcpTransportTypes.IsStdio(server.Transport))
-            {
-                StartStdioProcess(server, session);
-            }
             _sessions[server.Id] = session;
 
             try
             {
+                if (AgentMcpTransportTypes.IsStdio(server.Transport))
+                {
+                    StartStdioProcess(server, session);
+                }
                 if (session.UsesStatelessProtocol)
                 {
                     session.Initialized = true;
@@ -530,10 +538,12 @@ namespace TxtAIEditor.Controls
             }
 
             session.Process = process;
+            session.TrackProcessTree();
             session.StandardInput = process.StandardInput;
             session.StandardOutput = process.StandardOutput;
+            session.StandardError = process.StandardError;
             session.StandardInput.AutoFlush = true;
-            session.StderrPump = PumpStderrAsync(session, process.StandardError);
+            _ = PumpStderrAsync(session, session.StandardError);
         }
 
         private ProcessStartInfo CreateStdioStartInfo(AgentMcpServer server)
@@ -752,10 +762,7 @@ namespace TxtAIEditor.Controls
                     }
                 }
             }
-            catch (ObjectDisposedException)
-            {
-            }
-            catch (InvalidOperationException)
+            catch (Exception ex) when (ex is IOException or InvalidOperationException)
             {
             }
         }
@@ -954,6 +961,8 @@ namespace TxtAIEditor.Controls
         private sealed class AgentMcpSession : IDisposable
         {
             private int _disposed;
+            private SafeFileHandle? _job;
+            private AgentProcessTreeFallback? _processTree;
 
             public string SessionId { get; set; } = string.Empty;
             public string ProtocolVersion { get; set; } = LegacyProtocolVersion;
@@ -965,9 +974,32 @@ namespace TxtAIEditor.Controls
             public Process? Process { get; set; }
             public StreamWriter? StandardInput { get; set; }
             public StreamReader? StandardOutput { get; set; }
+            public StreamReader? StandardError { get; set; }
             public SemaphoreSlim StdioLock { get; } = new(1, 1);
             public Queue<string> StderrLines { get; } = new();
-            public Task? StderrPump { get; set; }
+
+            public void TrackProcessTree()
+            {
+                Process process = Process!;
+                try
+                {
+                    _processTree = new AgentProcessTreeFallback(process);
+                    _job = CreateJobObjectW(IntPtr.Zero, null);
+                    if (_job.IsInvalid || !AssignProcessToJobObject(_job, process.SafeHandle))
+                    {
+                        _job.Dispose();
+                        _job = null;
+                    }
+                    // A launcher may have spawned a child before the job assignment.
+                    _processTree.CaptureDescendants();
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+                {
+                    _job?.Dispose();
+                    _job = null;
+                    Trace.TraceWarning("MCP process tracking failed: {0}", ex.Message);
+                }
+            }
 
             public void Dispose()
             {
@@ -979,36 +1011,47 @@ namespace TxtAIEditor.Controls
                 Process? process = Process;
                 try
                 {
-                    if (process is { HasExited: false })
+                    if (process != null)
                     {
-                        process.Kill(entireProcessTree: true);
-                        process.WaitForExit(2000);
+                        if (_job != null)
+                        {
+                            TerminateJobObject(_job, 1);
+                        }
+                        if (_processTree?.Terminate() != true && !process.HasExited)
+                        {
+                            process.Kill(entireProcessTree: true);
+                        }
+                        if (!process.HasExited)
+                        {
+                            process.WaitForExit(2000);
+                        }
                     }
                 }
                 catch (Exception ex) when (
-                    ex is InvalidOperationException or
-                    System.ComponentModel.Win32Exception or
-                    NotSupportedException)
+                    ex is InvalidOperationException or Win32Exception or NotSupportedException or AggregateException)
                 {
+                    Trace.TraceWarning("MCP process cleanup failed: {0}", ex.Message);
                 }
+                finally
+                {
+                    _job?.Dispose();
+                    _processTree?.Dispose();
+                    DisposeStream(StandardInput);
+                    DisposeStream(StandardOutput);
+                    DisposeStream(StandardError);
+                    process?.Dispose();
+                }
+            }
 
+            private static void DisposeStream(IDisposable? stream)
+            {
                 try
                 {
-                    StandardInput?.Dispose();
+                    stream?.Dispose();
                 }
-                catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+                catch (Exception ex) when (ex is IOException or InvalidOperationException)
                 {
                 }
-
-                try
-                {
-                    StandardOutput?.Dispose();
-                }
-                catch (Exception ex) when (ex is IOException or ObjectDisposedException)
-                {
-                }
-
-                process?.Dispose();
             }
         }
     }

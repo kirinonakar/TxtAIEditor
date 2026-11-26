@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 using TxtAIEditor.Core.Services;
+using static TxtAIEditor.Controls.AgentProcessJob;
 
 namespace TxtAIEditor.Controls
 {
@@ -160,17 +161,6 @@ namespace TxtAIEditor.Controls
 
         [DllImport("kernel32.dll")]
         private static extern uint GetACP();
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
-        private static extern SafeFileHandle CreateJobObjectW(IntPtr attributes, string? name);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool AssignProcessToJobObject(SafeFileHandle job, SafeProcessHandle process);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool TerminateJobObject(SafeFileHandle job, uint exitCode);
 
         private static Encoding GetSystemAnsiEncoding()
         {

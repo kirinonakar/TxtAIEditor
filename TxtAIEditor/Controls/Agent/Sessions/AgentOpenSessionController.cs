@@ -185,7 +185,9 @@ namespace TxtAIEditor.Controls
         public IEnumerable<AgentOpenSessionState> GetOpenSubagentSessions(string parentId) =>
             _openSessions.Where(item => item.Role == AgentSessionRole.Subagent && item.OrchestratorSessionId == parentId);
 
-        public bool IsMcpServerInOpenSession(string id) => _openSessions.Any(session => session.Selections.McpServers.Contains(id));
+        public bool IsMcpServerInActiveSession(string id) =>
+            FindOpenSession(_currentSessionIdProvider())?.Selections.McpServers.Contains(id) == true ||
+            _runningSessions.Values.Any(run => run.Selections.McpServers.Contains(id));
 
         public AgentOpenSessionState CreateBlankSession(string? sessionId = null)
         {
@@ -376,7 +378,12 @@ namespace TxtAIEditor.Controls
             try
             {
                 _setCurrentSessionId(session.Id);
+                var previousSelections = _selections.Visible;
                 _selections.Visible = session.Selections;
+                if (!ReferenceEquals(previousSelections, session.Selections))
+                {
+                    _mcpController.ReleaseUnusedConnections(previousSelections.McpServers);
+                }
                 _presetController.RefreshSelection();
                 _mcpController.RefreshSessionSelection();
                 session.CompletedNotificationCount = 0;
