@@ -74,6 +74,7 @@ namespace TxtAIEditor.Core.Services
                 ".dockerfile" => "dockerfile",
                 ".toml" => "toml",
                 ".ini" => "ini",
+                ".iss" => "innosetup",
                 ".yml" => "yaml",
                 ".yaml" => "yaml",
                 ".reg" => "reg",

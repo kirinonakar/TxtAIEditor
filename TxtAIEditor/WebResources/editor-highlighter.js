@@ -503,6 +503,195 @@ function renderTokenizedSegment(fullText, segmentStart, segmentLength, tokens) {
     return output;
 }
 
+const innoSetupSectionPattern = /^\s*(\[(\/?)([a-z_]\w*)\])\s*$/i;
+const innoSetupControlWords = /^(?:begin|end|if|then|else|case|of|for|to|downto|do|while|repeat|until|try|except|finally|raise|exit|break|continue|with)$/i;
+const innoSetupKeywords = /^(?:procedure|function|var|const|type|array|record|set|external|forward|out|and|or|xor|not|div|mod|shl|shr|in|is|as)$/i;
+const innoSetupTypes = /^(?:string|ansistring|widestring|char|boolean|byte|word|integer|cardinal|longint|int64|single|double|extended|currency|variant|pchar|true|false|nil)$/i;
+
+function findInnoSetupConstantEnd(text, start) {
+    // A constant can contain another constant. ISPP expressions can contain quoted braces.
+    const parts = /\{\{|[{}]/g;
+    const expressionParts = /\{\{|[{}]|"(?:\\.|""|[^"\\])*"|'(?:\\.|''|[^'\\])*'/g;
+    const pattern = text[start + 1] === '#' ? expressionParts : parts;
+    pattern.lastIndex = start + 1;
+    let depth = 1;
+    let match;
+    while (match = pattern.exec(text)) {
+        if (match[0] === '{') depth++;
+        if (match[0] === '}' && --depth === 0) return pattern.lastIndex;
+    }
+    return text.length;
+}
+
+function tokenizeInnoSetupSettings(text, emit) {
+    const assignment = /^\s*([\w.-]+)(?=\s*=)/.exec(text);
+    const unquoted = /(?:^|;)\s*([a-z]\w*)(?=\s*:)|\{\{|[{"=:;]|\b(?:yes|no|true|false)\b|\b\d+(?:\.\d+)*\b/gi;
+    const quoted = /\{\{|{|""|"/g;
+    let index = 0;
+    let stringStart = -1;
+
+    if (assignment) {
+        index = assignment[0].length;
+        emit(index - assignment[1].length, index, 'token-keyword');
+    }
+
+    while (index < text.length) {
+        const pattern = stringStart < 0 ? unquoted : quoted;
+        pattern.lastIndex = index;
+        const match = pattern.exec(text);
+        if (!match) break;
+
+        const [value, parameter] = match;
+        const start = match.index;
+        index = pattern.lastIndex;
+        if (value === '{') {
+            if (stringStart >= 0) emit(stringStart, start, 'token-string');
+            index = findInnoSetupConstantEnd(text, start);
+            emit(start, index, 'token-variable');
+            if (stringStart >= 0) stringStart = index;
+        } else if (value === '"') {
+            if (stringStart < 0) {
+                stringStart = start;
+            } else {
+                emit(stringStart, index, 'token-string');
+                stringStart = -1;
+            }
+        } else if (stringStart < 0 && value !== '{{') {
+            if (value[0] === ';') emit(start, start + 1, 'token-punctuation');
+            if (parameter) {
+                if (!assignment) emit(index - parameter.length, index, 'token-keyword');
+            } else if (value === '=' || value === ':') {
+                emit(start, index, 'token-operator');
+            } else if (value !== ';') {
+                emit(start, index, /^\d/.test(value) ? 'token-number' : 'token-type');
+            }
+        }
+    }
+    if (stringStart >= 0) emit(stringStart, text.length, 'token-string');
+}
+
+function scanInnoSetupCode(text, context, emit) {
+    const pattern = /\/\/.*|\(\*|\{#|\{|'(?:''|[^'])*(?:'|$)|#(?:\d+|\$[\da-f]+)|\$[\da-f]+\b|\b\d+(?:\.\d+)?(?:e[+-]?\d+)?\b|\b[a-z_]\w*\b|:=|<>|<=|>=|[+\-*/=<>@^]|[()[\].;,:]/gi;
+    let index = 0;
+    let commentStart = 0;
+    let commentEnd = context === 'code' ? null : context;
+    let previousToken = '';
+
+    while (index < text.length || commentEnd) {
+        if (commentEnd) {
+            const end = text.indexOf(commentEnd, index);
+            if (end === -1) {
+                emit?.(commentStart, text.length, 'token-comment');
+                return commentEnd;
+            }
+            index = end + commentEnd.length;
+            emit?.(commentStart, index, 'token-comment');
+            commentEnd = null;
+        }
+
+        pattern.lastIndex = index;
+        const match = pattern.exec(text);
+        if (!match) break;
+
+        const value = match[0];
+        const start = match.index;
+        index = pattern.lastIndex;
+        if (value === '{' || value === '(*') {
+            commentStart = start;
+            commentEnd = value === '{' ? '}' : '*)';
+        } else if (value === '{#') {
+            index = findInnoSetupConstantEnd(text, start);
+            emit?.(start, index, 'token-variable');
+        } else if (emit) {
+            let className;
+            if (value.startsWith('//')) className = 'token-comment';
+            else if (value[0] === "'" || value[0] === '#') className = 'token-string';
+            else if (/^[\d$]/.test(value)) className = 'token-number';
+            else if (innoSetupControlWords.test(value)) className = 'token-control';
+            else if (innoSetupKeywords.test(value)) className = 'token-keyword';
+            else if (innoSetupTypes.test(value)) className = 'token-type';
+            else if (/^[()[\].;,:]$/.test(value)) className = 'token-punctuation';
+            else if (/^[+\-*/=<>@^]|^:=/.test(value)) className = 'token-operator';
+            else if (/^(?:function|procedure)$/i.test(previousToken) || /^\s*\(/.test(text.slice(index))) {
+                className = 'token-function';
+            }
+            if (className) emit(start, index, className);
+        }
+        previousToken = value;
+    }
+    return 'code';
+}
+
+function scanInnoSetupLine(text, context, emit) {
+    const section = innoSetupSectionPattern.exec(text);
+    if (section) {
+        const start = text.indexOf('[');
+        emit?.(start, start + section[1].length, 'token-type');
+        return !section[2] && section[3].toLowerCase() === 'code' ? 'code' : 'settings';
+    }
+
+    const directive = /^\s*(#\s*[a-z]\w*)/i.exec(text);
+    if (directive) {
+        if (emit) {
+            const end = directive[0].length;
+            emit(end - directive[1].length, end, 'token-keyword');
+            const argumentsText = text.slice(end);
+            for (const match of argumentsText.matchAll(/\/\*.*?(?:\*\/|$)|;.*|"(?:\\.|""|[^"\\])*"|'(?:\\.|''|[^'\\])*'|\b(?:0x[\da-f]+|\d+)\b/gi)) {
+                const value = match[0];
+                const className = /^[;/]/.test(value) ? 'token-comment'
+                    : /^\d/.test(value) ? 'token-number' : 'token-string';
+                emit(end + match.index, end + match.index + value.length, className);
+            }
+        }
+        return context;
+    }
+
+    if (context !== 'settings') return scanInnoSetupCode(text, context, emit);
+
+    const comment = /^\s*(?:;|\/\/)/.exec(text);
+    if (comment) {
+        emit?.(text.search(/\S/), text.length, 'token-comment');
+    } else if (emit) {
+        tokenizeInnoSetupSettings(text, emit);
+    }
+    return context;
+}
+
+function getInnoSetupLineStartContext(lineNumber) {
+    let line = lineNumber - 1;
+    let context = 'settings';
+    for (; line >= 1 && state.cache.has(line); line--) {
+        const cached = state.cache.getInnoSetupLineEndContext(line);
+        if (cached) {
+            context = cached;
+            break;
+        }
+        const text = state.cache.get(line);
+        if (innoSetupSectionPattern.test(text)) {
+            context = scanInnoSetupLine(text, context);
+            state.cache.setInnoSetupLineEndContext(line, context);
+            break;
+        }
+    }
+    for (line++; line < lineNumber; line++) {
+        context = scanInnoSetupLine(state.cache.get(line), context);
+        state.cache.setInnoSetupLineEndContext(line, context);
+    }
+    return context;
+}
+
+function highlightInnoSetupLine(text, lineNumber, startCharIndex) {
+    const cachedText = state.cache.get(lineNumber);
+    const useCachedText = cachedText?.startsWith(text, startCharIndex);
+    const fullText = useCachedText ? cachedText : text;
+    const tokens = [];
+    const context = scanInnoSetupLine(fullText, getInnoSetupLineStartContext(lineNumber), (start, end, className) => {
+        if (end > start) tokens.push({ start, end, className });
+    });
+    if (useCachedText) state.cache.setInnoSetupLineEndContext(lineNumber, context);
+    return renderTokenizedSegment(fullText, useCachedText ? startCharIndex : 0, text.length, tokens);
+}
+
 function highlightHexLine(text, lineNumber = null, startCharIndex = 0) {
     const fullText = lineNumber !== null && state.cache.has(lineNumber)
         ? state.cache.get(lineNumber) || ''
@@ -602,6 +791,10 @@ function highlightLine(text, language, lineNumber = null, startCharIndex = 0) {
 
     if (language === 'hex') {
         return highlightHexLine(text, lineNumber, startCharIndex);
+    }
+
+    if (language === 'innosetup') {
+        return highlightInnoSetupLine(text, lineNumber, startCharIndex);
     }
 
     const tokens = [];

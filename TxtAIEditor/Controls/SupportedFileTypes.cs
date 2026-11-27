@@ -53,6 +53,7 @@ namespace TxtAIEditor.Controls
             ".yml",
             ".toml",
             ".ini",
+            ".iss",
             ".diff",
             ".reg"
         };

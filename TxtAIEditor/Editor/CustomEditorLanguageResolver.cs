@@ -54,6 +54,7 @@ namespace TxtAIEditor.Editor
                 ".dockerfile" => "dockerfile",
                 ".toml" => "toml",
                 ".ini" => "ini",
+                ".iss" => "innosetup",
                 ".yml" or ".yaml" => "yaml",
                 ".reg" => "reg",
                 _ => "plaintext"

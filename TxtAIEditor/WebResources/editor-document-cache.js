@@ -3,6 +3,7 @@ export class EditorDocumentCache {
     #lines = new Map();
     #lineEndStacks = new Map();
     #htmlLineEndContexts = new Map();
+    #innoSetupLineEndContexts = new Map();
     #pendingLineRequests = new Map();
 
     get size() {
@@ -18,6 +19,7 @@ export class EditorDocumentCache {
     clearDerivedContexts() {
         this.#lineEndStacks.clear();
         this.#htmlLineEndContexts.clear();
+        this.#innoSetupLineEndContexts.clear();
     }
 
     delete(lineNumber) {
@@ -60,7 +62,7 @@ export class EditorDocumentCache {
         }
 
         // Context at and below the first changed line depends on the old text.
-        // Invalidate once for the entire block instead of scanning both maps per line.
+        // Invalidate once for the entire block instead of scanning the context maps per line.
         if (firstChangedLine === null) return false;
         this.#invalidateDerivedContexts(firstChangedLine);
         return true;
@@ -88,6 +90,14 @@ export class EditorDocumentCache {
 
     setHtmlLineEndContext(lineNumber, context) {
         this.#htmlLineEndContexts.set(lineNumber, context);
+    }
+
+    getInnoSetupLineEndContext(lineNumber) {
+        return this.#innoSetupLineEndContexts.get(lineNumber);
+    }
+
+    setInnoSetupLineEndContext(lineNumber, context) {
+        this.#innoSetupLineEndContexts.set(lineNumber, context);
     }
 
     beginLineRequest(startLine, count) {
@@ -143,13 +153,13 @@ export class EditorDocumentCache {
     #invalidateDerivedContexts(startLine) {
         const line = Number(startLine);
         if (!Number.isFinite(line) || line <= 1) {
-            this.#lineEndStacks.clear();
-            this.#htmlLineEndContexts.clear();
+            this.clearDerivedContexts();
             return;
         }
 
         this.#deleteKeysFrom(this.#lineEndStacks, line);
         this.#deleteKeysFrom(this.#htmlLineEndContexts, line);
+        this.#deleteKeysFrom(this.#innoSetupLineEndContexts, line);
     }
 
     #deleteKeysFrom(map, startLine) {
