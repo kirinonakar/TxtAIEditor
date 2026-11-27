@@ -40,7 +40,8 @@ namespace TxtAIEditor.Core.Services
     }
 
     function fitSinglePage(pageHeight) {
-        if (!page.hasAttribute('data-word-single-page') || page.querySelector('.doc-page-break')) return false;
+        if (!page.hasAttribute('data-word-single-page') || page.querySelector('.doc-page-break') ||
+            !page.querySelector('template.doc-positioned-drawing')) return false;
         const blocks = [...page.children];
         const style = getComputedStyle(page);
         const width = page.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
@@ -170,6 +171,11 @@ namespace TxtAIEditor.Core.Services
             const paragraph = separator.parentElement;
             const continuation = paragraph.cloneNode(false);
             while (separator.nextSibling) continuation.append(separator.nextSibling);
+            const marker = paragraph.firstElementChild;
+            if (marker?.classList.contains('word-list-marker') && continuation.hasChildNodes()) {
+                if (separator.previousSibling === marker) continuation.prepend(marker);
+                else continuation.style.textIndent = '0';
+            }
             paragraph.after(separator);
             if (continuation.hasChildNodes()) separator.after(continuation);
             if (!paragraph.hasChildNodes()) paragraph.remove();

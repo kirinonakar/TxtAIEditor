@@ -108,6 +108,11 @@ namespace TxtAIEditor.Core.Services
             string pageParts = legacy
                 ? await BuildPagePartsAsync(archive, relationships, body.Element(body.Name.Namespace + "sectPr")).ConfigureAwait(false)
                 : string.Empty;
+            XDocument? settings = legacy
+                ? await TryLoadXmlEntryAsync(archive, "word/settings.xml").ConfigureAwait(false)
+                : null;
+            string? tabWidth = TryReadWordTwips(GetDirectProperty(settings?.Root, "defaultTabStop"), "val", out int tabStop)
+                && tabStop > 0 ? WordTwipsToCssPoints(tabStop) : null;
             XDocument? propertiesDocument = legacy
                 ? await TryLoadXmlEntryAsync(archive, "docProps/app.xml").ConfigureAwait(false)
                 : null;
@@ -122,7 +127,8 @@ namespace TxtAIEditor.Core.Services
                 hasSavedPagination,
                 paginateWord: legacy,
                 wordPageParts: pageParts,
-                savedWordSinglePage: savedSinglePage);
+                savedWordSinglePage: savedSinglePage,
+                wordTabWidth: tabWidth);
         }
 
         private static async Task<string> BuildPagePartsAsync(ZipArchive archive,
@@ -295,7 +301,9 @@ namespace TxtAIEditor.Core.Services
             XElement paragraph,
             bool documentFlow)
         {
-            string paragraphStyle = BuildParagraphStyle(paragraph);
+            XElement? paragraphProperties = GetDirectProperty(paragraph, "pPr");
+            XElement? marker = paragraphProperties?.Element(OfficeBinaryWord.Preview + "listMarker");
+            string paragraphStyle = BuildParagraphStyle(paragraphProperties, GetAttributeValue(marker, "follow") == "0");
             var content = new StringBuilder();
             bool suppressLeadingCachedBreak = builder.Length == 0 || EndsWithPageBreak(builder);
             foreach (XElement child in paragraph.Elements())
@@ -317,10 +325,11 @@ namespace TxtAIEditor.Core.Services
             string styleAttribute = string.IsNullOrWhiteSpace(paragraphStyle)
                 ? string.Empty
                 : " style=\"" + Html(paragraphStyle) + "\"";
-            if (content.Length > 0)
+            if (content.Length > 0 || (marker != null && trailingBreaks == 0))
             {
-                builder.Append("<p class=\"doc-paragraph\"").Append(styleAttribute).Append('>')
-                    .Append(content).Append("</p>");
+                builder.Append("<p class=\"doc-paragraph\"").Append(styleAttribute).Append('>');
+                if (marker != null) AppendListMarkerHtml(builder, marker);
+                builder.Append(content).Append("</p>");
             }
             else if (trailingBreaks == 0)
             {
@@ -333,9 +342,26 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static string BuildParagraphStyle(XElement paragraph)
+        private static void AppendListMarkerHtml(StringBuilder builder, XElement marker)
         {
-            XElement? paragraphProperties = GetDirectProperty(paragraph, "pPr");
+            string alignment = GetAttributeValue(marker, "alignment") switch
+            {
+                "1" => "center",
+                "2" => "right",
+                _ => "left"
+            };
+            string follow = GetAttributeValue(marker, "follow");
+            builder.Append("<span class=\"word-list-marker");
+            if (follow == "0") builder.Append(" word-list-marker-tab");
+            builder.Append("\" style=\"text-align:").Append(alignment).Append("\">");
+            AppendStyledText(builder, GetDirectProperty(marker, "t")?.Value ?? string.Empty,
+                BuildRunStyle(GetDirectProperty(marker, "rPr")));
+            if (follow == "1") builder.Append(' ');
+            builder.Append("</span>");
+        }
+
+        private static string BuildParagraphStyle(XElement? paragraphProperties, bool listTab)
+        {
             XElement? justification = GetDirectProperty(paragraphProperties, "jc");
             string value = GetAttributeValue(justification, "val").ToLowerInvariant();
             string? alignment = value switch
@@ -349,7 +375,12 @@ namespace TxtAIEditor.Core.Services
             };
 
             var styles = new List<string>();
-            AppendStyle(styles, BuildRunStyle(GetDirectProperty(paragraphProperties, "rPr")));
+            XElement? paragraphMark = GetDirectProperty(paragraphProperties, "rPr");
+            AppendStyle(styles, BuildRunStyle(paragraphMark));
+            if (GetAttributeValue(GetDirectProperty(paragraphMark, "lang"), "eastAsia") == "ko-KR")
+            {
+                styles.Add("word-break:keep-all");
+            }
             if (alignment != null) styles.Add("text-align:" + alignment);
             if (value == "distribute") styles.Add("text-align-last:justify");
 
@@ -367,10 +398,21 @@ namespace TxtAIEditor.Core.Services
                 };
                 styles.Add("line-height:" + height);
             }
-            AppendMeasurement(styles, indentation, "left", "margin-left");
-            AppendMeasurement(styles, indentation, "right", "margin-right");
-            AppendMeasurement(styles, indentation, "firstLine", "text-indent");
+            AppendIndent("left", "margin-left");
+            AppendIndent("right", "margin-right");
+            AppendIndent("firstLine", "text-indent", listTab);
             return string.Join(';', styles);
+
+            void AppendIndent(string name, string css, bool markerGap = false)
+            {
+                bool characterUnits = TryReadWordTwips(indentation, name + "Chars", out int value);
+                if (!characterUnits && !TryReadWordTwips(indentation, name, out value)) return;
+                string Format(int amount) => characterUnits
+                    ? (amount / 100.0).ToString("0.##", CultureInfo.InvariantCulture) + "em"
+                    : WordTwipsToCssPoints(amount);
+                styles.Add(css + ":" + Format(value));
+                if (markerGap && value < 0) styles.Add("--word-list-tab-width:" + Format(-value));
+            }
         }
 
         private static void AppendMeasurement(List<string> styles, XElement? properties, string attribute, string css)
@@ -437,6 +479,10 @@ namespace TxtAIEditor.Core.Services
         {
             XElement? properties = run.Elements().FirstOrDefault(e => e.Name.LocalName == "rPr");
             string style = BuildRunStyle(properties);
+            if (ReadShadingStyle(properties) is string shading)
+            {
+                style = style.Length == 0 ? shading : style + ";" + shading;
+            }
             foreach (XElement child in run.Elements())
             {
                 switch (child.Name.LocalName)

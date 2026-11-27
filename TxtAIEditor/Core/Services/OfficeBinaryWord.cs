@@ -12,7 +12,7 @@ using static TxtAIEditor.Core.Services.OfficeLegacyPackage;
 namespace TxtAIEditor.Core.Services
 {
     // MS-DOC, Word 97–2003. Text is in logical CP order; FKP properties use physical FC offsets.
-    internal sealed class OfficeBinaryWord
+    internal sealed partial class OfficeBinaryWord
     {
         private static readonly XNamespace W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
         private static readonly XNamespace A = "http://schemas.openxmlformats.org/drawingml/2006/main";
@@ -20,6 +20,16 @@ namespace TxtAIEditor.Core.Services
         private static readonly Encoding CompressedText = CodePagesEncodingProvider.Instance.GetEncoding(1252)!;
         private static readonly string[] Colors = ["", "000000", "0000FF", "00FFFF", "00FF00", "FF00FF", "FF0000",
             "FFFF00", "FFFFFF", "000080", "008080", "008000", "800080", "800000", "808000", "808080", "C0C0C0"];
+        private const ushort CharacterHighlight = 0x2A0C;
+        private const ushort CharacterShading80 = 0x4866;
+        private const ushort CharacterShading = 0xCA71;
+        private const int AutomaticColor = -1;
+        // MS-DOC Ipat coverage, in thousandths of the shaded area.
+        private static readonly int[] ShadingCoverage =
+            [50, 100, 200, 250, 300, 400, 500, 600, 700, 750, 800, 900];
+        private static readonly int[] ExtendedShadingCoverage =
+            [25, 75, 125, 150, 175, 225, 275, 325, 350, 375, 425, 450, 475, 525, 550, 575,
+                625, 650, 675, 725, 775, 825, 850, 875, 925, 950, 975];
 
         private readonly ZipArchive _archive;
         private readonly OfficeCompoundFile _compound;
@@ -35,6 +45,7 @@ namespace TxtAIEditor.Core.Services
         private int _hiddenFieldCount;
         private Dictionary<ushort, int>? _normalParagraph;
         private Dictionary<ushort, int>? _normalCharacters;
+        private readonly Dictionary<int, ParagraphStyle> _paragraphStyles = new();
         private byte[]? _data;
         private XElement _paragraph = new(W + "p");
         private readonly List<TableFrame> _tables = new();
@@ -70,7 +81,16 @@ namespace TxtAIEditor.Core.Services
 
             offsets += 2;
             ReadFonts(TablePart(word, table, offsets, 15));
-            ReadNormalStyle(TablePart(word, table, offsets, 1));
+            ReadParagraphStyles(TablePart(word, table, offsets, 1));
+            if (U16(word, offsets - 2) > 74)
+            {
+                ReadOnlySpan<byte> listHeaders = TablePart(word, table, offsets, 73);
+                if (!listHeaders.IsEmpty)
+                {
+                    int levelsOffset = I32(word, offsets + 73 * 8) + listHeaders.Length;
+                    ReadLists(listHeaders, table.AsSpan(levelsOffset), TablePart(word, table, offsets, 74));
+                }
+            }
             ReadOnlySpan<byte> documentProperties = TablePart(word, table, offsets, 31);
             List<PropertyRange> paragraphs = ReadFkp(word, TablePart(word, table, offsets, 13), paragraph: true);
             List<PropertyRange> characters = ReadFkp(word, TablePart(word, table, offsets, 12), paragraph: false);
@@ -106,8 +126,12 @@ namespace TxtAIEditor.Core.Services
             body.Add(section);
             WriteXml(_archive, "word/document.xml", new XElement(W + "document", body));
             if (_relationships.HasElements) WriteXml(_archive, "word/_rels/document.xml.rels", _relationships);
-            // The last calculated page count is a layout hint for forms with floating shapes.
-            if (_anchoredShapes.Count > 0 && documentProperties.Length >= 48 && I16(documentProperties, 46) == 1)
+            if (documentProperties.Length >= 12 && U16(documentProperties, 10) is > 0 and <= 31680)
+            {
+                WriteXml(_archive, "word/settings.xml",
+                    new XElement(W + "settings", Val("defaultTabStop", U16(documentProperties, 10))));
+            }
+            if (documentProperties.Length >= 48 && I16(documentProperties, 46) == 1)
             {
                 XNamespace properties = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties";
                 WriteXml(_archive, "docProps/app.xml", new XElement(properties + "Properties", new XElement(properties + "Pages", 1)));
@@ -180,30 +204,54 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private void ReadNormalStyle(ReadOnlySpan<byte> stylesheet)
+        private void ReadParagraphStyles(ReadOnlySpan<byte> stylesheet)
         {
             if (stylesheet.Length < 20) return;
-            int infoSize = U16(stylesheet, 0);
             int baseSize = U16(stylesheet, 4);
-            int offset = 2 + infoSize;
-            if (baseSize is not (10 or 18) || offset > stylesheet.Length - 2) return;
-            int length = U16(stylesheet, offset);
-            offset += 2;
-            if (length < baseSize + 4 || length > stylesheet.Length - offset) return;
-            ReadOnlySpan<byte> style = stylesheet.Slice(offset, length);
-            if ((U16(style, 2) & 15) != 1) return;
-            offset = baseSize + 4 + 2 * U16(style, baseSize);
-            if (offset > style.Length - 2) return;
-            int papLength = U16(style, offset);
-            offset += 2;
-            if (papLength < 2 || papLength > style.Length - offset) return;
-            _normalParagraph = ReadProperties(style.Slice(offset + 2, papLength - 2), false, out _);
-            offset += (papLength + 1) & ~1;
-            if (offset > style.Length - 2) return;
-            int chpLength = U16(style, offset);
-            offset += 2;
-            if (chpLength > style.Length - offset) return;
-            _normalCharacters = ReadProperties(style.Slice(offset, chpLength), false, out _);
+            if (baseSize is not (10 or 18)) return;
+            int offset = 2 + U16(stylesheet, 0);
+            int count = U16(stylesheet, 2);
+            for (int index = 0; index < count && offset <= stylesheet.Length - 2; index++)
+            {
+                int length = U16(stylesheet, offset);
+                offset += 2;
+                if (length > stylesheet.Length - offset) break;
+                ReadOnlySpan<byte> style = stylesheet.Slice(offset, length);
+                offset += length;
+                if (length < baseSize + 4 || (U16(style, 2) & 15) != 1) continue;
+
+                int position = baseSize + 4 + 2 * U16(style, baseSize);
+                if (position > style.Length - 2) continue;
+                int papLength = U16(style, position);
+                position += 2;
+                if (papLength < 2 || papLength > style.Length - position) continue;
+                var paragraph = ReadProperties(style.Slice(position + 2, papLength - 2), false, out _);
+                position += (papLength + 1) & ~1;
+                Dictionary<ushort, int>? characters = null;
+                if (position <= style.Length - 2)
+                {
+                    int chpLength = U16(style, position);
+                    position += 2;
+                    if (chpLength <= style.Length - position)
+                        characters = ReadProperties(style.Slice(position, chpLength), false, out _);
+                }
+                _paragraphStyles[index] = new ParagraphStyle(U16(style, 2) >> 4, paragraph, characters);
+            }
+
+            if (_paragraphStyles.TryGetValue(0, out ParagraphStyle? normal))
+            {
+                _normalParagraph = normal.Paragraph;
+                _normalCharacters = normal.Characters;
+            }
+            if (U16(stylesheet, 0) >= 18)
+            {
+                // Stshif supplies the document fonts when the paragraph style leaves them unset.
+                _normalCharacters ??= new Dictionary<ushort, int>();
+                int latinFont = U16(stylesheet, 14);
+                int eastAsianFont = U16(stylesheet, 16);
+                if (latinFont < _fonts.Count) _normalCharacters.TryAdd(0x4A4F, latinFont);
+                if (eastAsianFont < _fonts.Count) _normalCharacters.TryAdd(0x4A50, eastAsianFont);
+            }
         }
 
         private void ReadStory(XElement content, byte[] word, ReadOnlySpan<byte> pieces, int startCp, int endCp,
@@ -213,6 +261,7 @@ namespace TxtAIEditor.Core.Services
             _paragraph = new XElement(W + "p");
             _fieldResults.Clear();
             _hiddenFieldCount = 0;
+            foreach (WordList list in _lists.Values) Array.Clear(list.Counters);
             ReadPieces(word, pieces, startCp, endCp, paragraphs, characters);
             if (_paragraph.HasElements) FinishParagraph('\r', default);
             CloseTablesAbove(0);
@@ -265,7 +314,7 @@ namespace TxtAIEditor.Core.Services
                     if (ch is '\r' or '\a')
                     {
                         FlushText(text, style);
-                        FinishParagraph(ch, FindRange(paragraphs, position));
+                        FinishParagraph(ch, FindRange(paragraphs, position), style);
                         continue;
                     }
 
@@ -340,58 +389,86 @@ namespace TxtAIEditor.Core.Services
             if (Get(style, 0x2A3E) > 0) properties.Add(new XElement(W + "u"));
             int size = Get(style, 0x4A43, 0x4A61);
             properties.Add(Val("sz", size > 0 ? size : DefaultFontSize()));
-            int font = EffectiveProperty(style, _normalCharacters, 0x4A4F, 0x4A50);
-            int eastAsian = EffectiveProperty(style, _normalCharacters, 0x4A50, 0x4A4F);
-            var fonts = new XElement(W + "rFonts");
-            if ((uint)font < _fonts.Count && _fonts[font].Length > 0) fonts.SetAttributeValue(W + "ascii", _fonts[font]);
-            if ((uint)eastAsian < _fonts.Count && _fonts[eastAsian].Length > 0) fonts.SetAttributeValue(W + "eastAsia", _fonts[eastAsian]);
-            if (fonts.HasAttributes)
+            AddRunFonts(properties, style, _normalCharacters);
+            string? textColor = IndexedColor(Get(style, 0x2A42));
+            if (style?.TryGetValue(0x6870, out int color) == true)
             {
-                properties.Add(fonts);
+                textColor = color >>> 24 == 0 ? ColorRef(color) : null;
             }
-            int color = Get(style, 0x6870);
-            int indexedColor = Get(style, 0x2A42);
-            if (style?.ContainsKey(0x6870) == true) properties.Add(Val("color", ColorRef(color)));
-            else if (indexedColor > 0 && indexedColor < Colors.Length) properties.Add(Val("color", Colors[indexedColor]));
+            int background = ReadIndexedRgb(EffectiveProperty(style, _normalCharacters, CharacterHighlight));
+            if (background == AutomaticColor)
+            {
+                background = EffectiveProperty(style, _normalCharacters, CharacterShading, CharacterShading80);
+            }
+            if (background != AutomaticColor)
+            {
+                properties.Add(new XElement(W + "shd", new XAttribute(W + "val", "clear"),
+                    new XAttribute(W + "fill", $"{background:X6}")));
+                int brightness = 299 * (background >> 16) + 587 * ((background >> 8) & 255) + 114 * (background & 255);
+                textColor ??= brightness >= 128_000 ? "000000" : "FFFFFF";
+            }
+            if (textColor != null) properties.Add(Val("color", textColor));
             _paragraph.Add(new XElement(W + "r", properties.HasElements ? properties : null,
                 new XElement(W + "t", new XAttribute(XNamespace.Xml + "space", "preserve"), XmlText(text.ToString()))));
             text.Clear();
         }
 
-        private void FinishParagraph(char mark, PropertyRange range)
+        private void AddRunFonts(XElement properties, Dictionary<ushort, int>? direct, Dictionary<ushort, int>? inherited)
+        {
+            int font = EffectiveProperty(direct, inherited, 0x4A4F, 0x4A50);
+            int eastAsian = EffectiveProperty(direct, inherited, 0x4A50, 0x4A4F);
+            var fonts = new XElement(W + "rFonts");
+            if ((uint)font < _fonts.Count && _fonts[font].Length > 0) fonts.SetAttributeValue(W + "ascii", _fonts[font]);
+            if ((uint)eastAsian < _fonts.Count && _fonts[eastAsian].Length > 0) fonts.SetAttributeValue(W + "eastAsia", _fonts[eastAsian]);
+            if (fonts.HasAttributes) properties.Add(fonts);
+        }
+
+        private void FinishParagraph(char mark, PropertyRange range, Dictionary<ushort, int>? markStyle = null)
         {
             Dictionary<ushort, int>? style = range.Properties;
+            ParagraphStyle? inherited = ReadParagraphStyle(range.StyleIndex);
+            Dictionary<ushort, int>? paragraphStyle = inherited?.Paragraph ?? _normalParagraph;
+            Dictionary<ushort, int>? characterStyle = inherited?.Characters ?? _normalCharacters;
+            int depth = Get(style, 0x6649);
+            if (depth <= 0) depth = mark == '\a' || Get(style, 0x2416) == 1 ? 1 : 0;
+            bool endRow = depth == 1 ? mark == '\a' && Get(style, 0x2417) == 1 : Get(style, 0x244C) == 1;
+
             XElement properties = new(W + "pPr");
-            string? alignment = EffectiveProperty(style, _normalParagraph, 0x2461, 0x2403, 0) switch
+            string? alignment = EffectiveProperty(style, paragraphStyle, 0x2461, 0x2403, 0) switch
             {
                 1 => "center", 2 => "right", 3 => "both", 4 => "distribute", _ => null
             };
             if (alignment != null) properties.Add(Val("jc", alignment));
-            if (Get(style, 0x2407) == 1) properties.Add(new XElement(W + "pageBreakBefore"));
+            if (EffectiveProperty(style, paragraphStyle, 0x2407) == 1) properties.Add(new XElement(W + "pageBreakBefore"));
             var spacing = new XElement(W + "spacing");
-            spacing.SetAttributeValue(W + "before", EffectiveProperty(style, _normalParagraph, 0xA413, missing: 0));
-            spacing.SetAttributeValue(W + "after", EffectiveProperty(style, _normalParagraph, 0xA414, missing: 0));
-            int line = EffectiveProperty(style, _normalParagraph, 0x6412, missing: 0);
+            spacing.SetAttributeValue(W + "before", EffectiveProperty(style, paragraphStyle, 0xA413, missing: 0));
+            spacing.SetAttributeValue(W + "after", EffectiveProperty(style, paragraphStyle, 0xA414, missing: 0));
+            int line = EffectiveProperty(style, paragraphStyle, 0x6412, missing: 0);
             short lineSize = unchecked((short)line);
             if (lineSize != 0)
             {
                 spacing.SetAttributeValue(W + "line", Math.Abs((int)lineSize));
                 spacing.SetAttributeValue(W + "lineRule", lineSize < 0 ? "exact" : line >> 16 == 1 ? "auto" : "atLeast");
             }
-            properties.Add(spacing, new XElement(W + "rPr", Val("sz", DefaultFontSize())));
-            AddMeasurements(properties, "ind", ("left", (short)Get(style, 0x845E, 0x840F)),
-                ("right", (short)Get(style, 0x845D, 0x840E)), ("firstLine", (short)Get(style, 0x8460, 0x8411)));
+            int paragraphSize = EffectiveProperty(markStyle, characterStyle, 0x4A43);
+            var markProperties = new XElement(W + "rPr", Val("sz", paragraphSize > 0 ? paragraphSize : DefaultFontSize()));
+            AddRunFonts(markProperties, markStyle, characterStyle);
+            int eastAsianLanguage = EffectiveProperty(markStyle, characterStyle, 0x4874, 0x486E);
+            if ((eastAsianLanguage & 0x03FF) == 0x0012)
+            {
+                markProperties.Add(new XElement(W + "lang", new XAttribute(W + "eastAsia", "ko-KR")));
+            }
+            properties.Add(spacing, markProperties);
+            WordListLevel? listLevel = endRow ? null : AddListMarker(properties, style, paragraphStyle, markStyle);
+            AddParagraphIndent(properties, style, listLevel?.Paragraph, paragraphStyle);
             if (properties.HasElements) _paragraph.AddFirst(properties);
 
-            int depth = Get(style, 0x6649);
-            if (depth <= 0) depth = mark == '\a' || Get(style, 0x2416) == 1 ? 1 : 0;
             if (depth > 64) throw new InvalidDataException("Word tables are nested too deeply.");
             CloseTablesAbove(depth);
             if (depth > 0)
             {
                 while (_tables.Count < depth) _tables.Add(new TableFrame());
                 TableFrame frame = _tables[^1];
-                bool endRow = depth == 1 ? mark == '\a' && Get(style, 0x2417) == 1 : Get(style, 0x244C) == 1;
                 if (endRow)
                 {
                     frame.FinishRow(range.RowProperties);
@@ -428,6 +505,61 @@ namespace TxtAIEditor.Core.Services
         {
             int size = Get(_normalCharacters, 0x4A43);
             return size > 0 ? size : 20;
+        }
+
+        private ParagraphStyle? ReadParagraphStyle(int index)
+        {
+            if (!_paragraphStyles.TryGetValue(index, out ParagraphStyle? style) || style.Parent == 0xFFF) return style;
+            var paragraph = new Dictionary<ushort, int>(style.Paragraph);
+            var characters = new Dictionary<ushort, int>(style.Characters ?? []);
+            int parent = style.Parent;
+            for (int depth = 0; depth < 32 && parent != index && _paragraphStyles.TryGetValue(parent, out ParagraphStyle? ancestor); depth++)
+            {
+                foreach ((ushort code, int value) in ancestor.Paragraph) paragraph.TryAdd(code, value);
+                if (ancestor.Characters != null)
+                {
+                    foreach ((ushort code, int value) in ancestor.Characters) characters.TryAdd(code, value);
+                }
+                parent = ancestor.Parent;
+            }
+            var resolved = new ParagraphStyle(0xFFF, paragraph, characters);
+            _paragraphStyles[index] = resolved;
+            return resolved;
+        }
+
+        private static void AddParagraphIndent(XElement properties, Dictionary<ushort, int>? direct,
+            Dictionary<ushort, int>? list, Dictionary<ushort, int>? inherited)
+        {
+            var indent = new XElement(W + "ind");
+            Dictionary<ushort, int>?[] layers = [direct, list, inherited];
+            AddIndent("left", 0x4456, 0x845E, 0x840F);
+            AddIndent("right", 0x4455, 0x845D, 0x840E);
+            AddIndent("firstLine", 0x4457, 0x8460, 0x8411);
+            if (indent.HasAttributes) properties.Add(indent);
+
+            void AddIndent(string name, ushort chars, ushort twips, ushort legacyTwips)
+            {
+                int? characterUnits = null;
+                int? twipUnits = null;
+                foreach (Dictionary<ushort, int>? layer in layers)
+                {
+                    if (layer == null) continue;
+                    if (characterUnits == null && layer.TryGetValue(chars, out int value))
+                    {
+                        characterUnits = (short)value;
+                    }
+                    if (twipUnits == null && (layer.TryGetValue(twips, out value) || layer.TryGetValue(legacyTwips, out value)))
+                    {
+                        twipUnits = (short)value;
+                    }
+                }
+
+                // A zero character indent clears inherited character units and leaves the twip indent in effect.
+                if (characterUnits is int characters && characters != 0)
+                    indent.SetAttributeValue(W + (name + "Chars"), characters);
+                else if (twipUnits is int distance)
+                    indent.SetAttributeValue(W + name, distance);
+            }
         }
 
         private static int EffectiveProperty(Dictionary<ushort, int>? direct, Dictionary<ushort, int>? inherited,
@@ -626,18 +758,21 @@ namespace TxtAIEditor.Core.Services
                     int offset = page[entries + run * stride] * 2;
                     if (offset == 0) continue;
                     int length = page[offset++];
+                    int styleIndex = 0;
                     if (paragraph)
                     {
                         length = length == 0 ? 2 * page[offset++] : 2 * length - 1;
                         if (length < 2) continue;
-                        offset += 2; // Paragraph style index precedes the direct properties.
+                        styleIndex = U16(page, offset);
+                        offset += 2;
                         length -= 2;
                     }
 
                     var properties = ReadProperties(Slice(page[..511], offset, length), paragraph, out var rowProperties);
-                    if (properties.Count > 0 || rowProperties != null)
+                    if (styleIndex != 0 || properties.Count > 0 || rowProperties != null)
                     {
-                        ranges.Add(new PropertyRange(I32(page, run * 4), I32(page, (run + 1) * 4), properties, rowProperties));
+                        ranges.Add(new PropertyRange(I32(page, run * 4), I32(page, (run + 1) * 4),
+                            properties, rowProperties, styleIndex));
                     }
                 }
             }
@@ -698,6 +833,16 @@ namespace TxtAIEditor.Core.Services
                     // also read the backward-compatible TDefTable that can follow the pointer.
                     if (code == 0x6646) break;
                 }
+                else if (!paragraph && code == CharacterShading && size == 10)
+                {
+                    properties[code] = ResolveShadingRgb(ReadShadingRgb(operand), ReadShadingRgb(operand[4..]), U16(operand, 8));
+                }
+                else if (!paragraph && code == CharacterShading80)
+                {
+                    int packed = U16(operand, 0);
+                    properties[code] = packed == 0xFFFF ? AutomaticColor :
+                        ResolveShadingRgb(ReadIndexedRgb(packed & 31), ReadIndexedRgb((packed >> 5) & 31), packed >> 10);
+                }
                 else if ((code >> 13) != 6)
                 {
                     if (size == 1) properties[code] = operand[0];
@@ -706,6 +851,39 @@ namespace TxtAIEditor.Core.Services
                 }
                 offset += size;
             }
+        }
+
+        private static int ReadShadingRgb(ReadOnlySpan<byte> color) =>
+            color[3] == 0 ? (color[0] << 16) | (color[1] << 8) | color[2] : AutomaticColor;
+
+        private static int ReadIndexedRgb(int index) =>
+            IndexedColor(index) is string color ? Convert.ToInt32(color, 16) : AutomaticColor;
+
+        private static int ResolveShadingRgb(int foreground, int background, int pattern)
+        {
+            if (pattern == 0xFFFF) return AutomaticColor;
+            if (pattern == 1) return foreground == AutomaticColor ? 0 : foreground;
+
+            int coverage = pattern switch
+            {
+                >= 0x02 and <= 0x0D => ShadingCoverage[pattern - 0x02],
+                >= 0x23 and <= 0x3D => ExtendedShadingCoverage[pattern - 0x23],
+                _ => 0
+            };
+            if (coverage == 0) return background;
+
+            // Use the average color of the percentage fill for the preview.
+            if (foreground == AutomaticColor) foreground = 0;
+            if (background == AutomaticColor) background = 0xFFFFFF;
+            int rgb = 0;
+            for (int shift = 0; shift < 24; shift += 8)
+            {
+                int ink = (foreground >> shift) & 255;
+                int paper = (background >> shift) & 255;
+                int channel = (ink * coverage + paper * (1000 - coverage) + 500) / 1000;
+                rgb |= channel << shift;
+            }
+            return rgb;
         }
 
         private bool TryReadIndirectProperties(int offset, out ReadOnlySpan<byte> properties)
@@ -744,18 +922,10 @@ namespace TxtAIEditor.Core.Services
         internal static string ColorRef(int color) => $"{color & 255:X2}{(color >> 8) & 255:X2}{(color >> 16) & 255:X2}";
         internal static string? IndexedColor(int index) => index > 0 && index < Colors.Length ? Colors[index] : null;
 
-        private static void AddMeasurements(XElement properties, string name, params (string Name, int Value)[] values)
-        {
-            var item = new XElement(W + name);
-            foreach ((string key, int value) in values)
-            {
-                if (value != 0) item.SetAttributeValue(W + key, value);
-            }
-            if (item.HasAttributes) properties.Add(item);
-        }
-
         private readonly record struct PropertyRange(int Start, int End, Dictionary<ushort, int>? Properties,
-            OfficeBinaryWordTable.RowProperties? RowProperties);
+            OfficeBinaryWordTable.RowProperties? RowProperties, int StyleIndex = 0);
+        private sealed record ParagraphStyle(int Parent, Dictionary<ushort, int> Paragraph,
+            Dictionary<ushort, int>? Characters);
         private sealed record Picture(string Id, long Width, long Height);
 
         private sealed class TableFrame

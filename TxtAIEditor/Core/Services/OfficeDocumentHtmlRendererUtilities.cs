@@ -27,7 +27,8 @@ namespace TxtAIEditor.Core.Services
             bool hasSavedPagination = false,
             bool paginateWord = false,
             string wordPageParts = "",
-            bool savedWordSinglePage = false)
+            bool savedWordSinglePage = false,
+            string? wordTabWidth = null)
         {
             string documentPageWidth = string.IsNullOrWhiteSpace(pageWidth) ? "920px" : pageWidth;
             string responsivePageWidth = string.IsNullOrWhiteSpace(pageWidth)
@@ -136,11 +137,16 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
 }
 .word-fixed-table td { min-width: 0; }
 .word-fixed-table .doc-paragraph { margin: 0; line-height: normal; }
-[data-word-pagination] .doc-table-wrap { overflow: visible; }
-[data-word-pagination] td > .doc-table-wrap { margin-block: 0; }
+[data-word-pagination] .doc-table-wrap { overflow: visible; margin-block: 0; }
 [data-word-pagination] .doc-table { table-layout: fixed; }
 [data-word-pagination] .doc-table td { min-width: 0; }
-[data-word-pagination] .doc-paragraph { margin: 0; line-height: normal; }
+[data-word-pagination] .doc-paragraph { margin: 0; line-height: normal; tab-size: {{wordTabWidth ?? "8"}}; }
+[data-word-pagination] .empty-paragraph::before { content: "\200b"; }
+.word-list-marker { display: inline-block; text-indent: 0; white-space: pre; }
+.word-list-marker-tab { min-width: var(--word-list-tab-width, 1em); }
+@media screen {
+    main[data-word-single-page]:not(:has(> .doc-page-break)) { min-height: var(--document-page-height); }
+}
 .doc-page-part { display: flow-root; }
 .doc-fitted-page { display: flow-root; }
 .doc-page-part .doc-image, .doc-positioned-shape .doc-image { margin: 0; }
