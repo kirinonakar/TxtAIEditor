@@ -1,4 +1,4 @@
-import { blockContainsInlineMath, containsInlineMath, escapeHtml, findEditablePreviewBlockContaining, inlineMarkdown, isRenderedCodeFence, renderMarkdownSvgFile, renderPreviewLineAt, sanitizeHtml, tableRowContainsInlineMath } from './markdown-preview-renderer.js';
+import { blockContainsInlineMath, containsInlineMath, escapeHtml, findEditablePreviewBlockContaining, inlineMarkdown, isRenderedCodeFence, listItemInfo, renderMarkdownSvgFile, renderMarkdownTaskCheckbox, renderPreviewLineAt, sanitizeHtml, tableRowContainsInlineMath } from './markdown-preview-renderer.js';
 import { parseMarkdownTableRow } from './editor-markdown-table-model.js';
 
 // Every text node remains part of the Markdown source, in source order. Hiding
@@ -6,6 +6,9 @@ import { parseMarkdownTableRow } from './editor-markdown-table-model.js';
 // keep using source columns, including during native IME composition.
 const syntax = text => `<span class="md-preview-syntax" contenteditable="false">${escapeHtml(text)}</span>`;
 const content = (html, options = {}) => `<span class="md-preview-content${options.htmlSource ? ' md-preview-html-content' : ''}"${options.editableCell !== undefined ? ` contenteditable="${options.editableCell}" tabindex="-1"` : ''}>${html}</span>`;
+// A closing delimiter at the end of a run needs a visible caret position on
+// its outside, even when no plain text follows it yet.
+const inlineEndCaret = '<span class="md-preview-content md-preview-inline-end"></span>';
 
 function safeOpeningTag(raw, options) {
     const template = document.createElement('template');
@@ -102,10 +105,12 @@ function inlineSource(text, options, depth = 0) {
             index += br[0].length;
             continue;
         }
-        const code = !options.htmlSource && /^(`+)([\s\S]*?)\1(?!`)/.exec(rest);
+        const code = !options.htmlSource && /^(`+)(?!`)(?:([\s\S]*?)(?<!`)\1(?!`))?/.exec(rest);
         if (code) {
-            html += syntax(code[1]) + `<code>${content(escapeHtml(code[2]))}</code>` + syntax(code[1]);
+            html += code[2] === undefined ? escapeHtml(code[1])
+                : syntax(code[1]) + `<code>${content(escapeHtml(code[2]))}</code>` + syntax(code[1]);
             index += code[0].length;
+            if (code[2] !== undefined && index === text.length) html += inlineEndCaret;
             continue;
         }
         const svgFile = !options.htmlSource && /^!\[\[([^\]\n]+)\]\]/.exec(rest);
@@ -141,6 +146,7 @@ function inlineSource(text, options, depth = 0) {
             const body = content(inlineSource(emphasis[2], options, depth + 1));
             html += syntax(marker) + `<${tag}>${marker.length === 3 ? `<em>${body}</em>` : body}</${tag}>` + syntax(marker);
             index += emphasis[0].length;
+            if (index === text.length) html += inlineEndCaret;
             continue;
         }
         html += escapeHtml(text[index++]);
@@ -160,7 +166,7 @@ function editableAttributes(text, lineNumber, state, kind) {
     return `class="line-text md-preview-embedded-line" data-markdown-preview-line="${kind}" data-line="${lineNumber}" contenteditable="${!state.readOnly && text.length <= 20000}" spellcheck="false"`;
 }
 
-function listItemSource(text, info, options) {
+function listItemSource(text, info, lineNumber, state, options) {
     const prefix = text.slice(0, text.length - info.content.length);
     const space = /[ \t]+$/.exec(prefix)?.[0] || '';
     // Only the first separator belongs to the Markdown marker. Additional
@@ -168,7 +174,7 @@ function listItemSource(text, info, options) {
     const body = space.slice(1) + info.content;
     if (info.taskChecked !== null) {
         return syntax(prefix.slice(0, prefix.length - space.length)) +
-            `<input type="checkbox" disabled${info.taskChecked ? ' checked' : ''}>` + escapeHtml(space.slice(0, 1)) + content(inlineSource(body, options));
+            renderMarkdownTaskCheckbox(info, lineNumber, !state.readOnly) + escapeHtml(space.slice(0, 1)) + content(inlineSource(body, options));
     }
     return syntax(prefix.slice(0, prefix.length - Math.max(0, space.length - 1))) + content(inlineSource(body, options));
 }
@@ -244,7 +250,7 @@ function editableCodeBlock(block, startLine, state, options, sourceLines = null,
 export function renderGroupedEditableMarkdown(lineNumber, state, options = {}, skipUntil = 0) {
     const editableOptions = {
         ...options, sourceLine: 0,
-        editableListItem: (text, line, info) => `<span ${editableAttributes(text, line, state, 'list')}>${listItemSource(text, info, options)}</span>`,
+        editableListItem: (text, line, info) => `<span ${editableAttributes(text, line, state, 'list')}>${listItemSource(text, info, line, state, options)}</span>`,
         editableListContinuation: (text, line, prefix) => `<span ${editableAttributes(text, line, state, 'continuation')} data-markdown-continuation-prefix="${prefix}">${trimmedInlineSource(text, options, false, prefix)}</span>`,
         editableParagraphLine: (text, line) => `<span ${editableAttributes(text, line, state, 'paragraph')} data-markdown-paragraph-line="${line}">${content(inlineSource(text, options))}</span>`,
         editableHtmlBlock: (block, line) => editableHtmlBlock(block, line, state, options),
@@ -268,8 +274,8 @@ export function updateGroupedMarkdownElement(element, text, state) {
         element.innerHTML = tableRowSource(text, element.dataset.previewTableHeader === 'true',
             JSON.parse(element.dataset.previewTableAligns || '[]'), Number(element.dataset.previewTableColumns || 0), { ...options, editableCell: !state.readOnly });
     } else if (kind === 'list') {
-        const match = /^([ \t]*)([-*+]|\d+[.)])([ \t]+)(?:\[([ xX])\]([ \t]+))?(.*)$/.exec(text);
-        element.innerHTML = match ? listItemSource(text, { content: match[6], taskChecked: match[4] === undefined ? null : match[4].toLowerCase() === 'x' }, options)
+        const info = listItemInfo(text, options);
+        element.innerHTML = info ? listItemSource(text, info, Number(element.dataset.line), state, options)
             : content(inlineSource(text, options));
     } else if (kind === 'continuation') {
         element.innerHTML = trimmedInlineSource(text, options, false, Number(element.dataset.markdownContinuationPrefix ?? Infinity));
@@ -328,14 +334,15 @@ export function renderEditableMarkdownLine(text, lineNumber, state, previewOptio
     }
     const quote = /^( {0,3}>[ \t]?)(.*)$/.exec(text);
     if (quote) return syntax(quote[1]) + `<blockquote>${content(inlineSource(quote[2], options))}</blockquote>`;
-    const list = /^([ \t]*)([-*+]|\d+[.)])([ \t]+)(?:\[([ xX])\]([ \t]+))?(.*)$/.exec(text);
+    const list = listItemInfo(text, options);
     if (list) {
-        const prefix = text.slice(0, text.length - list[6].length);
+        if (list.taskChecked !== null) {
+            return `<span style="margin-left:${list.indent}ch">${listItemSource(text, list, lineNumber, state, options)}</span>`;
+        }
+        const prefix = text.slice(0, text.length - list.content.length);
         const extraSpace = (/[ \t]+$/.exec(prefix)?.[0] || '').slice(1);
-        const marker = list[4] !== undefined ? (list[4].toLowerCase() === 'x' ? '☑' : '☐')
-            : /^\d/.test(list[2]) ? list[2] : '•';
-        const indent = list[1].replace(/\t/g, ' '.repeat(options.tabSize)).length;
-        return syntax(prefix.slice(0, prefix.length - extraSpace.length)) + `<span class="md-preview-list" style="margin-left:${indent}ch" data-marker="${escapeHtml(marker)}">${content(inlineSource(extraSpace + list[6], options))}</span>`;
+        const marker = list.type === 'ol' ? list.marker : '•';
+        return syntax(prefix.slice(0, prefix.length - extraSpace.length)) + `<span class="md-preview-list" style="margin-left:${list.indent}ch" data-marker="${escapeHtml(marker)}">${content(inlineSource(extraSpace + list.content, options))}</span>`;
     }
     if (/^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/.test(text)) {
         return content(`<span class="md-preview-atom">${syntax(text)}<hr></span>`);
@@ -461,6 +468,44 @@ export function markdownPreviewLineBreakOffset(element, offset) {
     return markdownPreviewBoundaryOffset(element, offset, true);
 }
 
+function markdownPreviewDeletionDelimiters(element, node) {
+    const opener = node.previousSibling;
+    if (!opener?.classList?.contains('md-preview-syntax')) return null;
+    if (node.matches('strong, em, s, mark, code')) return markdownPreviewDelimiters(node, false);
+    if (node.matches('h1,h2,h3,h4,h5,h6') && /^ {0,3}#{1,6}[ \t]$/.test(opener.textContent)) {
+        return markdownPreviewDelimiters(node, true) || { opener };
+    }
+    const isListBody = node.matches('.md-preview-list') ||
+        (element.dataset.markdownPreviewLine === 'list' && node.parentElement === element && node.matches('.md-preview-content'));
+    return isListBody && /^[ \t]*(?:[-*+]|\d+[.)])[ \t]$/.test(opener.textContent) ? { opener } : null;
+}
+
+export function expandMarkdownPreviewDeletion(element, start, end) {
+    if (start >= end || !element?.querySelector('.md-preview-syntax')) return { start, end };
+
+    function visit(node, bodyStart, bodyEnd) {
+        if (node.nodeType !== Node.ELEMENT_NODE || bodyStart >= end || bodyEnd <= start || bodyStart === bodyEnd) return;
+        let offset = bodyStart;
+        for (const child of node.childNodes) {
+            if (offset >= end) break;
+            const next = offset + child.textContent.length;
+            visit(child, offset, next);
+            offset = next;
+        }
+        // Remove innermost pairs first. An outer span containing only that
+        // pair can then be removed by the same source edit.
+        if (start > bodyStart || end < bodyEnd || node === element) return;
+        const delimiters = markdownPreviewDeletionDelimiters(element, node);
+        if (delimiters) {
+            start = Math.min(start, bodyStart - delimiters.opener.textContent.length);
+            end = Math.max(end, bodyEnd + (delimiters.closer?.textContent.length || 0));
+        }
+    }
+
+    visit(element, 0, element.textContent.length);
+    return { start, end };
+}
+
 export function markdownPreviewDeleteRange(element, offset, direction, deleteStart, deleteEnd) {
     if (!element?.querySelector('.md-preview-content')) return null;
     const selectionNode = window.getSelection()?.rangeCount ? window.getSelection().getRangeAt(0).startContainer : null;
@@ -483,12 +528,12 @@ export function markdownPreviewDeleteRange(element, offset, direction, deleteSta
         if (atom && !atoms.has(atom)) {
             atoms.add(atom);
             const atomEnd = sourceOffset + atom.textContent.length;
-            if (direction > 0 && atomEnd > offset) return { start: sourceOffset, end: atomEnd };
+            if (direction > 0 && atomEnd > offset) return expandMarkdownPreviewDeletion(element, sourceOffset, atomEnd);
             if (direction < 0 && sourceOffset < offset) previous = { start: sourceOffset, end: atomEnd };
         } else if (!atom && !node.parentElement?.closest('.md-preview-syntax')) {
             if (direction > 0 && end > offset) {
                 const start = Math.max(sourceOffset, offset);
-                return { start, end: sourceOffset + deleteEnd(text, start - sourceOffset) };
+                return expandMarkdownPreviewDeletion(element, start, sourceOffset + deleteEnd(text, start - sourceOffset));
             }
             if (direction < 0 && sourceOffset < offset && text.length) {
                 const boundary = Math.min(offset, end);
@@ -497,5 +542,6 @@ export function markdownPreviewDeleteRange(element, offset, direction, deleteSta
         }
         sourceOffset = end;
     }
-    return direction < 0 ? previous : { start: sourceOffset, end: sourceOffset, merge: true };
+    if (direction > 0) return { start: sourceOffset, end: sourceOffset, merge: true };
+    return previous ? expandMarkdownPreviewDeletion(element, previous.start, previous.end) : null;
 }

@@ -37,7 +37,8 @@ import {
     replaceSelectionWith,
     selectWordAtPointer,
     setCaret,
-    setNativeSelectionRangeInElement
+    setNativeSelectionRangeInElement,
+    toggleMarkdownTaskCheckbox
 } from './editor-commands.js';
 import { isPointOnScrollContainerScrollbar } from './editor-caret.js';
 import { showContextMenu, hideContextMenu } from './editor-context-menu.js';
@@ -961,6 +962,10 @@ export function bindPointerSelectionEvents({
         cancelPostEditFocusFollowUps();
         if (csvTableMode.isEnabled) return;
         if (event.button !== 0 || findPanel.contains(event.target)) return;
+        if (event.target.matches?.('input[data-markdown-task-line]')) {
+            event.preventDefault();
+            return;
+        }
         if (usesMarkdownPreviewEditing(state) && imeController.isComposing) {
             if (event.target.closest('.line-number, .fold-summary, .fold-toggle')) event.preventDefault();
             return;
@@ -1685,6 +1690,10 @@ export function bindPointerSelectionEvents({
     });
 
     viewport.addEventListener('click', event => {
+        if (event.target.matches?.('input[data-markdown-task-line]')) {
+            if (!toggleMarkdownTaskCheckbox(event.target)) event.preventDefault();
+            return;
+        }
         if (event.target.closest?.('.fold-toggle')) {
             if (event.detail === 0) changeFolding('toggle', Number(event.target.closest('.fold-toggle').dataset.line));
             return;

@@ -984,8 +984,14 @@ br[data-markdown-caret-anchor] {
 }
 
 .markdown-preview-group-row .md-preview-content.md-preview-br-anchor:empty::after,
-.markdown-preview-edit-row .md-preview-content.md-preview-br-anchor:empty::after {
+.markdown-preview-edit-row .md-preview-content.md-preview-br-anchor:empty::after,
+.markdown-preview-group-row .md-preview-content.md-preview-inline-end:empty::after,
+.markdown-preview-edit-row .md-preview-content.md-preview-inline-end:empty::after {
     content: '';
+}
+
+.live-preview-row input[data-markdown-task-line] {
+    cursor: pointer;
 }
 
 /* The empty row already owns the canonical fixed preview height. Its caret

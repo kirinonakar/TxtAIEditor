@@ -15,7 +15,7 @@ import {
     syncCustomSelectionClass
 } from './editor-core.js';
 import { highlightPreviewSearchInElement, renderLineContent } from './editor-highlighter.js';
-import { markdownPreviewDeleteRange, markdownPreviewSpaceInsertionOffset, updateGroupedMarkdownElement } from './editor-markdown-preview-edit.js';
+import { expandMarkdownPreviewDeletion, markdownPreviewDeleteRange, markdownPreviewSpaceInsertionOffset, updateGroupedMarkdownElement } from './editor-markdown-preview-edit.js';
 import { capturePreviewInputScrollAnchor } from './editor-caret.js';
 import {
     activeColumnSelection,
@@ -28,10 +28,12 @@ import {
     clearPendingImeSelectionCollapse,
     commitLine,
     compositionSelectionRange,
+    deleteSelectedText,
     finishColumnComposition,
     finishRangeComposition,
     focusLine,
     getCaretOffset,
+    handleMarkdownListBackspace,
     inputRangeInElement,
     insertPlainTextByModel,
     isPendingImeSelectionCollapseFor,
@@ -43,7 +45,6 @@ import {
     mergeLineBackward,
     mergeLineForward,
     moveCaretVertical,
-    outdentMarkdownListAtStart,
     replaceSelectionForCompositionStart,
     replaceSelectionWith,
     resetModelRepeatState,
@@ -97,6 +98,7 @@ export function bindTextInputEvents({ renderer }) {
     }
 
     viewport.addEventListener('input', event => {
+        if (event.target.matches?.('input[data-markdown-task-line]')) return;
         if (shouldSuppressNativeBeforeInput(event)) {
             return;
         }
@@ -421,20 +423,21 @@ export function bindTextInputEvents({ renderer }) {
 
             if (hasCustomSelection()) {
                 const sel = normalizeSelection();
-                if (sel) replaceSelectionWith(sel, '');
+                if (sel) deleteSelectedText(sel);
                 return;
             }
+            if (event.inputType === 'deleteContentBackward' && handleMarkdownListBackspace(target)) return;
 
             const text = lineTextFromElement(target);
             const range = inputRangeInElement(event, target);
             if (range && range.start !== range.end) {
-                makeEditablePlainText(target, range.start);
-                updateSingleLine(target, text.slice(0, range.start) + text.slice(range.end), range.start);
+                const { start, end } = expandMarkdownPreviewDeletion(target, range.start, range.end);
+                makeEditablePlainText(target, start);
+                updateSingleLine(target, text.slice(0, start) + text.slice(end), start);
                 return;
             }
 
             const caret = range ? range.start : getCaretOffset(target);
-            if (event.inputType === 'deleteContentBackward' && outdentMarkdownListAtStart(target, caret)) return;
             makeEditablePlainText(target, caret);
             const previewRange = markdownPreviewDeleteRange(target, caret,
                 event.inputType === 'deleteContentBackward' ? -1 : 1, graphemeDeleteStart, graphemeDeleteEnd);
@@ -443,7 +446,7 @@ export function bindTextInputEvents({ renderer }) {
                     if (target.dataset.markdownPreviewLine !== 'table') mergeLineForward(target);
                 }
                 else updateSingleLine(target, text.slice(0, previewRange.start) + text.slice(previewRange.end),
-                    event.inputType === 'deleteContentBackward' ? previewRange.start : caret);
+                    event.inputType === 'deleteContentBackward' ? previewRange.start : Math.min(caret, previewRange.start));
                 return;
             }
             if (target.dataset.markdownPreviewLine === 'table') return;

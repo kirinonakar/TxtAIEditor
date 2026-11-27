@@ -1,10 +1,12 @@
 export function createClipboardCommandHandlers({
     activeEditableElement,
+    compositionSelectionRange,
     copyCsvSelectionToClipboard,
     csvTableMode,
     cutCsvSelectionToClipboard,
     commitLine,
     deleteForwardAtCaret,
+    deleteSelectedText,
     focusLine,
     hasCustomSelection,
     hexEditorMode,
@@ -29,7 +31,7 @@ export function createClipboardCommandHandlers({
         if (state.readOnly) return;
         if (hasCustomSelection()) {
             const sel = normalizeSelection();
-            if (sel) replaceSelectionWith(sel, '');
+            if (sel) deleteSelectedText(sel);
             return;
         }
 
@@ -38,6 +40,11 @@ export function createClipboardCommandHandlers({
         if (element && selection?.rangeCount && element.contains(selection.anchorNode)) {
             const selected = selection.toString();
             if (selected) {
+                const previewSelection = state.inlineLivePreviewEnabled && element.querySelector('.md-preview-syntax') && compositionSelectionRange();
+                if (previewSelection) {
+                    deleteSelectedText(previewSelection);
+                    return;
+                }
                 document.execCommand('delete');
                 commitLine(element);
                 return;

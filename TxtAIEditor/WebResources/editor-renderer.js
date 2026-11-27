@@ -506,6 +506,7 @@ function createEditorRenderer({
             const livePreviewOptions = {
                 ...previewBlockOptions,
                 mode: 'markdown',
+                interactiveTaskLists: !state.readOnly,
                 renderCharts: true,
                 baseHref: state.livePreviewBaseHref || '',
                 localResourceVersion: state.livePreviewLocalResourceVersion || '0',

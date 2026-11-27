@@ -315,7 +315,7 @@ function sanitizeHtml(html, options = {}) {
         [...node.attributes].forEach(attr => {
             const name = attr.name.toLowerCase();
             const value = attr.value.trim().toLowerCase();
-            if (name.startsWith('on') || value.startsWith('javascript:') || value.startsWith('data:text/html')) {
+            if (name === 'data-markdown-task-line' || name.startsWith('on') || value.startsWith('javascript:') || value.startsWith('data:text/html')) {
                 node.removeAttribute(attr.name);
             }
         });
@@ -1065,17 +1065,24 @@ function leadingWhitespaceLength(line, tabSize = 4) {
 
 function listItemInfo(text, options = {}) {
     const tabSize = Number(options.tabSize || 4);
-    const match = /^([ \t]*)([-*+]|\d+[.)])(?:[ \t]+\[([ xX])\])?[ \t]+(.*)$/.exec(text || '');
+    const match = /^([ \t]*)([-*+]|\d+[.)])([ \t]+)(?:\[([ xX])\](?:[ \t]+|$))?(.*)$/.exec(text || '');
     if (!match) return null;
     const ordered = /^\d/.test(match[2]);
+    const taskMarkerColumn = match[4] === undefined ? null : match[1].length + match[2].length + match[3].length + 1;
     return {
         type: ordered ? 'ol' : 'ul',
         indent: indentColumnLength(match[1], tabSize),
         marker: match[2],
-        content: match[4],
+        content: match[5],
         startNum: ordered ? Number.parseInt(match[2], 10) : 1,
-        taskChecked: match[3] ? match[3].toLowerCase() === 'x' : null
+        taskChecked: taskMarkerColumn === null ? null : match[4].toLowerCase() === 'x',
+        taskMarkerColumn
     };
+}
+
+function renderMarkdownTaskCheckbox(info, lineNumber, interactive) {
+    const control = interactive && lineNumber > 0 ? ` data-markdown-task-line="${lineNumber}"` : ' disabled';
+    return `<input type="checkbox" contenteditable="false"${control}${info.taskChecked ? ' checked' : ''}>`;
 }
 
 function isMarkdownListStart(lineNumber, getLine, options = {}) {
@@ -1247,10 +1254,10 @@ function renderMarkdownListAt(lines, startIndex, indent, options = {}) {
 
         const itemSourceLine = Number(options.sourceStartLine || 1) + index;
         let itemHtml = options.editableListItem
-            ? options.editableListItem(lines[index], Number(options.sourceStartLine || 1) + index, info)
+            ? options.editableListItem(lines[index], itemSourceLine, info)
             : info.taskChecked === null
             ? inlineMarkdown(info.content, options)
-            : `<input type="checkbox" disabled${info.taskChecked ? ' checked' : ''}> ${inlineMarkdown(info.content, options)}`;
+            : `${renderMarkdownTaskCheckbox(info, itemSourceLine, options.interactiveTaskLists)} ${inlineMarkdown(info.content, options)}`;
         const itemClass = info.taskChecked === null ? '' : ' class="task-list-item"';
         index++;
 
@@ -1328,7 +1335,7 @@ function blockContainsInlineMath(block, getLine, options = {}) {
     return false;
 }
 
-function renderMarkdownLine(line, options = {}) {
+function renderMarkdownLine(line, options = {}, lineNumber = 0) {
     const raw = String(line ?? '');
     const trimmed = raw.trim();
     if (!trimmed) return '';
@@ -1348,7 +1355,7 @@ function renderMarkdownLine(line, options = {}) {
         const itemClass = listInfo.taskChecked === null ? '' : ' class="task-list-item"';
         const itemHtml = listInfo.taskChecked === null
             ? inlineMarkdown(listInfo.content, options)
-            : `<input type="checkbox" disabled${listInfo.taskChecked ? ' checked' : ''}> ${inlineMarkdown(listInfo.content, options)}`;
+            : `${renderMarkdownTaskCheckbox(listInfo, lineNumber, options.interactiveTaskLists)} ${inlineMarkdown(listInfo.content, options)}`;
         return `<${listInfo.type}${startAttr}${markerClass}${indentStyle}><li${itemClass}>${itemHtml}</li></${listInfo.type}>`;
     }
     const singleLineHtml = /^<([A-Za-z][A-Za-z0-9:-]*)(?:\s[^<>]*?)?>[\s\S]*<\/\1\s*>$/.exec(trimmed);
@@ -1478,7 +1485,7 @@ function renderBlockAt(lineNumber, maxLine, getLine, options = {}) {
         return { html: `<p>${innerHtml}</p>`, endLine };
     }
 
-    return { html: renderMarkdownLine(line, options), endLine: lineNumber };
+    return { html: renderMarkdownLine(line, options, lineNumber), endLine: lineNumber };
 }
 
 function renderPreviewLineAt(lineNumber, maxLine, getLine, options = {}, skipUntilRef = { val: 0 }) {
@@ -1642,6 +1649,7 @@ export {
     renderLatexLine,
     renderLine,
     renderMarkdownLine,
+    renderMarkdownTaskCheckbox,
     renderMarkdownSvgFile,
     renderMermaidBlocks,
     renderPreviewEmbeds,

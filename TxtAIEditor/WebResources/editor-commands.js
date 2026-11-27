@@ -59,7 +59,8 @@ import {
     setNativeSelectionRangeInElement
 } from './editor-caret.js';
 import { highlightPreviewSearchInElement, renderLineContent } from './editor-highlighter.js';
-import { markdownPreviewDeleteRange, markdownPreviewLineBreakOffset, markdownPreviewSpaceInsertionOffset, markdownPreviewTextPosition, needsMarkdownPreviewBlockRefresh, updateGroupedMarkdownElement, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
+import { expandMarkdownPreviewDeletion, markdownPreviewDeleteRange, markdownPreviewLineBreakOffset, markdownPreviewSpaceInsertionOffset, markdownPreviewTextPosition, needsMarkdownPreviewBlockRefresh, updateGroupedMarkdownElement, usesMarkdownPreviewEditing } from './editor-markdown-preview-edit.js';
+import { listItemInfo } from './markdown-preview-renderer.js';
 import {
     activeColumnSelection,
     cloneEditorSelection,
@@ -125,6 +126,34 @@ function postLineUpdate(lineNumber, previousText, nextText, isComposing = false)
         text: after.slice(prefixLength, afterEnd),
         isComposing
     });
+}
+
+function toggleMarkdownTaskCheckbox(checkbox) {
+    if (!state.inlineLivePreviewEnabled || state.readOnly || imeController.isCompositionActive) return false;
+
+    const lineNumber = Number(checkbox.dataset.markdownTaskLine);
+    const text = state.cache.get(lineNumber);
+    const item = listItemInfo(text);
+    if (!item || item.taskMarkerColumn === null) return false;
+    if (item.taskChecked === checkbox.checked) return true;
+
+    const column = item.taskMarkerColumn;
+    const marker = checkbox.checked ? 'x' : ' ';
+    const nextText = text.slice(0, column) + marker + text.slice(column + 1);
+    const syntax = checkbox.previousElementSibling;
+    const prefix = syntax?.classList.contains('md-preview-syntax') ? syntax.firstChild : null;
+    if (prefix?.nodeType === Node.TEXT_NODE && prefix.data[column] === text[column]) {
+        // Keep the live source in sync so a commit before the next render
+        // sees the new marker without moving the caret in the item body.
+        prefix.replaceData(column, 1, marker);
+    }
+    state.cache.set(lineNumber, nextText);
+    state.cacheVersion++;
+    if (!cleanDirtyMarker(lineNumber)) markDirty(lineNumber, 'mod');
+    postLineUpdate(lineNumber, text, nextText);
+    post({ type: 'contentChanged' });
+    queueRender(true);
+    return true;
 }
 
 function cancelPendingRepeatFollowUps(key) {
@@ -1107,7 +1136,7 @@ function deleteForwardAtCaret(element = activeEditableElement()) {
             if (sel.isColumn && sel.start.column === sel.end.column) {
                 sel.end.column = sel.end.column + 1;
             }
-            replaceSelectionWith(sel, '');
+            deleteSelectedText(sel);
         }
         return;
     }
@@ -1119,7 +1148,7 @@ function deleteForwardAtCaret(element = activeEditableElement()) {
         if (previewRange.merge) {
             if (element.dataset.markdownPreviewLine !== 'table') mergeLineForward(element);
         }
-        else updateSingleLine(element, text.slice(0, previewRange.start) + text.slice(previewRange.end), caret);
+        else updateSingleLine(element, text.slice(0, previewRange.start) + text.slice(previewRange.end), Math.min(caret, previewRange.start));
         return;
     }
     if (caret < text.length) {
@@ -1131,12 +1160,17 @@ function deleteForwardAtCaret(element = activeEditableElement()) {
     mergeLineForward(element);
 }
 
-function outdentMarkdownListAtStart(element, caret = element ? getCaretOffset(element) : 0) {
+function handleMarkdownListBackspace(element, caret = element ? getCaretOffset(element) : 0) {
     if (state.readOnly || imeController.isComposing || hasCustomSelection() ||
         !usesMarkdownPreviewEditing(state) || element?.getAttribute('contenteditable') !== 'true' ||
         element.dataset.markdownPreviewLine !== 'list' ||
         window.getSelection()?.isCollapsed === false) return false;
     const text = lineTextFromElement(element);
+    const item = listItemInfo(text);
+    if (item && !item.content.trim()) {
+        updateSingleLine(element, '', 0);
+        return true;
+    }
     const indent = /^[ \t]+(?=(?:[-*+]|\d+[.)])[ \t]+)/.exec(text)?.[0];
     const visibleStart = markdownPreviewTextPosition(element, 0)?.sourceOffset;
     if (!indent || visibleStart === undefined || caret > visibleStart) return false;
@@ -1182,14 +1216,14 @@ function deleteBackwardAtCaret(element = activeEditableElement()) {
             if (sel.isColumn && sel.start.column === sel.end.column) {
                 sel.start.column = Math.max(0, sel.start.column - 1);
             }
-            replaceSelectionWith(sel, '');
+            deleteSelectedText(sel);
         }
         return;
     }
 
     const text = lineTextFromElement(element);
     const caret = getCaretOffset(element);
-    if (outdentMarkdownListAtStart(element, caret)) return;
+    if (handleMarkdownListBackspace(element, caret)) return;
     const previewRange = markdownPreviewDeleteRange(element, caret, -1, graphemeDeleteStart, graphemeDeleteEnd);
     if (previewRange) {
         updateSingleLine(element, text.slice(0, previewRange.start) + text.slice(previewRange.end), previewRange.start);
@@ -1403,7 +1437,11 @@ function moveSelectedLines(direction) {
     return true;
 }
 
-function replaceSelectionWith(selection, text, editSelection = null) {
+function deleteSelectedText(selection) {
+    replaceSelectionWith(selection, '', null, true);
+}
+
+function replaceSelectionWith(selection, text, editSelection = null, expandPreviewDeletion = false) {
     if (selection.isColumn) {
         replaceColumnSelectionWith(selection, text);
         return;
@@ -1423,6 +1461,15 @@ function replaceSelectionWith(selection, text, editSelection = null) {
             const prevLineLength = (state.cache.get(start.line - 1) || '').length;
             start = { line: start.line - 1, column: prevLineLength };
         }
+    } else if (expandPreviewDeletion && state.inlineLivePreviewEnabled) {
+        const first = viewport.querySelector(`.line-text[data-line="${start.line}"]`);
+        const sameLine = start.line === end.line;
+        const firstEnd = sameLine ? end.column : (state.cache.get(start.line) || '').length;
+        const bounds = expandMarkdownPreviewDeletion(first, start.column, firstEnd);
+        start = { line: start.line, column: bounds.start };
+        const last = sameLine ? first : viewport.querySelector(`.line-text[data-line="${end.line}"]`);
+        const lastEnd = sameLine ? bounds.end : expandMarkdownPreviewDeletion(last, 0, end.column).end;
+        end = { line: end.line, column: lastEnd };
     }
 
     const prefix = (state.cache.get(start.line) || '').slice(0, start.column);
@@ -1822,11 +1869,13 @@ const {
     submitHexEdit
 } = createClipboardCommandHandlers({
     activeEditableElement,
+    compositionSelectionRange,
     copyCsvSelectionToClipboard,
     csvTableMode,
     cutCsvSelectionToClipboard,
     commitLine,
     deleteForwardAtCaret,
+    deleteSelectedText,
     focusLine,
     hasCustomSelection,
     hexEditorMode,
@@ -1892,6 +1941,7 @@ export {
     compositionSelectionRange,
     copySelectionToClipboard,
     cutSelectionToClipboard,
+    deleteSelectedText,
     deleteSelectionOrForward,
     endHostStreamInsert,
     finishColumnComposition,
@@ -1901,6 +1951,7 @@ export {
     getCaretOffset,
     handleFormatText,
     handleLineSortingAndCleanup,
+    handleMarkdownListBackspace,
     handleTextConversion,
     inputRangeInElement,
     insertHostStreamText,
@@ -1921,7 +1972,6 @@ export {
     moveCaretVertical,
     moveCaretWord,
     normalizedModelRepeatKey,
-    outdentMarkdownListAtStart,
     pasteFromClipboard,
     prepareMultilineCompositionHost,
     releaseModelRepeatKey,
@@ -1939,6 +1989,7 @@ export {
     shouldSuppressNativeBeforeInput,
     splitCurrentLine,
     toggleComment,
+    toggleMarkdownTaskCheckbox,
     changeLineIndent,
     updateSingleLine
 };
