@@ -14,7 +14,7 @@ namespace TxtAIEditor.Core.Services
         private static readonly string[] Sides = ["top", "left", "bottom", "right"];
 
         internal static bool IsRowProperty(ushort code) => code is
-            0xD608 or 0x9407 or 0xD605 or 0xD613 or >= 0xD61A and <= 0xD61D or
+            0xD608 or 0x9407 or 0x3403 or 0x3466 or 0xD605 or 0xD613 or >= 0xD61A and <= 0xD61D or
             0x5624 or 0x5625 or 0xD62B or 0xD62C or 0xD620 or 0xD62F or 0xD632 or 0xD634 or
             0xD612 or 0xD616 or 0xD60C or 0xD670 or 0xD671 or 0xD672;
 
@@ -72,6 +72,8 @@ namespace TxtAIEditor.Core.Services
             private readonly Cell[] _cells;
             private readonly Border?[] _rowBorders = new Border?[6];
             private int _height;
+            private bool _cantSplitLegacy;
+            private bool? _cantSplit;
 
             internal int[] Edges { get; private set; } = [];
 
@@ -133,6 +135,8 @@ namespace TxtAIEditor.Core.Services
                 switch (code)
                 {
                     case 0x9407: _height = I16(data, 0); break;
+                    case 0x3403: _cantSplitLegacy = data[0] == 1; break;
+                    case 0x3466: _cantSplit = data[0] == 1; break;
                     case 0xD613: ReadRowBorders(data, 8); break;
                     case >= 0xD61A and <= 0xD61D:
                         int side = code - 0xD61A;
@@ -194,6 +198,7 @@ namespace TxtAIEditor.Core.Services
             internal void Apply(int[] grid, bool firstRow, bool lastRow)
             {
                 var rowProperties = new XElement(W + "trPr");
+                if (_cantSplit ?? _cantSplitLegacy) rowProperties.Add(new XElement(W + "cantSplit"));
                 if (_height != 0)
                 {
                     rowProperties.Add(new XElement(W + "trHeight",

@@ -12,10 +12,11 @@ export async function prepareOfficePdf() {
     }
     await window.prepareWordPagination?.();
     page?.classList.add('office-pdf-export');
+    const wordPageFrames = page?.hasAttribute('data-word-page-frames');
     const layout = { width: 210 / 25.4, height: 297 / 25.4, top: .5, right: .5, bottom: .5, left: .5 };
     if (page) {
         const style = getComputedStyle(page);
-        layout.width = page.offsetWidth / 96;
+        layout.width = (wordPageFrames ? parseFloat(style.width) : page.offsetWidth) / 96;
         for (const side of ['top', 'right', 'bottom', 'left']) layout[side] = parseFloat(style.getPropertyValue(`padding-${side}`)) / 96;
         const height = getComputedStyle(document.documentElement).getPropertyValue('--document-page-height');
         if (height) {
@@ -92,7 +93,7 @@ export async function prepareOfficePdf() {
         .forEach(element => element.classList.remove('selected-cell', 'active-cell', 'selected-column-heading', 'selected-row-heading'));
     document.querySelectorAll('.slide').forEach(element => window.fitSlide?.(element));
     await document.fonts.ready;
-    if (page) {
+    if (page && !wordPageFrames) {
         const namedPages = readHwpxPrintLayouts(page);
         const hasSavedPagination = page.hasAttribute('data-saved-pagination') ||
             page.hasAttribute('data-word-pagination') ||

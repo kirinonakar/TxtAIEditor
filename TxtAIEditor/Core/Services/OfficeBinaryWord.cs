@@ -225,7 +225,7 @@ namespace TxtAIEditor.Core.Services
                 int papLength = U16(style, position);
                 position += 2;
                 if (papLength < 2 || papLength > style.Length - position) continue;
-                var paragraph = ReadProperties(style.Slice(position + 2, papLength - 2), false, out _);
+                var paragraph = ReadProperties(style.Slice(position + 2, papLength - 2), false, out _, out var tabs);
                 position += (papLength + 1) & ~1;
                 Dictionary<ushort, int>? characters = null;
                 if (position <= style.Length - 2)
@@ -235,7 +235,7 @@ namespace TxtAIEditor.Core.Services
                     if (chpLength <= style.Length - position)
                         characters = ReadProperties(style.Slice(position, chpLength), false, out _);
                 }
-                _paragraphStyles[index] = new ParagraphStyle(U16(style, 2) >> 4, paragraph, characters);
+                _paragraphStyles[index] = new ParagraphStyle(U16(style, 2) >> 4, paragraph, characters, tabs);
             }
 
             if (_paragraphStyles.TryGetValue(0, out ParagraphStyle? normal))
@@ -420,6 +420,7 @@ namespace TxtAIEditor.Core.Services
             var fonts = new XElement(W + "rFonts");
             if ((uint)font < _fonts.Count && _fonts[font].Length > 0) fonts.SetAttributeValue(W + "ascii", _fonts[font]);
             if ((uint)eastAsian < _fonts.Count && _fonts[eastAsian].Length > 0) fonts.SetAttributeValue(W + "eastAsia", _fonts[eastAsian]);
+            if (Get(direct, 0x286F) == 1) fonts.SetAttributeValue(W + "hint", "eastAsia");
             if (fonts.HasAttributes) properties.Add(fonts);
         }
 
@@ -439,6 +440,7 @@ namespace TxtAIEditor.Core.Services
                 1 => "center", 2 => "right", 3 => "both", 4 => "distribute", _ => null
             };
             if (alignment != null) properties.Add(Val("jc", alignment));
+            if (EffectiveProperty(style, paragraphStyle, 0x2405) == 1) properties.Add(new XElement(W + "keepLines"));
             if (EffectiveProperty(style, paragraphStyle, 0x2407) == 1) properties.Add(new XElement(W + "pageBreakBefore"));
             var spacing = new XElement(W + "spacing");
             spacing.SetAttributeValue(W + "before", EffectiveProperty(style, paragraphStyle, 0xA413, missing: 0));
@@ -457,10 +459,13 @@ namespace TxtAIEditor.Core.Services
             if ((eastAsianLanguage & 0x03FF) == 0x0012)
             {
                 markProperties.Add(new XElement(W + "lang", new XAttribute(W + "eastAsia", "ko-KR")));
+                if (_body.Name == W + "body") properties.SetAttributeValue(Preview + "koreanLayout", "1");
             }
             properties.Add(spacing, markProperties);
             WordListLevel? listLevel = endRow ? null : AddListMarker(properties, style, paragraphStyle, markStyle);
             AddParagraphIndent(properties, style, listLevel?.Paragraph, paragraphStyle);
+            if ((_body.Name == W + "hdr" || _body.Name == W + "ftr") && _paragraph.Descendants(W + "tab").Any())
+                AddPagePartTabs(properties, inherited?.Tabs, range.Tabs);
             if (properties.HasElements) _paragraph.AddFirst(properties);
 
             if (depth > 64) throw new InvalidDataException("Word tables are nested too deeply.");
@@ -512,6 +517,7 @@ namespace TxtAIEditor.Core.Services
             if (!_paragraphStyles.TryGetValue(index, out ParagraphStyle? style) || style.Parent == 0xFFF) return style;
             var paragraph = new Dictionary<ushort, int>(style.Paragraph);
             var characters = new Dictionary<ushort, int>(style.Characters ?? []);
+            List<TabChange>? tabs = style.Tabs == null ? null : new List<TabChange>(style.Tabs);
             int parent = style.Parent;
             for (int depth = 0; depth < 32 && parent != index && _paragraphStyles.TryGetValue(parent, out ParagraphStyle? ancestor); depth++)
             {
@@ -520,11 +526,44 @@ namespace TxtAIEditor.Core.Services
                 {
                     foreach ((ushort code, int value) in ancestor.Characters) characters.TryAdd(code, value);
                 }
+                if (ancestor.Tabs != null) (tabs ??= new()).InsertRange(0, ancestor.Tabs);
                 parent = ancestor.Parent;
             }
-            var resolved = new ParagraphStyle(0xFFF, paragraph, characters);
+            var resolved = new ParagraphStyle(0xFFF, paragraph, characters, tabs);
             _paragraphStyles[index] = resolved;
             return resolved;
+        }
+
+        private static void AddPagePartTabs(XElement properties, List<TabChange>? inherited, List<TabChange>? direct)
+        {
+            if (inherited == null && direct == null) return;
+            var stops = new SortedDictionary<int, string>();
+            Apply(inherited);
+            Apply(direct);
+            if (stops.Count > 0)
+            {
+                properties.Add(new XElement(W + "tabs", new XAttribute(Preview + "positioned", "1"),
+                    stops.Select(stop => new XElement(W + "tab",
+                    new XAttribute(W + "pos", stop.Key), new XAttribute(W + "val", stop.Value)))));
+            }
+
+            void Apply(List<TabChange>? changes)
+            {
+                if (changes == null) return;
+                foreach (TabChange change in changes)
+                {
+                    if (change.Alignment == null)
+                    {
+                        foreach (int position in stops.Keys.Where(position =>
+                            Math.Abs(position - change.Position) <= change.Tolerance).ToArray())
+                            stops.Remove(position);
+                    }
+                    else
+                    {
+                        stops[change.Position] = change.Alignment;
+                    }
+                }
+            }
         }
 
         private static void AddParagraphIndent(XElement properties, Dictionary<ushort, int>? direct,
@@ -722,8 +761,10 @@ namespace TxtAIEditor.Core.Services
                     new XAttribute(W + "h", SectionValue(properties, 0xB020, 15840))),
                 new XElement(W + "pgMar", new XAttribute(W + "left", SectionValue(properties, 0xB021, 1440)),
                     new XAttribute(W + "right", SectionValue(properties, 0xB022, 1440)),
-                    new XAttribute(W + "top", Math.Abs((short)SectionValue(properties, 0x9023, 1440))),
-                    new XAttribute(W + "bottom", Math.Abs((short)SectionValue(properties, 0x9024, 1440)))));
+                    new XAttribute(W + "top", (short)SectionValue(properties, 0x9023, 1440)),
+                    new XAttribute(W + "bottom", (short)SectionValue(properties, 0x9024, 1440)),
+                    new XAttribute(W + "header", SectionValue(properties, 0xB017, 720)),
+                    new XAttribute(W + "footer", SectionValue(properties, 0xB018, 720))));
         }
 
         private static int SectionValue(Dictionary<ushort, int>? style, ushort key, int fallback) =>
@@ -768,11 +809,11 @@ namespace TxtAIEditor.Core.Services
                         length -= 2;
                     }
 
-                    var properties = ReadProperties(Slice(page[..511], offset, length), paragraph, out var rowProperties);
-                    if (styleIndex != 0 || properties.Count > 0 || rowProperties != null)
+                    var properties = ReadProperties(Slice(page[..511], offset, length), paragraph, out var rowProperties, out var tabs);
+                    if (styleIndex != 0 || properties.Count > 0 || rowProperties != null || tabs != null)
                     {
                         ranges.Add(new PropertyRange(I32(page, run * 4), I32(page, (run + 1) * 4),
-                            properties, rowProperties, styleIndex));
+                            properties, rowProperties, styleIndex, tabs));
                     }
                 }
             }
@@ -782,16 +823,20 @@ namespace TxtAIEditor.Core.Services
         }
 
         private Dictionary<ushort, int> ReadProperties(ReadOnlySpan<byte> data, bool paragraph,
-            out OfficeBinaryWordTable.RowProperties? rowProperties)
+            out OfficeBinaryWordTable.RowProperties? rowProperties) => ReadProperties(data, paragraph, out rowProperties, out _);
+
+        private Dictionary<ushort, int> ReadProperties(ReadOnlySpan<byte> data, bool paragraph,
+            out OfficeBinaryWordTable.RowProperties? rowProperties, out List<TabChange>? tabs)
         {
             var properties = new Dictionary<ushort, int>();
             rowProperties = null;
-            ReadProperties(data, properties, paragraph, ref rowProperties, depth: 0);
+            tabs = null;
+            ReadProperties(data, properties, paragraph, ref rowProperties, ref tabs, depth: 0);
             return properties;
         }
 
         private void ReadProperties(ReadOnlySpan<byte> data, Dictionary<ushort, int> properties, bool paragraph,
-            ref OfficeBinaryWordTable.RowProperties? rowProperties, int depth)
+            ref OfficeBinaryWordTable.RowProperties? rowProperties, ref List<TabChange>? tabs, int depth)
         {
             for (int offset = 0; offset + 2 <= data.Length;)
             {
@@ -813,6 +858,12 @@ namespace TxtAIEditor.Core.Services
                     else
                     {
                         size = data[offset++];
+                        if (code == 0xC615 && size == 255 && offset < data.Length)
+                        {
+                            int addedOffset = offset + 1 + 4 * data[offset];
+                            if (addedOffset >= data.Length) break;
+                            size = addedOffset + 1 + 3 * data[addedOffset] - offset;
+                        }
                     }
 
                 }
@@ -827,11 +878,15 @@ namespace TxtAIEditor.Core.Services
                 {
                     if (depth < 8 && TryReadIndirectProperties(I32(operand, 0), out ReadOnlySpan<byte> indirect))
                     {
-                        ReadProperties(indirect, properties, paragraph, ref rowProperties, depth + 1);
+                        ReadProperties(indirect, properties, paragraph, ref rowProperties, ref tabs, depth + 1);
                     }
                     // A huge PAPX replaces the rest of this property block. For PTableProps,
                     // also read the backward-compatible TDefTable that can follow the pointer.
                     if (code == 0x6646) break;
+                }
+                else if (code is 0xC60D or 0xC615)
+                {
+                    ReadTabChanges(operand, code == 0xC615, ref tabs);
                 }
                 else if (!paragraph && code == CharacterShading && size == 10)
                 {
@@ -850,6 +905,32 @@ namespace TxtAIEditor.Core.Services
                     if (size == 4) properties[code] = I32(operand, 0);
                 }
                 offset += size;
+            }
+        }
+
+        private static void ReadTabChanges(ReadOnlySpan<byte> operand, bool hasTolerance, ref List<TabChange>? changes)
+        {
+            if (operand.Length < 2) return;
+            int deleted = operand[0];
+            int addedOffset = 1 + deleted * (hasTolerance ? 4 : 2);
+            if (addedOffset >= operand.Length) return;
+            int added = operand[addedOffset++];
+            if (addedOffset + added * 3 > operand.Length) return;
+
+            for (int index = 0; index < deleted; index++)
+            {
+                int position = I16(operand, 1 + 2 * index);
+                int tolerance = hasTolerance ? U16(operand, 1 + 2 * (deleted + index)) : 0;
+                (changes ??= new()).Add(new TabChange(position, tolerance, null));
+            }
+            for (int index = 0; index < added; index++)
+            {
+                int position = I16(operand, addedOffset + 2 * index);
+                string? alignment = (operand[addedOffset + 2 * added + index] & 7) switch
+                {
+                    0 or 6 => "left", 1 => "center", 2 => "right", _ => null
+                };
+                (changes ??= new()).Add(new TabChange(position, 0, alignment));
             }
         }
 
@@ -923,9 +1004,10 @@ namespace TxtAIEditor.Core.Services
         internal static string? IndexedColor(int index) => index > 0 && index < Colors.Length ? Colors[index] : null;
 
         private readonly record struct PropertyRange(int Start, int End, Dictionary<ushort, int>? Properties,
-            OfficeBinaryWordTable.RowProperties? RowProperties, int StyleIndex = 0);
+            OfficeBinaryWordTable.RowProperties? RowProperties, int StyleIndex = 0, List<TabChange>? Tabs = null);
         private sealed record ParagraphStyle(int Parent, Dictionary<ushort, int> Paragraph,
-            Dictionary<ushort, int>? Characters);
+            Dictionary<ushort, int>? Characters, List<TabChange>? Tabs);
+        private readonly record struct TabChange(int Position, int Tolerance, string? Alignment);
         private sealed record Picture(string Id, long Width, long Height);
 
         private sealed class TableFrame

@@ -97,14 +97,14 @@ namespace TxtAIEditor.Core.Services
             string? pageWidth = null;
             string? pagePadding = null;
             string? pageHeight = null;
-            if (TryReadWordPageLayout(document, out string documentPageWidth, out string documentPagePadding, out string documentPageHeight))
+            bool legacy = Path.GetExtension(filePath).Equals(".doc", StringComparison.OrdinalIgnoreCase);
+            if (TryReadWordPageLayout(document, legacy, out string documentPageWidth, out string documentPagePadding, out string documentPageHeight))
             {
                 pageWidth = documentPageWidth;
                 pagePadding = documentPagePadding;
                 pageHeight = documentPageHeight;
             }
 
-            bool legacy = Path.GetExtension(filePath).Equals(".doc", StringComparison.OrdinalIgnoreCase);
             string pageParts = legacy
                 ? await BuildPagePartsAsync(archive, relationships, body.Element(body.Name.Namespace + "sectPr")).ConfigureAwait(false)
                 : string.Empty;
@@ -135,6 +135,7 @@ namespace TxtAIEditor.Core.Services
             IReadOnlyDictionary<string, string> relationships, XElement? section)
         {
             var parts = new StringBuilder();
+            XElement? margins = GetDirectProperty(section, "pgMar");
             foreach (XElement reference in section?.Elements() ?? Enumerable.Empty<XElement>())
             {
                 string kind = reference.Name.LocalName switch
@@ -152,7 +153,13 @@ namespace TxtAIEditor.Core.Services
                 var images = await LoadRelationshipsAsync(archive,
                     OfficePresentationPackageReader.GetRelationshipsPath(path), "word").ConfigureAwait(false);
 
-                parts.Append("<template data-doc-page-part=\"").Append(kind).Append('-').Append(variant).Append("\"><")
+                int offset = TryReadWordTwips(margins, kind, out int distance) ? Math.Max(0, distance) : 720;
+                string edge = kind == "header" ? "top" : "bottom";
+                bool fixedMargin = TryReadWordTwips(margins, edge, out int margin) && margin < 0;
+                parts.Append("<template data-doc-page-part=\"").Append(kind).Append('-').Append(variant)
+                    .Append("\" data-word-part-offset=\"").Append(offset.ToString(CultureInfo.InvariantCulture)).Append('"');
+                if (fixedMargin) parts.Append(" data-word-fixed-margin");
+                parts.Append("><")
                     .Append(kind).Append(" class=\"doc-page-part\">");
                 foreach (XElement block in EnumerateWordBlocks(part.Root))
                 {
@@ -165,6 +172,7 @@ namespace TxtAIEditor.Core.Services
 
         private static bool TryReadWordPageLayout(
             XDocument document,
+            bool legacy,
             out string pageWidth,
             out string pagePadding,
             out string pageHeight)
@@ -202,9 +210,9 @@ namespace TxtAIEditor.Core.Services
             {
                 pagePadding = string.Join(
                     ' ',
-                    WordTwipsToCssPoints(topTwips),
+                    WordTwipsToCssPoints(legacy ? Math.Abs(topTwips) : topTwips),
                     WordTwipsToCssPoints(rightTwips),
-                    WordTwipsToCssPoints(bottomTwips),
+                    WordTwipsToCssPoints(legacy ? Math.Abs(bottomTwips) : bottomTwips),
                     WordTwipsToCssPoints(leftTwips));
             }
 
@@ -260,8 +268,11 @@ namespace TxtAIEditor.Core.Services
                 styleId = GetAttributeValue(GetDirectProperty(style, "basedOn"), "val");
             }
 
-            return pageBreak != null && GetAttributeValue(pageBreak, "val") is not ("0" or "false" or "off");
+            return IsEnabledWordProperty(pageBreak);
         }
+
+        private static bool IsEnabledWordProperty(XElement? property) =>
+            property != null && GetAttributeValue(property, "val") is not ("0" or "false" or "off");
 
         private static bool EndsWithPageBreak(StringBuilder builder)
         {
@@ -325,15 +336,29 @@ namespace TxtAIEditor.Core.Services
             string styleAttribute = string.IsNullOrWhiteSpace(paragraphStyle)
                 ? string.Empty
                 : " style=\"" + Html(paragraphStyle) + "\"";
+            string languageAttribute = paragraphProperties?.Attribute(OfficeBinaryWord.Preview + "koreanLayout") != null
+                ? " lang=\"ko\"" : string.Empty;
             if (content.Length > 0 || (marker != null && trailingBreaks == 0))
             {
-                builder.Append("<p class=\"doc-paragraph\"").Append(styleAttribute).Append('>');
+                builder.Append("<p class=\"doc-paragraph\"").Append(styleAttribute).Append(languageAttribute);
+                if (IsEnabledWordProperty(GetDirectProperty(paragraphProperties, "keepLines")))
+                    builder.Append(" data-word-keep-lines");
+                if (GetDirectProperty(paragraphProperties, "tabs") is XElement tabs &&
+                    tabs.Attribute(OfficeBinaryWord.Preview + "positioned") != null)
+                {
+                    string stops = string.Join(' ', tabs.Elements().Select(tab =>
+                        GetAttributeValue(tab, "pos") + ":" + GetAttributeValue(tab, "val")));
+                    builder.Append(" data-word-tab-stops=\"").Append(Html(stops)).Append('"');
+                    content.Replace("\t", "<span class=\"doc-word-tab\" aria-hidden=\"true\"></span>");
+                }
+                builder.Append('>');
                 if (marker != null) AppendListMarkerHtml(builder, marker);
                 builder.Append(content).Append("</p>");
             }
             else if (trailingBreaks == 0)
             {
-                builder.Append("<p class=\"doc-paragraph empty-paragraph\"").Append(styleAttribute).Append("></p>");
+                builder.Append("<p class=\"doc-paragraph empty-paragraph\"").Append(styleAttribute)
+                    .Append(languageAttribute).Append("></p>");
             }
 
             for (int i = 0; i < trailingBreaks; i++)
@@ -379,7 +404,22 @@ namespace TxtAIEditor.Core.Services
             AppendStyle(styles, BuildRunStyle(paragraphMark));
             if (GetAttributeValue(GetDirectProperty(paragraphMark, "lang"), "eastAsia") == "ko-KR")
             {
-                styles.Add("word-break:keep-all");
+                if (paragraphProperties?.Attribute(OfficeBinaryWord.Preview + "koreanLayout") != null)
+                {
+                    string font = GetAttributeValue(GetDirectProperty(paragraphMark, "rFonts"), "eastAsia");
+                    // Word's single-spaced line boxes for these Korean fonts are taller than Chromium's.
+                    string? lineHeight = font.ToUpperInvariant() switch
+                    {
+                        "맑은 고딕" or "MALGUN GOTHIC" => "1.75",
+                        "굴림체" or "GULIMCHE" => "1.27",
+                        _ => null
+                    };
+                    if (lineHeight != null) styles.Add("--word-default-line-height:" + lineHeight);
+                }
+                else
+                {
+                    styles.Add("word-break:keep-all");
+                }
             }
             if (alignment != null) styles.Add("text-align:" + alignment);
             if (value == "distribute") styles.Add("text-align-last:justify");
@@ -483,12 +523,13 @@ namespace TxtAIEditor.Core.Services
             {
                 style = style.Length == 0 ? shading : style + ";" + shading;
             }
+            bool eastAsian = GetAttributeValue(GetDirectProperty(properties, "rFonts"), "hint") == "eastAsia";
             foreach (XElement child in run.Elements())
             {
                 switch (child.Name.LocalName)
                 {
                     case "t":
-                        AppendStyledText(builder, child.Value, style);
+                        AppendStyledText(builder, child.Value, style, eastAsian && child.Value.All(ch => ch == ' '));
                         break;
                     case "tab":
                         builder.Append('\t');
@@ -576,22 +617,23 @@ namespace TxtAIEditor.Core.Services
             return string.Join(';', styles);
         }
 
-        private static void AppendStyledText(StringBuilder builder, string text, string style)
+        private static void AppendStyledText(StringBuilder builder, string text, string style, bool eastAsianSpace = false)
         {
             if (string.IsNullOrEmpty(text))
             {
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(style))
+            if (string.IsNullOrWhiteSpace(style) && !eastAsianSpace)
             {
                 builder.Append(Html(text));
                 return;
             }
 
-            builder.Append("<span style=\"")
-                .Append(Html(style))
-                .Append("\">")
+            builder.Append("<span");
+            if (eastAsianSpace) builder.Append(" class=\"doc-word-east-asian-space\"");
+            AppendStyleAttribute(builder, style);
+            builder.Append('>')
                 .Append(Html(text))
                 .Append("</span>");
         }
@@ -714,6 +756,9 @@ namespace TxtAIEditor.Core.Services
                 XElement row = layout.Rows[rowIndex];
                 XElement? rowProperties = GetDirectProperty(row, "trPr");
                 builder.Append("<tr");
+                if (IsEnabledWordProperty(GetDirectProperty(rowProperties, "cantSplit")) ||
+                    GetAttributeValue(GetDirectProperty(rowProperties, "trHeight"), "hRule") == "exact")
+                    builder.Append(" data-word-keep-row");
                 AppendStyleAttribute(builder, BuildRowStyle(rowProperties));
                 builder.Append('>');
                 AppendOmittedTableColumns(builder, ReadOmittedTableColumns(rowProperties, "gridBefore"));

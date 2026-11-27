@@ -141,6 +141,16 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
 [data-word-pagination] .doc-table { table-layout: fixed; }
 [data-word-pagination] .doc-table td { min-width: 0; }
 [data-word-pagination] .doc-paragraph { margin: 0; line-height: normal; tab-size: {{wordTabWidth ?? "8"}}; }
+[data-word-pagination] .doc-paragraph[lang="ko"] { word-break: keep-all; }
+[data-word-page-parts] .doc-paragraph[lang="ko"] {
+    word-break: normal;
+    line-break: strict;
+    line-height: var(--word-default-line-height, normal);
+}
+[data-word-page-parts] > .doc-table-wrap > .word-fixed-table,
+[data-word-page-parts] > .doc-word-page > .doc-table-wrap > .word-fixed-table {
+    max-width: calc(100% + var(--word-table-right-margin, 0px));
+}
 [data-word-pagination] .empty-paragraph::before { content: "\200b"; }
 .word-list-marker { display: inline-block; text-indent: 0; white-space: pre; }
 .word-list-marker-tab { min-width: var(--word-list-tab-width, 1em); }
@@ -148,8 +158,15 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
     main[data-word-single-page]:not(:has(> .doc-page-break)) { min-height: var(--document-page-height); }
 }
 .doc-page-part { display: flow-root; }
+.page[data-word-page-frames] { padding: 0; }
+.doc-word-page { position: relative; display: flow-root; min-height: var(--document-page-height); }
+.doc-word-page > .doc-page-part { position: absolute; }
+.doc-page-part [data-word-tab-stops] { text-align: left !important; }
+.doc-word-tab, .doc-word-space { display: inline-block; }
+.doc-word-space { white-space: pre; }
 .doc-fitted-page { display: flow-root; }
 .doc-page-part .doc-image, .doc-positioned-shape .doc-image { margin: 0; }
+.doc-page-part .doc-paragraph > .doc-image { display: inline; }
 .doc-paragraph > .doc-image img { display: inline-block; vertical-align: middle; }
 .doc-drawing-layer { position: relative; height: 0; pointer-events: none; z-index: 1; }
 .doc-positioned-shape { position: absolute; }
@@ -274,12 +291,16 @@ main.page:not(.office-pdf-export) .hwpx-paragraph {
         margin: 0;
         border: 0;
     }
+    [data-word-page-frames] > .doc-page-break { display: none; }
+    /* The print engine rounds the paper size. Leave one layout pixel at the boundary. */
+    .doc-word-page { min-height: calc(var(--document-page-height) - 1px); }
+    .doc-word-page ~ .doc-word-page { break-before: page; }
     [data-word-pagination] .doc-table tr { break-inside: avoid; }
 }
 </style>
 </head>
 <body>
-<main class="page"{{(hasSavedPagination ? " data-saved-pagination" : string.Empty)}}{{(paginateWord ? " data-word-pagination" : string.Empty)}}{{(savedWordSinglePage ? " data-word-single-page" : string.Empty)}}>
+<main class="page"{{(hasSavedPagination ? " data-saved-pagination" : string.Empty)}}{{(paginateWord ? " data-word-pagination" : string.Empty)}}{{(wordPageParts.Length > 0 ? " data-word-page-parts" : string.Empty)}}{{(savedWordSinglePage ? " data-word-single-page" : string.Empty)}}>
 {{content}}
 </main>
 {{wordPageParts}}
