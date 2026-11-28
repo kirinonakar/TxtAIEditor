@@ -5,6 +5,9 @@ const hwpxCellLineSelector = `.hwpx-squeeze-cell > ${hwpxSingleLineSelector},
 
 export async function prepareOfficePdf() {
     const page = document.querySelector('main.page');
+    if (page?.dataset.rdocsLayout === 'document') {
+        return { width: 210 / 25.4, height: 297 / 25.4, top: 0, right: 0, bottom: 0, left: 0, preferCssPageSize: true };
+    }
     const slide = document.querySelector('.slide');
     const workbook = typeof window.__txtAiEditorPrepareWorkbookPdf === 'function';
     if (!page && !slide && !workbook) {

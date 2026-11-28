@@ -175,7 +175,8 @@ namespace TxtAIEditor.Controls
 
         public static bool IsOfficeDocumentFile(string filePath)
         {
-            return HasExtension(filePath, OfficeDocumentFileExtensions);
+            return HasExtension(filePath, OfficeDocumentFileExtensions) ||
+                   HasExtension(filePath, Rdocs2mdConvertibleFileExtensions);
         }
 
         public static bool IsNotebookFile(string filePath)

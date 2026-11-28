@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.Tasks;
 using static TxtAIEditor.Core.Services.OfficeHtmlEncoder;
@@ -25,6 +26,11 @@ namespace TxtAIEditor.Core.Services
 
             try
             {
+                if (extension == ".hwp")
+                {
+                    return await BuildHwpHtmlAsync(filePath, forPdf).ConfigureAwait(false);
+                }
+
                 string html = extension switch
                 {
                     ".doc" or ".docx" => await OfficeTextDocumentHtmlRenderer.BuildWordAsync(filePath, _getString).ConfigureAwait(false),
@@ -39,7 +45,7 @@ namespace TxtAIEditor.Core.Services
             {
                 return AddFindPanel(BuildErrorHtml(_getString("OfficeViewerLegacyEncrypted", "This Office document is password-encrypted.")));
             }
-            catch (Exception ex) when (!forPdf && (extension is ".doc" or ".ppt" or ".xls" || ex is NotSupportedException))
+            catch (Exception ex) when (!forPdf && (extension is ".doc" or ".ppt" or ".xls" or ".hwp" || ex is NotSupportedException))
             {
                 System.Diagnostics.Debug.WriteLine(ex);
                 string message = ex is NotSupportedException
@@ -49,7 +55,27 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private string AddFindPanel(string html)
+        private async Task<string> BuildHwpHtmlAsync(string filePath, bool forPdf)
+        {
+            string html = await Rdocs2mdConverter.ConvertToDocumentHtmlAsync(filePath).ConfigureAwait(false);
+            const string head = "<!doctype html>\n<html>\n<head>\n";
+            if (!html.StartsWith(head, StringComparison.Ordinal) ||
+                !html.Contains("<main class=\"page rdocs-document\" data-rdocs-layout=\"document\"", StringComparison.Ordinal))
+            {
+                throw new NotSupportedException("rdocs2md did not return document layout HTML.");
+            }
+
+            string nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
+            string host = PreviewWebResourceService.ResourceHostName;
+            string scriptPolicy = forPdf
+                ? $"script-src http://{host} 'wasm-unsafe-eval'; connect-src http://{host} http://pdf-fonts.{host}; font-src data: blob: http://pdf-fonts.{host}"
+                : $"script-src 'nonce-{nonce}'";
+            string policy = $"default-src 'none'; base-uri 'none'; form-action 'none'; img-src data:; style-src 'unsafe-inline'; {scriptPolicy}";
+            html = html.Insert(head.Length, $"<meta http-equiv=\"Content-Security-Policy\" content=\"{policy}\">\n");
+            return forPdf ? html : AddFindPanel(html, nonce);
+        }
+
+        private string AddFindPanel(string html, string? scriptNonce = null)
         {
             if (string.IsNullOrWhiteSpace(html) ||
                 html.Contains("__txtAiEditorOfficeFind", StringComparison.Ordinal))
@@ -57,15 +83,16 @@ namespace TxtAIEditor.Core.Services
                 return html;
             }
 
-            string assets = BuildFindPanelAssets();
+            string assets = BuildFindPanelAssets(scriptNonce);
             int bodyCloseIndex = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
             return bodyCloseIndex >= 0
                 ? html.Insert(bodyCloseIndex, assets)
                 : html + assets;
         }
 
-        private string BuildFindPanelAssets()
+        private string BuildFindPanelAssets(string? scriptNonce)
         {
+            string scriptAttributes = scriptNonce == null ? string.Empty : $" nonce=\"{scriptNonce}\"";
             string optionsJson = JsonSerializer.Serialize(new
             {
                 findPlaceholder = _getString("EditorFindPlaceholder", "찾기"),
@@ -244,7 +271,7 @@ mark.txt-office-find-match.txt-office-find-active {
     <button id="txt-office-find-next" class="txt-office-find-button" type="button">↓</button>
     <button id="txt-office-find-close" class="txt-office-find-button" type="button">×</button>
 </div>
-<script>
+<script{{scriptAttributes}}>
 (() => {
     if (window.__txtAiEditorOfficeFind) return;
 

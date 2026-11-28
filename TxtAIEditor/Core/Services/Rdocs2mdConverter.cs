@@ -99,6 +99,9 @@ namespace TxtAIEditor.Core.Services
             return await ConvertAsync(filePath, "html", sheetName: null, sectionRange: null, cancellationToken, includeImages: true).ConfigureAwait(false);
         }
 
+        internal static Task<string> ConvertToDocumentHtmlAsync(string filePath, CancellationToken cancellationToken = default) =>
+            ConvertAsync(filePath, "html", sheetName: null, sectionRange: null, cancellationToken, includeImages: true, documentLayout: true);
+
         /// <summary>
         /// Converts a workbook to CSV. When <paramref name="sheetName"/> is set, only that worksheet is converted;
         /// <paramref name="sectionRange"/> selects 1-based sheet numbers instead (e.g. "3" or "2-4").
@@ -126,15 +129,15 @@ namespace TxtAIEditor.Core.Services
             }
         }
 
-        private static async Task<string> ConvertAsync(string filePath, string format, string? sheetName, string? sectionRange, CancellationToken cancellationToken, bool includeImages = false)
+        private static async Task<string> ConvertAsync(string filePath, string format, string? sheetName, string? sectionRange, CancellationToken cancellationToken, bool includeImages = false, bool documentLayout = false)
         {
             using var output = new StringWriter();
-            await RunConversionAsync(filePath, format, sheetName, sectionRange, output, int.MaxValue, cancellationToken, includeImages).ConfigureAwait(false);
+            await RunConversionAsync(filePath, format, sheetName, sectionRange, output, int.MaxValue, cancellationToken, includeImages, documentLayout).ConfigureAwait(false);
             return output.ToString();
         }
 
         private static async Task<bool> RunConversionAsync(string filePath, string format, string? sheetName, string? sectionRange,
-            TextWriter output, int maxChars, CancellationToken cancellationToken, bool includeImages = false)
+            TextWriter output, int maxChars, CancellationToken cancellationToken, bool includeImages = false, bool documentLayout = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string? executablePath = ExecutablePath;
@@ -156,6 +159,12 @@ namespace TxtAIEditor.Core.Services
             startInfo.ArgumentList.Add("--stdout");
             startInfo.ArgumentList.Add("--format");
             startInfo.ArgumentList.Add(format);
+            if (documentLayout)
+            {
+                startInfo.ArgumentList.Add("--layout");
+                startInfo.ArgumentList.Add("document");
+            }
+
             if (includeImages)
             {
                 // Inlines embedded raster images into the HTML output so the live preview

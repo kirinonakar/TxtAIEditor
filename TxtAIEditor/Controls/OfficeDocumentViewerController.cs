@@ -124,7 +124,7 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                await ConfigureAsync(webView);
+                await ConfigureAsync(tab, webView);
                 await NavigateAsync(tab, webView);
             }
             catch
@@ -132,7 +132,7 @@ namespace TxtAIEditor.Controls
             }
         }
 
-        private async Task ConfigureAsync(WebView2 webView)
+        private async Task ConfigureAsync(OpenedTab tab, WebView2 webView)
         {
             if (webView.CoreWebView2 == null)
             {
@@ -144,9 +144,29 @@ namespace TxtAIEditor.Controls
             webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = false;
             webView.CoreWebView2.Settings.IsStatusBarEnabled = true;
             webView.CoreWebView2.Settings.IsScriptEnabled = true;
-            webView.WebMessageReceived += OnWebMessageReceived;
+            if (string.Equals(Path.GetExtension(tab.FilePath), ".hwp", StringComparison.OrdinalIgnoreCase))
+            {
+                webView.CoreWebView2.NavigationStarting += (_, args) => args.Cancel = !IsViewerDocument(tab.Id, args.Uri);
+                webView.CoreWebView2.NewWindowRequested += (_, args) => args.Handled = true;
+                webView.CoreWebView2.DownloadStarting += (_, args) => args.Cancel = true;
+            }
+            webView.WebMessageReceived += (sender, args) =>
+            {
+                if (IsViewerDocument(tab.Id, args.Source))
+                {
+                    OnWebMessageReceived(sender, args);
+                }
+            };
             WebViewAppearanceService.ApplyPreferredColorScheme(webView.CoreWebView2, _settingsService.CurrentSettings.Theme);
             await InstallShortcutBridgeAsync(webView);
+        }
+
+        private bool IsViewerDocument(string tabId, string uri)
+        {
+            return _viewerHtmlPaths.TryGetValue(tabId, out string? path) &&
+                Uri.TryCreate(uri, UriKind.Absolute, out Uri? source) &&
+                source.IsFile && source.Query.Length == 0 &&
+                string.Equals(source.LocalPath, path, StringComparison.OrdinalIgnoreCase);
         }
 
         private void OnWebMessageReceived(WebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)

@@ -137,16 +137,6 @@ namespace TxtAIEditor.Controls
                     return FileTabLoadResult.Opened(tab);
                 }
 
-                if (ShouldUseRdocs2mdHtmlPreview(filePath))
-                {
-                    var convertedTab = await TryOpenConvertedHtmlTabAsync(filePath);
-                    if (convertedTab != null)
-                    {
-                        QueueGitRefreshIfNeeded(repoRoot);
-                        return FileTabLoadResult.Opened(convertedTab);
-                    }
-                }
-
                 if (SupportedFileTypes.IsOfficeDocumentFile(filePath))
                 {
                     var tab = _openOfficeDocumentTab(filePath);
@@ -385,42 +375,6 @@ namespace TxtAIEditor.Controls
             });
         }
 
-        /// <summary>
-        /// Converts an office document to HTML with rdocs2md and opens the result in live preview
-        /// mode. Returns null when rdocs2md produced nothing so the caller can fall back to the
-        /// existing viewer.
-        /// </summary>
-        private async Task<OpenedTab?> TryOpenConvertedHtmlTabAsync(string filePath)
-        {
-            string html;
-            try
-            {
-                html = await Rdocs2mdConverter.ConvertToHtmlAsync(filePath);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"rdocs2md HTML conversion failed for {filePath}: {ex.Message}");
-                return null;
-            }
-
-            if (string.IsNullOrWhiteSpace(html))
-            {
-                return null;
-            }
-
-            return _openNewTab(new FileTabOpenRequest
-            {
-                FilePath = filePath,
-                Content = html,
-                Language = "html",
-                EncodingName = "UTF-8",
-                EncodingWasAutoDetected = false,
-                TextModel = TextModelFactory.FromText(html),
-                IsReadOnly = true,
-                IsConvertedDocumentHtml = true
-            });
-        }
-
         private void QueueGitRefreshIfNeeded(string? repoRoot)
         {
             if (!string.IsNullOrEmpty(repoRoot))
@@ -454,12 +408,6 @@ namespace TxtAIEditor.Controls
             }
 
             return _openOfficeDocumentTab(filePath);
-        }
-
-        private static bool ShouldUseRdocs2mdHtmlPreview(string filePath)
-        {
-            return Path.GetExtension(filePath).Equals(".hwp", StringComparison.OrdinalIgnoreCase) &&
-                Rdocs2mdConverter.SupportsExtension(filePath);
         }
 
         private static bool RequiresExtractedViewer(string entryPath)
