@@ -167,7 +167,8 @@ namespace TxtAIEditor.Core.Services
             Func<Task>? onNativeToolCall = null,
             Func<string, Task>? onApiType = null,
             string? sessionId = null,
-            GeminiToolConversation? geminiConversation = null)
+            GeminiToolConversation? geminiConversation = null,
+            Func<string, Task>? onBufferedNativeToolCall = null)
         {
             return _agentService.RunAgentAsync(
                 settings,
@@ -190,7 +191,8 @@ namespace TxtAIEditor.Core.Services
                 onNativeToolCall,
                 onApiType,
                 sessionId,
-                geminiConversation);
+                geminiConversation,
+                onBufferedNativeToolCall);
         }
 
         public void ResetTokenUsageStats()

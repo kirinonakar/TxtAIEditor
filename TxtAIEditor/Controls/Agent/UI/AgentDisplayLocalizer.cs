@@ -98,15 +98,13 @@ namespace TxtAIEditor.Controls
             return string.Format(GetString(key, fallback), count);
         }
 
-        public string FormatPreparingToolLabel(int tokenCount)
-        {
-            return string.Format(
-                GetString("AgentOutputPreparingToolWithTokensFormat", "{0} ({1})"),
-                GetString("AgentOutputPreparingTool", "Preparing tool call"),
-                FormatInlineTokenCount(tokenCount));
-        }
+        public string FormatCallingToolLabel(double estimatedTokens, TimeSpan elapsed) =>
+            FormatActivityMetrics(GetString("AgentOutputCallingTool", "Calling tool"), estimatedTokens, elapsed);
 
-        public string FormatThinkingLabel(double estimatedTokens, TimeSpan elapsed)
+        public string FormatThinkingLabel(double estimatedTokens, TimeSpan elapsed) =>
+            FormatActivityMetrics(GetString("AgentActivityThinking", "생각중"), estimatedTokens, elapsed);
+
+        private string FormatActivityMetrics(string label, double estimatedTokens, TimeSpan elapsed)
         {
             int tokenCount = (int)Math.Round(estimatedTokens);
             double seconds = elapsed.TotalSeconds;
@@ -115,7 +113,7 @@ namespace TxtAIEditor.Controls
                 : "—";
             return string.Format(
                 GetString("AgentActivityThinkingMetricsFormat", "{0} ({1}, {2:0.0}s, {3} TPS)"),
-                GetString("AgentActivityThinking", "생각중"),
+                label,
                 FormatInlineTokenCount(tokenCount),
                 seconds,
                 rate);

@@ -2312,8 +2312,8 @@
   <data name="AgentActivityThinking" xml:space="preserve">
     <value>생각중</value>
   </data>
-  <data name="AgentOutputPreparingTool" xml:space="preserve">
-    <value>도구 호출 준비 중</value>
+  <data name="AgentOutputCallingTool" xml:space="preserve">
+    <value>도구 호출 중</value>
   </data>
   <data name="AgentToolCallParseFailed" xml:space="preserve">
     <value>도구 호출을 해석하지 못해 원문을 표시합니다.</value>
@@ -2622,9 +2622,6 @@
   </data>
   <data name="AgentInlineTokenCountFormat" xml:space="preserve">
     <value>{0:N0} 토큰</value>
-  </data>
-  <data name="AgentOutputPreparingToolWithTokensFormat" xml:space="preserve">
-    <value>{0} ({1})</value>
   </data>
   <data name="AgentLlmUsageWithCachedTokensFormat" xml:space="preserve">
     <value>LLM 사용량: 입력 {0} / 출력 {1} / 전체 {2} / cached {3}</value>

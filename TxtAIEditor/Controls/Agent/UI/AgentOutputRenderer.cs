@@ -745,8 +745,8 @@ namespace TxtAIEditor.Controls
                        "생각중") ||
                    StartsWithLocalizedActivityLabel(
                        message,
-                       "AgentOutputPreparingTool",
-                       "도구 호출 준비 중") ||
+                       "AgentOutputCallingTool",
+                       "도구 호출 중") ||
                    StartsWithLocalizedActivityFormat(
                        message,
                        "AgentActivityUnknownToolFormat",

@@ -215,10 +215,8 @@ namespace TxtAIEditor.Controls
             var runOutputController = new AgentRunOutputController(openSessionController);
             var responseStreamService = new AgentResponseStreamService(
                 llmService,
-                agentPane,
                 uiDispatcher,
                 runOutputController,
-                openSessionController,
                 displayText,
                 responseInspector,
                 callbacks.UpdateContextStatsImmediate,

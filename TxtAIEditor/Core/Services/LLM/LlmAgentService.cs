@@ -40,7 +40,7 @@ namespace TxtAIEditor.Core.Services.LLM
             return await _requestExecutor.ExecuteAsync(systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult, onNativeToolCall, onApiType, sessionId);
         }
 
-        public async Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, string fixedContext = "", Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null, string? sessionId = null, GeminiToolConversation? geminiConversation = null)
+        public async Task<string> RunAgentAsync(EditorSettings settings, string instruction, string workspaceContext, string selectedText, string mode, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, bool isPlanningMode = false, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, bool hasEnabledSkills = false, bool hasEnabledMcp = false, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, string fixedContext = "", Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null, string? sessionId = null, GeminiToolConversation? geminiConversation = null, Func<string, Task>? onBufferedNativeToolCall = null)
         {
             string langCode = LlmLanguageResolver.Resolve(settings);
             string targetLanguage = settings.LlmTargetLanguage ?? "Default";
@@ -60,7 +60,7 @@ namespace TxtAIEditor.Core.Services.LLM
                 string.Empty, langCode, out int transcriptStart, out int transcriptLength);
             GeminiToolRequest? geminiTools = geminiConversation == null ? null :
                 new GeminiToolRequest(geminiConversation, transcriptStart, transcriptLength);
-            return await _requestExecutor.ExecuteAsync(settings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult, onNativeToolCall, onApiType, sessionId, geminiTools);
+            return await _requestExecutor.ExecuteAsync(settings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult, onNativeToolCall, onApiType, sessionId, geminiTools, onBufferedNativeToolCall);
         }
 
     }

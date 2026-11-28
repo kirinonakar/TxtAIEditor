@@ -2312,8 +2312,8 @@ Supports live preview, code &amp; formula templates, terminal interface, Git int
   <data name="AgentActivityThinkingMetricsFormat" xml:space="preserve">
     <value>{0} ({1}, {2:0.0}s, {3} TPS)</value>
   </data>
-  <data name="AgentOutputPreparingTool" xml:space="preserve">
-    <value>Preparing tool call</value>
+  <data name="AgentOutputCallingTool" xml:space="preserve">
+    <value>Calling tool</value>
   </data>
   <data name="AgentToolCallParseFailed" xml:space="preserve">
     <value>Failed to parse tool call, displaying raw response.</value>
@@ -2622,9 +2622,6 @@ Plan: {0}</value>
   </data>
   <data name="AgentInlineTokenCountFormat" xml:space="preserve">
     <value>{0:N0} tokens</value>
-  </data>
-  <data name="AgentOutputPreparingToolWithTokensFormat" xml:space="preserve">
-    <value>{0} ({1})</value>
   </data>
   <data name="AgentLlmUsageWithCachedTokensFormat" xml:space="preserve">
     <value>LLM usage: input {0} / output {1} / total {2} / cached {3}</value>

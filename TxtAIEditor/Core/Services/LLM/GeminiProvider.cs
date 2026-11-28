@@ -606,6 +606,18 @@ namespace TxtAIEditor.Core.Services.LLM
                                                     }
                                                 }
                                             }
+
+                                            if (modelParts != null && completion.OnBufferedNativeToolCall is { } onBufferedNativeToolCall)
+                                            {
+                                                foreach (JsonElement part in parts.EnumerateArray())
+                                                {
+                                                    if (part.TryGetProperty("functionCall", out var call) &&
+                                                        call.ValueKind == JsonValueKind.Object)
+                                                    {
+                                                        await onBufferedNativeToolCall(call.GetRawText());
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }

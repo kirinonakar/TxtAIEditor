@@ -15,10 +15,8 @@ namespace TxtAIEditor.Controls
         private const long InFlightContextStatsIntervalMs = 500;
 
         private readonly ILLMService _llmService;
-        private readonly AgentPane _agentPane;
         private readonly AgentUiDispatcher _uiDispatcher;
         private readonly AgentRunOutputController _runOutputController;
-        private readonly AgentOpenSessionController _openSessionController;
         private readonly AgentDisplayLocalizer _displayText;
         private readonly AgentResponseInspector _responseInspector;
         private readonly Action<bool> _updateContextStatsImmediate;
@@ -26,20 +24,16 @@ namespace TxtAIEditor.Controls
 
         public AgentResponseStreamService(
             ILLMService llmService,
-            AgentPane agentPane,
             AgentUiDispatcher uiDispatcher,
             AgentRunOutputController runOutputController,
-            AgentOpenSessionController openSessionController,
             AgentDisplayLocalizer displayText,
             AgentResponseInspector responseInspector,
             Action<bool> updateContextStatsImmediate,
             Func<string, string, string> getString)
         {
             _llmService = llmService;
-            _agentPane = agentPane;
             _uiDispatcher = uiDispatcher;
             _runOutputController = runOutputController;
-            _openSessionController = openSessionController;
             _displayText = displayText;
             _responseInspector = responseInspector;
             _updateContextStatsImmediate = updateContextStatsImmediate;
@@ -90,12 +84,19 @@ namespace TxtAIEditor.Controls
             runContext.ActualRequestTokens = runContext.RequestTokenCalibration.Estimate(rawRequestEstimate);
             runContext.ActualRequestTokensBase = runContext.CurrentRunTranscriptTokens;
             int printedLength = 0;
-            bool toolCallPlaceholderShown = false;
             bool visibleTextFlushed = false;
             bool heldPotentialToolCallText = false;
             bool? isJsonToolCall = null;
+            bool jsonToolCallClosed = false;
             bool hasToolCall = false;
             bool nativeFunctionToolCallDetected = false;
+            ThinkingProgress? nativeToolProgress = null;
+            bool nativeToolActivityShown = false;
+            double bufferedNativeToolTokens = 0;
+            double streamedNativeToolTokens = 0;
+            double countedNativeToolTokens = 0;
+            var nativeToolDiagnostics = new StringBuilder();
+            ThinkingProgress? textToolProgress = null;
             bool suppressStreamingText = planningMode || deferAnswer;
 
             bool inThoughtBlock = false;
@@ -106,6 +107,46 @@ namespace TxtAIEditor.Controls
 
             var stepReasoningBuilder = new StringBuilder();
             long lastInFlightStatsUpdateTicks = 0;
+
+            async Task ShowNativeToolProgressAsync()
+            {
+                if (!nativeToolActivityShown)
+                {
+                    nativeToolProgress ??= new ThinkingProgress(_displayText);
+                    await _runOutputController.BeginRunThinkingActivityAsync(
+                        runContext, nativeToolProgress.FormatCallingToolLabel(), nativeToolProgress.FormatCallingToolLabel);
+                    nativeToolActivityShown = true;
+                }
+            }
+
+            void UpdateNativeToolTokens()
+            {
+                // A buffered call is emitted again as normalized tool text at the end of the stream.
+                double tokens = Math.Max(bufferedNativeToolTokens, streamedNativeToolTokens);
+                runContext.InFlightResponseTokens += tokens - countedNativeToolTokens;
+                countedNativeToolTokens = tokens;
+                nativeToolProgress ??= new ThinkingProgress(_displayText);
+                nativeToolProgress.SetTokenCount(tokens);
+            }
+
+            Task AppendVisibleTextAsync(string text)
+            {
+                visibleTextFlushed = true;
+                nativeToolActivityShown = false;
+                return _runOutputController.AppendRunOutputTextAsync(runContext, text);
+            }
+
+            Task AppendDiagnosticTextAsync(string text)
+            {
+                if (nativeToolProgress == null)
+                {
+                    return _runOutputController.AppendRunDiagnosticTextAsync(runContext, text);
+                }
+
+                // Diagnostic output finishes the live activity line. Append it after preparation.
+                nativeToolDiagnostics.Append(text);
+                return Task.CompletedTask;
+            }
 
             void UpdateInFlightReasoningTokens(string chunk)
             {
@@ -142,7 +183,7 @@ namespace TxtAIEditor.Controls
                     stepReasoningBuilder.Append(reasoningChunk);
                     runContext.StreamingReasoningText = stepReasoningBuilder.ToString();
                     UpdateInFlightReasoningTokens(reasoningChunk);
-                    await _runOutputController.AppendRunDiagnosticTextAsync(runContext, reasoningChunk);
+                    await AppendDiagnosticTextAsync(reasoningChunk);
                     await RefreshContextStatsAsync();
                 };
             }
@@ -173,7 +214,15 @@ namespace TxtAIEditor.Controls
                     return;
                 }
 
-                await _runOutputController.AppendRunActivityAsync(runContext, _displayText.FormatLlmTokenUsage(usage));
+                string message = _displayText.FormatLlmTokenUsage(usage);
+                if (nativeToolActivityShown)
+                {
+                    await _runOutputController.AppendRunNoticeAsync(runContext, message);
+                }
+                else
+                {
+                    await _runOutputController.AppendRunActivityAsync(runContext, message);
+                }
             };
 
             bool truncated = false;
@@ -193,7 +242,16 @@ namespace TxtAIEditor.Controls
                         cancellationToken.ThrowIfCancellationRequested();
                         responseBuilder.Append(chunk);
                         runContext.StreamingResponseText = responseBuilder.ToString();
-                        runContext.InFlightResponseTokens += AgentTokenEstimator.Estimate(chunk);
+                        double chunkTokens = AgentTokenEstimator.Estimate(chunk);
+                        if (nativeFunctionToolCallDetected)
+                        {
+                            streamedNativeToolTokens += chunkTokens;
+                            UpdateNativeToolTokens();
+                        }
+                        else
+                        {
+                            runContext.InFlightResponseTokens += chunkTokens;
+                        }
                         // Refresh before the filtering/tool-call branches, including their
                         // early returns. Hidden output still contributes to context length.
                         await RefreshContextStatsAsync();
@@ -254,9 +312,9 @@ namespace TxtAIEditor.Controls
                                         thoughtTextBuilder.Clear();
                                         currentPos = earliestStartIdx + matchedStartTag.Length;
 
-                                        if (visibleTextFlushed ||
+                                        if (nativeToolProgress == null && (visibleTextFlushed ||
                                             !rawStreamedText.AsSpan(0, earliestStartIdx).IsWhiteSpace() ||
-                                            runContext.InFlightReasoningTokens > 0)
+                                            runContext.InFlightReasoningTokens > 0))
                                         {
                                             inlineThinking = new ThinkingProgress(_displayText);
                                             await _runOutputController.BeginRunThinkingActivityAsync(
@@ -313,91 +371,54 @@ namespace TxtAIEditor.Controls
                             ? rawStreamedText
                             : AgentNonVerboseTextFilter.Filter(cleanStreamTextBuilder.ToString());
 
-                        if (isJsonToolCall == null)
+                        if (isJsonToolCall == null && !nativeFunctionToolCallDetected)
                         {
                             string trimmed = streamedText.TrimStart();
                             if (!string.IsNullOrEmpty(trimmed))
                             {
                                 isJsonToolCall = _responseInspector.LooksLikeStreamedToolCallEnvelopeStart(trimmed);
-                                if (isJsonToolCall.Value)
-                                {
-                                    toolCallPlaceholderShown = true;
-                                    if (!runContext.LlmSettings.LlmAgentVerbose)
-                                    {
-                                        heldPotentialToolCallText = true;
-                                        int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
-                                        string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                        await _runOutputController.BeginRunThinkingActivityAsync(runContext, label);
-                                        printedLength = streamedText.Length;
-                                    }
-                                    else
-                                    {
-                                        await _runOutputController.AppendRunDiagnosticTextAsync(runContext, streamedText);
-                                        printedLength = streamedText.Length;
-                                    }
-                                }
                             }
                         }
 
-                        if (isJsonToolCall == true)
+                        if (isJsonToolCall == true && !nativeFunctionToolCallDetected)
                         {
                             if (!runContext.LlmSettings.LlmAgentVerbose)
                             {
-                                bool toolCallClosed = streamedText.TrimEnd().EndsWith("}");
-                                int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
-                                string label;
-                                if (toolCallClosed)
+                                double tokens = AgentTokenEstimator.Estimate(streamedText);
+                                Volatile.Write(ref jsonToolCallClosed, streamedText.TrimEnd().EndsWith('}'));
+                                if (textToolProgress == null)
                                 {
-                                    label = _displayText.FormatThinkingLabel(tokenCount, requestThinking.Elapsed);
+                                    heldPotentialToolCallText = true;
+                                    var progress = new ThinkingProgress(_displayText);
+                                    textToolProgress = progress;
+                                    progress.SetTokenCount(tokens);
+                                    string LiveJsonLabel() => Volatile.Read(ref jsonToolCallClosed)
+                                        ? _displayText.FormatThinkingLabel(progress.TokenCount, requestThinking.Elapsed)
+                                        : progress.FormatCallingToolLabel();
+                                    await _runOutputController.BeginRunThinkingActivityAsync(runContext, LiveJsonLabel(), LiveJsonLabel);
                                 }
-                                else
-                                {
-                                    label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                }
-                                _runOutputController.EnqueueRunUi(
-                                    runContext,
-                                    () => _agentPane.UpdateThinkingActivity(label),
-                                    session => _openSessionController.UpdateThinkingInSession(session, label));
-                                printedLength = streamedText.Length;
+                                textToolProgress.SetTokenCount(tokens);
                             }
                             else
                             {
-                                await _runOutputController.AppendRunDiagnosticTextAsync(runContext, chunk);
-                                printedLength = streamedText.Length;
+                                await AppendDiagnosticTextAsync(streamedText.Substring(printedLength));
                             }
+                            printedLength = streamedText.Length;
                             return;
                         }
 
                         if (hasToolCall)
                         {
-                            if (!runContext.LlmSettings.LlmAgentVerbose)
+                            if (runContext.LlmSettings.LlmAgentVerbose)
+                            {
+                                await AppendDiagnosticTextAsync(chunk);
+                                printedLength = streamedText.Length;
+                            }
+                            else if (!nativeFunctionToolCallDetected && textToolProgress != null)
                             {
                                 int idx = AgentToolCallParser.FindToolCallIndex(streamedText);
-                                int lastCloseIdx = AgentToolCallParser.FindLastToolCallCloseIndex(streamedText);
-                                bool toolCallClosed = lastCloseIdx >= 0 && lastCloseIdx > idx;
-
-                                string label;
-                                if (toolCallClosed)
-                                {
-                                    int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText));
-                                    label = _displayText.FormatThinkingLabel(tokenCount, requestThinking.Elapsed);
-                                }
-                                else
-                                {
-                                    string toolCallText = idx >= 0 ? streamedText.Substring(idx) : streamedText;
-                                    int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(toolCallText));
-                                    label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                }
-
-                                _runOutputController.EnqueueRunUi(
-                                    runContext,
-                                    () => _agentPane.UpdateThinkingActivity(label),
-                                    session => _openSessionController.UpdateThinkingInSession(session, label));
-                            }
-                            else
-                            {
-                                await _runOutputController.AppendRunDiagnosticTextAsync(runContext, chunk);
-                                printedLength = streamedText.Length;
+                                string toolCallText = idx >= 0 ? streamedText.Substring(idx) : streamedText;
+                                textToolProgress.SetTokenCount(AgentTokenEstimator.Estimate(toolCallText));
                             }
                             return;
                         }
@@ -409,29 +430,30 @@ namespace TxtAIEditor.Controls
                             if (printedLength < toolCallIndex)
                             {
                                 string textToPrint = streamedText.Substring(printedLength, toolCallIndex - printedLength);
-                                if (!suppressStreamingText)
+                                if (!suppressStreamingText &&
+                                    (!nativeToolActivityShown || !string.IsNullOrWhiteSpace(textToPrint)))
                                 {
-                                    visibleTextFlushed = true;
-                                    await _runOutputController.AppendRunOutputTextAsync(runContext, textToPrint);
+                                    await AppendVisibleTextAsync(textToPrint);
                                 }
                                 printedLength = toolCallIndex;
                             }
 
-                            if (!runContext.LlmSettings.LlmAgentVerbose)
+                            if (nativeFunctionToolCallDetected)
                             {
-                                if (!toolCallPlaceholderShown)
-                                {
-                                    toolCallPlaceholderShown = true;
-                                    int tokenCount = (int)Math.Round(AgentTokenEstimator.Estimate(streamedText.Substring(toolCallIndex)));
-                                    string label = _displayText.FormatPreparingToolLabel(tokenCount);
-                                    await _runOutputController.BeginRunThinkingActivityAsync(runContext, label);
-                                }
+                                await ShowNativeToolProgressAsync();
                             }
-                            else
+
+                            if (runContext.LlmSettings.LlmAgentVerbose)
                             {
-                                string toolCallText = streamedText.Substring(toolCallIndex);
-                                await _runOutputController.AppendRunDiagnosticTextAsync(runContext, toolCallText);
+                                await AppendDiagnosticTextAsync(streamedText.Substring(toolCallIndex));
                                 printedLength = streamedText.Length;
+                            }
+                            else if (!nativeFunctionToolCallDetected && textToolProgress == null)
+                            {
+                                textToolProgress = new ThinkingProgress(_displayText);
+                                textToolProgress.SetTokenCount(AgentTokenEstimator.Estimate(streamedText.Substring(toolCallIndex)));
+                                await _runOutputController.BeginRunThinkingActivityAsync(
+                                    runContext, textToolProgress.FormatCallingToolLabel(), textToolProgress.FormatCallingToolLabel);
                             }
                         }
                         else
@@ -443,13 +465,15 @@ namespace TxtAIEditor.Controls
                                 string textToPrint = streamedText.Substring(printedLength, safeLength - printedLength);
                                 if (!suppressStreamingText)
                                 {
-                                    visibleTextFlushed = true;
-                                    await _runOutputController.AppendRunOutputTextAsync(runContext, textToPrint);
+                                    await AppendVisibleTextAsync(textToPrint);
                                 }
                                 printedLength = safeLength;
                             }
                         }
-                        await Task.CompletedTask;
+                        if (bufferedNativeToolTokens > 0)
+                        {
+                            await ShowNativeToolProgressAsync();
+                        }
                     },
                     cancellationToken,
                     imageAttachments,
@@ -471,10 +495,11 @@ namespace TxtAIEditor.Controls
                         return Task.FromResult(false);
                     },
                     fixedContext: fixedPromptContext,
-                    onNativeToolCall: () =>
+                    onNativeToolCall: async () =>
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         nativeFunctionToolCallDetected = true;
-                        return Task.CompletedTask;
+                        await ShowNativeToolProgressAsync();
                     },
                     onApiType: apiType =>
                     {
@@ -482,7 +507,24 @@ namespace TxtAIEditor.Controls
                         return Task.CompletedTask;
                     },
                     sessionId: runContext.SessionId,
-                    geminiConversation: geminiConversation);
+                    geminiConversation: geminiConversation,
+                    onBufferedNativeToolCall: async call =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        bufferedNativeToolTokens += AgentTokenEstimator.Estimate(call);
+                        UpdateNativeToolTokens();
+                        await ShowNativeToolProgressAsync();
+                        await RefreshContextStatsAsync();
+                    });
+                if (nativeFunctionToolCallDetected && streamedNativeToolTokens == 0)
+                {
+                    int toolCallIndex = AgentToolCallParser.FindToolCallIndex(response);
+                    if (toolCallIndex >= 0)
+                    {
+                        streamedNativeToolTokens = AgentTokenEstimator.Estimate(response.Substring(toolCallIndex));
+                        UpdateNativeToolTokens();
+                    }
+                }
                 await RefreshContextStatsAsync(force: true);
             }
             catch (ResponseTruncatedException)
@@ -492,6 +534,10 @@ namespace TxtAIEditor.Controls
             }
             finally
             {
+                if (nativeToolDiagnostics.Length > 0)
+                {
+                    await _runOutputController.AppendRunDiagnosticTextAsync(runContext, nativeToolDiagnostics.ToString());
+                }
                 runContext.InFlightReasoningTokens = 0;
                 runContext.InFlightResponseTokens = 0;
                 if (visionFallbackPending)
@@ -638,10 +684,13 @@ namespace TxtAIEditor.Controls
             private double _estimatedTokens;
 
             public TimeSpan Elapsed => Stopwatch.GetElapsedTime(_startedAt);
+            public double TokenCount => Volatile.Read(ref _estimatedTokens);
 
             public void SetTokenCount(double estimatedTokens) => Volatile.Write(ref _estimatedTokens, estimatedTokens);
 
-            public string FormatLabel() => displayText.FormatThinkingLabel(Volatile.Read(ref _estimatedTokens), Elapsed);
+            public string FormatLabel() => displayText.FormatThinkingLabel(TokenCount, Elapsed);
+
+            public string FormatCallingToolLabel() => displayText.FormatCallingToolLabel(TokenCount, Elapsed);
         }
     }
 

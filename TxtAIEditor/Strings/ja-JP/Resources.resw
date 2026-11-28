@@ -2312,8 +2312,8 @@
   <data name="AgentActivityThinking" xml:space="preserve">
     <value>思考中</value>
   </data>
-  <data name="AgentOutputPreparingTool" xml:space="preserve">
-    <value>ツール呼び出し準備中</value>
+  <data name="AgentOutputCallingTool" xml:space="preserve">
+    <value>ツール呼び出し中</value>
   </data>
   <data name="AgentToolCallParseFailed" xml:space="preserve">
     <value>ツールの呼び出しを解析できませんでした。原文を表示します。</value>
@@ -2622,9 +2622,6 @@
   </data>
   <data name="AgentInlineTokenCountFormat" xml:space="preserve">
     <value>{0:N0} トークン</value>
-  </data>
-  <data name="AgentOutputPreparingToolWithTokensFormat" xml:space="preserve">
-    <value>{0} ({1})</value>
   </data>
   <data name="AgentLlmUsageWithCachedTokensFormat" xml:space="preserve">
     <value>LLM使用量: 入力 {0} / 出力 {1} / 合計 {2} / cached {3}</value>

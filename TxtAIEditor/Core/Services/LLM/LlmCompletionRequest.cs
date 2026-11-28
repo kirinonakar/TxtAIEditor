@@ -19,6 +19,7 @@ namespace TxtAIEditor.Core.Services.LLM
         public Func<string, Task>? OnReasoning { get; init; }
         public Func<LlmTokenUsage, Task>? OnUsage { get; init; }
         public Func<Task>? OnNativeToolCall { get; init; }
+        internal Func<string, Task>? OnBufferedNativeToolCall { get; init; }
         public Func<string, Task>? OnApiType { get; init; }
         internal GeminiToolRequest? GeminiTools { get; init; }
 

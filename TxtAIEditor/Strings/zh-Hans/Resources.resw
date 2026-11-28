@@ -2312,8 +2312,8 @@
   <data name="AgentActivityThinking" xml:space="preserve">
     <value>思考</value>
   </data>
-  <data name="AgentOutputPreparingTool" xml:space="preserve">
-    <value>准备工具调用</value>
+  <data name="AgentOutputCallingTool" xml:space="preserve">
+    <value>正在调用工具</value>
   </data>
   <data name="AgentToolCallParseFailed" xml:space="preserve">
     <value>无法解析工具调用，显示原始响应。</value>
@@ -2622,9 +2622,6 @@
   </data>
   <data name="AgentInlineTokenCountFormat" xml:space="preserve">
     <value>{0:N0} 个 token</value>
-  </data>
-  <data name="AgentOutputPreparingToolWithTokensFormat" xml:space="preserve">
-    <value>{0} ({1})</value>
   </data>
   <data name="AgentLlmUsageWithCachedTokensFormat" xml:space="preserve">
     <value>LLM 用量：输入 {0} / 输出 {1} / 总计 {2} / cached {3}</value>

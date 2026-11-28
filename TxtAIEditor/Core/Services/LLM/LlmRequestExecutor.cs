@@ -32,7 +32,7 @@ namespace TxtAIEditor.Core.Services.LLM
             return await ExecuteAsync(_settingsService.CurrentSettings, systemPrompt, userContent, onChunk, cancellationToken, attachments, onReasoning, tools, onUsage, allowVisionFallback, onVisionFallbackResult, onNativeToolCall, onApiType, sessionId);
         }
 
-        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null, string? sessionId = null, GeminiToolRequest? geminiTools = null)
+        public async Task<string> ExecuteAsync(EditorSettings settings, string systemPrompt, string userContent, Func<string, Task>? onChunk = null, CancellationToken cancellationToken = default, IReadOnlyList<LlmMessageAttachment>? attachments = null, Func<string, Task>? onReasoning = null, IReadOnlyList<LlmTool>? tools = null, Func<LlmTokenUsage, Task>? onUsage = null, bool allowVisionFallback = false, Func<string, Task<bool>>? onVisionFallbackResult = null, Func<Task>? onNativeToolCall = null, Func<string, Task>? onApiType = null, string? sessionId = null, GeminiToolRequest? geminiTools = null, Func<string, Task>? onBufferedNativeToolCall = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string providerName = settings.LlmProvider;
@@ -147,6 +147,11 @@ namespace TxtAIEditor.Core.Services.LLM
                             emittedOutput = true;
                             if (onNativeToolCall != null) await onNativeToolCall();
                         },
+                        OnBufferedNativeToolCall = onBufferedNativeToolCall == null ? null : async call =>
+                        {
+                            emittedOutput = true;
+                            await onBufferedNativeToolCall(call);
+                        },
                         OnApiType = onApiType
                     });
                     if (observedUsage != null)
@@ -225,7 +230,8 @@ namespace TxtAIEditor.Core.Services.LLM
                         onVisionFallbackResult: null,
                         onNativeToolCall: onNativeToolCall,
                         onApiType: onApiType,
-                        sessionId: sessionId);
+                        sessionId: sessionId,
+                        onBufferedNativeToolCall: onBufferedNativeToolCall);
 
                     string fallbackContext =
                         $"[Vision fallback result: {fallbackSettings.LlmProvider} / {fallbackSettings.LlmModel}]\n" +
@@ -258,7 +264,8 @@ namespace TxtAIEditor.Core.Services.LLM
                         onNativeToolCall: onNativeToolCall,
                         onApiType: onApiType,
                         sessionId: sessionId,
-                        geminiTools: geminiTools);
+                        geminiTools: geminiTools,
+                        onBufferedNativeToolCall: onBufferedNativeToolCall);
                     if (IsLlmEmptyResponse(continuationResponse))
                     {
                         if (onChunk != null)
