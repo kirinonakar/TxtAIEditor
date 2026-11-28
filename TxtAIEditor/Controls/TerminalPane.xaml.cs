@@ -33,6 +33,7 @@ namespace TxtAIEditor.Controls
         private readonly Queue<string> _pendingOutput = new Queue<string>();
         private int _pendingOutputOffset;
         private int _pendingOutputLength;
+        private int _pendingReplayLength;
         private bool _outputReplayPending;
         private bool _outputFlushStartQueued;
         private TerminalSession? _activeTerminalSession;
@@ -647,6 +648,7 @@ namespace TxtAIEditor.Controls
             TerminalSession? session;
             string output;
             bool resetTerminal;
+            bool scrollToBottom;
             lock (_outputLock)
             {
                 session = _activeTerminalSession;
@@ -657,6 +659,7 @@ namespace TxtAIEditor.Controls
                     ClearPendingOutput();
                     _pendingOutput.Enqueue(snapshot);
                     _pendingOutputLength = snapshot.Length;
+                    _pendingReplayLength = snapshot.Length;
                 }
 
                 if (session == null || _pendingOutputLength == 0 || !_webViewReady)
@@ -687,13 +690,15 @@ namespace TxtAIEditor.Controls
                     }
                 }
                 output = batch.ToString();
+                scrollToBottom = _pendingReplayLength > 0 && output.Length >= _pendingReplayLength;
+                _pendingReplayLength = Math.Max(0, _pendingReplayLength - output.Length);
             }
 
             if (resetTerminal)
             {
                 PostTerminalSessionSettings(session);
             }
-            PostTerminalMessage(new { type = "output", sessionId = session.WindowTitle, data = output });
+            PostTerminalMessage(new { type = "output", sessionId = session.WindowTitle, data = output, scrollToBottom });
         }
 
         private void ClearPendingOutput()
@@ -701,6 +706,7 @@ namespace TxtAIEditor.Controls
             _pendingOutput.Clear();
             _pendingOutputOffset = 0;
             _pendingOutputLength = 0;
+            _pendingReplayLength = 0;
             _outputReplayPending = false;
         }
 
@@ -740,6 +746,7 @@ namespace TxtAIEditor.Controls
                 {
                     _pendingOutput.Enqueue(existingOutput);
                     _pendingOutputLength = existingOutput.Length;
+                    _pendingReplayLength = existingOutput.Length;
                     _outputFlushStartQueued = true;
                 }
             }

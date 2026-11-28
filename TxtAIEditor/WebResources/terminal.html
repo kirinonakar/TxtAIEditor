@@ -98,6 +98,7 @@
     const fitAddon = new FitAddon.FitAddon();
     const terminalElement = document.getElementById('terminal');
     let activeSessionId = null;
+    let sessionRevision = 0;
     let pendingFit = 0;
     let terminalFontSize = 13;
 
@@ -345,15 +346,27 @@
       switch (message.type) {
         case 'setSession':
           activeSessionId = message.sessionId || null;
-          term.reset();
+          sessionRevision++;
+          // Reset between queued writes so output from the previous session is cleared.
+          term.write('', () => term.reset());
           applySettings(message);
           term.focus();
           break;
-        case 'output':
-          if (!message.sessionId || message.sessionId === activeSessionId) {
-            term.write(message.data || '');
+        case 'output': {
+          if (message.sessionId && message.sessionId !== activeSessionId) {
+            break;
           }
+          const revision = sessionRevision;
+          const onWritten = message.scrollToBottom ? () => {
+            requestAnimationFrame(() => {
+              if (revision === sessionRevision) {
+                term.scrollToBottom();
+              }
+            });
+          } : undefined;
+          term.write(message.data || '', onWritten);
           break;
+        }
         case 'theme':
           applyTheme(message.theme || 'Dark');
           break;
